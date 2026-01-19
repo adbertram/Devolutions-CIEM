@@ -1,12 +1,3 @@
-# Planning documents (contain AI-generated implementation plans)
-plans/
-
-# Agent workspaces
-agent_workspaces/
-
-# Research (original CIEM project docs)
-research/
-
 # Swap
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]
