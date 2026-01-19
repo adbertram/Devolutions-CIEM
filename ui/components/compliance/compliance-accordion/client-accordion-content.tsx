@@ -190,7 +190,7 @@ export const ClientAccordionContent = ({
             items={accordionChecksItems}
             variant="light"
             defaultExpandedKeys={[""]}
-            className="dark:bg-prowler-blue-400 rounded-lg bg-gray-50"
+            className="dark:bg-devolutions-blue-400 rounded-lg bg-gray-50"
           />
         </div>
       )}

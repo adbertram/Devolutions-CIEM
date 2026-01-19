@@ -18,7 +18,7 @@ import {
   Warehouse,
 } from "lucide-react";
 
-import { ProwlerShort } from "@/components/icons";
+import { DevolutionsShort } from "@/components/icons";
 import {
   APIdocIcon,
   DocIcon,
@@ -149,28 +149,25 @@ export const getMenuList = ({ pathname }: MenuListOptions): GroupProps[] => {
           icon: SupportIcon,
           submenus: [
             {
-              href: "https://docs.prowler.com/",
+              href: "https://docs.devolutions.net/ciem/",
               target: "_blank",
               label: "Documentation",
               icon: DocIcon,
             },
             {
-              href:
-                process.env.NEXT_PUBLIC_IS_CLOUD_ENV === "true"
-                  ? "https://api.prowler.com/api/v1/docs"
-                  : `${process.env.NEXT_PUBLIC_API_DOCS_URL}`,
+              href: `${process.env.NEXT_PUBLIC_API_DOCS_URL}`,
               target: "_blank",
               label: "API reference",
               icon: APIdocIcon,
             },
             {
-              href: "https://customer.support.prowler.com/servicedesk/customer/portal/9/create/102",
+              href: "https://devolutions.net/support/",
               target: "_blank",
               label: "Customer Support",
               icon: MessageCircleQuestion,
             },
             {
-              href: "https://github.com/prowler-cloud/prowler/issues",
+              href: "https://github.com/Devolutions/ciem/issues",
               target: "_blank",
               label: "Community Support",
               icon: GithubIcon,
@@ -184,11 +181,11 @@ export const getMenuList = ({ pathname }: MenuListOptions): GroupProps[] => {
       groupLabel: "",
       menus: [
         {
-          href: "https://hub.prowler.com/",
-          label: "Prowler Hub",
-          icon: ProwlerShort,
+          href: "https://devolutions.net/ciem/",
+          label: "Devolutions CIEM",
+          icon: DevolutionsShort,
           target: "_blank",
-          tooltip: "Looking for all available checks? learn more.",
+          tooltip: "Learn more about Devolutions CIEM.",
         },
       ],
     },

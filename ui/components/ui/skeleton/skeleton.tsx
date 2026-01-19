@@ -39,7 +39,7 @@ export function Skeleton({
           : undefined,
       }}
       className={cn(
-        "dark:bg-prowler-blue-800 animate-pulse bg-gray-200",
+        "dark:bg-devolutions-blue-800 animate-pulse bg-gray-200",
         variantClasses[variant],
         !animate && "animate-none",
         className,

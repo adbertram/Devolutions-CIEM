@@ -24,16 +24,18 @@ module.exports = {
         mono: ["var(--font-geist-mono)"],
       },
       colors: {
-        prowler: {
+        devolutions: {
           theme: {
-            pale: "#f3fcff",
-            green: "#8ce112",
+            pale: "#f0f9ff",
+            blue: "#0078D4",
             purple: "#5001d0",
             orange: "#f69000",
             yellow: "#ffdf16",
           },
           blue: {
             800: "#1e293bff",
+            600: "#0078D4",
+            500: "#3b82f6",
             400: "#1A202C",
           },
           grey: {
@@ -41,9 +43,9 @@ module.exports = {
             light: "#868994",
             600: "#64748b",
           },
-          green: {
-            DEFAULT: "#9FD655",
-            medium: "#09BF3D",
+          accent: {
+            DEFAULT: "#3b82f6",
+            medium: "#0078D4",
           },
           black: {
             DEFAULT: "#000",
@@ -87,7 +89,7 @@ module.exports = {
           },
         },
         danger: "#E11D48",
-        action: "#9FD655",
+        action: "#3b82f6",
       },
       animation: {
         "fade-in": "fade-in 200ms ease-out 0s 1 normal forwards running",
@@ -174,18 +176,18 @@ module.exports = {
         dark: {
           colors: {
             primary: {
-              DEFAULT: "#6ee7b7",
-              foreground: "#000000",
+              DEFAULT: "#3b82f6",
+              foreground: "#ffffff",
             },
-            focus: "#6ee7b7",
+            focus: "#3b82f6",
             background: "#09090B",
           },
         },
         light: {
           colors: {
             primary: {
-              DEFAULT: "#6ee7b7",
-              foreground: "#000000",
+              DEFAULT: "#3b82f6",
+              foreground: "#ffffff",
             },
           },
         },

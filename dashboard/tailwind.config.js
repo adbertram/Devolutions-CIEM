@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        prowler: {
+        devolutions: {
           stone: {
             950: "#1C1917",
             900: "#292524",
@@ -25,7 +25,7 @@ module.exports = {
             passed: "#1FB53F",
             failed: "#A3231F",
           },
-        	lime: "#84CC16",
+          blue: "#3b82f6",
           white: "#FFFFFF",
           error: "#B91C1C",
         },

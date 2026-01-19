@@ -291,7 +291,7 @@ export default function AttackPathAnalysisPage() {
 
       {/* Header */}
       <div>
-        <h2 className="dark:text-prowler-theme-pale/90 text-xl font-semibold">
+        <h2 className="dark:text-devolutions-theme-pale/90 text-xl font-semibold">
           Attack Paths Analysis
         </h2>
         <p className="text-text-neutral-secondary dark:text-text-neutral-secondary mt-2 text-sm">

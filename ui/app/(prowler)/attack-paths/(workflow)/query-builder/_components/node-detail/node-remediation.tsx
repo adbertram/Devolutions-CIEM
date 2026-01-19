@@ -49,7 +49,7 @@ export const NodeRemediation = ({ findings }: NodeRemediationProps) => {
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <h5 className="dark:text-prowler-theme-pale/90 text-sm font-medium">
+              <h5 className="dark:text-devolutions-theme-pale/90 text-sm font-medium">
                 {finding.title}
               </h5>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

@@ -1,5 +1,5 @@
 {
-  "name": "prowler-next-app",
+  "name": "devolutions-ciem",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",

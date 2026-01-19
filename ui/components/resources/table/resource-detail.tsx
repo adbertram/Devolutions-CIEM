@@ -199,7 +199,7 @@ export const ResourceDetail = ({
     return (
       <div className="flex min-h-96 flex-col items-center justify-center gap-4 rounded-lg p-8">
         <Spinner size="lg" />
-        <p className="dark:text-prowler-theme-pale/80 text-sm text-gray-600">
+        <p className="dark:text-devolutions-theme-pale/80 text-sm text-gray-600">
           Loading resource details...
         </p>
       </div>
@@ -374,13 +374,13 @@ export const ResourceDetail = ({
           {findingsLoading ? (
             <div className="flex items-center justify-center gap-2 py-8">
               <Spinner size="sm" />
-              <p className="dark:text-prowler-theme-pale/80 text-sm text-gray-600">
+              <p className="dark:text-devolutions-theme-pale/80 text-sm text-gray-600">
                 Loading findings...
               </p>
             </div>
           ) : failedFindings.length > 0 ? (
             <div className="flex flex-col gap-4">
-              <p className="dark:text-prowler-theme-pale/80 text-sm text-gray-600">
+              <p className="dark:text-devolutions-theme-pale/80 text-sm text-gray-600">
                 Total failed findings: {failedFindings.length}
               </p>
               {failedFindings.map((finding: ResourceFinding, index: number) => {
@@ -391,7 +391,7 @@ export const ResourceDetail = ({
                   return (
                     <div
                       key={index}
-                      className="shadow-small dark:bg-prowler-blue-400 flex flex-col gap-2 rounded-lg px-4 py-2"
+                      className="shadow-small dark:bg-devolutions-blue-400 flex flex-col gap-2 rounded-lg px-4 py-2"
                     >
                       <p className="text-sm text-red-600">
                         Finding {id} - No attributes available
@@ -411,7 +411,7 @@ export const ResourceDetail = ({
                     className="shadow-small border-border-neutral-tertiary bg-bg-neutral-tertiary flex w-full cursor-pointer flex-col gap-2 rounded-lg px-4 py-2"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="dark:text-prowler-theme-pale/90 text-left text-sm font-medium text-gray-800">
+                      <h3 className="dark:text-devolutions-theme-pale/90 text-left text-sm font-medium text-gray-800">
                         {checktitle}
                       </h3>
                       <div className="flex items-center gap-2">
@@ -429,7 +429,7 @@ export const ResourceDetail = ({
               })}
             </div>
           ) : (
-            <p className="dark:text-prowler-theme-pale/80 text-gray-600">
+            <p className="dark:text-devolutions-theme-pale/80 text-gray-600">
               No failed findings found for this resource.
             </p>
           )}

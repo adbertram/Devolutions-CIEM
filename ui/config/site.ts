@@ -1,7 +1,7 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "Prowler",
+  name: "Devolutions CIEM",
   description:
-    "The most comprehensive, free tool for AWS security. ProwlerPro is trusted by leading organizations to make cloud security effortless.",
+    "Cloud Infrastructure Entitlement Management by Devolutions. Comprehensive cloud security and identity management.",
 };

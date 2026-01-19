@@ -7,9 +7,9 @@
 /* ===== LIGHT THEME (ROOT) ===== */
 :root {
   /* Button Colors */
-  --bg-button-primary: var(--color-emerald-300);
-  --bg-button-primary-hover: var(--color-teal-200);
-  --bg-button-primary-press: var(--color-emerald-400);
+  --bg-button-primary: var(--color-blue-500);
+  --bg-button-primary-hover: var(--color-blue-400);
+  --bg-button-primary-press: var(--color-blue-600);
   --bg-button-secondary: var(--color-slate-950);
   --bg-button-secondary-press: var(--color-slate-800);
   --bg-button-tertiary: var(--color-blue-600);
@@ -28,7 +28,7 @@
   --bg-input-primary: var(--color-white);
   --border-input-primary: var(--color-slate-400);
   --border-input-primary-press: var(--color-slate-700);
-  --border-input-primary-pressed: #A7F3D0;
+  --border-input-primary-pressed: #93C5FD;
   --border-input-primary-fill: var(--color-slate-500);
 
   /* Text Colors */
@@ -52,8 +52,8 @@
   --bg-neutral-secondary: var(--color-white);
   --bg-neutral-tertiary: #fbfdfd;
   --bg-tag-primary: var(--color-slate-50);
-  --bg-pass-primary: var(--color-emerald-400);
-  --bg-pass-secondary: var(--color-emerald-50);
+  --bg-pass-primary: var(--color-blue-500);
+  --bg-pass-secondary: var(--color-blue-50);
   --bg-warning-primary: var(--color-orange-500);
   --bg-warning-secondary: var(--color-orange-50);
   --bg-fail-primary: var(--color-rose-500);
@@ -86,11 +86,11 @@
 /* ===== DARK THEME ===== */
 .dark {
   /* Button Colors */
-  --bg-button-primary: var(--color-emerald-300);
-  --bg-button-primary-hover: var(--color-teal-200);
-  --bg-button-primary-press: var(--color-emerald-400);
+  --bg-button-primary: var(--color-blue-500);
+  --bg-button-primary-hover: var(--color-blue-400);
+  --bg-button-primary-press: var(--color-blue-600);
   --bg-button-secondary: var(--color-white);
-  --bg-button-secondary-press: var(--color-emerald-100);
+  --bg-button-secondary-press: var(--color-blue-100);
   --bg-button-tertiary: var(--color-blue-300);
   --bg-button-tertiary-hover: var(--color-blue-400);
   --bg-button-tertiary-active: var(--color-blue-600);
@@ -103,7 +103,7 @@
   --bg-input-primary: var(--color-neutral-900);
   --border-input-primary: var(--color-neutral-800);
   --border-input-primary-press: var(--color-neutral-800);
-  --border-input-primary-pressed: #A7F3D0;
+  --border-input-primary-pressed: #93C5FD;
   --border-input-primary-fill: var(--color-neutral-300);
 
   /* Text Colors */
@@ -127,8 +127,8 @@
   --bg-neutral-secondary: var(--color-stone-950);
   --bg-neutral-tertiary: #121110;
   --bg-tag-primary: var(--color-slate-950);
-  --bg-pass-primary: var(--color-green-400);
-  --bg-pass-secondary: var(--color-emerald-900);
+  --bg-pass-primary: var(--color-blue-400);
+  --bg-pass-secondary: var(--color-blue-900);
   --bg-warning-primary: var(--color-orange-400);
   --bg-warning-secondary: var(--color-orange-900);
   --bg-fail-primary: var(--color-rose-500);

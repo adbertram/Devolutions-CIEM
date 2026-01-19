@@ -1191,8 +1191,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="11.9909"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#2EE59B" />
-          <stop offset="1" stopColor="#62DFF0" />
+          <stop stopColor="#3B82F6" />
+          <stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
         <linearGradient
           id="paint1_linear_10004_99259"
@@ -1202,8 +1202,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="12.0322"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#2EE59B" />
-          <stop offset="1" stopColor="#62DFF0" />
+          <stop stopColor="#3B82F6" />
+          <stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
         <linearGradient
           id="paint2_linear_10004_99259"
@@ -1213,8 +1213,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="11.8582"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#2EE59B" />
-          <stop offset="1" stopColor="#62DFF0" />
+          <stop stopColor="#3B82F6" />
+          <stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
         <linearGradient
           id="paint3_linear_10004_99259"
@@ -1224,8 +1224,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="7.83895"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0.0673077" stopColor="#0A776E" />
-          <stop offset="0.831731" stopColor="#23C176" />
+          <stop offset="0.0673077" stopColor="#1E3A8A" />
+          <stop offset="0.831731" stopColor="#3B82F6" />
         </linearGradient>
         <linearGradient
           id="paint4_linear_10004_99259"
@@ -1235,8 +1235,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="7.83895"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0.0673077" stopColor="#0A776E" />
-          <stop offset="0.831731" stopColor="#23C176" />
+          <stop offset="0.0673077" stopColor="#1E3A8A" />
+          <stop offset="0.831731" stopColor="#3B82F6" />
         </linearGradient>
         <linearGradient
           id="paint5_linear_10004_99259"
@@ -1246,8 +1246,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="5.20013"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#2EE59B" />
-          <stop offset="1" stopColor="#62DFF0" />
+          <stop stopColor="#3B82F6" />
+          <stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
         <linearGradient
           id="paint6_linear_10004_99259"
@@ -1257,8 +1257,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="6.69814"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#2EE59B" />
-          <stop offset="1" stopColor="#62DFF0" />
+          <stop stopColor="#3B82F6" />
+          <stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
         <linearGradient
           id="paint7_linear_10004_99259"
@@ -1268,8 +1268,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="1.94451"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0.0673077" stopColor="#0A776E" />
-          <stop offset="0.831731" stopColor="#23C176" />
+          <stop offset="0.0673077" stopColor="#1E3A8A" />
+          <stop offset="0.831731" stopColor="#3B82F6" />
         </linearGradient>
         <linearGradient
           id="paint8_linear_10004_99259"
@@ -1279,8 +1279,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="1.94451"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0.0673077" stopColor="#0A776E" />
-          <stop offset="0.831731" stopColor="#23C176" />
+          <stop offset="0.0673077" stopColor="#1E3A8A" />
+          <stop offset="0.831731" stopColor="#3B82F6" />
         </linearGradient>
         <linearGradient
           id="paint9_linear_10004_99259"
@@ -1290,8 +1290,8 @@ export const LighthouseIcon: React.FC<IconSvgProps> = ({
           y2="0.707504"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#2EE59B" />
-          <stop offset="1" stopColor="#62DFF0" />
+          <stop stopColor="#3B82F6" />
+          <stop offset="1" stopColor="#60A5FA" />
         </linearGradient>
       </defs>
     </svg>

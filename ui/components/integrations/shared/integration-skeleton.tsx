@@ -21,7 +21,7 @@ export const IntegrationSkeleton = ({
 }: IntegrationSkeletonProps) => {
   if (variant === "main") {
     return (
-      <Card className="dark:bg-prowler-blue-400">
+      <Card className="dark:bg-devolutions-blue-400">
         <CardHeader className="gap-2">
           <div className="flex w-full items-center justify-between">
             <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ export const IntegrationSkeleton = ({
   return (
     <div className="grid gap-4">
       {Array.from({ length: count }).map((_, index) => (
-        <Card key={index} className="dark:bg-prowler-blue-400">
+        <Card key={index} className="dark:bg-devolutions-blue-400">
           <CardHeader className="pb-2">
             <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">

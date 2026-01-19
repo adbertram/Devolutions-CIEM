@@ -71,7 +71,7 @@ export const NodeFindings = ({ node, allNodes = [] }: NodeFindingsProps) => {
                       severity={normalizeSeverity(finding.properties.severity)}
                     />
                   )}
-                  <h5 className="dark:text-prowler-theme-pale/90 text-sm font-medium">
+                  <h5 className="dark:text-devolutions-theme-pale/90 text-sm font-medium">
                     {findingName}
                   </h5>
                 </div>

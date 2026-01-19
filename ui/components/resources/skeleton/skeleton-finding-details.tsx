@@ -2,7 +2,7 @@ import React from "react";
 
 export const SkeletonFindingDetails = () => {
   return (
-    <div className="dark:bg-prowler-blue-400 flex animate-pulse flex-col gap-6 rounded-lg p-4 shadow">
+    <div className="dark:bg-devolutions-blue-400 flex animate-pulse flex-col gap-6 rounded-lg p-4 shadow">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="bg-default-200 h-6 w-2/3 rounded" />

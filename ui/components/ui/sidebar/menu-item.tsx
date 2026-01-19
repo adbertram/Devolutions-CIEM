@@ -58,7 +58,7 @@ export const MenuItem = ({
                 <p className="max-w-[200px] truncate">
                   {label}
                   {highlight && (
-                    <span className="ml-2 rounded-sm bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="ml-2 rounded-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
                       NEW
                     </span>
                   )}

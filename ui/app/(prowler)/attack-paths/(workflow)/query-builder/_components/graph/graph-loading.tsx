@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/shadcn/skeleton/skeleton";
  */
 export const GraphLoading = () => {
   return (
-    <div className="dark:bg-prowler-blue-400 flex h-96 items-center justify-center rounded-lg bg-gray-50">
+    <div className="dark:bg-devolutions-blue-400 flex h-96 items-center justify-center rounded-lg bg-gray-50">
       <div className="flex flex-col items-center gap-3">
         <div className="flex gap-2">
           <Skeleton className="h-3 w-3 rounded-full" />

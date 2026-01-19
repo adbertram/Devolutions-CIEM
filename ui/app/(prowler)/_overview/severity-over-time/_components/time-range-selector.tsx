@@ -21,7 +21,7 @@ const BUTTON_STYLES = {
   text: "text-text-neutral-secondary hover:text-text-neutral-primary",
   active: "data-[state=active]:text-text-neutral-primary",
   underline:
-    "after:absolute after:bottom-1 after:left-1/2 after:h-px after:w-0 after:-translate-x-1/2 after:bg-emerald-400 after:transition-all data-[state=active]:after:w-8",
+    "after:absolute after:bottom-1 after:left-1/2 after:h-px after:w-0 after:-translate-x-1/2 after:bg-blue-400 after:transition-all data-[state=active]:after:w-8",
   focus:
     "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
 } as const;

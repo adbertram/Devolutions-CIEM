@@ -67,7 +67,7 @@ export const NodeRelationships = ({
     <div className="flex flex-col gap-6">
       {/* Outgoing Relationships */}
       <div>
-        <h4 className="dark:text-prowler-theme-pale/90 mb-3 text-sm font-semibold">
+        <h4 className="dark:text-devolutions-theme-pale/90 mb-3 text-sm font-semibold">
           Outgoing Relationships ({outgoingEdges.length})
         </h4>
         {outgoingEdges.length > 0 ? (
@@ -85,7 +85,7 @@ export const NodeRelationships = ({
 
       {/* Incoming Relationships */}
       <div className="border-border-neutral-tertiary dark:border-border-neutral-tertiary border-t pt-6">
-        <h4 className="dark:text-prowler-theme-pale/90 mb-3 text-sm font-semibold">
+        <h4 className="dark:text-devolutions-theme-pale/90 mb-3 text-sm font-semibold">
           Incoming Relationships ({incomingEdges.length})
         </h4>
         {incomingEdges.length > 0 ? (

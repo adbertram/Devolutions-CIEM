@@ -33,7 +33,7 @@ export const QueryParametersForm = ({
 
   return (
     <div className="flex flex-col gap-4">
-      <h3 className="dark:text-prowler-theme-pale/90 text-sm font-semibold">
+      <h3 className="dark:text-devolutions-theme-pale/90 text-sm font-semibold">
         Query Parameters
       </h3>
 

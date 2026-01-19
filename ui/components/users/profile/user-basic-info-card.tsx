@@ -2,7 +2,7 @@
 
 import { Divider } from "@heroui/divider";
 
-import { ProwlerShort } from "@/components/icons";
+import { DevolutionsShort } from "@/components/icons";
 import { Card, CardContent } from "@/components/shadcn";
 import { DateWithTime, InfoField, SnippetChip } from "@/components/ui/entities";
 import { UserDataWithRoles } from "@/types/users";
@@ -29,7 +29,7 @@ export const UserBasicInfoCard = ({
       <CardContent>
         <div className="flex items-center gap-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-full border-3 border-black p-1 dark:border-white">
-            <ProwlerShort />
+            <DevolutionsShort />
           </div>
           <div className="flex flex-col">
             <span className="text-md font-bold">{name}</span>
