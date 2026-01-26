@@ -5,6 +5,30 @@ All notable changes to the **Prowler SDK** are documented in this file.
 ## [5.17.0] (Prowler UNRELEASED)
 
 ### Added
+<<<<<<< HEAD:prowler/prowler/CHANGELOG.md
+=======
+
+- `compute_instance_suspended_without_persistent_disks` check for GCP provider [(#9747)](https://github.com/prowler-cloud/prowler/pull/9747)
+- `codebuild_project_webhook_filters_use_anchored_patterns` check for AWS provider to detect CodeBreach vulnerability [(#9840)](https://github.com/prowler-cloud/prowler/pull/9840)
+
+### Changed
+
+- Update Azure App Service service metadata to new format [(#9613)](https://github.com/prowler-cloud/prowler/pull/9613)
+- Update Azure Application Insights service metadata to new format [(#9614)](https://github.com/prowler-cloud/prowler/pull/9614)
+- Update Azure Container Registry service metadata to new format [(#9615)](https://github.com/prowler-cloud/prowler/pull/9615)
+- Update Azure Cosmos DB service metadata to new format [(#9616)](https://github.com/prowler-cloud/prowler/pull/9616)
+- Update Azure Databricks service metadata to new format [(#9617)](https://github.com/prowler-cloud/prowler/pull/9617)
+- Parallelize Azure Key Vault vaults and vaults contents retrieval to improve performance [(#9876)](https://github.com/prowler-cloud/prowler/pull/9876)
+- Update Azure IAM service metadata to new format [(#9620)](https://github.com/prowler-cloud/prowler/pull/9620)
+- Update Azure Policy service metadata to new format [(#9625)](https://github.com/prowler-cloud/prowler/pull/9625)
+
+---
+
+## [5.17.0] (Prowler v5.17.0)
+
+### Added
+
+>>>>>>> 578459243 (chore(azure): add vault parallelization in `keyvault` service (#9876)):prowler/CHANGELOG.md
 - AI Skills pack for AI coding assistants (Claude Code, OpenCode, Codex) following agentskills.io standard [(#9728)](https://github.com/prowler-cloud/prowler/pull/9728)
 - Add Prowler ThreatScore for the Alibaba Cloud provider [(#9511)](https://github.com/prowler-cloud/prowler/pull/9511)
 - `compute_instance_group_multiple_zones` check for GCP provider [(#9566)](https://github.com/prowler-cloud/prowler/pull/9566)
