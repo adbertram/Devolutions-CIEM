@@ -1,0 +1,70 @@
+function Test-StorageBlobVersioningIsEnabled {
+    <#
+    .SYNOPSIS
+        Tests if blob versioning is enabled on storage accounts.
+
+    .DESCRIPTION
+        Ensures that blob versioning is enabled on Azure Blob Storage accounts
+        to automatically retain previous versions of objects.
+
+    .PARAMETER CheckMetadata
+        Hashtable containing check metadata from AzureChecks.json.
+
+    .OUTPUTS
+        [PSCustomObject[]] Array of finding objects.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$CheckMetadata
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    foreach ($subscriptionId in $script:StorageService.Keys) {
+        $storageData = $script:StorageService[$subscriptionId]
+
+        foreach ($account in $storageData.StorageAccounts) {
+            $accountName = $account.name
+            $resourceId = $account.id
+
+            # Get blob service configuration for this account
+            $blobService = $storageData.BlobServices[$accountName]
+
+            if (-not $blobService) {
+                $status = 'FAIL'
+                $statusExtended = "Storage account '$accountName' blob service configuration could not be retrieved. Blob versioning status is unknown."
+            }
+            else {
+                # Strict mode safe property access
+                $isVersioningEnabled = if ($blobService.PSObject.Properties['properties'] -and
+                    $blobService.properties.PSObject.Properties['isVersioningEnabled']) {
+                    $blobService.properties.isVersioningEnabled
+                }
+                else {
+                    $null
+                }
+
+                if ($isVersioningEnabled -eq $true) {
+                    $status = 'PASS'
+                    $statusExtended = "Storage account '$accountName' has blob versioning enabled."
+                }
+                else {
+                    $status = 'FAIL'
+                    $statusExtended = "Storage account '$accountName' does not have blob versioning enabled. Enable versioning to protect against accidental data loss."
+                }
+            }
+
+            [PSCustomObject]@{
+                CheckId        = $CheckMetadata.id
+                Status         = $status
+                StatusExtended = $statusExtended
+                ResourceId     = $resourceId
+                ResourceName   = $accountName
+                Location       = $account.location
+                Severity       = $CheckMetadata.severity
+            }
+        }
+    }
+}

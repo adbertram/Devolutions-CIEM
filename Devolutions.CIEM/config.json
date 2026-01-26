@@ -1,0 +1,29 @@
+{
+  "azure": {
+    "authentication": {
+      "_comment": "method: CurrentContext | ServicePrincipal | ManagedIdentity | Interactive",
+      "method": "CurrentContext",
+      "servicePrincipal": {
+        "tenantId": null,
+        "clientId": null,
+        "clientSecret": null
+      }
+    },
+    "subscriptionFilter": [],
+    "endpoints": {
+      "graphApi": "https://graph.microsoft.com/v1.0",
+      "armApi": "https://management.azure.com"
+    }
+  },
+  "scan": {
+    "throttleLimit": 10,
+    "timeoutSeconds": 300,
+    "continueOnError": true
+  },
+  "output": {
+    "verboseLogging": false
+  },
+  "pam": {
+    "remediationUrl": "https://devolutions.net/pam"
+  }
+}

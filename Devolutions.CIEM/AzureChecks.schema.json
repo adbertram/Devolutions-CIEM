@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devolutions.net/ciem/schemas/azure-checks.schema.json",
+  "title": "Azure Security Checks Definition",
+  "description": "Schema for defining Azure security checks used by the Devolutions.CIEM module",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/check"
+  },
+  "minItems": 1,
+  "$defs": {
+    "check": {
+      "type": "object",
+      "required": [
+        "id",
+        "service",
+        "title",
+        "description",
+        "risk",
+        "severity",
+        "categories",
+        "remediation",
+        "relatedUrl",
+        "checkScript",
+        "dependsOn",
+        "permissions"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z]+(_[a-z0-9]+)+$",
+          "description": "Unique check identifier in snake_case format",
+          "examples": ["entra_security_defaults_enabled", "storage_secure_transfer_required_is_enabled"]
+        },
+        "service": {
+          "type": "string",
+          "enum": ["Entra", "IAM", "KeyVault", "Storage"],
+          "description": "Azure service category this check applies to"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 200,
+          "description": "Human-readable check title"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 20,
+          "description": "Detailed description of what the check verifies"
+        },
+        "risk": {
+          "type": "string",
+          "minLength": 20,
+          "description": "Description of the security risk if this check fails"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Severity level of the finding if check fails"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["encryption", "identity", "network", "logging", "compliance"]
+          },
+          "description": "Optional category tags for filtering checks"
+        },
+        "remediation": {
+          "type": "object",
+          "required": ["text", "url"],
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 5,
+              "description": "Brief remediation guidance"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL to detailed remediation guidance (typically Devolutions PAM)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Remediation guidance for failed checks"
+        },
+        "relatedUrl": {
+          "type": "string",
+          "description": "URL to Microsoft documentation or related resource (can be empty string)"
+        },
+        "checkScript": {
+          "type": "string",
+          "pattern": "^Test-[A-Z][a-zA-Z0-9]+\\.ps1$",
+          "description": "PowerShell script filename that implements the check",
+          "examples": ["Test-EntraSecurityDefaultsEnabled.ps1", "Test-StorageSecureTransferRequiredIsEnabled.ps1"]
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+(_[a-z0-9]+)+$"
+          },
+          "description": "Array of check IDs that must run before this check"
+        },
+        "permissions": {
+          "$ref": "#/$defs/permissions"
+        }
+      },
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "graph": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/graphPermission"
+          },
+          "minItems": 1,
+          "description": "Microsoft Graph API permissions (delegated scopes)"
+        },
+        "arm": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/armPermission"
+          },
+          "minItems": 1,
+          "description": "Azure Resource Manager RBAC actions"
+        },
+        "keyvaultDataPlane": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/keyvaultDataPlanePermission"
+          },
+          "minItems": 1,
+          "description": "Key Vault data plane permissions"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Required permissions to execute this check"
+    },
+    "graphPermission": {
+      "type": "string",
+      "pattern": "^[A-Z][a-zA-Z]+\\.[A-Z][a-zA-Z]+(\\.[A-Z][a-zA-Z]+)?$",
+      "description": "Microsoft Graph API permission scope",
+      "examples": ["Policy.Read.All", "User.Read.All", "RoleManagement.Read.Directory", "Directory.Read.All", "UserAuthenticationMethod.Read.All"]
+    },
+    "armPermission": {
+      "type": "string",
+      "pattern": "^Microsoft\\.[A-Za-z]+/[a-zA-Z/]+$",
+      "description": "Azure Resource Manager RBAC action",
+      "examples": [
+        "Microsoft.Storage/storageAccounts/read",
+        "Microsoft.KeyVault/vaults/read",
+        "Microsoft.Authorization/roleDefinitions/read",
+        "Microsoft.Insights/diagnosticSettings/read"
+      ]
+    },
+    "keyvaultDataPlanePermission": {
+      "type": "string",
+      "enum": ["keys/list", "keys/get", "secrets/list", "secrets/get", "certificates/list", "certificates/get"],
+      "description": "Key Vault data plane permission"
+    }
+  }
+}

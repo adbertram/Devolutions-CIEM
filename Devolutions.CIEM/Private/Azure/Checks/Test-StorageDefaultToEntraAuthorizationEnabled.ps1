@@ -1,0 +1,31 @@
+function Test-StorageDefaultToEntraAuthorizationEnabled {
+    <#
+    .SYNOPSIS
+        Tests if Microsoft Entra authorization is the default for storage accounts.
+
+    .DESCRIPTION
+        Ensures that the Azure Storage Account setting 'Default to Microsoft Entra
+        authorization in the Azure portal' is enabled.
+
+    .PARAMETER CheckMetadata
+        Hashtable containing check metadata from AzureChecks.json.
+
+    .OUTPUTS
+        [PSCustomObject[]] Array of finding objects.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject[]])]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$CheckMetadata
+    )
+
+    $params = @{
+        CheckMetadata = $CheckMetadata
+        PropertyPath  = 'properties.defaultToOAuthAuthentication'
+        ExpectedValue = $true
+        PassMessage   = "Storage account '{0}' defaults to Microsoft Entra ID authorization."
+        FailMessage   = "Storage account '{0}' does not default to Microsoft Entra ID authorization. Enable 'Default to Microsoft Entra authorization in the Azure portal' to enforce identity-based access."
+    }
+    Test-StorageAccountProperty @params
+}
