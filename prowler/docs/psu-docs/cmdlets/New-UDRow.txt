@@ -1,0 +1,93 @@
+
+NAME
+    New-UDRow
+    
+SYNOPSIS
+    Creates a new row for a grid.
+    
+    
+SYNTAX
+    New-UDRow [-Id <String>] [[-Columns] <ScriptBlock>] [-Style <Hashtable>] [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Creates a new row for a grid. This is a wrapper for New-UDGrid -Container.
+    
+
+PARAMETERS
+    -Id <String>
+        The ID of the row.
+        
+        Required?                    false
+        Position?                    named
+        Default value                ([Guid]::NewGuid())
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Columns <ScriptBlock>
+        The columns to include in the row.
+        
+        Required?                    false
+        Position?                    1
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Style <Hashtable>
+        The style of the row.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    
+OUTPUTS
+    
+    -------------------------- EXAMPLE 1 --------------------------
+    
+    PS >New-UDRow -Columns {
+    PS >     New-UDColumn -SmallSize 6 -Content {
+    PS >         "Column 1"
+    PS >     }
+    PS >     New-UDColumn -SmallSize 6 -Content {
+    PS >         "Column 2"
+    PS >     }
+    PS > }
+    
+    Basic Row|Creates a new row with two columns, each taking up half the width on small screens.
+    
+    
+    
+    
+    -------------------------- EXAMPLE 2 --------------------------
+    
+    PS >New-UDRow -Id "myRow" -Columns {
+    PS >     New-UDColumn -SmallSize 4 -Content {
+    PS >         "Column 1"
+    PS >     }
+    PS >     New-UDColumn -SmallSize 4 -Content {
+    PS >         "Column 2"
+    PS >     }
+    PS > } -Style @{ backgroundColor = "#f0f0f0" }
+    
+    Row Style| Creates a new row with two columns, each taking up one-third of the width on small screens, and applies a background color style to the row.
+    
+    
+    
+    
+    
+RELATED LINKS
+
+

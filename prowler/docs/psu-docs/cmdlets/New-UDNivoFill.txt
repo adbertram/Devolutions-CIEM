@@ -1,0 +1,62 @@
+
+NAME
+    New-UDNivoFill
+    
+SYNOPSIS
+    Specifies fill options for a nivo chart.
+    
+    
+SYNTAX
+    New-UDNivoFill -ElementId <String> -PatternId <String> [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Specifies fill options for a nivo chart.
+    
+
+PARAMETERS
+    -ElementId <String>
+        The element ID to match to this fill.
+        
+        Required?                    true
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -PatternId <String>
+        The pattern to use for the element.
+        
+        Required?                    true
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      GradientId
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    None
+        
+    
+    
+OUTPUTS
+    System.Object
+        
+    
+    
+NOTES
+    
+    
+        
+    
+    
+RELATED LINKS
+
+

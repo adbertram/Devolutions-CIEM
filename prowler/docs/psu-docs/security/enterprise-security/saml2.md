@@ -1,0 +1,464 @@
+---
+description: SAML2 authentication for PowerShell Universal.
+---
+
+# SAML2
+
+{% hint style="info" %}
+SAML2 requires a [license](https://ironmansoftware.com/pricing/powershell-universal).
+{% endhint %}
+
+PowerShell Universal can be configured to integrate with a SAML2 identity provider. This documentation provides the details for configuring PSU with such a system.
+
+## Automatically Loading Metadata
+
+PowerShell Universal provides a mechanism to load the metadata document directly from the SAML2 identity provider rather than manually providing configuration options. This will collect as much information as possible. The Entity ID will still need to be provided.
+
+The callback path will be displayed at the top of the property's modal.
+
+<figure><img src="../../.gitbook/assets/image (4) (1) (1) (1).png" alt=""><figcaption><p>Loading Metadata</p></figcaption></figure>
+
+## Manually Providing Values
+
+### Identity Provider Settings
+
+You will need to configure your identity provider for the PowerShell Universal application. You will need to setup an acceptable entity ID and map attributes. PowerShell Universal requires that the name attribute is mapped. The attribute name needs to be the following.
+
+```
+http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name
+```
+
+You should map this to the user identity you wish to be used within PowerShell Universal.
+
+Additional attributes can be mapped and will be available during [role evaluation](../../config/security/#authorization). You will find an example of configuring Shibboleth below.
+
+### Entity ID Settings
+
+{% hint style="info" %}
+[HTTPS ](../../config/hosting/#configuring-https)is required for SAML2 authentication.
+{% endhint %}
+
+There are several basic settings you can configure in the PowerShell Universal admin console. To add SAML2 support, click Security \ Authentication. In the top right corner, you can select SAML2 from the drop down.
+
+![](<../../.gitbook/assets/image (301).png>)
+
+Once the SAML2 integration has been added, you can configure the basic settings for communicating with your identity provider. You will need at least the Entity ID and Identity Provider Entity ID configured.
+
+Typically, these entity IDs are URLs configured within your identity provider.
+
+<figure><img src="../../.gitbook/assets/image (3) (1) (1) (1).png" alt=""><figcaption><p>SAML2 Properties</p></figcaption></figure>
+
+The service certificate is used for signing requests. It is not required. This can either be a path local to the PSU service or the distinguished name of a certificate installed in the Personal Computer Certificate store.
+
+### Additional Settings
+
+In addition to the settings available within the admin console, you can also set the following within the `authentication.ps1` config file.
+
+#### ServiceCertificatePassword
+
+If you are using a file path for your certificate and it requires a password, you can specify it via the `-ServiceCertificatePassword` of `Set-PSUAuthenticationMethod`. The value of this parameter is a `SecureString`. You can take advantage of the SecretManagement module to load secrets.
+
+```powershell
+Set-PSUAuthenticationMethod `
+-Type "Saml2" `
+-EntityId "http://psu.ironman.local/sp" `
+-IdentityProviderEntityId 'https://ironman.local/idp' `
+-MetadataAddress 'https://idp.ironman.local/idp/shibboleth' `
+-CallbackPath "https://localhost:5000/" `
+-ServiceCertificate cert.pfx `
+-ServiceCertificatePassword (Get-Secret -Name 'certPassword')
+```
+
+#### Configure
+
+The `-Configure` parameter is a script block that can be used to set additional settings not exposed by the `Set-PSUAuthenticationMethod`. The script block will be called when the provider is configured and will receive a single parameter that contains an object with the options for the SAML2 authentication.
+
+The object is of the type [Saml2Options](https://github.com/Sustainsys/Saml2/blob/develop/Sustainsys.Saml2.AspNetCore2/Saml2Options.cs). The sub object of SPOptions can be found [here](https://github.com/Sustainsys/Saml2/blob/20990905ecdcf15f6f76fef80506d53831f7857b/Sustainsys.Saml2/Configuration/SPOptions.cs).
+
+```powershell
+Set-PSUAuthenticationMethod `
+-Type "Saml2" `
+-EntityId "http://psu.ironman.local/sp" `
+-IdentityProviderEntityId 'https://ironman.local/idp' `
+-MetadataAddress 'https://idp.ironman.local/idp/shibboleth' `
+-Configure {
+  $options = $args[0]
+  $options.SPOptions.DiscoveryServiceUrl = 'https://idp.ironman.local/discovery'
+}
+```
+
+## Example: Entra ID <a href="#example-entra-id" id="example-entra-id"></a>
+
+Setup an Entra ID Enterprise Application within Azure. You can find a [step-by-step guide here](https://docs.powershelluniversal.com/config/security/openid-connect#configuring-azure-entra-id-azure-active-directory). You will need to retrieve the application ID and the Federation metadata document as well as the SAML-P sign-on endpoint. Within your Application Registration, click the Endpoints button.
+
+<figure><img src="../../.gitbook/assets/image (40).png" alt=""><figcaption></figcaption></figure>
+
+### Step by Step <a href="#step-by-step" id="step-by-step"></a>
+
+**Within PowerShell Universal:**
+
+1. Click Security \ Authentication.
+2. Add SAML2 authentication provider.
+3. Click the Edit Properties button.
+
+For Entity ID, you will need to put the Entra ID application ID prefixed with `spn:`
+
+For example: `spn:2cf33625-e312-4659-a7bd-66ade51a0ea2`
+
+For Identity Provider Entity ID, you will need to retrieve the entity ID from the Federation metadata document. Open the document URL in a web browser.
+
+<figure><img src="../../.gitbook/assets/image (42).png" alt=""><figcaption></figcaption></figure>
+
+For Metadata Address, insert the Federation metadata document URL.
+
+For the Return URL, insert the URL of your PowerShell Universal server with the `/Saml/Acs` path.
+
+```
+https://localhost/Saml2/Acs
+```
+
+For Single Sign-On Service URL, insert the SAML-P sign-on endpoint from Azure.
+
+<figure><img src="../../.gitbook/assets/image (5) (1) (1).png" alt=""><figcaption><p>PSU Configuration</p></figcaption></figure>
+
+Once complete, save the settings and enable the SAML provider. Click sign out and navigate to your admin console URL.
+
+```
+https://localhost/admin
+```
+
+You will be forwarded to Azure for login and redirected back to PowerShell Universal after authentication.
+
+Any errors that occur will be listed in the PowerShell Universal log. If you fail to login, you can navigate to `/login` to login with a local account.
+
+### Claim Mapping
+
+In order to provide group claims to PowerShell Universal, you will need to expose the group claims from your app registration. Click Token Configuration and then click Add groups claim.
+
+<figure><img src="../../.gitbook/assets/image (1) (1) (1) (1) (1) (1) (1) (1) (1) (1).png" alt=""><figcaption><p>Entra ID Group Claims</p></figcaption></figure>
+
+After clicking Add groups claim, you will have the option to select which groups are provided. If you select All Groups, the groups claims will be provided to PowerShell Universal
+
+If you select Groups assigned to the application, ensure that you check the Emit groups as role claims value. This setting requires a paid Entra ID plan.
+
+<figure><img src="../../.gitbook/assets/image (2) (1) (1) (1) (1) (1) (1).png" alt=""><figcaption><p>Emit groups as role claims setting</p></figcaption></figure>
+
+To assign a group to your app registration, locate your app in Enterprise Applications and click User and Groups. Next, click Add User\Group and select the groups you would like assigned to your application.
+
+Once you have the groups claim configured in Entra ID, you can then update PowerShell Universal claim mappings to the groups provided.
+
+For each role you would like to assign to an Entra ID group, specify the Claim Type and Claim Value for that role. For example, I have a group in my environment with the ID 446832da-d4ad-4972-b0a2-eda736129928. The Claim Type for this object is [http://schemas.microsoft.com/ws/2008/06/identity/claims/role](http://schemas.microsoft.com/ws/2008/06/identity/claims/role).
+
+To assign this to the administrator group, I would do the following.
+
+<figure><img src="../../.gitbook/assets/image (3) (1) (1) (1) (1).png" alt=""><figcaption><p>Claim Mapping</p></figcaption></figure>
+
+Users of this group would now be part of the Administrator role in PowerShell Universal. If you selected a different SAML group property, the value may be different (e.g. sAMAccountName).
+
+### Group Overages <a href="#group-overages" id="group-overages"></a>
+
+For organizations with many groups, you will want to limit the number of groups provided to PowerShell Universal. This can alleviate authorization issues that arise from having too many groups provide causing it to exceed limits within the application. Within the Enterprise application settings, click Single sign-on and then click the Edit button under Attributes & Claims.
+
+<figure><img src="../../.gitbook/assets/image (38).png" alt=""><figcaption></figcaption></figure>
+
+Click the groups claim to view the options. The advanced options will allow you to filter the groups that are provided to the PowerShell Universal server. You can also configure group claims through the token configuration on the Application Registration for the Enterprise Application.
+
+<figure><img src="../../.gitbook/assets/image (39).png" alt=""><figcaption></figcaption></figure>
+
+## Example: Okta
+
+This example shows how to configure Okta SAML2 authentication for use with PowerShell Universal.
+
+Within Okta, you will need to configure your application similar to the following. HTTPS is required by SAML2, and you will need to include the URL for your PSU instance in the Single Sign On URL, followed by `/Saml2/Acs`. The path is case sensitive.
+
+The Audience Restriction should be the URL of your PowerShell Universal server.
+
+![](<../../.gitbook/assets/image (132).png>)
+
+In order for your users to access PowerShell Universal, you will need to ensure they have been assigned to the Okta application.
+
+![](<../../.gitbook/assets/image (131).png>)
+
+Within the Sign On tab of your application, click the View SAML setup instructions button.
+
+![](<../../.gitbook/assets/image (382).png>)
+
+You will need to capture the two URLs and download the certificate for configuring PowerShell Universal. See the next step on how to use these URLs within the `authentication.ps1` file.
+
+### authentication.ps1
+
+The authentication.ps1 file is used for configuring PowerShell Universal.
+
+```powershell
+Set-PSUAuthenticationMethod -Type "Saml2" `
+-EntityId "https://localhost:5001" `
+-IdentityProviderEntityId "http://www.okta.com/exk5dvbyzgASPiOFp5d7" `
+-CallbackPath "https://localhost:5001" `
+-SigningKey "C:\Users\adamr\Downloads\okta.cert" `
+-SingleSignOnServiceUrl "https://dev-36706648.okta.com/app/dev-36706648_psusaml_1/exk5dvbyzgASPiOFp5d7/sso/saml"
+```
+
+| Parameter                | Description                                                                                | Type   |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ------ |
+| EntityId                 | This value should match what you put in Audience Restriction within Okta.                  | string |
+| IdentityProviderEntityId | This is the value that was presented in the View SAML setup instructions page.             | string |
+| CallbackPath             | This is the path that the user will be redirected to if no redirect path was provided      | string |
+| SigningKey               | This is the certificate file that was downloaded on the View SAML setup instructions page. | string |
+| SingleSignOnServiceUrl   | This is the sign on URL that was provided on the View SAML setup instructions page.        | string |
+
+## Example: Shibboleth
+
+This example shows how to configure Shibboleth for use with PowerShell Universal. It provides the very basic configuration and does not necessarily follow best practices.
+
+This assumes that you have installed Shibboleth Identity Provider v4 with Active Directory integration.
+
+### ldap.properties
+
+LDAP properties have been configured to authentication against the local domain using a Domain Administrator account. The LDAP URL has been configured and TLS has been disabled.
+
+Below you will find the full example of the `ldap.properties` file.
+
+```
+# LDAP authentication (and possibly attribute resolver) configuration
+# Note, this doesn't apply to the use of JAAS authentication via LDAP
+
+## Authenticator strategy, either anonSearchAuthenticator, bindSearchAuthenticator, directAuthenticator, adAuthenticator
+idp.authn.LDAP.authenticator=adAuthenticator
+
+## Connection properties ##
+idp.authn.LDAP.ldapURL=ldap://ironman.local:389
+idp.authn.LDAP.useStartTLS                     = false
+# Time in milliseconds that connects will block
+#idp.authn.LDAP.connectTimeout                  = PT3S
+# Time in milliseconds to wait for responses
+#idp.authn.LDAP.responseTimeout                 = PT3S
+# Connection strategy to use when multiple URLs are supplied, either ACTIVE_PASSIVE, ROUND_ROBIN, RANDOM
+#idp.authn.LDAP.connectionStrategy               = ACTIVE_PASSIVE
+
+## SSL configuration, either jvmTrust, certificateTrust, or keyStoreTrust
+idp.authn.LDAP.sslConfig                       = jvmTrust
+## If using certificateTrust above, set to the trusted certificate's path
+idp.authn.LDAP.trustCertificates=%{idp.home}/credentials/ldap-server.crt
+## If using keyStoreTrust above, set to the truststore path
+idp.authn.LDAP.trustStore=%{idp.home}/credentials/ldap-server.truststore
+
+## Return attributes during authentication
+idp.authn.LDAP.returnAttributes=passwordExpirationTime,loginGraceRemaining,sn,mail
+
+## DN resolution properties ##
+
+# Search DN resolution, used by anonSearchAuthenticator, bindSearchAuthenticator
+# for AD: CN=Users,DC=example,DC=org
+idp.authn.LDAP.baseDN=CN=Users,DC=ironman, DC=local
+idp.authn.LDAP.subtreeSearch                   = true
+idp.authn.LDAP.userFilter=(sAMAccountName={user})
+# bind search configuration
+# for AD: idp.authn.LDAP.bindDN=adminuser@domain.com
+idp.authn.LDAP.bindDN=administrator@ironman.local
+
+# Format DN resolution, used by directAuthenticator, adAuthenticator
+# for AD use idp.authn.LDAP.dnFormat=%s@domain.com
+idp.authn.LDAP.dnFormat=%s@ironman.local
+
+# pool passivator, either none, bind or anonymousBind
+#idp.authn.LDAP.bindPoolPassivator                  = none
+
+# LDAP attribute configuration, see attribute-resolver.xml
+# Note, this likely won't apply to the use of legacy V2 resolver configurations
+idp.attribute.resolver.LDAP.ldapURL=%{idp.authn.LDAP.ldapURL}
+idp.attribute.resolver.LDAP.connectTimeout=%{idp.authn.LDAP.connectTimeout:PT3S}
+idp.attribute.resolver.LDAP.responseTimeout=%{idp.authn.LDAP.responseTimeout:PT3S}
+idp.attribute.resolver.LDAP.connectionStrategy=%{idp.authn.LDAP.connectionStrategy:ACTIVE_PASSIVE}
+idp.attribute.resolver.LDAP.baseDN=%{idp.authn.LDAP.baseDN:undefined}
+idp.attribute.resolver.LDAP.bindDN=%{idp.authn.LDAP.bindDN:undefined}
+idp.attribute.resolver.LDAP.useStartTLS=%{idp.authn.LDAP.useStartTLS:true}
+idp.attribute.resolver.LDAP.trustCertificates=%{idp.authn.LDAP.trustCertificates:undefined}
+idp.attribute.resolver.LDAP.searchFilter=(sAMAccountName=$resolutionContext.principal)
+
+# LDAP pool configuration, used for both authn and DN resolution
+#idp.pool.LDAP.minSize                          = 3
+#idp.pool.LDAP.maxSize                          = 10
+#idp.pool.LDAP.validateOnCheckout               = false
+#idp.pool.LDAP.validatePeriodically             = true
+#idp.pool.LDAP.validatePeriod                   = PT5M
+#idp.pool.LDAP.validateDN                       =
+#idp.pool.LDAP.validateFilter                   = (objectClass=*)
+#idp.pool.LDAP.prunePeriod                      = PT5M
+#idp.pool.LDAP.idleTime                         = PT10M
+#idp.pool.LDAP.blockWaitTime                    = PT3S
+
+```
+
+### relying-party.xml
+
+The `relying-party.xml` file has been updated to enable open IdP. This means that any entity ID can communicate with the identity provider. You can also configure this to enforce specific entity IDs. The default configure has also been adjusted to use the `SAML2.AttributeQuery` bean.
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:c="http://www.springframework.org/schema/c"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd"
+                           
+       default-init-method="initialize"
+       default-destroy-method="destroy">
+
+    <!--
+    Unverified RP configuration, defaults to no support for any profiles. Add <ref> elements to the list
+    to enable specific default profile settings (as below), or create new beans inline to override defaults.
+    
+    "Unverified" typically means the IdP has no metadata, or equivalent way of assuring the identity and
+    legitimacy of a requesting system. To run an "open" IdP, you can enable profiles here.
+    -->
+    <bean id="shibboleth.UnverifiedRelyingParty" parent="RelyingParty">
+        <property name="profileConfigurations">
+            <list>
+			<bean parent="SAML2.SSO" p:encryptAssertions="false" />
+            </list>
+        </property>
+    </bean>
+
+    <!-- Default configuration, with default settings applied for all profiles. -->
+    <bean id="shibboleth.DefaultRelyingParty" parent="RelyingParty">
+        <property name="profileConfigurations">
+            <list>
+                <!-- SAML 1.1 and SAML 2.0 AttributeQuery are disabled by default. -->
+                <!--
+                <bean parent="Shibboleth.SSO" />
+                <ref bean="SAML1.AttributeQuery" />
+                <ref bean="SAML1.ArtifactResolution" />
+                -->
+                <bean parent="SAML2.SSO" />
+                <ref bean="SAML2.ECP" />
+                <ref bean="SAML2.Logout" />
+                <ref bean="SAML2.AttributeQuery" />
+                <ref bean="SAML2.ArtifactResolution" />
+                <ref bean="Liberty.SSOS" />
+            </list>
+        </property>
+    </bean>
+</beans>
+
+```
+
+### attribute-resolver.xml
+
+The `attribute-resolver.xml` file has been updated to use the LDAPDirectory Data Connector. It loads the email address, given name, SN, and display name from Active Directory. It then maps the Principal Name, which will be the username of the user logging in, to the required claim type using an attribute encoder.
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    This file is an EXAMPLE configuration file containing some example attributes
+    based on some commonly used approaches when LDAP is the principal data source.
+     
+    Not all attribute definitions or data connectors are demonstrated, but some
+    LDAP attributes common to Shibboleth deployments (and some not so common) are
+    included.
+
+    This example is in no way usable as a substitute for reading the documentation.    
+-->
+<AttributeResolver
+        xmlns="urn:mace:shibboleth:2.0:resolver"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="urn:mace:shibboleth:2.0:resolver http://shibboleth.net/schema/idp/shibboleth-attribute-resolver.xsd">
+
+    <!-- ========================================== -->
+    <!--      Attribute Definitions                 -->
+    <!-- ========================================== -->
+
+    <!-- Simple attributes are exported directly from the LDAP connector. -->
+
+    <AttributeDefinition id="uid" xsi:type="PrincipalName" />
+    <AttributeDefinition id="username" xsi:type="PrincipalName">
+         <AttributeEncoder xsi:type="SAML2String" name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name" friendlyName="displayName" encodeType="false" />
+    </AttributeDefinition>
+
+    <!-- ========================================== -->
+    <!--      Data Connectors                       -->
+    <!-- ========================================== -->
+
+    <!-- Example LDAP Connector -->
+
+    <DataConnector id="myLDAP" xsi:type="LDAPDirectory"
+        ldapURL="%{idp.attribute.resolver.LDAP.ldapURL}"
+        baseDN="%{idp.attribute.resolver.LDAP.baseDN}" 
+        principal="%{idp.attribute.resolver.LDAP.bindDN}"
+        principalCredential="%{idp.attribute.resolver.LDAP.bindDNCredential}"
+        useStartTLS="%{idp.attribute.resolver.LDAP.useStartTLS:true}"
+        connectTimeout="%{idp.attribute.resolver.LDAP.connectTimeout}"
+        responseTimeout="%{idp.attribute.resolver.LDAP.responseTimeout}"
+        connectionStrategy="%{idp.attribute.resolver.LDAP.connectionStrategy}"
+        noResultIsError="true"
+        multipleResultsIsError="true"
+        excludeResolutionPhases="c14n/attribute"
+        exportAttributes="mail displayName sn givenName">
+        <FilterTemplate>
+            <![CDATA[
+                %{idp.attribute.resolver.LDAP.searchFilter}
+            ]]>
+        </FilterTemplate>
+        <ConnectionPool
+            minPoolSize="%{idp.pool.LDAP.minSize:3}"
+            maxPoolSize="%{idp.pool.LDAP.maxSize:10}"
+            blockWaitTime="%{idp.pool.LDAP.blockWaitTime:PT3S}"
+            validatePeriodically="%{idp.pool.LDAP.validatePeriodically:true}"
+            validateTimerPeriod="%{idp.pool.LDAP.validatePeriod:PT5M}"
+            validateDN="%{idp.pool.LDAP.validateDN:}"
+            validateFilter="%{idp.pool.LDAP.validateFilter:(objectClass=*)}"
+            expirationTime="%{idp.pool.LDAP.idleTime:PT10M}"/>
+    </DataConnector>
+
+</AttributeResolver>
+
+```
+
+### attribute-filter.xml
+
+The `attribute-filter.xml` file has been updated to release several of the attributes mapped by the LDAPDirectory data connector as well as the user name that will be used as the identity within PowerShell Universal.
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+    This file is an EXAMPLE policy file.  While the policy presented in this 
+    example file is illustrative of some simple cases, it relies on the names of
+    non-existent example services and the example attributes demonstrated in the
+    default attribute-resolver.xml file.
+
+    This example does contain some usable "general purpose" policies that may be
+    useful in conjunction with specific deployment choices, but those policies may
+    not be applicable to your specific needs or constraints.    
+-->
+<AttributeFilterPolicyGroup id="ShibbolethFilterPolicy"
+        xmlns="urn:mace:shibboleth:2.0:afp"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="urn:mace:shibboleth:2.0:afp http://shibboleth.net/schema/idp/shibboleth-afp.xsd">
+
+<AttributeFilterPolicy id="example1">
+        <PolicyRequirementRule xsi:type="ANY" />
+        <AttributeRule attributeID="username">
+            <PermitValueRule xsi:type="ANY" />
+        </AttributeRule>
+        <AttributeRule attributeID="displayName">
+            <PermitValueRule xsi:type="ANY" />
+        </AttributeRule>
+        <AttributeRule attributeID="uid">
+            <PermitValueRule xsi:type="ANY" />
+        </AttributeRule>
+        <AttributeRule attributeID="mail">
+            <PermitValueRule xsi:type="ANY" />
+        </AttributeRule>
+        <AttributeRule attributeID="sn">
+            <PermitValueRule xsi:type="ANY" />
+        </AttributeRule>
+    </AttributeFilterPolicy>
+ 
+
+
+</AttributeFilterPolicyGroup>
+
+```

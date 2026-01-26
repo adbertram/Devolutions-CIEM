@@ -1,0 +1,122 @@
+
+NAME
+    New-UDColumn
+    
+SYNOPSIS
+    Creates a new column for a grid.
+    
+    
+SYNTAX
+    New-UDColumn [-Id <String>] [-SmallSize <Int32>] [-LargeSize <Int32>] [-MediumSize <Int32>] [-ExtraLargeSize <Int32>] [-ExtraSmallSize <Int32>] [[-Content] <ScriptBlock>] [-Style <Hashtable>] [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Creates a new column for a grid. This is a wrapper for New-UDGrid -Item. Sizing uses screen size breakpoints and a 12 column grid system.
+    
+
+PARAMETERS
+    -Id <String>
+        The ID of the column.
+        
+        Required?                    false
+        Position?                    named
+        Default value                ([Guid]::NewGuid())
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -SmallSize <Int32>
+        The size of the column on small screens.
+        
+        Required?                    false
+        Position?                    named
+        Default value                12
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -LargeSize <Int32>
+        The size of the column on large screens.
+        
+        Required?                    false
+        Position?                    named
+        Default value                12
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -MediumSize <Int32>
+        The size of the column on medium screens.
+        
+        Required?                    false
+        Position?                    named
+        Default value                12
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -ExtraLargeSize <Int32>
+        The size of the column on extra large screens.
+        
+        Required?                    false
+        Position?                    named
+        Default value                0
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -ExtraSmallSize <Int32>
+        The size of the column on extra small screens.
+        
+        Required?                    false
+        Position?                    named
+        Default value                0
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Content <ScriptBlock>
+        The content of the column.
+        
+        Required?                    false
+        Position?                    2
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Style <Hashtable>
+        The style of the column.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    
+OUTPUTS
+    
+    -------------------------- EXAMPLE 1 --------------------------
+    
+    PS >New-UDColumn -SmallSize 6 -Content {
+    PS >     "Column 1"
+    PS > }
+    
+    
+    
+    
+    
+    
+    
+RELATED LINKS
+
+

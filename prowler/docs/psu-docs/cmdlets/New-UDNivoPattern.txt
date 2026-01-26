@@ -1,0 +1,166 @@
+
+NAME
+    New-UDNivoPattern
+    
+SYNOPSIS
+    Creates a nivo pattern.
+    
+    
+SYNTAX
+    New-UDNivoPattern [-Background <String>] [-Color <String>] -Dots -Id <String> [-Padding <Int32>] [-Size <Int32>] [-Stagger] [<CommonParameters>]
+    
+    New-UDNivoPattern [-Background <String>] [-Color <String>] -Id <String> [-LineWidth <Int32>] -Lines [-Rotation <Int32>] [-Spacing <Int32>] [<CommonParameters>]
+    
+    New-UDNivoPattern [-Background <String>] [-Color <String>] -Id <String> [-Padding <Int32>] [-Size <Int32>] -Squares [-Stagger] [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Creates a nivo pattern.
+    
+
+PARAMETERS
+    -Background <String>
+        The background color.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Color <String>
+        The foreground color.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Dots [<SwitchParameter>]
+        Include dots.
+        
+        Required?                    true
+        Position?                    named
+        Default value                False
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Id <String>
+        The ID of this pattern.
+        
+        Required?                    true
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -LineWidth <Int32>
+        The width of the lines for this pattern.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Lines [<SwitchParameter>]
+        Use lines for this pattern.
+        
+        Required?                    true
+        Position?                    named
+        Default value                False
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Padding <Int32>
+        The padding between dots or squares.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Rotation <Int32>
+        The rotation of lines in this pattern.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Size <Int32>
+        The size of the dots or squares.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Spacing <Int32>
+        The spacing between lines in this pattern.
+        
+        Required?                    false
+        Position?                    named
+        Default value                None
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Squares [<SwitchParameter>]
+        Creates squares.
+        
+        Required?                    true
+        Position?                    named
+        Default value                False
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    -Stagger [<SwitchParameter>]
+        Stagger the dots or squares.
+        
+        Required?                    false
+        Position?                    named
+        Default value                False
+        Accept pipeline input?       False
+        Aliases                      none
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    None
+        
+    
+    
+OUTPUTS
+    System.Object
+        
+    
+    
+NOTES
+    
+    
+        
+    
+    
+RELATED LINKS
+
+
