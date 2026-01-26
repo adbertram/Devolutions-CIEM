@@ -1,0 +1,558 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devolutions.net/ciem/schemas/finding.schema.json",
+  "title": "OCSF IAM Analysis Finding",
+  "description": "Schema for findings based on OCSF v1.7.0 IAM Analysis Finding class (class_uid: 2008)",
+  "type": "object",
+  "required": [
+    "class_uid",
+    "category_uid",
+    "activity_id",
+    "severity_id",
+    "time",
+    "finding_info",
+    "cloud",
+    "metadata"
+  ],
+  "properties": {
+    "class_uid": {
+      "type": "integer",
+      "const": 2008,
+      "description": "OCSF class identifier for IAM Analysis Finding"
+    },
+    "class_name": {
+      "type": "string",
+      "const": "IAM Analysis Finding",
+      "description": "Human-readable class name"
+    },
+    "category_uid": {
+      "type": "integer",
+      "const": 2,
+      "description": "OCSF category identifier for Findings"
+    },
+    "category_name": {
+      "type": "string",
+      "const": "Findings",
+      "description": "Human-readable category name"
+    },
+    "activity_id": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3, 99],
+      "description": "Activity: 0=Unknown, 1=Create, 2=Update, 3=Close, 99=Other"
+    },
+    "activity_name": {
+      "type": "string",
+      "enum": ["Unknown", "Create", "Update", "Close", "Other"],
+      "description": "Human-readable activity name"
+    },
+    "type_uid": {
+      "type": "integer",
+      "description": "Computed as class_uid * 100 + activity_id (e.g., 200801 for Create)"
+    },
+    "type_name": {
+      "type": "string",
+      "description": "Human-readable type name (e.g., 'IAM Analysis Finding: Create')"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Finding creation time (ISO-8601)"
+    },
+    "timezone_offset": {
+      "type": "integer",
+      "minimum": -1080,
+      "maximum": 1080,
+      "description": "Minutes ahead/behind UTC"
+    },
+    "severity_id": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 99],
+      "description": "0=Unknown, 1=Informational, 2=Low, 3=Medium, 4=High, 5=Critical, 6=Fatal, 99=Other"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Unknown", "Informational", "Low", "Medium", "High", "Critical", "Fatal", "Other"],
+      "description": "Human-readable severity"
+    },
+    "confidence_id": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3, 99],
+      "description": "Rule accuracy: 0=Unknown, 1=Low, 2=Medium, 3=High, 99=Other"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["Unknown", "Low", "Medium", "High", "Other"]
+    },
+    "risk_level_id": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3, 4, 99],
+      "description": "Risk: 0=Info, 1=Low, 2=Medium, 3=High, 4=Critical, 99=Other"
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["Info", "Low", "Medium", "High", "Critical", "Other"]
+    },
+    "status_id": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 99],
+      "description": "0=Unknown, 1=New, 2=In Progress, 3=Suppressed, 4=Resolved, 5=Archived, 6=Deleted, 99=Other"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Unknown", "New", "In Progress", "Suppressed", "Resolved", "Archived", "Deleted", "Other"]
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable finding description"
+    },
+    "finding_info": {
+      "$ref": "#/$defs/findingInfo"
+    },
+    "cloud": {
+      "$ref": "#/$defs/cloud"
+    },
+    "user": {
+      "$ref": "#/$defs/user"
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/resourceDetails"
+      },
+      "description": "Resources involved in the finding"
+    },
+    "permission_analysis_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/permissionAnalysisResult"
+      },
+      "description": "Identity-centric permission analysis"
+    },
+    "remediation": {
+      "$ref": "#/$defs/remediation"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "observables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observable"
+      },
+      "description": "Observable artifacts from the finding"
+    },
+    "attacks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attack"
+      },
+      "description": "MITRE ATT&CK mappings"
+    },
+    "enrichments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/enrichment"
+      },
+      "description": "Additional enrichment data"
+    },
+    "unmapped": {
+      "type": "object",
+      "description": "Attributes not mapped to OCSF schema"
+    }
+  },
+  "$defs": {
+    "findingInfo": {
+      "type": "object",
+      "required": ["uid", "title"],
+      "properties": {
+        "uid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique finding identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Finding title"
+        },
+        "desc": {
+          "type": "string",
+          "description": "Detailed finding description"
+        },
+        "created_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "modified_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "first_seen_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_seen_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Finding type labels (e.g., ['Identity Hygiene', 'Orphaned Assignment'])"
+        },
+        "product": {
+          "$ref": "#/$defs/product"
+        },
+        "analytic": {
+          "$ref": "#/$defs/analytic"
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "required": ["name", "vendor_name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Product name",
+          "examples": ["Devolutions CIEM"]
+        },
+        "vendor_name": {
+          "type": "string",
+          "description": "Vendor name",
+          "examples": ["Devolutions"]
+        },
+        "version": {
+          "type": "string",
+          "description": "Product version"
+        },
+        "lang": {
+          "type": "string",
+          "description": "Language code",
+          "examples": ["en"]
+        }
+      }
+    },
+    "analytic": {
+      "type": "object",
+      "required": ["uid", "name"],
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Rule ID that generated this finding",
+          "examples": ["AZURE-RBAC-001"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Rule name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Rule", "ML", "Heuristic", "Behavior"],
+          "description": "Type of detection"
+        },
+        "type_id": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4, 99],
+          "description": "0=Unknown, 1=Rule, 2=ML, 3=Heuristic, 4=Behavior, 99=Other"
+        },
+        "version": {
+          "type": "string",
+          "description": "Rule version"
+        },
+        "category": {
+          "type": "string",
+          "description": "Rule category"
+        }
+      }
+    },
+    "cloud": {
+      "type": "object",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["Azure", "AWS", "GCP", "Unknown", "Other"],
+          "description": "Cloud provider name"
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "string",
+              "description": "Account/subscription ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Account/subscription name"
+            },
+            "type": {
+              "type": "string",
+              "description": "Account type (e.g., Subscription, AWSAccount)"
+            },
+            "type_id": {
+              "type": "integer"
+            }
+          }
+        },
+        "org": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "string",
+              "description": "Organization/tenant ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Organization/tenant name"
+            }
+          }
+        },
+        "region": {
+          "type": "string",
+          "description": "Cloud region"
+        },
+        "zone": {
+          "type": "string",
+          "description": "Availability zone"
+        },
+        "project_uid": {
+          "type": "string",
+          "description": "Project ID (GCP)"
+        }
+      }
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "User/principal object ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Unknown", "User", "Service", "Group", "Role", "Other"],
+          "description": "Principal type"
+        },
+        "type_id": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4, 99],
+          "description": "0=Unknown, 1=User, 2=Service, 3=Group, 4=Role, 99=Other"
+        },
+        "email_addr": {
+          "type": "string",
+          "format": "email"
+        },
+        "account": {
+          "type": "object",
+          "properties": {
+            "uid": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        },
+        "credential_uid": {
+          "type": "string",
+          "description": "Associated credential ID if applicable"
+        }
+      }
+    },
+    "resourceDetails": {
+      "type": "object",
+      "required": ["uid", "type"],
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Resource ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Resource display name"
+        },
+        "type": {
+          "type": "string",
+          "description": "Resource type (e.g., Microsoft.Authorization/roleAssignments)"
+        },
+        "cloud_partition": {
+          "type": "string",
+          "description": "Cloud partition (e.g., Azure, AWS)"
+        },
+        "region": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Resource labels/tags"
+        },
+        "data": {
+          "type": "object",
+          "description": "Resource-specific data/evidence",
+          "additionalProperties": true
+        },
+        "owner": {
+          "$ref": "#/$defs/user"
+        }
+      }
+    },
+    "permissionAnalysisResult": {
+      "type": "object",
+      "properties": {
+        "query_type": {
+          "type": "string",
+          "description": "Type of analysis performed",
+          "examples": ["EffectivePermissions", "UnusedPermissions", "OverPrivileged"]
+        },
+        "privileges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Permission/action name"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["Action", "DataAction", "NotAction", "NotDataAction"]
+              },
+              "state": {
+                "type": "string",
+                "enum": ["Granted", "Denied", "Unused"]
+              }
+            }
+          }
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uid": { "type": "string" },
+              "name": { "type": "string" },
+              "type": { "type": "string" },
+              "is_managed": { "type": "boolean" }
+            }
+          }
+        },
+        "scope": {
+          "type": "string",
+          "description": "Scope of the analysis"
+        }
+      }
+    },
+    "remediation": {
+      "type": "object",
+      "properties": {
+        "desc": {
+          "type": "string",
+          "description": "Remediation description"
+        },
+        "kb_articles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Knowledge base articles or commands"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": "Reference URLs"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["version", "product"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "OCSF schema version",
+          "examples": ["1.7.0"]
+        },
+        "product": {
+          "$ref": "#/$defs/product"
+        },
+        "profiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OCSF profiles applied",
+          "examples": [["cloud"]]
+        },
+        "uid": {
+          "type": "string",
+          "description": "Scan ID this finding belongs to"
+        },
+        "logged_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time finding was logged"
+        },
+        "original_time": {
+          "type": "string",
+          "description": "Original event time if different"
+        }
+      }
+    },
+    "observable": {
+      "type": "object",
+      "required": ["name", "type_id"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Observable field name"
+        },
+        "type_id": {
+          "type": "integer",
+          "description": "Observable type"
+        },
+        "type": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string",
+          "description": "Observable value"
+        }
+      }
+    },
+    "attack": {
+      "type": "object",
+      "properties": {
+        "tactic": {
+          "type": "object",
+          "properties": {
+            "uid": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        },
+        "technique": {
+          "type": "object",
+          "properties": {
+            "uid": {
+              "type": "string",
+              "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"
+            },
+            "name": { "type": "string" }
+          }
+        },
+        "version": {
+          "type": "string",
+          "description": "ATT&CK version"
+        }
+      }
+    },
+    "enrichment": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "value": { "type": "string" },
+        "data": { "type": "object" }
+      }
+    }
+  }
+}

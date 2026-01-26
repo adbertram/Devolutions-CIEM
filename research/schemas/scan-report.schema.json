@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devolutions.net/ciem/schemas/scan-report.schema.json",
+  "title": "CIEM Scan Report",
+  "description": "Schema for the complete scan report returned by the REST API",
+  "type": "object",
+  "required": [
+    "scan_metadata",
+    "findings",
+    "summary"
+  ],
+  "properties": {
+    "scan_metadata": {
+      "$ref": "#/$defs/scanMetadata"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "finding.schema.json"
+      },
+      "description": "Array of OCSF IAM Analysis Finding objects"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "discovery_statistics": {
+      "$ref": "#/$defs/discoveryStatistics"
+    }
+  },
+  "$defs": {
+    "scanMetadata": {
+      "type": "object",
+      "required": [
+        "scan_id",
+        "instance_id",
+        "scan_timestamp",
+        "provider",
+        "scope",
+        "status"
+      ],
+      "properties": {
+        "scan_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique scan identifier"
+        },
+        "instance_id": {
+          "type": "string",
+          "description": "PSU instance identifier for aggregation tracking"
+        },
+        "scan_timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Scan start time (ISO-8601)"
+        },
+        "scan_completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Scan completion time (ISO-8601)"
+        },
+        "scan_duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total scan duration in milliseconds"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["Azure", "AWS", "GCP"],
+          "description": "Cloud provider scanned"
+        },
+        "scope": {
+          "type": "object",
+          "required": ["id", "type"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Scope identifier (subscription ID, account ID)"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["Subscription", "ManagementGroup", "ResourceGroup", "AWSAccount", "AWSOrganization"]
+            },
+            "name": {
+              "type": "string",
+              "description": "Scope display name"
+            },
+            "tenant_id": {
+              "type": "string",
+              "description": "Azure tenant ID"
+            }
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "running", "completed", "failed", "partial"],
+          "description": "Scan status"
+        },
+        "status_detail": {
+          "type": "string",
+          "description": "Additional status information (e.g., error message if failed)"
+        },
+        "version": {
+          "type": "object",
+          "properties": {
+            "product": {
+              "type": "string",
+              "description": "Devolutions CIEM version"
+            },
+            "schema": {
+              "type": "string",
+              "description": "Schema version"
+            },
+            "ocsf": {
+              "type": "string",
+              "description": "OCSF version",
+              "examples": ["1.7.0"]
+            }
+          }
+        },
+        "rules_executed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of detection rules executed"
+        },
+        "triggered_by": {
+          "type": "string",
+          "enum": ["api", "scheduled", "manual"],
+          "description": "How the scan was initiated"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_findings"],
+      "properties": {
+        "total_findings": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of findings"
+        },
+        "by_severity": {
+          "type": "object",
+          "properties": {
+            "critical": { "type": "integer", "minimum": 0 },
+            "high": { "type": "integer", "minimum": 0 },
+            "medium": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 },
+            "informational": { "type": "integer", "minimum": 0 }
+          },
+          "description": "Finding counts by severity level"
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Finding counts by category",
+          "examples": [{
+            "Permission Issues": 12,
+            "Identity Hygiene": 25,
+            "Access Risks": 10
+          }]
+        },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Finding counts by status"
+        },
+        "by_rule": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Finding counts by rule ID"
+        },
+        "by_resource_type": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Finding counts by resource type"
+        },
+        "risk_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Overall risk score (0-100)"
+        }
+      }
+    },
+    "discoveryStatistics": {
+      "type": "object",
+      "properties": {
+        "total_items_discovered": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "by_data_source": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Item counts by data source",
+          "examples": [{
+            "roleAssignments": 150,
+            "roleDefinitions": 45,
+            "servicePrincipals": 200
+          }]
+        },
+        "discovery_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "analysis_duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phase": {
+                "type": "string",
+                "enum": ["discovery", "analysis", "reporting"]
+              },
+              "data_source": { "type": "string" },
+              "error": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          },
+          "description": "Errors encountered during scan"
+        }
+      }
+    }
+  }
+}

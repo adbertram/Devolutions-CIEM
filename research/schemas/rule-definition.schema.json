@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devolutions.net/ciem/schemas/rule-definition.schema.json",
+  "title": "CIEM Detection Rule Definition",
+  "description": "Schema for defining detection rules used in the Analysis phase",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "description",
+    "severity_id",
+    "provider",
+    "category",
+    "version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[A-Z]+-[0-9]{3}$",
+      "description": "Unique rule identifier (e.g., AZURE-RBAC-001, AWS-IAM-002)",
+      "examples": ["AZURE-RBAC-001", "AWS-IAM-001"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100,
+      "description": "Human-readable rule name",
+      "examples": ["Orphaned Role Assignment", "Wildcard Custom Role"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Detailed description of what the rule detects",
+      "examples": ["Detects role assignments that reference deleted identities (ObjectType = Unknown)"]
+    },
+    "severity_id": {
+      "type": "integer",
+      "enum": [1, 2, 3, 4, 5],
+      "description": "OCSF severity level: 1=Informational, 2=Low, 3=Medium, 4=High, 5=Critical"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["Informational", "Low", "Medium", "High", "Critical"],
+      "description": "Human-readable severity label"
+    },
+    "confidence_id": {
+      "type": "integer",
+      "enum": [1, 2, 3],
+      "default": 3,
+      "description": "Rule accuracy: 1=Low, 2=Medium, 3=High"
+    },
+    "risk_level_id": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3, 4],
+      "description": "Risk level: 0=Info, 1=Low, 2=Medium, 3=High, 4=Critical"
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["Azure", "AWS", "GCP", "All"],
+      "description": "Cloud provider this rule applies to"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["Permission Issues", "Identity Hygiene", "Access Risks"],
+      "description": "Detection category"
+    },
+    "subcategory": {
+      "type": "string",
+      "description": "Optional subcategory for finer classification",
+      "examples": ["Orphaned Assignment", "Wildcard Permission", "Stale Credential"]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of the rule",
+      "examples": ["1.0.0", "1.2.1"]
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the rule is enabled by default"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Optional tags for filtering and grouping",
+      "examples": [["RBAC", "Subscription-Level"], ["IAM", "Credential"]]
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "Reference URLs for documentation or best practices"
+    },
+    "remediation": {
+      "type": "object",
+      "description": "Remediation guidance",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable remediation steps"
+        },
+        "script": {
+          "type": "string",
+          "description": "PowerShell command or script to remediate"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "required": ["description"]
+    },
+    "detection": {
+      "type": "object",
+      "description": "Detection logic configuration",
+      "required": ["data_sources", "logic"],
+      "properties": {
+        "data_sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "roleAssignments",
+              "roleDefinitions",
+              "servicePrincipals",
+              "servicePrincipalCredentials",
+              "managedIdentities",
+              "subscriptions",
+              "iamUsers",
+              "iamRoles",
+              "iamPolicies",
+              "iamAccessKeys"
+            ]
+          },
+          "minItems": 1,
+          "description": "Discovery data sources required for this rule"
+        },
+        "logic": {
+          "type": "string",
+          "enum": ["script", "query"],
+          "description": "Type of detection logic"
+        },
+        "query": {
+          "type": "string",
+          "description": "JMESPath or similar query expression (if logic=query)"
+        },
+        "script_file": {
+          "type": "string",
+          "description": "Path to PowerShell script file (if logic=script)",
+          "examples": ["Rules/AZURE-RBAC-001.ps1"]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field", "operator", "value"],
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Field path in discovery data"
+              },
+              "operator": {
+                "type": "string",
+                "enum": ["eq", "ne", "contains", "not_contains", "gt", "lt", "gte", "lte", "matches", "exists", "not_exists"]
+              },
+              "value": {
+                "description": "Value to compare against"
+              }
+            }
+          },
+          "description": "Simple condition-based detection (alternative to script)"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "Configuration for finding output",
+      "properties": {
+        "title_template": {
+          "type": "string",
+          "description": "Template for finding title with placeholders",
+          "examples": ["Orphaned role assignment: {RoleDefinitionName} on {Scope}"]
+        },
+        "description_template": {
+          "type": "string",
+          "description": "Template for finding description"
+        },
+        "evidence_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields to include in evidence object",
+          "examples": [["ObjectType", "PrincipalId", "RoleDefinitionName", "Scope"]]
+        }
+      }
+    },
+    "mitre_attack": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tactic": {
+            "type": "string",
+            "description": "MITRE ATT&CK tactic",
+            "examples": ["Persistence", "Privilege Escalation"]
+          },
+          "technique_id": {
+            "type": "string",
+            "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$",
+            "description": "MITRE ATT&CK technique ID",
+            "examples": ["T1078", "T1078.004"]
+          },
+          "technique_name": {
+            "type": "string",
+            "examples": ["Valid Accounts", "Cloud Accounts"]
+          }
+        }
+      },
+      "description": "MITRE ATT&CK mapping"
+    }
+  },
+  "additionalProperties": false
+}

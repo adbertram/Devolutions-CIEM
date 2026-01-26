@@ -1,0 +1,483 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devolutions.net/ciem/schemas/discovery-output.schema.json",
+  "title": "CIEM Discovery Phase Output",
+  "description": "Schema for the output of the Discovery phase - raw cloud data collected for analysis",
+  "type": "object",
+  "required": [
+    "provider",
+    "scope",
+    "discovered_at",
+    "data"
+  ],
+  "properties": {
+    "provider": {
+      "type": "string",
+      "enum": ["Azure", "AWS", "GCP"],
+      "description": "Cloud provider that was scanned"
+    },
+    "scope": {
+      "type": "object",
+      "description": "Scope of the discovery scan",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Scope identifier (subscription ID, account ID, etc.)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Subscription", "ManagementGroup", "ResourceGroup", "AWSAccount", "AWSOrganization"],
+          "description": "Type of scope"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable scope name"
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Azure tenant ID (Azure only)"
+        },
+        "region": {
+          "type": "string",
+          "description": "AWS region (AWS only, if region-scoped)"
+        }
+      }
+    },
+    "discovered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when discovery started"
+    },
+    "discovery_duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Duration of discovery in milliseconds"
+    },
+    "data": {
+      "type": "object",
+      "description": "Collected discovery data by type",
+      "properties": {
+        "roleAssignments": {
+          "$ref": "#/$defs/azureRoleAssignments"
+        },
+        "roleDefinitions": {
+          "$ref": "#/$defs/azureRoleDefinitions"
+        },
+        "servicePrincipals": {
+          "$ref": "#/$defs/azureServicePrincipals"
+        },
+        "servicePrincipalCredentials": {
+          "$ref": "#/$defs/azureServicePrincipalCredentials"
+        },
+        "managedIdentities": {
+          "$ref": "#/$defs/azureManagedIdentities"
+        },
+        "subscriptions": {
+          "$ref": "#/$defs/azureSubscriptions"
+        },
+        "iamUsers": {
+          "$ref": "#/$defs/awsIamUsers"
+        },
+        "iamRoles": {
+          "$ref": "#/$defs/awsIamRoles"
+        },
+        "iamPolicies": {
+          "$ref": "#/$defs/awsIamPolicies"
+        },
+        "iamAccessKeys": {
+          "$ref": "#/$defs/awsIamAccessKeys"
+        }
+      },
+      "additionalProperties": true
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["data_source", "error"],
+        "properties": {
+          "data_source": {
+            "type": "string",
+            "description": "Data source that failed"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "description": "Errors encountered during discovery (partial failures)"
+    },
+    "statistics": {
+      "type": "object",
+      "description": "Discovery statistics",
+      "properties": {
+        "total_items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "by_data_source": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "azureRoleAssignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["Id", "RoleDefinitionId", "PrincipalId", "Scope"],
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Role assignment resource ID"
+          },
+          "RoleDefinitionId": {
+            "type": "string",
+            "description": "Role definition resource ID"
+          },
+          "RoleDefinitionName": {
+            "type": "string",
+            "description": "Role name (e.g., Owner, Contributor)"
+          },
+          "PrincipalId": {
+            "type": "string",
+            "description": "Principal (user/group/SP) object ID"
+          },
+          "PrincipalType": {
+            "type": "string",
+            "enum": ["User", "Group", "ServicePrincipal", "Unknown"],
+            "description": "Type of principal"
+          },
+          "ObjectType": {
+            "type": "string",
+            "description": "Legacy field - same as PrincipalType"
+          },
+          "DisplayName": {
+            "type": "string",
+            "description": "Principal display name"
+          },
+          "SignInName": {
+            "type": "string",
+            "description": "User principal name (UPN) if applicable"
+          },
+          "Scope": {
+            "type": "string",
+            "description": "Scope at which role is assigned"
+          },
+          "Condition": {
+            "type": "string",
+            "description": "ABAC condition if present"
+          },
+          "ConditionVersion": {
+            "type": "string"
+          },
+          "CreatedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "UpdatedOn": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "CreatedBy": {
+            "type": "string"
+          },
+          "UpdatedBy": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "azureRoleDefinitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["Id", "Name"],
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Role definition resource ID"
+          },
+          "Name": {
+            "type": "string",
+            "description": "Role name"
+          },
+          "IsCustom": {
+            "type": "boolean",
+            "description": "Whether this is a custom role"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "Actions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Allowed actions"
+          },
+          "NotActions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Denied actions"
+          },
+          "DataActions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Allowed data actions"
+          },
+          "NotDataActions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Denied data actions"
+          },
+          "AssignableScopes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Scopes where role can be assigned"
+          }
+        }
+      }
+    },
+    "azureServicePrincipals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["Id", "AppId"],
+        "properties": {
+          "Id": {
+            "type": "string",
+            "description": "Object ID"
+          },
+          "AppId": {
+            "type": "string",
+            "description": "Application (client) ID"
+          },
+          "DisplayName": {
+            "type": "string"
+          },
+          "ServicePrincipalType": {
+            "type": "string",
+            "enum": ["Application", "ManagedIdentity", "Legacy", "SocialIdp"]
+          },
+          "AccountEnabled": {
+            "type": "boolean"
+          },
+          "AppOwnerOrganizationId": {
+            "type": "string"
+          },
+          "CreatedDateTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "Tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "azureServicePrincipalCredentials": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ServicePrincipalId"],
+        "properties": {
+          "ServicePrincipalId": {
+            "type": "string"
+          },
+          "ServicePrincipalDisplayName": {
+            "type": "string"
+          },
+          "KeyCredentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "KeyId": { "type": "string" },
+                "Type": { "type": "string" },
+                "Usage": { "type": "string" },
+                "DisplayName": { "type": "string" },
+                "StartDateTime": { "type": "string", "format": "date-time" },
+                "EndDateTime": { "type": "string", "format": "date-time" }
+              }
+            },
+            "description": "Certificate credentials"
+          },
+          "PasswordCredentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "KeyId": { "type": "string" },
+                "DisplayName": { "type": "string" },
+                "StartDateTime": { "type": "string", "format": "date-time" },
+                "EndDateTime": { "type": "string", "format": "date-time" },
+                "Hint": { "type": "string" }
+              }
+            },
+            "description": "Password/secret credentials"
+          }
+        }
+      }
+    },
+    "azureManagedIdentities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Id": { "type": "string" },
+          "Name": { "type": "string" },
+          "Type": {
+            "type": "string",
+            "enum": ["SystemAssigned", "UserAssigned"]
+          },
+          "PrincipalId": { "type": "string" },
+          "TenantId": { "type": "string" },
+          "ClientId": { "type": "string" },
+          "ResourceId": {
+            "type": "string",
+            "description": "Resource the MI is attached to (for system-assigned)"
+          }
+        }
+      }
+    },
+    "azureSubscriptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["Id", "Name"],
+        "properties": {
+          "Id": { "type": "string" },
+          "Name": { "type": "string" },
+          "State": { "type": "string" },
+          "TenantId": { "type": "string" }
+        }
+      }
+    },
+    "awsIamUsers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["UserId", "UserName", "Arn"],
+        "properties": {
+          "UserId": { "type": "string" },
+          "UserName": { "type": "string" },
+          "Arn": { "type": "string" },
+          "Path": { "type": "string" },
+          "CreateDate": { "type": "string", "format": "date-time" },
+          "PasswordLastUsed": { "type": "string", "format": "date-time" },
+          "Tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Key": { "type": "string" },
+                "Value": { "type": "string" }
+              }
+            }
+          },
+          "AttachedPolicies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "PolicyArn": { "type": "string" },
+                "PolicyName": { "type": "string" }
+              }
+            }
+          },
+          "Groups": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "awsIamRoles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["RoleId", "RoleName", "Arn"],
+        "properties": {
+          "RoleId": { "type": "string" },
+          "RoleName": { "type": "string" },
+          "Arn": { "type": "string" },
+          "Path": { "type": "string" },
+          "CreateDate": { "type": "string", "format": "date-time" },
+          "AssumeRolePolicyDocument": { "type": "object" },
+          "MaxSessionDuration": { "type": "integer" },
+          "RoleLastUsed": {
+            "type": "object",
+            "properties": {
+              "LastUsedDate": { "type": "string", "format": "date-time" },
+              "Region": { "type": "string" }
+            }
+          },
+          "AttachedPolicies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "PolicyArn": { "type": "string" },
+                "PolicyName": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "awsIamPolicies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["PolicyId", "PolicyName", "Arn"],
+        "properties": {
+          "PolicyId": { "type": "string" },
+          "PolicyName": { "type": "string" },
+          "Arn": { "type": "string" },
+          "Path": { "type": "string" },
+          "DefaultVersionId": { "type": "string" },
+          "AttachmentCount": { "type": "integer" },
+          "IsAttachable": { "type": "boolean" },
+          "CreateDate": { "type": "string", "format": "date-time" },
+          "UpdateDate": { "type": "string", "format": "date-time" },
+          "PolicyDocument": {
+            "type": "object",
+            "description": "The policy document (parsed JSON)"
+          }
+        }
+      }
+    },
+    "awsIamAccessKeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["AccessKeyId", "UserName", "Status"],
+        "properties": {
+          "AccessKeyId": { "type": "string" },
+          "UserName": { "type": "string" },
+          "Status": {
+            "type": "string",
+            "enum": ["Active", "Inactive"]
+          },
+          "CreateDate": { "type": "string", "format": "date-time" },
+          "LastUsedDate": { "type": "string", "format": "date-time" },
+          "LastUsedService": { "type": "string" },
+          "LastUsedRegion": { "type": "string" }
+        }
+      }
+    }
+  }
+}
