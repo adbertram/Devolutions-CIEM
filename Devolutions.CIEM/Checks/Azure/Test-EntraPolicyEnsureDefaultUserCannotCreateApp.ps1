@@ -1,4 +1,4 @@
-function Test-EntraPolicyEnsureDefaultUserCannotCreateApps {
+function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
     <#
     .SYNOPSIS
         Tests if default users are restricted from registering applications.

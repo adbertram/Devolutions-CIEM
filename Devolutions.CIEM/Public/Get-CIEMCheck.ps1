@@ -59,19 +59,7 @@ function Get-CIEMCheck {
     $ErrorActionPreference = 'Stop'
 
     # Load checks metadata
-    $checksPath = Join-Path $PSScriptRoot '../AzureChecks.json'
-
-    if (-not (Test-Path $checksPath)) {
-        throw "Checks metadata file not found: $checksPath"
-    }
-
-    $metadata = Get-Content $checksPath -Raw | ConvertFrom-Json
-    $checks = $metadata
-
-    # Handle both array and object with checks property
-    if ($metadata.PSObject.Properties.Name -contains 'checks') {
-        $checks = $metadata.checks
-    }
+    $checks = Get-CheckMetadata
 
     # Apply filters
     if ($Service) {

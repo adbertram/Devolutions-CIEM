@@ -1,4 +1,4 @@
-function Test-EntraPolicyGuestInviteOnlyForAdminRoles {
+function Test-EntraPolicyGuestInviteOnlyForAdminRole {
     <#
     .SYNOPSIS
         Tests if guest invitations are restricted to admin roles.

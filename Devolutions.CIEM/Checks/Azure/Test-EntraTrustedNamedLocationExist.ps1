@@ -1,4 +1,4 @@
-function Test-EntraTrustedNamedLocationsExists {
+function Test-EntraTrustedNamedLocationExist {
     <#
     .SYNOPSIS
         Tests if trusted named locations with IP ranges are defined.

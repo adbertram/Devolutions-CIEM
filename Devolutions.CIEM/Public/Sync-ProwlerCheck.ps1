@@ -1,4 +1,4 @@
-function Sync-ProwlerChecks {
+function Sync-ProwlerCheck {
     <#
     .SYNOPSIS
         Syncs new Prowler checks from the upstream repository.
@@ -11,7 +11,7 @@ function Sync-ProwlerChecks {
 
         After syncing, new checks are automatically converted to PowerShell format.
 
-        Use Get-ProwlerChecks to preview available commits first.
+        Use Get-ProwlerCheck to preview available commits first.
 
     .PARAMETER Provider
         Filter to a specific provider (azure, aws, gcp).
@@ -29,15 +29,15 @@ function Sync-ProwlerChecks {
         If not specified, syncs all available commits.
 
     .EXAMPLE
-        Sync-ProwlerChecks
+        Sync-ProwlerCheck
         # Syncs all check commits for supported providers
 
     .EXAMPLE
-        Sync-ProwlerChecks -CherryPick "abc1234,def5678"
+        Sync-ProwlerCheck -CherryPick "abc1234,def5678"
         # Syncs only specific commits
 
     .EXAMPLE
-        Sync-ProwlerChecks -Service entra
+        Sync-ProwlerCheck -Service entra
         # Syncs only Entra-related check commits
 
     .NOTES
@@ -45,6 +45,7 @@ function Sync-ProwlerChecks {
         git remote add upstream https://github.com/prowler-cloud/prowler.git
     #>
     [CmdletBinding()]
+    [OutputType([PSCustomObject])]
     param(
         [Parameter()]
         [ValidateSet('azure', 'aws', 'gcp')]
@@ -62,35 +63,7 @@ function Sync-ProwlerChecks {
 
     $ErrorActionPreference = 'Stop'
 
-    #region Helper Functions
-
-    function Get-SupportedProviders {
-        $knownProviders = @('azure', 'aws', 'gcp')
-
-        $supported = @()
-        foreach ($key in ($script:Config | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)) {
-            if ($knownProviders -contains $key.ToLower()) {
-                $supported += $key.ToLower()
-            }
-        }
-
-        if ($supported.Count -eq 0) {
-            throw "No supported providers found in config.json. Expected top-level keys: azure, aws, or gcp"
-        }
-
-        $supported
-    }
-
-    function Test-GitRemote {
-        $upstreamRemote = $script:Config.prowler.upstreamRemote
-        $remotes = (git remote -v 2>&1) -join "`n"
-        if ($remotes -notmatch "$upstreamRemote.*prowler") {
-            throw @"
-Upstream remote '$upstreamRemote' not configured. Please run:
-    git remote add $upstreamRemote https://github.com/prowler-cloud/prowler.git
-"@
-        }
-    }
+    #region Nested Helper Functions
 
     function Get-CheckPathPattern {
         param(
@@ -107,7 +80,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         $patterns
     }
 
-    function Get-UpstreamCheckCommits {
+    function Get-UpstreamCheckCommit {
         param(
             [string[]]$PathPatterns,
             [string]$Since,
@@ -138,61 +111,57 @@ Upstream remote '$upstreamRemote' not configured. Please run:
 
         $logOutput = & git @gitLogArgs 2>&1
 
-        if (-not $logOutput) {
-            @()
-        }
-        else {
-
-        $commits = $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
-            $parts = $_ -split '\|', 5
-            if ($parts.Count -ge 5) {
-                [PSCustomObject]@{
-                    Hash         = $parts[0]
-                    ShortHash    = $parts[0].Substring(0, 8)
-                    Subject      = $parts[1]
-                    Author       = $parts[2]
-                    Date         = $parts[3]
-                    RelativeDate = $parts[4]
-                    Files        = @()
-                    NewChecks    = @()
-                    Provider     = ''
-                    Services     = @()
-                }
-            }
-        }
-
-        foreach ($commit in $commits) {
-            $files = git show --name-only --pretty=format: $commit.Hash -- @filePatterns 2>&1 |
-                Where-Object { $_ -and $_ -match '\.metadata\.json$|\.py$' }
-
-            $commit.Files = @($files)
-
-            $checkIds = @()
-            $providers = @()
-            $services = @()
-
-            foreach ($file in $files) {
-                if ($file -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
-                    $prov = $Matches[1]
-                    $svc = $Matches[2]
-                    $checkId = $Matches[3]
-
-                    if ($providers -notcontains $prov) { $providers += $prov }
-                    if ($services -notcontains $svc) { $services += $svc }
-                    if ($checkIds -notcontains $checkId) { $checkIds += $checkId }
+        if ($logOutput) {
+            $commits = $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
+                $parts = $_ -split '\|', 5
+                if ($parts.Count -ge 5) {
+                    [PSCustomObject]@{
+                        Hash         = $parts[0]
+                        ShortHash    = $parts[0].Substring(0, 8)
+                        Subject      = $parts[1]
+                        Author       = $parts[2]
+                        Date         = $parts[3]
+                        RelativeDate = $parts[4]
+                        Files        = @()
+                        NewChecks    = @()
+                        Provider     = ''
+                        Services     = @()
+                    }
                 }
             }
 
-            $commit.Provider = $providers -join ', '
-            $commit.Services = $services
-            $commit.NewChecks = $checkIds
-        }
+            foreach ($commit in $commits) {
+                $files = git show --name-only --pretty=format: $commit.Hash -- @filePatterns 2>&1 |
+                    Where-Object { $_ -and $_ -match '\.metadata\.json$|\.py$' }
+
+                $commit.Files = @($files)
+
+                $checkIds = @()
+                $providers = @()
+                $services = @()
+
+                foreach ($file in $files) {
+                    if ($file -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
+                        $prov = $Matches[1]
+                        $svc = $Matches[2]
+                        $checkId = $Matches[3]
+
+                        if ($providers -notcontains $prov) { $providers += $prov }
+                        if ($services -notcontains $svc) { $services += $svc }
+                        if ($checkIds -notcontains $checkId) { $checkIds += $checkId }
+                    }
+                }
+
+                $commit.Provider = $providers -join ', '
+                $commit.Services = $services
+                $commit.NewChecks = $checkIds
+            }
 
             @($commits | Where-Object { @($_.Files).Count -gt 0 })
         }
     }
 
-    function Show-CommitDetails {
+    function Show-CommitDetail {
         param(
             [array]$Commits,
             [string[]]$Providers
@@ -201,16 +170,15 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         if ($Commits.Count -eq 0) {
             Write-Verbose "No check-related commits found."
             Write-Verbose "Providers searched: $($Providers -join ', ')"
-            return
         }
-
-        Write-Verbose "Found $($Commits.Count) check-related commits"
+        else {
+            Write-Verbose "Found $($Commits.Count) check-related commits"
+        }
     }
 
     function Invoke-CheckSync {
         param(
-            [array]$Commits,
-            [string[]]$PathPatterns
+            [array]$Commits
         )
 
         $results = [PSCustomObject]@{
@@ -294,7 +262,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         $results
     }
 
-    function Get-NewCheckPaths {
+    function Get-NewCheckPath {
         param([array]$Commits)
 
         $checkPaths = @()
@@ -320,39 +288,40 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         )
 
         $relevantCommits = @($Commits | Where-Object { $SuccessHashes -contains $_.Hash })
-        $checkPaths = @(Get-NewCheckPaths -Commits $relevantCommits)
+        $checkPaths = @(Get-NewCheckPath -Commits $relevantCommits)
 
-        if ($checkPaths.Count -eq 0) {
-            Write-Verbose "No new checks to convert."
-            return
+        if ($checkPaths.Count -gt 0) {
+            Write-Verbose "Converting $($checkPaths.Count) check(s) to PowerShell..."
+
+            foreach ($checkPath in $checkPaths) {
+                $checkId = Split-Path $checkPath -Leaf
+                Write-Verbose "  Converting: $checkId"
+                try {
+                    Convert-ProwlerCheck -CheckPath $checkPath | Out-Null
+                    Write-Verbose "    Done"
+                }
+                catch {
+                    Write-Verbose "    Failed: $_"
+                }
+            }
         }
-
-        Write-Verbose "Converting $($checkPaths.Count) check(s) to PowerShell..."
-
-        foreach ($checkPath in $checkPaths) {
-            $checkId = Split-Path $checkPath -Leaf
-            Write-Verbose "  Converting: $checkId"
-            try {
-                Convert-ProwlerCheck -CheckPath $checkPath | Out-Null
-                Write-Verbose "    Done"
-            }
-            catch {
-                Write-Verbose "    Failed: $_"
-            }
+        else {
+            Write-Verbose "No new checks to convert."
         }
     }
 
-    #endregion Helper Functions
+    #endregion Nested Helper Functions
 
     #region Main Logic
 
+    # Use shared private functions
     Test-GitRemote
 
     $providersToSync = if ($Provider) {
         @($Provider)
     }
     else {
-        Get-SupportedProviders
+        Get-SupportedProvider
     }
 
     Write-Verbose "Syncing Prowler checks..."
@@ -363,7 +332,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
     }
 
     $pathPatterns = Get-CheckPathPattern -Providers $providersToSync -Service $Service
-    $commits = @(Get-UpstreamCheckCommits -PathPatterns $pathPatterns -Since $Since)
+    $commits = @(Get-UpstreamCheckCommit -PathPatterns $pathPatterns -Since $Since)
 
     if ($commits.Count -eq 0) {
         Write-Verbose "No commits to sync."
@@ -392,7 +361,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             $commitsToSync = @($commits)
         }
 
-        Show-CommitDetails -Commits $commitsToSync -Providers $providersToSync
+        Show-CommitDetail -Commits $commitsToSync -Providers $providersToSync
 
         Write-Verbose "Syncing $($commitsToSync.Count) commits..."
         $results = Invoke-CheckSync -Commits $commitsToSync

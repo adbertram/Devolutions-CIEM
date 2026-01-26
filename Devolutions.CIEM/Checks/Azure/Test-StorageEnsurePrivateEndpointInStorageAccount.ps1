@@ -1,4 +1,4 @@
-function Test-StorageEnsurePrivateEndpointsInStorageAccounts {
+function Test-StorageEnsurePrivateEndpointInStorageAccount {
     <#
     .SYNOPSIS
         Tests if Private Endpoints are used to access storage accounts.

@@ -51,6 +51,7 @@ function Invoke-CIEMScan {
         # Get only failed findings
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'ThrottleLimit', Justification = 'Reserved for future parallel implementation')]
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter()]
@@ -68,10 +69,13 @@ function Invoke-CIEMScan {
         [string[]]$Service,
 
         [Parameter()]
+        [ValidateRange(1, 100)]
         [int]$ThrottleLimit = $(if ($script:Config.scan.throttleLimit) { $script:Config.scan.throttleLimit } else { 10 })
     )
 
     $ErrorActionPreference = 'Stop'
+
+    # Note: ThrottleLimit reserved for future parallel implementation
 
     Write-Verbose "Starting CIEM scan for provider: $Provider"
 
@@ -100,12 +104,7 @@ function Invoke-CIEMScan {
     Initialize-StorageService -SubscriptionIds $authContext.SubscriptionIds
 
     # Step 3: Load check metadata
-    $checksPath = Join-Path -Path $PSScriptRoot -ChildPath '../AzureChecks.json'
-    $metadata = Get-Content $checksPath -Raw | ConvertFrom-Json
-    $checks = $metadata
-    if ($metadata.PSObject.Properties.Name -contains 'checks') {
-        $checks = $metadata.checks
-    }
+    $checks = Get-CheckMetadata
 
     # Step 4: Filter checks
     if ($CheckId) {

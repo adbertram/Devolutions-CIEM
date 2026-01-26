@@ -1,4 +1,4 @@
-function Test-EntraPolicyGuestUsersAccessRestrictions {
+function Test-EntraPolicyGuestUserAccessRestriction {
     <#
     .SYNOPSIS
         Tests if guest user access is restricted to their own directory objects.

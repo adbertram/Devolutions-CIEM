@@ -1,4 +1,4 @@
-function Test-KeyvaultPrivateEndpoints {
+function Test-KeyvaultPrivateEndpoint {
     <#
     .SYNOPSIS
         Tests that Azure Key Vaults have private endpoints configured.

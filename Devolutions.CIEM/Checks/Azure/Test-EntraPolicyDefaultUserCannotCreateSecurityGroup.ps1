@@ -1,4 +1,4 @@
-function Test-EntraPolicyDefaultUsersCannotCreateSecurityGroups {
+function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
     <#
     .SYNOPSIS
         Tests if default users are restricted from creating security groups.

@@ -29,17 +29,8 @@ function Get-CIEMProvider {
     $ErrorActionPreference = 'Stop'
 
     # Get actual check count from metadata
-    $checksPath = Join-Path $PSScriptRoot '../AzureChecks.json'
-    $checkCount = 46  # Default
-
-    if (Test-Path $checksPath) {
-        $metadata = Get-Content $checksPath -Raw | ConvertFrom-Json
-        $checks = $metadata
-        if ($metadata.PSObject.Properties.Name -contains 'checks') {
-            $checks = $metadata.checks
-        }
-        $checkCount = @($checks).Count
-    }
+    $checks = Get-CheckMetadata
+    $checkCount = @($checks).Count
 
     [PSCustomObject]@{
         Name = 'Azure'

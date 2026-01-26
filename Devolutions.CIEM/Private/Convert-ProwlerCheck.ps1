@@ -110,7 +110,7 @@ function Convert-ProwlerCheck {
         return "Test-$($pascalParts -join '')"
     }
 
-    function Get-InferredPermissions {
+    function Get-InferredPermission {
         param(
             [string]$PythonCode,
             [string]$ServiceName,
@@ -196,9 +196,7 @@ function Convert-ProwlerCheck {
     function ConvertTo-PowerShellCheck {
         param(
             [hashtable]$Metadata,
-            [string]$PythonCode,
-            [string]$FunctionName,
-            [string]$ServiceDisplayName
+            [string]$FunctionName
         )
 
         $scriptContent = @"
@@ -339,11 +337,11 @@ function $FunctionName {
     $functionName = Get-CheckFunctionName -CheckId $CheckId
 
     if (-not $Permissions) {
-        $Permissions = Get-InferredPermissions -PythonCode $pythonCode -ServiceName $serviceName -ProviderName $Provider
+        $Permissions = Get-InferredPermission -PythonCode $pythonCode -ServiceName $serviceName -ProviderName $Provider
     }
 
     if (-not $OutputDirectory) {
-        $OutputDirectory = Join-Path $script:ModuleRoot $script:Config.checksPath "$Provider/Checks"
+        $OutputDirectory = Join-Path -Path $script:ModuleRoot -ChildPath $script:Config.checksPath -AdditionalChildPath "$Provider/Checks"
     }
 
     $results = @{
@@ -354,7 +352,7 @@ function $FunctionName {
     }
 
     if (-not $MetadataOnly) {
-        $scriptContent = ConvertTo-PowerShellCheck -Metadata $metadata -PythonCode $pythonCode -FunctionName $functionName -ServiceDisplayName $serviceDisplayName
+        $scriptContent = ConvertTo-PowerShellCheck -Metadata $metadata -FunctionName $functionName
         $scriptPath = Join-Path $OutputDirectory "$functionName.ps1"
 
         if (-not (Test-Path $OutputDirectory)) {

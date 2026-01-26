@@ -1,4 +1,4 @@
-function Test-EntraUsersCannotCreateMicrosoft365Groups {
+function Test-EntraUserCannotCreateMicrosoft365Group {
     <#
     .SYNOPSIS
         Tests if users are restricted from creating Microsoft 365 groups.

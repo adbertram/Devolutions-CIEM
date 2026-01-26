@@ -1,4 +1,4 @@
-function Test-EntraPolicyRestrictsUserConsentForApps {
+function Test-EntraPolicyRestrictUserConsentForApp {
     <#
     .SYNOPSIS
         Tests if user consent for applications is properly restricted.

@@ -1,4 +1,4 @@
-function Test-StorageKeyRotation90Days {
+function Test-StorageKeyRotation90Day {
     <#
     .SYNOPSIS
         Tests if storage account access keys have been rotated within 90 days.

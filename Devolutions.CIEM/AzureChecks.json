@@ -69,7 +69,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/identity/users/groups-self-service-management",
-    "checkScript": "Test-EntraPolicyDefaultUsersCannotCreateSecurityGroups.ps1",
+    "checkScript": "Test-EntraPolicyDefaultUserCannotCreateSecurityGroup.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Directory.Read.All"]
@@ -88,7 +88,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/identity-platform/how-applications-are-added#who-has-permission-to-add-applications-to-my-azure-ad-instance",
-    "checkScript": "Test-EntraPolicyEnsureDefaultUserCannotCreateApps.ps1",
+    "checkScript": "Test-EntraPolicyEnsureDefaultUserCannotCreateApp.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -107,7 +107,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/fundamentals/users-default-permissions",
-    "checkScript": "Test-EntraPolicyEnsureDefaultUserCannotCreateTenants.ps1",
+    "checkScript": "Test-EntraPolicyEnsureDefaultUserCannotCreateTenant.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -126,7 +126,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure",
-    "checkScript": "Test-EntraPolicyGuestInviteOnlyForAdminRoles.ps1",
+    "checkScript": "Test-EntraPolicyGuestInviteOnlyForAdminRole.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -145,7 +145,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/identity/users/users-restrict-guest-permissions",
-    "checkScript": "Test-EntraPolicyGuestUsersAccessRestrictions.ps1",
+    "checkScript": "Test-EntraPolicyGuestUserAccessRestriction.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -164,7 +164,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-gb/entra/identity/enterprise-apps/configure-user-consent?pivots=portal",
-    "checkScript": "Test-EntraPolicyRestrictsUserConsentForApps.ps1",
+    "checkScript": "Test-EntraPolicyRestrictUserConsentForApp.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -183,7 +183,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-user-consent?pivots=portal#configure-user-consent-to-applications",
-    "checkScript": "Test-EntraPolicyUserConsentForVerifiedApps.ps1",
+    "checkScript": "Test-EntraPolicyUserConsentForVerifiedApp.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -240,7 +240,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/identity/conditional-access/location-condition",
-    "checkScript": "Test-EntraTrustedNamedLocationsExists.ps1",
+    "checkScript": "Test-EntraTrustedNamedLocationExist.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Policy.Read.All"]
@@ -279,7 +279,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/microsoft-365/community/all-about-groups#microsoft-365-groups",
-    "checkScript": "Test-EntraUsersCannotCreateMicrosoft365Groups.ps1",
+    "checkScript": "Test-EntraUserCannotCreateMicrosoft365Group.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["Directory.Read.All"]
@@ -298,7 +298,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources?tabs=json",
-    "checkScript": "Test-IamCustomRoleHasPermissionsToAdministerResourceLocks.ps1",
+    "checkScript": "Test-IamCustomRoleHasPermissionToAdministerResourceLock.ps1",
     "dependsOn": [],
     "permissions": {
       "arm": ["Microsoft.Authorization/roleDefinitions/read"]
@@ -434,7 +434,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://docs.microsoft.com/en-us/azure/private-link/private-endpoint-overview",
-    "checkScript": "Test-KeyvaultPrivateEndpoints.ps1",
+    "checkScript": "Test-KeyvaultPrivateEndpoint.ps1",
     "dependsOn": [],
     "permissions": {
       "arm": ["Microsoft.KeyVault/vaults/read"]
@@ -685,7 +685,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "",
-    "checkScript": "Test-StorageEnsureEncryptionWithCustomerManagedKeys.ps1",
+    "checkScript": "Test-StorageEnsureEncryptionWithCustomerManagedKey.ps1",
     "dependsOn": [],
     "permissions": {
       "arm": ["Microsoft.Storage/storageAccounts/read"]
@@ -746,7 +746,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/azure/storage/common/storage-private-endpoints",
-    "checkScript": "Test-StorageEnsurePrivateEndpointsInStorageAccounts.ps1",
+    "checkScript": "Test-StorageEnsurePrivateEndpointInStorageAccount.ps1",
     "dependsOn": [],
     "permissions": {
       "arm": ["Microsoft.Storage/storageAccounts/read"]
@@ -828,7 +828,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?tabs=azure-portal",
-    "checkScript": "Test-StorageKeyRotation90Days.ps1",
+    "checkScript": "Test-StorageKeyRotation90Day.ps1",
     "dependsOn": [],
     "permissions": {
       "arm": ["Microsoft.Storage/storageAccounts/read"]

@@ -1,4 +1,4 @@
-function Test-IamCustomRoleHasPermissionsToAdministerResourceLocks {
+function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
     <#
     .SYNOPSIS
         Tests if a custom role has permissions to administer resource locks.

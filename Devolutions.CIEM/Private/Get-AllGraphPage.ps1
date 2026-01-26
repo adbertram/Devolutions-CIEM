@@ -1,4 +1,4 @@
-function Get-AllGraphPages {
+function Get-AllGraphPage {
     <#
     .SYNOPSIS
         Retrieves all pages of results from a Microsoft Graph API endpoint.
@@ -15,12 +15,12 @@ function Get-AllGraphPages {
         A friendly name for the resource being loaded, used in warning messages.
 
     .EXAMPLE
-        Get-AllGraphPages -Uri 'https://graph.microsoft.com/v1.0/users' -ResourceName 'Users'
+        Get-AllGraphPage -Uri 'https://graph.microsoft.com/v1.0/users' -ResourceName 'Users'
         Retrieves all users from Microsoft Graph, handling pagination automatically.
 
     .EXAMPLE
         $usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName"
-        $users = @(Get-AllGraphPages -Uri $usersUri -ResourceName "Users")
+        $users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
     #>
     [CmdletBinding()]
     param(

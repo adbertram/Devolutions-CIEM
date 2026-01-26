@@ -1,4 +1,4 @@
-function Test-EntraPolicyUserConsentForVerifiedApps {
+function Test-EntraPolicyUserConsentForVerifiedApp {
     <#
     .SYNOPSIS
         Tests if user consent is limited to verified publisher applications.

@@ -1,4 +1,4 @@
-function Test-EntraPolicyEnsureDefaultUserCannotCreateTenants {
+function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
     <#
     .SYNOPSIS
         Tests if non-admin users are restricted from creating new tenants.

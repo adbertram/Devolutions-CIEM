@@ -1,4 +1,4 @@
-function Test-StorageEnsureEncryptionWithCustomerManagedKeys {
+function Test-StorageEnsureEncryptionWithCustomerManagedKey {
     <#
     .SYNOPSIS
         Tests if storage accounts use Customer Managed Keys for encryption.

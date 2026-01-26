@@ -37,6 +37,7 @@ function New-CIEMFinding {
         New-CIEMFinding @params
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Creates in-memory object, no system state change')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]

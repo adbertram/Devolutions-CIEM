@@ -45,11 +45,11 @@ function Initialize-EntraService {
     # Load paginated resources
     Write-Verbose "Loading users..."
     $usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType"
-    $script:EntraService.Users = @(Get-AllGraphPages -Uri $usersUri -ResourceName "Users")
+    $script:EntraService.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
 
     Write-Verbose "Loading user MFA status..."
     $mfaUri = "$graphApiBase/reports/authenticationMethods/userRegistrationDetails"
-    $script:EntraService.UserMFAStatus = @(Get-AllGraphPages -Uri $mfaUri -ResourceName "UserMFAStatus")
+    $script:EntraService.UserMFAStatus = @(Get-AllGraphPage -Uri $mfaUri -ResourceName "UserMFAStatus")
 
     # Define non-paginated API endpoints to load - data-driven pattern
     $apiEndpoints = @{

@@ -64,7 +64,7 @@ function Get-AzureAuthenticationContext {
     $context = Get-AzContext -ErrorAction SilentlyContinue
 
     if (-not $context) {
-        return [PSCustomObject]@{
+        [PSCustomObject]@{
             Provider           = 'Azure'
             ConfiguredMethod   = $configuredMethod
             IsAuthenticated    = $false
@@ -77,52 +77,53 @@ function Get-AzureAuthenticationContext {
             Subscriptions      = @()
         }
     }
+    else {
+        # Determine account type
+        $accountType = switch ($context.Account.Type) {
+            'User' { 'User' }
+            'ServicePrincipal' { 'ServicePrincipal' }
+            'ManagedService' { 'ManagedIdentity' }
+            default { $context.Account.Type }
+        }
 
-    # Determine account type
-    $accountType = switch ($context.Account.Type) {
-        'User' { 'User' }
-        'ServicePrincipal' { 'ServicePrincipal' }
-        'ManagedService' { 'ManagedIdentity' }
-        default { $context.Account.Type }
-    }
+        # Get accessible subscriptions
+        $subscriptions = @(Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue)
 
-    # Get accessible subscriptions
-    $subscriptions = @(Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue)
+        # Apply subscription filter if configured
+        if ($subscriptionFilter -and $subscriptionFilter.Count -gt 0) {
+            $subscriptions = @($subscriptions | Where-Object { $subscriptionFilter -contains $_.Id })
+        }
 
-    # Apply subscription filter if configured
-    if ($subscriptionFilter -and $subscriptionFilter.Count -gt 0) {
-        $subscriptions = @($subscriptions | Where-Object { $subscriptionFilter -contains $_.Id })
-    }
+        # Build subscription details
+        $subscriptionDetails = $subscriptions | ForEach-Object {
+            [PSCustomObject]@{
+                Id    = $_.Id
+                Name  = $_.Name
+                State = $_.State
+            }
+        }
 
-    # Build subscription details
-    $subscriptionDetails = $subscriptions | ForEach-Object {
+        # Try to get tenant domain
+        $tenantDomain = $null
+        if ($context.Tenant.Id) {
+            $tenant = Get-AzTenant -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
+            if ($tenant -and $tenant.Domains) {
+                $tenantDomain = ($tenant.Domains | Where-Object { $_ -notmatch '\.onmicrosoft\.com$' } | Select-Object -First 1) ??
+                               ($tenant.Domains | Select-Object -First 1)
+            }
+        }
+
         [PSCustomObject]@{
-            Id    = $_.Id
-            Name  = $_.Name
-            State = $_.State
+            Provider           = 'Azure'
+            ConfiguredMethod   = $configuredMethod
+            IsAuthenticated    = $true
+            AccountId          = $context.Account.Id
+            AccountType        = $accountType
+            TenantId           = $context.Tenant.Id
+            TenantDomain       = $tenantDomain
+            SubscriptionCount  = $subscriptions.Count
+            SubscriptionFilter = $subscriptionFilter
+            Subscriptions      = @($subscriptionDetails)
         }
-    }
-
-    # Try to get tenant domain
-    $tenantDomain = $null
-    if ($context.Tenant.Id) {
-        $tenant = Get-AzTenant -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
-        if ($tenant -and $tenant.Domains) {
-            $tenantDomain = ($tenant.Domains | Where-Object { $_ -notmatch '\.onmicrosoft\.com$' } | Select-Object -First 1) ??
-                           ($tenant.Domains | Select-Object -First 1)
-        }
-    }
-
-    [PSCustomObject]@{
-        Provider           = 'Azure'
-        ConfiguredMethod   = $configuredMethod
-        IsAuthenticated    = $true
-        AccountId          = $context.Account.Id
-        AccountType        = $accountType
-        TenantId           = $context.Tenant.Id
-        TenantDomain       = $tenantDomain
-        SubscriptionCount  = $subscriptions.Count
-        SubscriptionFilter = $subscriptionFilter
-        Subscriptions      = @($subscriptionDetails)
     }
 }
