@@ -1,4 +1,9 @@
 {
+  "prowler": {
+    "path": "../prowler/prowler/providers",
+    "upstreamRemote": "upstream"
+  },
+  "checksPath": "Private",
   "azure": {
     "authentication": {
       "_comment": "method: CurrentContext | ServicePrincipal | ManagedIdentity | Interactive",
