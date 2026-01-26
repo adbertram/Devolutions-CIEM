@@ -64,15 +64,15 @@ function Get-ProwlerChecks {
 
     $providersToQuery = if ($Provider) { @($Provider) } else { $supportedProviders }
 
-    Write-Host "Searching for check commits..." -ForegroundColor Cyan
-    Write-Host "  Providers: $($providersToQuery -join ', ')" -ForegroundColor DarkGray
-    Write-Host "  Since: $Since" -ForegroundColor DarkGray
+    Write-Verbose "Searching for check commits..."
+    Write-Verbose "  Providers: $($providersToQuery -join ', ')"
+    Write-Verbose "  Since: $Since"
     if ($Service) {
-        Write-Host "  Service: $Service" -ForegroundColor DarkGray
+        Write-Verbose "  Service: $Service"
     }
 
     # Fetch from upstream
-    Write-Host "Fetching from upstream..." -ForegroundColor Cyan
+    Write-Verbose "Fetching from upstream..."
     git fetch $upstreamRemote --quiet 2>&1 | Out-Null
 
     # Build file patterns using config path
@@ -95,7 +95,7 @@ function Get-ProwlerChecks {
     $logOutput = & git @gitLogArgs 2>&1
 
     if (-not $logOutput) {
-        Write-Host "`nNo check-related commits found." -ForegroundColor Yellow
+        Write-Verbose "No check-related commits found."
         return @()
     }
 
@@ -139,23 +139,11 @@ function Get-ProwlerChecks {
     $commits = $commits | Where-Object { $_.Files.Count -gt 0 }
 
     if ($commits.Count -eq 0) {
-        Write-Host "`nNo check-related commits found." -ForegroundColor Yellow
+        Write-Verbose "No check-related commits found."
         return @()
     }
 
-    Write-Host "`nFound $($commits.Count) check-related commits:`n" -ForegroundColor Green
-
-    $commits | ForEach-Object {
-        [PSCustomObject]@{
-            Hash     = $_.ShortHash
-            Date     = $_.Date
-            Provider = $_.Provider
-            Checks   = ($_.NewChecks | Select-Object -First 3) -join ', '
-            Subject  = if ($_.Subject.Length -gt 50) { $_.Subject.Substring(0, 47) + '...' } else { $_.Subject }
-        }
-    } | Format-Table -AutoSize
-
-    Write-Host "To sync, run: Sync-ProwlerChecks" -ForegroundColor Cyan
+    Write-Verbose "Found $($commits.Count) check-related commits"
 
     return $commits
 }

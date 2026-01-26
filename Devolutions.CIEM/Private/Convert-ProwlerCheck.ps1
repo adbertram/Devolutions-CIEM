@@ -363,7 +363,7 @@ function $FunctionName {
 
         $scriptContent | Set-Content -Path $scriptPath -Encoding UTF8
         $results.ScriptPath = $scriptPath
-        Write-Host "Generated: $scriptPath" -ForegroundColor Green
+        Write-Verbose "Generated: $scriptPath"
     }
 
     if (-not $ScriptOnly) {
@@ -371,8 +371,8 @@ function $FunctionName {
         $results.Metadata = $checkMetadata
 
         $jsonOutput = $checkMetadata | ConvertTo-Json -Depth 10
-        Write-Host "`nJSON Metadata:" -ForegroundColor Cyan
-        Write-Host $jsonOutput
+        Write-Verbose "JSON Metadata:"
+        Write-Verbose $jsonOutput
 
         $metadataOutputPath = Join-Path $OutputDirectory "$functionName.metadata.json"
         $jsonOutput | Set-Content -Path $metadataOutputPath -Encoding UTF8

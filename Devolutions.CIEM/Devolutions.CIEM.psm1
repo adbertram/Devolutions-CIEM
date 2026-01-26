@@ -46,12 +46,13 @@ $script:IAMService = @{}
 $script:KeyVaultService = @{}
 $script:StorageService = @{}
 
-# Get public and private function definition files
+# Get public, private, and check function definition files
 $Public = @(Get-ChildItem -Path $PSScriptRoot\Public\*.ps1 -ErrorAction SilentlyContinue)
-$Private = @(Get-ChildItem -Path $PSScriptRoot\Private\*.ps1 -Recurse -ErrorAction SilentlyContinue)
+$Private = @(Get-ChildItem -Path $PSScriptRoot\Private\*.ps1 -ErrorAction SilentlyContinue)
+$Checks = @(Get-ChildItem -Path $PSScriptRoot\Checks\*\*.ps1 -ErrorAction SilentlyContinue)
 
 # Dot source the files
-foreach ($import in @($Private + $Public)) {
+foreach ($import in @($Private + $Checks + $Public)) {
     try {
         Write-Verbose "Importing $($import.FullName)"
         . $import.FullName

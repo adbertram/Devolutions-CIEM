@@ -116,7 +116,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
 
         $upstreamRemote = $script:Config.prowler.upstreamRemote
 
-        Write-Host "Fetching from upstream..." -ForegroundColor Cyan
+        Write-Verbose "Fetching from upstream..."
         git fetch $upstreamRemote --quiet 2>&1 | Out-Null
 
         $filePatterns = @()
@@ -197,24 +197,12 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         )
 
         if ($Commits.Count -eq 0) {
-            Write-Host "`nNo check-related commits found." -ForegroundColor Yellow
-            Write-Host "Providers searched: $($Providers -join ', ')" -ForegroundColor DarkGray
+            Write-Verbose "No check-related commits found."
+            Write-Verbose "Providers searched: $($Providers -join ', ')"
             return
         }
 
-        Write-Host "`nFound $($Commits.Count) check-related commits:`n" -ForegroundColor Green
-
-        $tableData = $Commits | ForEach-Object {
-            [PSCustomObject]@{
-                Hash     = $_.ShortHash
-                Date     = $_.Date
-                Provider = $_.Provider
-                Checks   = ($_.NewChecks | Select-Object -First 3) -join ', '
-                Subject  = if ($_.Subject.Length -gt 50) { $_.Subject.Substring(0, 47) + '...' } else { $_.Subject }
-            }
-        }
-
-        $tableData | Format-Table -AutoSize
+        Write-Verbose "Found $($Commits.Count) check-related commits"
     }
 
     function Invoke-CheckSync {
@@ -245,7 +233,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             $checkFiles = @($allFiles | Where-Object { $_ -match $checkPathRegex })
 
             if ($checkFiles.Count -eq 0) {
-                Write-Host "  Skipping $shortHash - no check files" -ForegroundColor Yellow
+                Write-Verbose "  Skipping $shortHash - no check files"
                 $results.Skipped += $hash
                 continue
             }
@@ -262,12 +250,12 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             }
 
             if ($newFiles.Count -eq 0) {
-                Write-Host "  Skipping $shortHash - already synced" -ForegroundColor Yellow
+                Write-Verbose "  Skipping $shortHash - already synced"
                 $results.Skipped += $hash
                 continue
             }
 
-            Write-Host "  Syncing $shortHash ($($newFiles.Count) file(s))..." -ForegroundColor Cyan
+            Write-Verbose "  Syncing $shortHash ($($newFiles.Count) file(s))..."
 
             try {
                 # Extract check files from the commit to local paths
@@ -289,11 +277,11 @@ Upstream remote '$upstreamRemote' not configured. Please run:
                 git add $localPaths 2>&1 | Out-Null
                 git commit -m "Sync Prowler check: $shortHash" --no-verify 2>&1 | Out-Null
 
-                Write-Host "    Success" -ForegroundColor Green
+                Write-Verbose "    Success"
                 $results.Success += $hash
             }
             catch {
-                Write-Host "    Failed: $_" -ForegroundColor Red
+                Write-Verbose "    Failed: $_"
                 # Reset any staged changes
                 git reset HEAD 2>&1 | Out-Null
                 git checkout HEAD -- . 2>&1 | Out-Null
@@ -333,21 +321,21 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         $checkPaths = @(Get-NewCheckPaths -Commits $relevantCommits)
 
         if ($checkPaths.Count -eq 0) {
-            Write-Host "`nNo new checks to convert." -ForegroundColor DarkGray
+            Write-Verbose "No new checks to convert."
             return
         }
 
-        Write-Host "`nConverting $($checkPaths.Count) check(s) to PowerShell..." -ForegroundColor Cyan
+        Write-Verbose "Converting $($checkPaths.Count) check(s) to PowerShell..."
 
         foreach ($checkPath in $checkPaths) {
             $checkId = Split-Path $checkPath -Leaf
-            Write-Host "  Converting: $checkId" -ForegroundColor DarkGray
+            Write-Verbose "  Converting: $checkId"
             try {
                 Convert-ProwlerCheck -CheckPath $checkPath | Out-Null
-                Write-Host "    Done" -ForegroundColor Green
+                Write-Verbose "    Done"
             }
             catch {
-                Write-Host "    Failed: $_" -ForegroundColor Red
+                Write-Verbose "    Failed: $_"
             }
         }
     }
@@ -365,19 +353,19 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         Get-SupportedProviders
     }
 
-    Write-Host "Syncing Prowler checks..." -ForegroundColor Cyan
-    Write-Host "  Providers: $($providersToSync -join ', ')" -ForegroundColor DarkGray
-    Write-Host "  Since: $Since" -ForegroundColor DarkGray
+    Write-Verbose "Syncing Prowler checks..."
+    Write-Verbose "  Providers: $($providersToSync -join ', ')"
+    Write-Verbose "  Since: $Since"
     if ($Service) {
-        Write-Host "  Service: $Service" -ForegroundColor DarkGray
+        Write-Verbose "  Service: $Service"
     }
 
     $pathPatterns = Get-CheckPathPattern -Providers $providersToSync -Service $Service
     $commits = @(Get-UpstreamCheckCommits -PathPatterns $pathPatterns -Since $Since)
 
     if ($commits.Count -eq 0) {
-        Write-Host "`nNo commits to sync." -ForegroundColor Yellow
-        return @{ Success = @(); Failed = @(); Skipped = @() }
+        Write-Verbose "No commits to sync."
+        return [PSCustomObject]@{ Success = @(); Failed = @(); Skipped = @() }
     }
 
     # Determine which commits to sync
@@ -404,20 +392,20 @@ Upstream remote '$upstreamRemote' not configured. Please run:
 
     Show-CommitDetails -Commits $commitsToSync -Providers $providersToSync
 
-    Write-Host "`nSyncing $($commitsToSync.Count) commits..." -ForegroundColor Cyan
+    Write-Verbose "Syncing $($commitsToSync.Count) commits..."
     $results = Invoke-CheckSync -Commits $commitsToSync
 
     if ($results.Success.Count -gt 0) {
         Invoke-CheckConversion -Commits $commits -SuccessHashes $results.Success
     }
 
-    # Summary
-    Write-Host "`nSummary:" -ForegroundColor Cyan
-    Write-Host "  Success: $($results.Success.Count)" -ForegroundColor Green
-    Write-Host "  Skipped: $($results.Skipped.Count)" -ForegroundColor Yellow
-    Write-Host "  Failed:  $($results.Failed.Count)" -ForegroundColor Red
+    Write-Verbose "Summary: Success=$($results.Success.Count), Skipped=$($results.Skipped.Count), Failed=$($results.Failed.Count)"
 
-    return $results
+    return [PSCustomObject]@{
+        Success = $results.Success
+        Failed  = $results.Failed
+        Skipped = $results.Skipped
+    }
 
     #endregion Main Logic
 }
