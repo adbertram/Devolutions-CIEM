@@ -228,7 +228,7 @@ Once you have defined your Okta application, you can set your `appsettings.json`
       "Enabled": "true",
       "CallbackPath": "/authorization-code/callback",
       "ClientID": "6f006906-643a-40fe-af00-9060cea5d6ef",
-      "ClientSecret": "M~.rE56.md_MOpB2I5kwj_voFuX-i891N0",
+      "ClientSecret": "<YOUR_CLIENT_SECRET>",
       "Resource": "",
       "Authority": "https://poshtools.okta.com",
       "ResponseType": "code",
