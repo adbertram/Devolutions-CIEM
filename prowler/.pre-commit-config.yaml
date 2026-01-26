@@ -6,7 +6,7 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
         args: ["--unsafe"]
-        exclude: prowler/config/llm_config.yaml
+        exclude: prowler/prowler/config/llm_config.yaml
       - id: check-json
       - id: end-of-file-fixer
       - id: trailing-whitespace
@@ -27,14 +27,14 @@ repos:
     rev: v0.10.0
     hooks:
       - id: shellcheck
-        exclude: contrib
+        exclude: prowler/contrib
 
   ## PYTHON
   - repo: https://github.com/myint/autoflake
     rev: v2.3.1
     hooks:
       - id: autoflake
-        exclude: ^skills/
+        exclude: ^prowler/skills/
         args:
           [
             "--in-place",
@@ -46,20 +46,20 @@ repos:
     rev: 5.13.2
     hooks:
       - id: isort
-        exclude: ^skills/
+        exclude: ^prowler/skills/
         args: ["--profile", "black"]
 
   - repo: https://github.com/psf/black
     rev: 24.4.2
     hooks:
       - id: black
-        exclude: ^skills/
+        exclude: ^prowler/skills/
 
   - repo: https://github.com/pycqa/flake8
     rev: 7.0.0
     hooks:
       - id: flake8
-        exclude: (contrib|^skills/)
+        exclude: (prowler/contrib|^prowler/skills/)
         args: ["--ignore=E266,W503,E203,E501,W605"]
 
   - repo: https://github.com/python-poetry/poetry
@@ -67,22 +67,22 @@ repos:
     hooks:
       - id: poetry-check
         name: API - poetry-check
-        args: ["--directory=./api"]
+        args: ["--directory=./prowler/api"]
         pass_filenames: false
 
       - id: poetry-lock
         name: API - poetry-lock
-        args: ["--directory=./api"]
+        args: ["--directory=./prowler/api"]
         pass_filenames: false
 
       - id: poetry-check
         name: SDK - poetry-check
-        args: ["--directory=./"]
+        args: ["--directory=./prowler"]
         pass_filenames: false
 
       - id: poetry-lock
         name: SDK - poetry-lock
-        args: ["--directory=./"]
+        args: ["--directory=./prowler"]
         pass_filenames: false
 
 
@@ -96,7 +96,7 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: bash -c 'pylint --disable=W,C,R,E -j 0 -rn -sn prowler/'
+        entry: bash -c 'pylint --disable=W,C,R,E -j 0 -rn -sn prowler/prowler/'
         language: system
         files: '.*\.py'
 
@@ -112,7 +112,7 @@ repos:
       - id: bandit
         name: bandit
         description: "Bandit is a tool for finding common security issues in Python code"
-        entry: bash -c 'bandit -q -lll -x '*_test.py,./contrib/,./.venv/,./skills/' -r .'
+        entry: bash -c 'bandit -q -lll -x '*_test.py,./prowler/contrib/,./.venv/,./prowler/skills/' -r .'
         language: system
         files: '.*\.py'
 
@@ -127,15 +127,15 @@ repos:
       - id: vulture
         name: vulture
         description: "Vulture finds unused code in Python programs."
-        entry: bash -c 'vulture --exclude "contrib,.venv,api/src/backend/api/tests/,api/src/backend/conftest.py,api/src/backend/tasks/tests/,skills/" --min-confidence 100 .'
+        entry: bash -c 'vulture --exclude "prowler/contrib,.venv,prowler/api/src/backend/api/tests/,prowler/api/src/backend/conftest.py,prowler/api/src/backend/tasks/tests/,prowler/skills/" --min-confidence 100 .'
         language: system
         files: '.*\.py'
 
       - id: ui-checks
         name: UI - Husky Pre-commit
         description: "Run UI pre-commit checks (Claude Code validation + healthcheck)"
-        entry: bash -c 'cd ui && .husky/pre-commit'
+        entry: bash -c 'cd prowler/ui && .husky/pre-commit'
         language: system
-        files: '^ui/.*\.(ts|tsx|js|jsx|json|css)$'
+        files: '^prowler/ui/.*\.(ts|tsx|js|jsx|json|css)$'
         pass_filenames: false
         verbose: true
