@@ -186,7 +186,7 @@ function Get-UpstreamCheckCommits {
         $commit.NewChecks = $checkIds
     }
 
-    return $commits | Where-Object { $_.Files.Count -gt 0 }
+    return @($commits | Where-Object { @($_.Files).Count -gt 0 })
 }
 
 function Show-CommitDetails {
@@ -218,7 +218,8 @@ function Show-CommitDetails {
 
 function Invoke-CherryPick {
     param(
-        [array]$Commits
+        [array]$Commits,
+        [string[]]$PathPatterns
     )
 
     $results = @{
@@ -227,28 +228,74 @@ function Invoke-CherryPick {
         Skipped = @()
     }
 
+    # Build regex pattern for check files only
+    # Upstream paths are: prowler/providers/{provider}/services/{service}/{check}/*
+    # Local paths are:    prowler/prowler/providers/{provider}/services/{service}/{check}/*
+    $checkPathRegex = '^prowler/providers/[^/]+/services/[^/]+/[^/]+/'
+
     foreach ($commit in $Commits) {
         $hash = if ($commit -is [string]) { $commit } else { $commit.Hash }
         $shortHash = $hash.Substring(0, [Math]::Min(8, $hash.Length))
 
-        $isAncestor = git merge-base --is-ancestor $hash HEAD 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  Skipping $shortHash - already in current branch" -ForegroundColor Yellow
+        # Get all files changed in this commit
+        $allFiles = @(git show --name-only --pretty=format: $hash 2>&1 | Where-Object { $_ })
+
+        # Filter to ONLY check files (nothing else from the commit)
+        $checkFiles = @($allFiles | Where-Object { $_ -match $checkPathRegex })
+
+        if ($checkFiles.Count -eq 0) {
+            Write-Host "  Skipping $shortHash - no check files" -ForegroundColor Yellow
             $results.Skipped += $hash
             continue
         }
 
-        Write-Host "  Cherry-picking $shortHash..." -ForegroundColor Cyan
-        $output = git cherry-pick $hash --no-commit 2>&1
+        # Check which files need syncing
+        # Map upstream paths (prowler/providers/...) to local paths (prowler/prowler/providers/...)
+        $newFiles = @()
+        foreach ($upstreamFile in $checkFiles) {
+            $localFile = "prowler/$upstreamFile"
+            if (-not (Test-Path $localFile)) {
+                $newFiles += @{ Upstream = $upstreamFile; Local = $localFile }
+            }
+            # If file exists locally, skip it (delete local file to force re-sync)
+        }
 
-        if ($LASTEXITCODE -eq 0) {
-            git commit -m "Cherry-pick Prowler check: $shortHash" --no-verify 2>&1 | Out-Null
+        if ($newFiles.Count -eq 0) {
+            Write-Host "  Skipping $shortHash - already synced" -ForegroundColor Yellow
+            $results.Skipped += $hash
+            continue
+        }
+
+        Write-Host "  Syncing $shortHash ($($newFiles.Count) file(s))..." -ForegroundColor Cyan
+
+        try {
+            # Extract check files from the commit to local paths
+            foreach ($filePair in $newFiles) {
+                $localDir = Split-Path $filePair.Local -Parent
+                if (-not (Test-Path $localDir)) {
+                    New-Item -ItemType Directory -Path $localDir -Force | Out-Null
+                }
+                # Get file content from upstream commit and write to local path
+                $content = git show "${hash}:$($filePair.Upstream)" 2>&1
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to get content for $($filePair.Upstream)"
+                }
+                Set-Content -Path $filePair.Local -Value $content -NoNewline
+            }
+
+            # Stage and commit
+            $localPaths = $newFiles | ForEach-Object { $_.Local }
+            git add $localPaths 2>&1 | Out-Null
+            git commit -m "Sync Prowler check: $shortHash" --no-verify 2>&1 | Out-Null
+
             Write-Host "    Success" -ForegroundColor Green
             $results.Success += $hash
         }
-        else {
-            Write-Host "    Failed: $output" -ForegroundColor Red
-            git cherry-pick --abort 2>&1 | Out-Null
+        catch {
+            Write-Host "    Failed: $_" -ForegroundColor Red
+            # Reset any staged changes
+            git reset HEAD 2>&1 | Out-Null
+            git checkout HEAD -- . 2>&1 | Out-Null
             $results.Failed += $hash
         }
     }
@@ -281,8 +328,8 @@ function Invoke-CheckConversion {
         [string[]]$SuccessHashes
     )
 
-    $relevantCommits = $Commits | Where-Object { $SuccessHashes -contains $_.Hash }
-    $checkPaths = Get-NewCheckPaths -Commits $relevantCommits
+    $relevantCommits = @($Commits | Where-Object { $SuccessHashes -contains $_.Hash })
+    $checkPaths = @(Get-NewCheckPaths -Commits $relevantCommits)
 
     if ($checkPaths.Count -eq 0) {
         Write-Host "`nNo new checks to convert." -ForegroundColor DarkGray
@@ -325,7 +372,7 @@ if ($Service) {
 }
 
 $pathPatterns = Get-CheckPathPattern -Providers $providersToSync -Service $Service
-$commits = Get-UpstreamCheckCommits -PathPatterns $pathPatterns -Since $Since
+$commits = @(Get-UpstreamCheckCommits -PathPatterns $pathPatterns -Since $Since)
 
 if ($commits.Count -eq 0) {
     Write-Host "`nNo commits to sync." -ForegroundColor Yellow
@@ -335,7 +382,7 @@ if ($commits.Count -eq 0) {
 # Determine which commits to sync
 if ($CherryPick) {
     $hashes = $CherryPick -split ',' | ForEach-Object { $_.Trim() }
-    $commitsToSync = foreach ($hash in $hashes) {
+    $commitsToSync = @(foreach ($hash in $hashes) {
         $found = $commits | Where-Object { $_.Hash -like "$hash*" -or $_.ShortHash -eq $hash }
         if ($found) {
             $found
@@ -347,11 +394,11 @@ if ($CherryPick) {
                 Files     = @()
             }
         }
-    }
+    })
 }
 else {
     # Sync all by default
-    $commitsToSync = $commits
+    $commitsToSync = @($commits)
 }
 
 Show-CommitDetails -Commits $commitsToSync -Providers $providersToSync
