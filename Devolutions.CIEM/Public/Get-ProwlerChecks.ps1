@@ -1,11 +1,12 @@
 function Get-ProwlerChecks {
     <#
     .SYNOPSIS
-        Lists available Prowler check commits from the upstream repository.
+        Lists available Prowler checks from the upstream repository.
 
     .DESCRIPTION
-        Queries the upstream Prowler repository for commits that add or modify
-        security checks. Only shows commits for providers defined in config.json.
+        Queries the upstream Prowler repository for security checks that have been
+        added or modified. Returns one object per check with Date, Provider, Service,
+        Name, and associated Files.
 
     .PARAMETER Provider
         Filter to a specific provider (azure, aws, gcp).
@@ -14,16 +15,19 @@ function Get-ProwlerChecks {
         Filter to a specific service (e.g., entra, iam, storage).
 
     .PARAMETER Since
-        Only show commits since this date. Defaults to 30 days ago.
+        Only show checks since this date. Defaults to 30 days ago.
 
     .PARAMETER Limit
-        Maximum number of commits to display. Defaults to 50.
+        Maximum number of commits to search. Defaults to 50.
 
     .EXAMPLE
         Get-ProwlerChecks
 
     .EXAMPLE
         Get-ProwlerChecks -Service entra
+
+    .OUTPUTS
+        PSCustomObject with properties: Date, Provider, Service, Name, Files
     #>
     [CmdletBinding()]
     param(
@@ -96,54 +100,52 @@ function Get-ProwlerChecks {
 
     if (-not $logOutput) {
         Write-Verbose "No check-related commits found."
-        return @()
+        @()
     }
 
-    $commits = $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
+    # Parse commits and extract check information
+    $checks = @()
+    $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
         $parts = $_ -split '\|', 5
         if ($parts.Count -ge 5) {
-            [PSCustomObject]@{
-                Hash         = $parts[0]
-                ShortHash    = $parts[0].Substring(0, 8)
-                Subject      = $parts[1]
-                Author       = $parts[2]
-                Date         = $parts[3]
-                RelativeDate = $parts[4]
-                Files        = @()
-                NewChecks    = @()
-                Provider     = ''
-                Services     = @()
+            $hash = $parts[0]
+            $date = $parts[3]
+
+            # Get files for this commit
+            $files = git show --name-only --pretty=format: $hash -- @filePatterns 2>&1 |
+                Where-Object { $_ -and $_ -match '\.metadata\.json$|\.py$' }
+
+            # Extract unique checks from file paths
+            $seenChecks = @{}
+            foreach ($file in $files) {
+                if ($file -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
+                    $provider = $Matches[1]
+                    $service = $Matches[2]
+                    $checkId = $Matches[3]
+
+                    # Create one object per unique check
+                    if (-not $seenChecks.ContainsKey($checkId)) {
+                        $seenChecks[$checkId] = $true
+                        $checkFiles = @($files | Where-Object { $_ -match "/$checkId/" })
+                        $checks += [PSCustomObject]@{
+                            Date     = $date
+                            Provider = $provider
+                            Service  = $service
+                            Name     = $checkId
+                            Files    = $checkFiles
+                        }
+                    }
+                }
             }
         }
     }
 
-    # Get files for each commit
-    foreach ($commit in $commits) {
-        $files = git show --name-only --pretty=format: $commit.Hash -- @filePatterns 2>&1 |
-            Where-Object { $_ -and $_ -match '\.metadata\.json$|\.py$' }
-        $commit.Files = @($files)
-
-        $checkIds = @(); $providers = @(); $services = @()
-        foreach ($file in $files) {
-            if ($file -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
-                if ($providers -notcontains $Matches[1]) { $providers += $Matches[1] }
-                if ($services -notcontains $Matches[2]) { $services += $Matches[2] }
-                if ($checkIds -notcontains $Matches[3]) { $checkIds += $Matches[3] }
-            }
-        }
-        $commit.Provider = $providers -join ', '
-        $commit.Services = $services
-        $commit.NewChecks = $checkIds
+    if ($checks.Count -eq 0) {
+        Write-Verbose "No checks found."
+        @()
     }
-
-    $commits = $commits | Where-Object { $_.Files.Count -gt 0 }
-
-    if ($commits.Count -eq 0) {
-        Write-Verbose "No check-related commits found."
-        return @()
+    else {
+        Write-Verbose "Found $($checks.Count) checks"
+        $checks
     }
-
-    Write-Verbose "Found $($commits.Count) check-related commits"
-
-    return $commits
 }
