@@ -78,7 +78,7 @@ function Sync-ProwlerChecks {
             throw "No supported providers found in config.json. Expected top-level keys: azure, aws, or gcp"
         }
 
-        return $supported
+        $supported
     }
 
     function Test-GitRemote {
@@ -104,7 +104,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             $patterns += "prowler/providers/$prov/services/$servicePath/*/"
         }
 
-        return $patterns
+        $patterns
     }
 
     function Get-UpstreamCheckCommits {
@@ -139,8 +139,9 @@ Upstream remote '$upstreamRemote' not configured. Please run:
         $logOutput = & git @gitLogArgs 2>&1
 
         if (-not $logOutput) {
-            return @()
+            @()
         }
+        else {
 
         $commits = $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
             $parts = $_ -split '\|', 5
@@ -187,7 +188,8 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             $commit.NewChecks = $checkIds
         }
 
-        return @($commits | Where-Object { @($_.Files).Count -gt 0 })
+            @($commits | Where-Object { @($_.Files).Count -gt 0 })
+        }
     }
 
     function Show-CommitDetails {
@@ -211,10 +213,10 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             [string[]]$PathPatterns
         )
 
-        $results = @{
-            Success = @()
-            Failed  = @()
-            Skipped = @()
+        $results = [PSCustomObject]@{
+            Success = [System.Collections.Generic.List[string]]::new()
+            Failed  = [System.Collections.Generic.List[string]]::new()
+            Skipped = [System.Collections.Generic.List[string]]::new()
         }
 
         # Build regex pattern for check files only
@@ -234,7 +236,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
 
             if ($checkFiles.Count -eq 0) {
                 Write-Verbose "  Skipping $shortHash - no check files"
-                $results.Skipped += $hash
+                $results.Skipped.Add($hash)
                 continue
             }
 
@@ -251,7 +253,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
 
             if ($newFiles.Count -eq 0) {
                 Write-Verbose "  Skipping $shortHash - already synced"
-                $results.Skipped += $hash
+                $results.Skipped.Add($hash)
                 continue
             }
 
@@ -278,18 +280,18 @@ Upstream remote '$upstreamRemote' not configured. Please run:
                 git commit -m "Sync Prowler check: $shortHash" --no-verify 2>&1 | Out-Null
 
                 Write-Verbose "    Success"
-                $results.Success += $hash
+                $results.Success.Add($hash)
             }
             catch {
                 Write-Verbose "    Failed: $_"
                 # Reset any staged changes
                 git reset HEAD 2>&1 | Out-Null
                 git checkout HEAD -- . 2>&1 | Out-Null
-                $results.Failed += $hash
+                $results.Failed.Add($hash)
             }
         }
 
-        return $results
+        $results
     }
 
     function Get-NewCheckPaths {
@@ -308,7 +310,7 @@ Upstream remote '$upstreamRemote' not configured. Please run:
             }
         }
 
-        return $checkPaths
+        $checkPaths
     }
 
     function Invoke-CheckConversion {
@@ -365,46 +367,47 @@ Upstream remote '$upstreamRemote' not configured. Please run:
 
     if ($commits.Count -eq 0) {
         Write-Verbose "No commits to sync."
-        return [PSCustomObject]@{ Success = @(); Failed = @(); Skipped = @() }
-    }
-
-    # Determine which commits to sync
-    if ($CherryPick) {
-        $hashes = $CherryPick -split ',' | ForEach-Object { $_.Trim() }
-        $commitsToSync = @(foreach ($hash in $hashes) {
-            $found = $commits | Where-Object { $_.Hash -like "$hash*" -or $_.ShortHash -eq $hash }
-            if ($found) {
-                $found
-            }
-            else {
-                [PSCustomObject]@{
-                    Hash      = $hash
-                    ShortHash = $hash.Substring(0, [Math]::Min(8, $hash.Length))
-                    Files     = @()
-                }
-            }
-        })
+        [PSCustomObject]@{ Success = @(); Failed = @(); Skipped = @() }
     }
     else {
-        # Sync all by default
-        $commitsToSync = @($commits)
-    }
+        # Determine which commits to sync
+        if ($CherryPick) {
+            $hashes = $CherryPick -split ',' | ForEach-Object { $_.Trim() }
+            $commitsToSync = @(foreach ($hash in $hashes) {
+                    $found = $commits | Where-Object { $_.Hash -like "$hash*" -or $_.ShortHash -eq $hash }
+                    if ($found) {
+                        $found
+                    }
+                    else {
+                        [PSCustomObject]@{
+                            Hash      = $hash
+                            ShortHash = $hash.Substring(0, [Math]::Min(8, $hash.Length))
+                            Files     = @()
+                        }
+                    }
+                })
+        }
+        else {
+            # Sync all by default
+            $commitsToSync = @($commits)
+        }
 
-    Show-CommitDetails -Commits $commitsToSync -Providers $providersToSync
+        Show-CommitDetails -Commits $commitsToSync -Providers $providersToSync
 
-    Write-Verbose "Syncing $($commitsToSync.Count) commits..."
-    $results = Invoke-CheckSync -Commits $commitsToSync
+        Write-Verbose "Syncing $($commitsToSync.Count) commits..."
+        $results = Invoke-CheckSync -Commits $commitsToSync
 
-    if ($results.Success.Count -gt 0) {
-        Invoke-CheckConversion -Commits $commits -SuccessHashes $results.Success
-    }
+        if ($results.Success.Count -gt 0) {
+            Invoke-CheckConversion -Commits $commits -SuccessHashes $results.Success
+        }
 
-    Write-Verbose "Summary: Success=$($results.Success.Count), Skipped=$($results.Skipped.Count), Failed=$($results.Failed.Count)"
+        Write-Verbose "Summary: Success=$($results.Success.Count), Skipped=$($results.Skipped.Count), Failed=$($results.Failed.Count)"
 
-    return [PSCustomObject]@{
-        Success = $results.Success
-        Failed  = $results.Failed
-        Skipped = $results.Skipped
+        [PSCustomObject]@{
+            Success = @($results.Success)
+            Failed  = @($results.Failed)
+            Skipped = @($results.Skipped)
+        }
     }
 
     #endregion Main Logic
