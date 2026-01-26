@@ -28,15 +28,14 @@ function Test-EntraPolicyRestrictsUserConsentForApps {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'Authorization Policy'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -74,27 +73,25 @@ function Test-EntraPolicyRestrictsUserConsentForApps {
         }
 
         if (-not $hasUserConsentPolicy) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = 'Entra does not allow users to consent apps accessing company data on their behalf'
                 ResourceId     = $authPolicy.id
                 ResourceName   = 'Authorization Policy'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
             $policyList = $userConsentPolicies -join ', '
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'FAIL'
                 StatusExtended = "Entra allows users to consent apps accessing company data on their behalf. User consent policies: $policyList"
                 ResourceId     = $authPolicy.id
                 ResourceName   = 'Authorization Policy'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

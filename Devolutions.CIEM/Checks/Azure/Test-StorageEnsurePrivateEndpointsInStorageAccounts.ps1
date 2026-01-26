@@ -57,15 +57,15 @@ function Test-StorageEnsurePrivateEndpointsInStorageAccounts {
                 $statusExtended = "Storage account '$accountName' does not have any private endpoints configured. Configure private endpoints for secure network access."
             }
 
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = $status
                 StatusExtended = $statusExtended
                 ResourceId     = $resourceId
                 ResourceName   = $accountName
                 Location       = $account.location
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

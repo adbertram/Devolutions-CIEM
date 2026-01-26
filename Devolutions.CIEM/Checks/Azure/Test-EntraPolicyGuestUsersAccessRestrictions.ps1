@@ -35,15 +35,14 @@ function Test-EntraPolicyGuestUsersAccessRestrictions {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'Authorization Policy'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -59,48 +58,44 @@ function Test-EntraPolicyGuestUsersAccessRestrictions {
 
         switch ($guestUserRoleId) {
             $restrictedRoleId {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'PASS'
                     StatusExtended = 'Guest user access is properly restricted to properties and memberships of their own directory objects only (most restrictive setting).'
                     ResourceId     = $authPolicy.id
                     ResourceName   = 'Authorization Policy'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
             $limitedRoleId {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = 'Guest users have limited access to properties and memberships of directory objects (default setting). Consider using the most restrictive option to limit guest access to their own directory objects only.'
                     ResourceId     = $authPolicy.id
                     ResourceName   = 'Authorization Policy'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
             $memberRoleId {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = 'Guest users have the same access as members (most permissive setting). This should be changed to restrict guest access to their own directory objects only.'
                     ResourceId     = $authPolicy.id
                     ResourceName   = 'Authorization Policy'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
             default {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = "Unknown guest user role ID: $guestUserRoleId. Unable to determine guest access restrictions."
                     ResourceId     = $authPolicy.id
                     ResourceName   = 'Authorization Policy'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
         }
     }

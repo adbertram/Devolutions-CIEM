@@ -26,15 +26,14 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
 
     # Check if Conditional Access policies data is available
     if (-not $script:EntraService.ConditionalAccessPolicies) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve Conditional Access policies - missing permissions or no policies configured'
             ResourceId     = 'N/A'
             ResourceName   = 'Conditional Access Policies'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Look for enabled policies that require MFA for Azure Management API
@@ -92,26 +91,24 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
 
         if ($mfaPolicyNames.Count -gt 0) {
             $policyNames = $mfaPolicyNames -join ', '
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = "Found $($mfaPolicyNames.Count) Conditional Access policy(ies) requiring MFA for Windows Azure Service Management API: $policyNames"
                 ResourceId     = 'conditional-access-policies'
                 ResourceName   = 'Conditional Access Policies'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'FAIL'
                 StatusExtended = 'No Conditional Access policy requires MFA for Windows Azure Service Management API (appId: 797f4846-ba00-4fd7-ba43-dac1f8f63013)'
                 ResourceId     = 'conditional-access-policies'
                 ResourceName   = 'Conditional Access Policies'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

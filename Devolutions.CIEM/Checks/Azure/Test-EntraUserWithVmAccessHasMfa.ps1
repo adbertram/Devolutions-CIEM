@@ -42,26 +42,24 @@ function Test-EntraUserWithVmAccessHasMfa {
 
     # Check if required data is available
     if (-not $script:EntraService.UserMFAStatus) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve user MFA registration details - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'User MFA Status'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     elseif (-not $script:IAMService -or -not $script:IAMService.RoleAssignments) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve IAM role assignments - IAM service not initialized or missing permissions. This check requires cross-reference with Azure Resource Manager role assignments.'
             ResourceId     = 'N/A'
             ResourceName   = 'IAM Role Assignments'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Build MFA status lookup
@@ -105,15 +103,14 @@ function Test-EntraUserWithVmAccessHasMfa {
         }
 
         if ($usersWithVmAccess.Count -eq 0) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = 'No users found with direct VM access role assignments'
                 ResourceId     = 'vm-access-users'
                 ResourceName   = 'VM Access Users'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
             # Check MFA status for each user with VM access
@@ -153,27 +150,25 @@ function Test-EntraUserWithVmAccessHasMfa {
             $withoutMfaCount = $usersWithoutMfa.Count
 
             if ($withoutMfaCount -eq 0) {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'PASS'
                     StatusExtended = "All $totalVmUsers users with VM access have MFA enabled"
                     ResourceId     = 'vm-access-users'
                     ResourceName   = 'VM Access Users'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
             else {
                 foreach ($userInfo in $usersWithoutMfa) {
-                    [PSCustomObject]@{
-                        CheckId        = $CheckMetadata.id
+                    $findingParams = @{
+                        CheckMetadata  = $CheckMetadata
                         Status         = 'FAIL'
                         StatusExtended = "User '$($userInfo.UserName)' has VM access but does not have MFA enabled"
                         ResourceId     = $userInfo.PrincipalId
                         ResourceName   = $userInfo.UserName
-                        Location       = 'Global'
-                        Severity       = $CheckMetadata.severity
                     }
+                    New-CIEMFinding @findingParams
                 }
             }
         }

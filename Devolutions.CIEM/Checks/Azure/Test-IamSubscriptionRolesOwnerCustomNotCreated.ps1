@@ -42,15 +42,14 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
 
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'SKIPPED'
                 StatusExtended = "Unable to retrieve role definitions for subscription $subscriptionId"
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
             continue
         }
 
@@ -59,15 +58,14 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
 
         if (-not $customRoles -or $customRoles.Count -eq 0) {
             # No custom roles exist - PASS (no custom owner roles can exist)
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = "No custom roles exist in subscription $subscriptionId. No custom owner roles can exist."
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
             continue
         }
 
@@ -157,28 +155,26 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         if ($customOwnerRoles.Count -gt 0) {
             # Found custom owner role(s) - generate a FAIL finding for each
             foreach ($ownerRole in $customOwnerRoles) {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = "Custom owner role '$($ownerRole.Name)' found with full permissions (*) at subscription scope. Custom roles should not have owner-equivalent permissions. Assignable scopes: $($ownerRole.AssignableScopes)"
                     ResourceId     = $ownerRole.Id
                     ResourceName   = $ownerRole.Name
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
         }
         else {
             # No custom owner roles found - PASS
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = "No custom owner roles found in subscription $subscriptionId. $($customRoles.Count) custom role(s) exist but none have owner-equivalent permissions."
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

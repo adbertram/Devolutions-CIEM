@@ -25,26 +25,24 @@ function Test-EntraNonPrivilegedUserHasMfa {
 
     # Check if required data is available
     if (-not $script:EntraService.Users) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve users - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'Users'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     elseif (-not $script:EntraService.UserMFAStatus) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve user MFA registration details - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'User MFA Status'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Build a set of privileged user IDs (users in any directory role)
@@ -107,26 +105,24 @@ function Test-EntraNonPrivilegedUserHasMfa {
         $withoutMfaCount = $usersWithoutMfa.Count
 
         if ($withoutMfaCount -eq 0 -and $totalNonPrivileged -gt 0) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = "All $totalNonPrivileged non-privileged users have MFA enabled"
                 ResourceId     = 'non-privileged-users'
                 ResourceName   = 'Non-Privileged Users'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         elseif ($totalNonPrivileged -eq 0) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = 'No non-privileged users found to check'
                 ResourceId     = 'non-privileged-users'
                 ResourceName   = 'Non-Privileged Users'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
             # Report individual users without MFA (limit to first 10 for readability)
@@ -134,27 +130,25 @@ function Test-EntraNonPrivilegedUserHasMfa {
             $usersToDisplay = $usersWithoutMfa | Select-Object -First $displayLimit
 
             foreach ($user in $usersToDisplay) {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = "Non-privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled"
                     ResourceId     = $user.id
                     ResourceName   = $user.displayName
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
 
             if ($withoutMfaCount -gt $displayLimit) {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = "... and $($withoutMfaCount - $displayLimit) additional non-privileged users without MFA (total: $withoutMfaCount out of $totalNonPrivileged)"
                     ResourceId     = 'non-privileged-users-summary'
                     ResourceName   = 'Non-Privileged Users Summary'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
         }
     }

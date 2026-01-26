@@ -54,15 +54,15 @@ function Test-StorageEnsureEncryptionWithCustomerManagedKeys {
                 $statusExtended = "Storage account '$accountName' uses Microsoft Managed Keys for encryption (keySource: '$keySource'). Configure Customer Managed Keys from Key Vault for enhanced control."
             }
 
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = $status
                 StatusExtended = $statusExtended
                 ResourceId     = $resourceId
                 ResourceName   = $accountName
                 Location       = $account.location
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

@@ -54,15 +54,15 @@ function Test-StorageDefaultNetworkAccessRuleIsDenied {
                 $statusExtended = "Storage account '$accountName' has default network access rule set to '$defaultAction'. Set the default action to 'Deny' to restrict access."
             }
 
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = $status
                 StatusExtended = $statusExtended
                 ResourceId     = $resourceId
                 ResourceName   = $accountName
                 Location       = $account.location
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

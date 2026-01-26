@@ -53,15 +53,14 @@ function Test-IamCustomRoleHasPermissionsToAdministerResourceLocks {
 
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'SKIPPED'
                 StatusExtended = "Unable to retrieve role definitions for subscription $subscriptionId"
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
             continue
         }
 
@@ -71,15 +70,14 @@ function Test-IamCustomRoleHasPermissionsToAdministerResourceLocks {
         if (-not $customRoles -or $customRoles.Count -eq 0) {
             # No custom roles exist - this is a FAIL condition
             # The recommendation is to have a dedicated custom role for lock administration
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'FAIL'
                 StatusExtended = "No custom roles exist in subscription $subscriptionId. A dedicated custom role should be created for resource lock administration."
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
             continue
         }
 
@@ -153,27 +151,25 @@ function Test-IamCustomRoleHasPermissionsToAdministerResourceLocks {
         if ($foundLockAdminRole) {
             # Found custom role(s) with lock permissions - PASS
             $roleNames = ($lockAdminRoles | ForEach-Object { $_.Name }) -join ', '
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = "Custom role(s) with resource lock administration permissions found in subscription $subscriptionId`: $roleNames"
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
             # No custom role has lock permissions - FAIL
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'FAIL'
                 StatusExtended = "No custom role with resource lock administration permissions found in subscription $subscriptionId. Custom roles exist ($($customRoles.Count)) but none have Microsoft.Authorization/locks/* permissions."
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

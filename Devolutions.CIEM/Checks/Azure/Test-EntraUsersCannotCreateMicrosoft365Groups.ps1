@@ -62,13 +62,12 @@ function Test-EntraUsersCannotCreateMicrosoft365Groups {
         }
     }
 
-    [PSCustomObject]@{
-        CheckId        = $CheckMetadata.id
+    $findingParams = @{
+        CheckMetadata  = $CheckMetadata
         Status         = $status
         StatusExtended = $statusExtended
         ResourceId     = $resourceId
         ResourceName   = $resourceName
-        Location       = 'Global'
-        Severity       = $CheckMetadata.severity
     }
+    New-CIEMFinding @findingParams
 }

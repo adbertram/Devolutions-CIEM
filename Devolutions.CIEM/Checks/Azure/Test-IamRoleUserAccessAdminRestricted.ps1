@@ -40,15 +40,14 @@ function Test-IamRoleUserAccessAdminRestricted {
 
         # Check if role assignments were loaded
         if (-not $iamData.RoleAssignments) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'SKIPPED'
                 StatusExtended = "Unable to retrieve role assignments for subscription $subscriptionId"
                 ResourceId     = "/subscriptions/$subscriptionId"
                 ResourceName   = "Subscription $subscriptionId"
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
             continue
         }
 
@@ -123,26 +122,24 @@ function Test-IamRoleUserAccessAdminRestricted {
             $isUserAccessAdmin = ($roleName -eq 'User Access Administrator') -or ($roleGuid -eq $userAccessAdminRoleId)
 
             if ($isUserAccessAdmin) {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'FAIL'
                     StatusExtended = "Role assignment $assignmentName in subscription $subscriptionId grants User Access Administrator role to $principalType $principalId."
                     ResourceId     = $assignment.id
                     ResourceName   = $assignmentName
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
             else {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'PASS'
                     StatusExtended = "Role assignment $assignmentName in subscription $subscriptionId does not grant User Access Administrator role."
                     ResourceId     = $assignment.id
                     ResourceName   = $assignmentName
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
         }
     }

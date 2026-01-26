@@ -69,15 +69,15 @@ function Test-StorageEnsureFileSharesSoftDeleteIsEnabled {
                 }
             }
 
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = $status
                 StatusExtended = $statusExtended
                 ResourceId     = $resourceId
                 ResourceName   = $accountName
                 Location       = $account.location
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

@@ -28,26 +28,24 @@ function Test-EntraPrivilegedUserHasMfa {
 
     # Check if required data is available
     if (-not $script:EntraService.DirectoryRoles) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve directory roles - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'Directory Roles'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     elseif (-not $script:EntraService.UserMFAStatus) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve user MFA registration details - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'User MFA Status'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Build a set of privileged users (users in any directory role)
@@ -75,15 +73,14 @@ function Test-EntraPrivilegedUserHasMfa {
         }
 
         if ($privilegedUsers.Count -eq 0) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = 'No privileged users found in directory roles'
                 ResourceId     = 'privileged-users'
                 ResourceName   = 'Privileged Users'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
             # Build MFA status lookup
@@ -134,30 +131,28 @@ function Test-EntraPrivilegedUserHasMfa {
             $withoutMfaCount = $usersWithoutMfa.Count
 
             if ($withoutMfaCount -eq 0) {
-                [PSCustomObject]@{
-                    CheckId        = $CheckMetadata.id
+                $findingParams = @{
+                    CheckMetadata  = $CheckMetadata
                     Status         = 'PASS'
                     StatusExtended = "All $totalPrivileged privileged users have MFA enabled"
                     ResourceId     = 'privileged-users'
                     ResourceName   = 'Privileged Users'
-                    Location       = 'Global'
-                    Severity       = $CheckMetadata.severity
                 }
+                New-CIEMFinding @findingParams
             }
             else {
                 # Report individual users without MFA
                 foreach ($item in $usersWithoutMfa) {
                     $user = $item.User
                     $roles = $item.Roles -join ', '
-                    [PSCustomObject]@{
-                        CheckId        = $CheckMetadata.id
+                    $findingParams = @{
+                        CheckMetadata  = $CheckMetadata
                         Status         = 'FAIL'
                         StatusExtended = "Privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled. Assigned roles: $roles"
                         ResourceId     = $user.id
                         ResourceName   = $user.displayName
-                        Location       = 'Global'
-                        Severity       = $CheckMetadata.severity
                     }
+                    New-CIEMFinding @findingParams
                 }
             }
         }

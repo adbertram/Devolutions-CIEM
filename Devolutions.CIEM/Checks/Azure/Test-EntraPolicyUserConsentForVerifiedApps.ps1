@@ -25,63 +25,61 @@ function Test-EntraPolicyUserConsentForVerifiedApps {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'Authorization Policy'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
-        return
-    }
-
-    # Authorization policy can be returned as an array, get the first item
-    $authPolicy = if ($script:EntraService.AuthorizationPolicy -is [array]) {
-        $script:EntraService.AuthorizationPolicy | Select-Object -First 1
+        New-CIEMFinding @findingParams
     }
     else {
-        $script:EntraService.AuthorizationPolicy
-    }
-
-    # Get defaultUserRolePermissions (strict mode safe)
-    $defaultUserRolePermissions = if ($authPolicy.PSObject.Properties['defaultUserRolePermissions']) {
-        $authPolicy.defaultUserRolePermissions
-    }
-    else {
-        $null
-    }
-
-    # Get permission grant policies assigned (strict mode safe)
-    $permissionPolicies = if ($defaultUserRolePermissions -and $defaultUserRolePermissions.PSObject.Properties['permissionGrantPoliciesAssigned']) {
-        $defaultUserRolePermissions.permissionGrantPoliciesAssigned
-    }
-    else {
-        @()
-    }
-
-    # Default to PASS
-    $status = 'PASS'
-    $statusExtended = 'Entra does not allow users to consent non-verified apps accessing company data on their behalf.'
-
-    # Check if legacy policy exists
-    $legacyPolicyName = 'ManagePermissionGrantsForSelf.microsoft-user-default-legacy'
-    foreach ($policy in $permissionPolicies) {
-        if ($policy -like "*$legacyPolicyName*") {
-            $status = 'FAIL'
-            $statusExtended = 'Entra allows users to consent apps accessing company data on their behalf.'
-            break
+        # Authorization policy can be returned as an array, get the first item
+        $authPolicy = if ($script:EntraService.AuthorizationPolicy -is [array]) {
+            $script:EntraService.AuthorizationPolicy | Select-Object -First 1
         }
-    }
+        else {
+            $script:EntraService.AuthorizationPolicy
+        }
 
-    [PSCustomObject]@{
-        CheckId        = $CheckMetadata.id
-        Status         = $status
-        StatusExtended = $statusExtended
-        ResourceId     = $authPolicy.id
-        ResourceName   = 'Authorization Policy'
-        Location       = 'Global'
-        Severity       = $CheckMetadata.severity
+        # Get defaultUserRolePermissions (strict mode safe)
+        $defaultUserRolePermissions = if ($authPolicy.PSObject.Properties['defaultUserRolePermissions']) {
+            $authPolicy.defaultUserRolePermissions
+        }
+        else {
+            $null
+        }
+
+        # Get permission grant policies assigned (strict mode safe)
+        $permissionPolicies = if ($defaultUserRolePermissions -and $defaultUserRolePermissions.PSObject.Properties['permissionGrantPoliciesAssigned']) {
+            $defaultUserRolePermissions.permissionGrantPoliciesAssigned
+        }
+        else {
+            @()
+        }
+
+        # Default to PASS
+        $status = 'PASS'
+        $statusExtended = 'Entra does not allow users to consent non-verified apps accessing company data on their behalf.'
+
+        # Check if legacy policy exists
+        $legacyPolicyName = 'ManagePermissionGrantsForSelf.microsoft-user-default-legacy'
+        foreach ($policy in $permissionPolicies) {
+            if ($policy -like "*$legacyPolicyName*") {
+                $status = 'FAIL'
+                $statusExtended = 'Entra allows users to consent apps accessing company data on their behalf.'
+                break
+            }
+        }
+
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
+            Status         = $status
+            StatusExtended = $statusExtended
+            ResourceId     = $authPolicy.id
+            ResourceName   = 'Authorization Policy'
+        }
+        New-CIEMFinding @findingParams
     }
 }

@@ -31,15 +31,14 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRoles {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
             StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
             ResourceId     = 'N/A'
             ResourceName   = 'Authorization Policy'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
+        New-CIEMFinding @findingParams
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -57,26 +56,24 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRoles {
         $acceptableValues = @('none', 'adminsAndGuestInviters')
 
         if ($allowInvitesFrom -in $acceptableValues) {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'PASS'
                 StatusExtended = "Guest invite restrictions are properly configured. Current setting: '$allowInvitesFrom' - only users with admin roles can invite guest users."
                 ResourceId     = $authPolicy.id
                 ResourceName   = 'Authorization Policy'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
         else {
-            [PSCustomObject]@{
-                CheckId        = $CheckMetadata.id
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
                 Status         = 'FAIL'
                 StatusExtended = "Guest invite restrictions are too permissive. Current setting: '$allowInvitesFrom'. Should be 'adminsAndGuestInviters' or 'none' to restrict guest invitations to admin roles only."
                 ResourceId     = $authPolicy.id
                 ResourceName   = 'Authorization Policy'
-                Location       = 'Global'
-                Severity       = $CheckMetadata.severity
             }
+            New-CIEMFinding @findingParams
         }
     }
 }

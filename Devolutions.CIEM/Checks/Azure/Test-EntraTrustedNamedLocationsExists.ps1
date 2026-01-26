@@ -26,79 +26,76 @@ function Test-EntraTrustedNamedLocationsExists {
 
     # Check if Named Locations data is available
     if (-not $script:EntraService.NamedLocations) {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
+        $findingParams = @{
+            CheckMetadata  = $CheckMetadata
             Status         = 'FAIL'
             StatusExtended = 'There is no trusted location with IP ranges defined.'
             ResourceId     = 'Named Locations'
             ResourceName   = 'Named Locations'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
         }
-        return
+        New-CIEMFinding @findingParams
     }
+    else {
+        # Look for trusted named locations with IP ranges
+        $trustedIpLocation = $null
+        foreach ($location in $script:EntraService.NamedLocations) {
+            # Check for isTrusted and ipRanges (IP-based locations)
+            $isTrusted = if ($location.PSObject.Properties['isTrusted']) {
+                $location.isTrusted -eq $true
+            }
+            else {
+                $false
+            }
 
-    # Look for trusted named locations with IP ranges
-    $trustedIpLocation = $null
-    foreach ($location in $script:EntraService.NamedLocations) {
-        # Check for isTrusted and ipRanges (IP-based locations)
-        $isTrusted = if ($location.PSObject.Properties['isTrusted']) {
-            $location.isTrusted -eq $true
-        }
-        else {
-            $false
-        }
-
-        $ipRanges = if ($location.PSObject.Properties['ipRanges']) {
-            $location.ipRanges
-        }
-        else {
-            $null
-        }
-
-        $hasIpRanges = $ipRanges -and @($ipRanges).Count -gt 0
-
-        if ($hasIpRanges -and $isTrusted) {
-            $trustedIpLocation = $location
-            break
-        }
-    }
-
-    if ($trustedIpLocation) {
-        # Extract IP range addresses
-        $ipRangeAddresses = @()
-        foreach ($range in $trustedIpLocation.ipRanges) {
-            $cidrAddress = if ($range.PSObject.Properties['cidrAddress']) {
-                $range.cidrAddress
+            $ipRanges = if ($location.PSObject.Properties['ipRanges']) {
+                $location.ipRanges
             }
             else {
                 $null
             }
-            if ($cidrAddress) {
-                $ipRangeAddresses += $cidrAddress
+
+            $hasIpRanges = $ipRanges -and @($ipRanges).Count -gt 0
+
+            if ($hasIpRanges -and $isTrusted) {
+                $trustedIpLocation = $location
+                break
             }
         }
 
-        $ipRangeList = $ipRangeAddresses -join ', '
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
-            Status         = 'PASS'
-            StatusExtended = "Exits trusted location with trusted IP ranges, this IPs ranges are: $ipRangeList"
-            ResourceId     = $trustedIpLocation.id
-            ResourceName   = $trustedIpLocation.displayName
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
+        if ($trustedIpLocation) {
+            # Extract IP range addresses
+            $ipRangeAddresses = @()
+            foreach ($range in $trustedIpLocation.ipRanges) {
+                $cidrAddress = if ($range.PSObject.Properties['cidrAddress']) {
+                    $range.cidrAddress
+                }
+                else {
+                    $null
+                }
+                if ($cidrAddress) {
+                    $ipRangeAddresses += $cidrAddress
+                }
+            }
+
+            $ipRangeList = $ipRangeAddresses -join ', '
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
+                Status         = 'PASS'
+                StatusExtended = "Exits trusted location with trusted IP ranges, this IPs ranges are: $ipRangeList"
+                ResourceId     = $trustedIpLocation.id
+                ResourceName   = $trustedIpLocation.displayName
+            }
+            New-CIEMFinding @findingParams
         }
-    }
-    else {
-        [PSCustomObject]@{
-            CheckId        = $CheckMetadata.id
-            Status         = 'FAIL'
-            StatusExtended = 'There is no trusted location with IP ranges defined.'
-            ResourceId     = 'Named Locations'
-            ResourceName   = 'Named Locations'
-            Location       = 'Global'
-            Severity       = $CheckMetadata.severity
+        else {
+            $findingParams = @{
+                CheckMetadata  = $CheckMetadata
+                Status         = 'FAIL'
+                StatusExtended = 'There is no trusted location with IP ranges defined.'
+                ResourceId     = 'Named Locations'
+                ResourceName   = 'Named Locations'
+            }
+            New-CIEMFinding @findingParams
         }
     }
 }
