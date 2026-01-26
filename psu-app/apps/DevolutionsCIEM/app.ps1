@@ -332,31 +332,78 @@ $ScanPage = New-UDPage -Name 'Scan' -Url '/ciem/scan' -Content {
     New-UDCard -Title 'Scan Configuration' -Content {
         New-UDAlert -Severity 'info' -Text 'This is a PoC demonstration. In production, this would connect to actual Azure subscriptions using the Devolutions.CIEM module.'
 
-        New-UDForm -Content {
+        New-UDElement -Tag 'div' -Content {
             New-UDSelect -Id 'provider' -Label 'Cloud Provider' -Option {
                 New-UDSelectOption -Name 'Azure' -Value 'azure'
-                New-UDSelectOption -Name 'AWS (Coming Soon)' -Value 'aws' -Disabled
+                New-UDSelectOption -Name 'AWS' -Value 'aws'
             } -DefaultValue 'azure' -FullWidth
+        } -Attributes @{ style = @{ marginBottom = '16px'; marginTop = '16px' } }
 
+        New-UDElement -Tag 'div' -Content {
             New-UDTextbox -Id 'subscriptionId' -Label 'Subscription ID (Optional)' -Placeholder 'Leave empty to scan all accessible subscriptions' -FullWidth
+        } -Attributes @{ style = @{ marginBottom = '16px' } }
 
+        New-UDElement -Tag 'div' -Content {
             New-UDCheckbox -Id 'includePassedChecks' -Label 'Include Passed Checks in Results' -Checked $true
+        } -Attributes @{ style = @{ marginBottom = '16px' } }
 
+        New-UDElement -Tag 'div' -Content {
             New-UDSelect -Id 'outputFormat' -Label 'Output Format' -Option {
                 New-UDSelectOption -Name 'Dashboard (Default)' -Value 'dashboard'
                 New-UDSelectOption -Name 'JSON Export' -Value 'json'
                 New-UDSelectOption -Name 'CSV Export' -Value 'csv'
             } -DefaultValue 'dashboard' -FullWidth
-        } -OnSubmit {
-            Show-UDToast -Message "Scan initiated for $($EventData.provider) provider..." -Duration 5000
-            Show-UDToast -Message "PoC Mode: Displaying sample findings data" -Duration 5000 -BackgroundColor '#ff9800'
+        } -Attributes @{ style = @{ marginBottom = '24px' } }
 
-            # In production, this would call:
-            # $results = Invoke-CIEMScan -Provider $EventData.provider -SubscriptionId $EventData.subscriptionId
+        # Action buttons
+        New-UDStack -Direction 'row' -Spacing 2 -Content {
+            New-UDButton -Text 'Start Scan' -Variant 'contained' -Color 'primary' -OnClick {
+                $Provider = (Get-UDElement -Id 'provider').value
+                Show-UDToast -Message "Scan initiated for $Provider provider..." -Duration 5000
+                Show-UDToast -Message "PoC Mode: Displaying sample findings data" -Duration 5000 -BackgroundColor '#ff9800'
 
-            Start-Sleep -Seconds 2
-            Invoke-UDRedirect '/ciem/findings'
-        } -SubmitText 'Start Scan'
+                # In production, this would call:
+                # $results = Invoke-CIEMScan -Provider $Provider -SubscriptionId $subscriptionId
+
+                Start-Sleep -Seconds 2
+                Invoke-UDRedirect '/ciem/findings'
+            }
+
+            New-UDButton -Text 'Test Authentication' -Variant 'outlined' -Color 'primary' -OnClick {
+                $Provider = (Get-UDElement -Id 'provider').value
+
+                Show-UDToast -Message "Testing $Provider authentication..." -Duration 3000
+
+                try {
+                    switch ($Provider) {
+                        'azure' {
+                            $context = Get-AzContext -ErrorAction Stop
+                            if ($context) {
+                                $message = "Azure authentication successful!`nAccount: $($context.Account.Id)`nSubscription: $($context.Subscription.Name)`nTenant: $($context.Tenant.Id)"
+                                Show-UDToast -Message $message -Duration 8000 -BackgroundColor '#4caf50'
+                            } else {
+                                Show-UDToast -Message "Azure: Not authenticated. Run Connect-AzAccount first." -Duration 5000 -BackgroundColor '#f44336'
+                            }
+                        }
+                        'aws' {
+                            $identity = Get-STSCallerIdentity -ErrorAction Stop
+                            if ($identity) {
+                                $message = "AWS authentication successful!`nAccount: $($identity.Account)`nARN: $($identity.Arn)`nUserId: $($identity.UserId)"
+                                Show-UDToast -Message $message -Duration 8000 -BackgroundColor '#4caf50'
+                            } else {
+                                Show-UDToast -Message "AWS: Not authenticated. Configure AWS credentials first." -Duration 5000 -BackgroundColor '#f44336'
+                            }
+                        }
+                        default {
+                            Show-UDToast -Message "Provider '$Provider' is not yet supported for authentication testing." -Duration 5000 -BackgroundColor '#ff9800'
+                        }
+                    }
+                } catch {
+                    $errorMsg = $_.Exception.Message
+                    Show-UDToast -Message "Authentication failed for $Provider`: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
+                }
+            }
+        }
     }
 
     # Scan History (placeholder)
