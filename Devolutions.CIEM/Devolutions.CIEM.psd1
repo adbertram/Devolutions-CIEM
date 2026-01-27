@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.1.0'
+    ModuleVersion = '0.2.4'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -30,9 +30,8 @@
     PowerShellVersion = '7.4'
 
     # Modules that must be imported into the global environment prior to importing this module
-    RequiredModules = @(
-        @{ ModuleName = 'Az.Accounts'; ModuleVersion = '4.0.0' }
-    )
+    # Az.Accounts is auto-installed by the module loader (psm1) if not present
+    RequiredModules = @()
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = @(
@@ -41,6 +40,7 @@
         'Get-CIEMProvider',
         'Get-ProwlerCheck',
         'Invoke-CIEMScan',
+        'New-DevolutionsCIEMApp',
         'Sync-ProwlerCheck'
     )
 
@@ -57,7 +57,7 @@
     PrivateData = @{
         PSData = @{
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @('Azure', 'CIEM', 'Security', 'Identity', 'IAM', 'Entra', 'RBAC', 'Compliance')
+            Tags = @('Azure', 'CIEM', 'Security', 'Identity', 'IAM', 'Entra', 'RBAC', 'Compliance', 'PowerShellUniversal', 'app')
 
             # A URL to the license for this module.
             # LicenseUri = ''
@@ -70,6 +70,28 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+## 0.2.4 - PSU App Auto-Registration Fix
+- Fixed: Include .universal directory in published module
+- PSU now auto-discovers and creates the CIEM app when module is installed
+- App registration uses -Module/-Command pattern for PSU Gallery compatibility
+
+## 0.2.3 - Az.Accounts Auto-Install
+- Auto-installs Az.Accounts when module loads if not present
+- Removed RequiredModules dependency (PSU Gallery does not auto-install dependencies)
+- Removed runtime checks from individual functions (handled at module load)
+- Module now works out-of-the-box when installed from PSU Gallery
+
+## 0.2.2 - PSU App Load Fix
+- Removed Az.Accounts from RequiredModules to fix PSU app loading
+- Az.Accounts was preventing module import on servers without Azure modules
+- Added runtime module checks to Get-CIEMAuthenticationContext and Invoke-CIEMScan
+- PSU app now loads without Azure modules; scans require Az.Accounts at runtime
+
+## 0.2.0 - PSU App Integration
+- Added New-DevolutionsCIEMApp function for PSU module-based discovery
+- Switched from -FilePath to -Module/-Command pattern for PSU Gallery compatibility
+- App now auto-discovers when module is installed to PSU Modules directory
+
 ## 0.1.0 - Initial Release
 - 46 Azure identity-focused security checks
 - Entra ID: 15 checks (MFA, conditional access, security defaults, etc.)
@@ -81,7 +103,7 @@
 '@
 
             # Prerelease string of this module
-            Prerelease = 'alpha'
+            # Prerelease = ''
         }
     }
 }
