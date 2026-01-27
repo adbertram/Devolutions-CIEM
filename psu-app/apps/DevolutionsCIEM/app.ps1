@@ -137,6 +137,7 @@ $Navigation = @(
     New-UDListItem -Label 'Dashboard' -Icon (New-UDIcon -Icon 'Home') -Href '/ciem'
     New-UDListItem -Label 'Findings' -Icon (New-UDIcon -Icon 'ExclamationTriangle') -Href '/ciem/findings'
     New-UDListItem -Label 'Scan' -Icon (New-UDIcon -Icon 'Play') -Href '/ciem/scan'
+    New-UDListItem -Label 'Configuration' -Icon (New-UDIcon -Icon 'Cog') -Href '/ciem/config'
     New-UDListItem -Label 'About' -Icon (New-UDIcon -Icon 'InfoCircle') -Href '/ciem/about'
 )
 
@@ -463,11 +464,219 @@ Devolutions CIEM is a security scanning solution that helps identify identity an
 } -Navigation $Navigation -NavigationLayout permanent
 
 # ============================================================================
+# Page: Configuration
+# ============================================================================
+$ConfigPage = New-UDPage -Name 'Configuration' -Url '/ciem/config' -Content {
+    # Load current configuration
+    $ModuleRoot = Join-Path $PSScriptRoot '..' '..' '..' 'Devolutions.CIEM'
+    $ConfigPath = Join-Path $ModuleRoot 'config.json'
+    $CurrentConfig = if (Test-Path $ConfigPath) {
+        Get-Content $ConfigPath -Raw | ConvertFrom-Json
+    } else {
+        # Defaults if config doesn't exist
+        [PSCustomObject]@{
+            azure = @{
+                authentication = @{
+                    method = 'CurrentContext'
+                    servicePrincipal = @{ tenantId = $null; clientId = $null; clientSecret = $null }
+                }
+                subscriptionFilter = @()
+            }
+            scan = @{ throttleLimit = 10; timeoutSeconds = 300; continueOnError = $true }
+            output = @{ verboseLogging = $false }
+            pam = @{ remediationUrl = 'https://devolutions.net/pam' }
+        }
+    }
+
+    New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
+    New-UDTypography -Text 'Configure CIEM scan settings, authentication, and integrations' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
+
+    New-UDGrid -Container -Spacing 3 -Content {
+        # Azure Authentication Card
+        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+            New-UDCard -Title 'Azure Authentication' -Content {
+                New-UDElement -Tag 'div' -Content {
+                    New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
+                        New-UDSelectOption -Name 'Current Context (Az PowerShell)' -Value 'CurrentContext'
+                        New-UDSelectOption -Name 'Service Principal' -Value 'ServicePrincipal'
+                        New-UDSelectOption -Name 'Managed Identity' -Value 'ManagedIdentity'
+                        New-UDSelectOption -Name 'Interactive Browser' -Value 'Interactive'
+                    } -DefaultValue $CurrentConfig.azure.authentication.method -FullWidth -OnChange {
+                        Sync-UDElement -Id 'spFieldsContainer'
+                    }
+                } -Attributes @{ style = @{ marginBottom = '16px' } }
+
+                # Service Principal fields - conditionally visible
+                New-UDDynamic -Id 'spFieldsContainer' -Content {
+                    $selectedMethod = (Get-UDElement -Id 'authMethod').value
+                    if ($selectedMethod -eq 'ServicePrincipal') {
+                        New-UDElement -Tag 'div' -Content {
+                            New-UDTextbox -Id 'spTenantId' -Label 'Tenant ID' -Value $CurrentConfig.azure.authentication.servicePrincipal.tenantId -FullWidth -Placeholder 'Enter Azure AD Tenant ID'
+                        } -Attributes @{ style = @{ marginBottom = '16px' } }
+
+                        New-UDElement -Tag 'div' -Content {
+                            New-UDTextbox -Id 'spClientId' -Label 'Client ID (App ID)' -Value $CurrentConfig.azure.authentication.servicePrincipal.clientId -FullWidth -Placeholder 'Enter Service Principal Client ID'
+                        } -Attributes @{ style = @{ marginBottom = '16px' } }
+
+                        New-UDElement -Tag 'div' -Content {
+                            New-UDTextbox -Id 'spClientSecret' -Label 'Client Secret' -Type 'password' -FullWidth -Placeholder 'Enter Service Principal Secret'
+                        } -Attributes @{ style = @{ marginBottom = '16px' } }
+                    }
+                }
+
+                New-UDElement -Tag 'div' -Content {
+                    $filterValue = if ($CurrentConfig.azure.subscriptionFilter -is [array]) {
+                        $CurrentConfig.azure.subscriptionFilter -join ', '
+                    } else { '' }
+                    New-UDTextbox -Id 'subscriptionFilter' -Label 'Subscription Filter' -Value $filterValue -FullWidth -Placeholder 'Comma-separated subscription IDs (leave empty for all)'
+                } -Attributes @{ style = @{ marginTop = '16px' } }
+            }
+        }
+
+        # Scan Settings Card
+        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+            New-UDCard -Title 'Scan Settings' -Content {
+                New-UDElement -Tag 'div' -Content {
+                    New-UDTextbox -Id 'throttleLimit' -Label 'Throttle Limit' -Value $CurrentConfig.scan.throttleLimit -FullWidth -Placeholder '1-100' -Type 'number'
+                } -Attributes @{ style = @{ marginBottom = '16px' } }
+
+                New-UDElement -Tag 'div' -Content {
+                    New-UDTextbox -Id 'timeoutSeconds' -Label 'Timeout (Seconds)' -Value $CurrentConfig.scan.timeoutSeconds -FullWidth -Placeholder 'Scan timeout in seconds' -Type 'number'
+                } -Attributes @{ style = @{ marginBottom = '16px' } }
+
+                New-UDElement -Tag 'div' -Content {
+                    New-UDCheckbox -Id 'continueOnError' -Label 'Continue on Error' -Checked $CurrentConfig.scan.continueOnError
+                }
+            }
+        }
+
+        # PAM Integration Card
+        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+            New-UDCard -Title 'PAM Integration' -Content {
+                New-UDElement -Tag 'div' -Content {
+                    New-UDTextbox -Id 'pamUrl' -Label 'Remediation URL' -Value $CurrentConfig.pam.remediationUrl -FullWidth -Placeholder 'URL for Devolutions PAM integration'
+                }
+            }
+        }
+
+        # Output Settings Card
+        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+            New-UDCard -Title 'Output Settings' -Content {
+                New-UDElement -Tag 'div' -Content {
+                    New-UDCheckbox -Id 'verboseLogging' -Label 'Verbose Logging' -Checked $CurrentConfig.output.verboseLogging
+                }
+            }
+        }
+    }
+
+    # Action Buttons
+    New-UDElement -Tag 'div' -Content {
+        New-UDStack -Direction 'row' -Spacing 2 -Content {
+            New-UDButton -Text 'Save Configuration' -Variant 'contained' -Color 'primary' -OnClick {
+                try {
+                    # Collect all form values
+                    $authMethod = (Get-UDElement -Id 'authMethod').value
+                    $subscriptionFilterRaw = (Get-UDElement -Id 'subscriptionFilter').value
+                    $throttleLimit = [int](Get-UDElement -Id 'throttleLimit').value
+                    $timeoutSeconds = [int](Get-UDElement -Id 'timeoutSeconds').value
+                    $continueOnError = (Get-UDElement -Id 'continueOnError').checked
+                    $verboseLogging = (Get-UDElement -Id 'verboseLogging').checked
+                    $pamUrl = (Get-UDElement -Id 'pamUrl').value
+
+                    # Parse subscription filter
+                    $subscriptionFilter = if ([string]::IsNullOrWhiteSpace($subscriptionFilterRaw)) {
+                        @()
+                    } else {
+                        $subscriptionFilterRaw -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+                    }
+
+                    # Build settings hashtable
+                    $settings = @{
+                        'azure.authentication.method' = $authMethod
+                        'azure.subscriptionFilter' = $subscriptionFilter
+                        'scan.throttleLimit' = $throttleLimit
+                        'scan.timeoutSeconds' = $timeoutSeconds
+                        'scan.continueOnError' = $continueOnError
+                        'output.verboseLogging' = $verboseLogging
+                        'pam.remediationUrl' = $pamUrl
+                    }
+
+                    # Add service principal settings if applicable
+                    if ($authMethod -eq 'ServicePrincipal') {
+                        $spTenantId = (Get-UDElement -Id 'spTenantId').value
+                        $spClientId = (Get-UDElement -Id 'spClientId').value
+                        $spClientSecret = (Get-UDElement -Id 'spClientSecret').value
+
+                        $settings['azure.authentication.servicePrincipal.tenantId'] = $spTenantId
+                        $settings['azure.authentication.servicePrincipal.clientId'] = $spClientId
+                        if (-not [string]::IsNullOrEmpty($spClientSecret)) {
+                            $settings['azure.authentication.servicePrincipal.clientSecret'] = $spClientSecret
+                        }
+                    }
+
+                    # Read existing config
+                    $ModuleRoot = Join-Path $PSScriptRoot '..' '..' '..' 'Devolutions.CIEM'
+                    $ConfigPath = Join-Path $ModuleRoot 'config.json'
+                    $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json -AsHashtable
+
+                    # Helper function to set nested values
+                    function Set-NestedValue {
+                        param([hashtable]$Hashtable, [string]$Path, $Value)
+                        $parts = $Path -split '\.'
+                        $current = $Hashtable
+                        for ($i = 0; $i -lt $parts.Count - 1; $i++) {
+                            $part = $parts[$i]
+                            if (-not $current.ContainsKey($part)) { $current[$part] = @{} }
+                            $current = $current[$part]
+                        }
+                        $current[$parts[-1]] = $Value
+                    }
+
+                    # Apply settings
+                    foreach ($key in $settings.Keys) {
+                        Set-NestedValue -Hashtable $config -Path $key -Value $settings[$key]
+                    }
+
+                    # Save config
+                    $jsonContent = $config | ConvertTo-Json -Depth 10
+                    Set-Content -Path $ConfigPath -Value $jsonContent -Encoding UTF8
+
+                    Show-UDToast -Message 'Configuration saved successfully!' -Duration 5000 -BackgroundColor '#4caf50'
+                } catch {
+                    Show-UDToast -Message "Failed to save configuration: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                }
+            }
+
+            New-UDButton -Text 'Reset to Defaults' -Variant 'outlined' -Color 'secondary' -OnClick {
+                try {
+                    # Set form elements to default values
+                    Set-UDElement -Id 'authMethod' -Properties @{ value = 'CurrentContext' }
+                    Set-UDElement -Id 'subscriptionFilter' -Properties @{ value = '' }
+                    Set-UDElement -Id 'throttleLimit' -Properties @{ value = '10' }
+                    Set-UDElement -Id 'timeoutSeconds' -Properties @{ value = '300' }
+                    Set-UDElement -Id 'continueOnError' -Properties @{ checked = $true }
+                    Set-UDElement -Id 'verboseLogging' -Properties @{ checked = $false }
+                    Set-UDElement -Id 'pamUrl' -Properties @{ value = 'https://devolutions.net/pam' }
+
+                    # Refresh service principal fields visibility
+                    Sync-UDElement -Id 'spFieldsContainer'
+
+                    Show-UDToast -Message 'Form reset to default values. Click Save to apply.' -Duration 5000 -BackgroundColor '#ff9800'
+                } catch {
+                    Show-UDToast -Message "Failed to reset: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                }
+            }
+        }
+    } -Attributes @{ style = @{ marginTop = '24px' } }
+} -Navigation $Navigation -NavigationLayout permanent
+
+# ============================================================================
 # Create the App
 # ============================================================================
 New-UDApp -Title 'Devolutions CIEM' -Pages @(
     $DashboardPage
     $FindingsPage
     $ScanPage
+    $ConfigPage
     $AboutPage
 ) -DefaultTheme 'Light'
