@@ -37,6 +37,67 @@ PSU v5 documentation is available at: `docs/psu-docs/`
 
 Always cite which documentation file you referenced.
 
+## PSU Server File Access
+
+Use `scripts/azure_psu_file_manager.sh` to access the Azure PSU server filesystem via Kudu API:
+
+```bash
+# List directories
+./scripts/azure_psu_file_manager.sh list                    # Root (maps to /home)
+./scripts/azure_psu_file_manager.sh list Repository/Modules # PSU modules
+
+# Read files
+./scripts/azure_psu_file_manager.sh read Repository/.universal/apps.ps1
+
+# Execute shell commands (runs in Kudu container, not PSU container)
+./scripts/azure_psu_file_manager.sh exec "ls -la"
+```
+
+**Key PSU paths:**
+- `Repository/Modules/` - Installed PowerShell modules
+- `Repository/.universal/` - PSU configuration files
+- `Repository/dashboards/` - Dashboard definitions
+- `database.db` - PSU SQLite database
+- `LogFiles/` - Application logs
+
+**Use this tool when:**
+- Troubleshooting module loading issues
+- Checking installed modules on the server
+- Reading PSU configuration files
+- Investigating app startup failures
+
+## PSU Troubleshooting Script
+
+Use `scripts/invoke_command_in_azure_webapp.sh` for advanced troubleshooting:
+
+```bash
+# Run shell commands with full shell features (pipes, redirects)
+./scripts/invoke_command_in_azure_webapp.sh run "ls -la /home/Repository"
+./scripts/invoke_command_in_azure_webapp.sh run "cat /home/LogFiles/*.log | tail -50"
+
+# Use presets for common troubleshooting tasks
+./scripts/invoke_command_in_azure_webapp.sh preset files      # List PSU config files
+./scripts/invoke_command_in_azure_webapp.sh preset apps       # Show apps.ps1 config
+./scripts/invoke_command_in_azure_webapp.sh preset modules    # List installed modules
+./scripts/invoke_command_in_azure_webapp.sh preset logs       # Show recent logs
+./scripts/invoke_command_in_azure_webapp.sh preset health     # Check PSU health endpoint
+./scripts/invoke_command_in_azure_webapp.sh preset version    # Get PSU version via API
+
+# Query PSU REST API (requires PSU_APP_TOKEN env var)
+./scripts/invoke_command_in_azure_webapp.sh api "/api/v1/dashboard"
+
+# Interactive SSH (if enabled in container image)
+./scripts/invoke_command_in_azure_webapp.sh ssh
+```
+
+**Architecture note:** Commands run in the Kudu sidecar container, which shares the `/home` filesystem with the PSU app. File operations work, but runtime state queries (loaded modules, running jobs) require the PSU REST API via the `api` command.
+
+**Use this tool when:**
+- Running commands with pipes/redirects (azure_psu_file_manager.sh doesn't support these)
+- Quick health checks and diagnostics
+- Querying the PSU REST API
+- Investigating runtime issues that require API access
+
 ## Core Responsibilities
 
 1. **Creating PSU Apps & Dashboards**

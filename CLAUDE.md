@@ -44,8 +44,8 @@ A PSU v5 server is deployed in Azure for this project.
 | **Azure Resource Group** | `devolutions-ciem-rg` |
 | **Location** | West US 2 |
 | **App Service Plan** | Standard S1 (Linux) |
-| **PSU Version** | 5.4.4 |
-| **Container Image** | `ironmansoftware/universal:5.4.4-azure` |
+| **PSU Version** | 5.5.4 |
+| **Container Image** | `ironmansoftware/universal:5.5.4-azure` |
 
 ### First-Time Setup
 
@@ -88,9 +88,6 @@ az deployment group create \
 ### Management Commands
 
 ```bash
-# View app logs
-az webapp log tail --resource-group devolutions-ciem-rg --name devolutions-ciem-psu
-
 # Restart the app
 az webapp restart --resource-group devolutions-ciem-rg --name devolutions-ciem-psu
 
@@ -100,6 +97,58 @@ az webapp config appsettings list --resource-group devolutions-ciem-rg --name de
 # Delete all resources
 az group delete --name devolutions-ciem-rg --yes
 ```
+
+### PSU File Manager
+
+Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem via Kudu API:
+
+```bash
+# List directories
+./scripts/azure_psu_file_manager.sh list                    # Root (maps to /home)
+./scripts/azure_psu_file_manager.sh list Repository/Modules # PSU modules
+
+# Read files
+./scripts/azure_psu_file_manager.sh read Repository/.universal/apps.ps1
+
+# Execute shell commands (runs in Kudu container, not PSU container)
+./scripts/azure_psu_file_manager.sh exec "ls -la"
+```
+
+**Key PSU paths:**
+- `Repository/Modules/` - Installed PowerShell modules
+- `Repository/.universal/` - PSU configuration files
+- `Repository/dashboards/` - Dashboard definitions
+- `database.db` - PSU SQLite database
+- `LogFiles/` - Application logs
+
+**Note:** The `exec` command runs in the Kudu sidecar container (Debian), not the PSU container. Use `list` and `read` commands to inspect PSU files.
+
+### PSU Troubleshooting Script
+
+Use `scripts/invoke_command_in_azure_webapp.sh` for troubleshooting the PSU web app:
+
+```bash
+# Run shell commands (via Kudu - shares /home filesystem with app)
+./scripts/invoke_command_in_azure_webapp.sh run "ls -la /home/Repository"
+./scripts/invoke_command_in_azure_webapp.sh run "cat /home/LogFiles/*.log | tail -50"
+
+# Use presets for common troubleshooting tasks
+./scripts/invoke_command_in_azure_webapp.sh preset files      # List PSU config files
+./scripts/invoke_command_in_azure_webapp.sh preset apps       # Show apps.ps1 config
+./scripts/invoke_command_in_azure_webapp.sh preset modules    # List installed modules
+./scripts/invoke_command_in_azure_webapp.sh preset logs       # Show recent logs
+./scripts/invoke_command_in_azure_webapp.sh preset health     # Check PSU health endpoint
+./scripts/invoke_command_in_azure_webapp.sh preset version    # Get PSU version via API
+
+# Query PSU REST API (requires PSU_APP_TOKEN)
+export PSU_APP_TOKEN="your-token-here"
+./scripts/invoke_command_in_azure_webapp.sh api "/api/v1/dashboard"
+
+# Interactive SSH (if enabled in container)
+./scripts/invoke_command_in_azure_webapp.sh ssh
+```
+
+**Architecture note:** Commands run in the Kudu sidecar container, which shares the `/home` filesystem with the PSU app container. File operations work, but runtime state queries (loaded modules, running jobs) require the PSU REST API.
 
 ### Documentation
 
