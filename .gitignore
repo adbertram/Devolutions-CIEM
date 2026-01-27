@@ -169,3 +169,4 @@ prowler/.claude/skills
 prowler/.codex/skills
 prowler/.github/skills
 prowler/.gemini/skills
+.env
