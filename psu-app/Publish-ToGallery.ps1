@@ -305,40 +305,43 @@ if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerS
             Write-Host '  [SKIP] PSU_URL or PSU_TOKEN not found in environment or .env file' -ForegroundColor Yellow
             Write-Host '  Manual update required: PSU Admin Console > Platform > Gallery' -ForegroundColor Yellow
         } else {
-            try {
-                $headers = @{
-                    'Authorization' = "Bearer $psuToken"
-                    'Content-Type'  = 'application/json'
-                }
+            # TODO: Re-enable once PSU module import API is working correctly
+            # try {
+            #     $headers = @{
+            #         'Authorization' = "Bearer $psuToken"
+            #         'Content-Type'  = 'application/json'
+            #     }
 
-                # Install/update module on PSU server
-                Write-Host "  Installing $moduleName $fullVersion on PSU server..." -ForegroundColor Gray
-                $moduleBody = @{ name = $moduleName; version = $fullVersion } | ConvertTo-Json
-                $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/module" -Method POST -Headers $headers -Body $moduleBody
-                Write-Host "  [OK] Module installed" -ForegroundColor Green
+            #     # Install/update module on PSU server
+            #     Write-Host "  Installing $moduleName $fullVersion on PSU server..." -ForegroundColor Gray
+            #     $moduleBody = @{ name = $moduleName; version = $fullVersion } | ConvertTo-Json
+            #     $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/module" -Method POST -Headers $headers -Body $moduleBody
+            #     Write-Host "  [OK] Module installed" -ForegroundColor Green
 
-                # Get the dashboard/app ID
-                Write-Host '  Finding Devolutions CIEM app...' -ForegroundColor Gray
-                $dashboards = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard" -Method GET -Headers $headers
-                $ciemApp = $dashboards | Where-Object { $_.name -eq 'Devolutions CIEM' }
+            #     # Get the dashboard/app ID
+            #     Write-Host '  Finding Devolutions CIEM app...' -ForegroundColor Gray
+            #     $dashboards = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard" -Method GET -Headers $headers
+            #     $ciemApp = $dashboards | Where-Object { $_.name -eq 'Devolutions CIEM' }
 
-                if ($ciemApp) {
-                    $appId = $ciemApp.id
-                    Write-Host "  [OK] Found app (ID: $appId)" -ForegroundColor Green
+            #     if ($ciemApp) {
+            #         $appId = $ciemApp.id
+            #         Write-Host "  [OK] Found app (ID: $appId)" -ForegroundColor Green
 
-                    # Restart app (stop then start)
-                    Write-Host '  Restarting app...' -ForegroundColor Gray
-                    $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard/$appId/status" -Method DELETE -Headers $headers
-                    Start-Sleep -Seconds 2
-                    $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard/$appId/status" -Method PUT -Headers $headers
-                    Write-Host "  [OK] App restarted" -ForegroundColor Green
-                } else {
-                    Write-Host '  [WARN] Devolutions CIEM app not found on PSU server' -ForegroundColor Yellow
-                }
-            } catch {
-                Write-Host "  [ERROR] Failed to update PSU server: $($_.Exception.Message)" -ForegroundColor Red
-                Write-Host '  Manual update required: PSU Admin Console > Platform > Gallery' -ForegroundColor Yellow
-            }
+            #         # Restart app (stop then start)
+            #         Write-Host '  Restarting app...' -ForegroundColor Gray
+            #         $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard/$appId/status" -Method DELETE -Headers $headers
+            #         Start-Sleep -Seconds 2
+            #         $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard/$appId/status" -Method PUT -Headers $headers
+            #         Write-Host "  [OK] App restarted" -ForegroundColor Green
+            #     } else {
+            #         Write-Host '  [WARN] Devolutions CIEM app not found on PSU server' -ForegroundColor Yellow
+            #     }
+            # } catch {
+            #     Write-Host "  [ERROR] Failed to update PSU server: $($_.Exception.Message)" -ForegroundColor Red
+            #     Write-Host '  Manual update required: PSU Admin Console > Platform > Gallery' -ForegroundColor Yellow
+            # }
+            Write-Host '  [SKIP] Auto-update disabled (manual import required)' -ForegroundColor Yellow
+            Write-Host '  Manual update: PSU Admin Console > Platform > Gallery' -ForegroundColor Yellow
         }
 
         Write-Host ''
