@@ -119,20 +119,23 @@ function New-DevolutionsCIEMApp {
         This function is exported for PSU to invoke via New-PSUApp -Module -Command.
     #>
     [CmdletBinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Creates in-memory PSU dashboard object, no system state change')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidReturnStatement', '', Justification = 'Return statements required for early exit in PSU OnClick handlers')]
     param()
 
     # Helper function to find config.json path
     function Get-CIEMConfigPath {
+        $configPath = $null
         $module = Get-Module -Name 'Devolutions.CIEM' -ErrorAction SilentlyContinue
         if ($module) {
-            $configPath = Join-Path $module.ModuleBase 'config.json'
-            if (Test-Path $configPath) { return $configPath }
+            $modulePath = Join-Path $module.ModuleBase 'config.json'
+            if (Test-Path $modulePath) { $configPath = $modulePath }
         }
-        if ($script:ModuleRoot) {
-            $configPath = Join-Path $script:ModuleRoot 'config.json'
-            if (Test-Path $configPath) { return $configPath }
+        if (-not $configPath -and $script:ModuleRoot) {
+            $rootPath = Join-Path $script:ModuleRoot 'config.json'
+            if (Test-Path $rootPath) { $configPath = $rootPath }
         }
-        return $null
+        $configPath
     }
 
     # Sample findings data for PoC demonstration
@@ -695,6 +698,57 @@ function New-DevolutionsCIEMApp {
                             New-UDTypography -Text 'AWS authentication configuration will be available in a future release.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic' }
                         }
                     }
+
+                    # Required Permissions Button
+                    New-UDElement -Tag 'div' -Content {
+                        New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
+                            try {
+                                $permissions = Get-CIEMRequiredPermission
+                                Show-UDModal -Header {
+                                    New-UDTypography -Text 'Required Permissions for CIEM Scans' -Variant 'h6'
+                                } -Content {
+                                    New-UDElement -Tag 'div' -Content {
+                                        New-UDTypography -Text "The following permissions are required for the service principal to run all $($permissions.CheckCount) security checks:" -Variant 'body2' -Style @{ marginBottom = '16px' }
+
+                                        if ($permissions.Graph.Count -gt 0) {
+                                            New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                            New-UDTypography -Text 'Grant these in Azure Portal > App Registrations > API Permissions > Add > Microsoft Graph > Application permissions' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                            New-UDList -Content {
+                                                foreach ($perm in $permissions.Graph) {
+                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Key' -Size 'sm')
+                                                }
+                                            }
+                                        }
+
+                                        if ($permissions.ARM.Count -gt 0) {
+                                            New-UDTypography -Text 'Azure Resource Manager RBAC Actions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                            New-UDTypography -Text 'Assign the Reader role at the subscription or management group level to cover these permissions.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                            New-UDList -Content {
+                                                foreach ($perm in $permissions.ARM) {
+                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
+                                                }
+                                            }
+                                        }
+
+                                        if ($permissions.KeyVaultDataPlane.Count -gt 0) {
+                                            New-UDTypography -Text 'Key Vault Data Plane Permissions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                            New-UDTypography -Text 'Configure Key Vault access policy or RBAC for data plane access.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                            New-UDList -Content {
+                                                foreach ($perm in $permissions.KeyVaultDataPlane) {
+                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Lock' -Size 'sm')
+                                                }
+                                            }
+                                        }
+                                    } -Attributes @{ style = @{ maxHeight = '60vh'; overflowY = 'auto' } }
+                                } -Footer {
+                                    New-UDButton -Text 'Close' -OnClick { Hide-UDModal }
+                                } -Persistent -FullWidth -MaxWidth 'md'
+                            }
+                            catch {
+                                Show-UDToast -Message "Failed to get permissions: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                            }
+                        }
+                    } -Attributes @{ style = @{ marginTop = '16px' } }
                 }
             }
 

@@ -94,9 +94,11 @@ function Convert-ProwlerCheck {
         }
 
         if ($serviceMap.ContainsKey($ServiceName.ToLower())) {
-            return $serviceMap[$ServiceName.ToLower()]
+            $serviceMap[$ServiceName.ToLower()]
         }
-        return $ServiceName.Substring(0, 1).ToUpper() + $ServiceName.Substring(1).ToLower()
+        else {
+            $ServiceName.Substring(0, 1).ToUpper() + $ServiceName.Substring(1).ToLower()
+        }
     }
 
     function Get-CheckFunctionName {
@@ -107,7 +109,7 @@ function Convert-ProwlerCheck {
                 $_.Substring(0, 1).ToUpper() + $_.Substring(1).ToLower()
             }
         }
-        return "Test-$($pascalParts -join '')"
+        "Test-$($pascalParts -join '')"
     }
 
     function Get-InferredPermission {
@@ -190,7 +192,7 @@ function Convert-ProwlerCheck {
             }
         }
 
-        return $perms
+        $perms
     }
 
     function ConvertTo-PowerShellCheck {
@@ -232,7 +234,7 @@ function $FunctionName {
     New-CIEMFinding @params
 }
 "@
-        return $scriptContent
+        $scriptContent
     }
 
     function ConvertTo-CheckMetadataJson {
@@ -258,7 +260,7 @@ function $FunctionName {
             }
         }
 
-        return [ordered]@{
+        [ordered]@{
             id           = $Metadata.CheckID
             service      = $ServiceDisplayName
             title        = $Metadata.CheckTitle

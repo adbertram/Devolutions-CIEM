@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.17'
+    ModuleVersion = '0.2.19'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -38,6 +38,7 @@
         'Get-CIEMAuthenticationContext',
         'Get-CIEMCheck',
         'Get-CIEMProvider',
+        'Get-CIEMRequiredPermission',
         'Get-PSUInstalledEnvironment',
         'Get-ProwlerCheck',
         'Invoke-CIEMScan',
@@ -129,6 +130,7 @@
         'Public/Get-CIEMAuthenticationContext.ps1',
         'Public/Get-CIEMCheck.ps1',
         'Public/Get-CIEMProvider.ps1',
+        'Public/Get-CIEMRequiredPermission.ps1',
         'Public/Get-PSUInstalledEnvironment.ps1',
         'Public/Get-ProwlerCheck.ps1',
         'Public/Invoke-CIEMScan.ps1',
@@ -152,6 +154,14 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+## 0.2.19 - Code Quality Improvements
+- Renamed Get-CIEMRequiredPermissions to Get-CIEMRequiredPermission (singular noun)
+- Fixed PSScriptAnalyzer warnings for return statements
+- Fixed helper function naming to avoid ShouldProcess requirements
+- Improved code structure in Get-PSUInstalledEnvironment and Get-CIEMRequiredPermission
+- Added proper begin/process block structure to Set-CIEMConfig
+- Added suppression attributes for PSU dashboard callback return statements
+
 ## 0.2.14 - Multi-Provider Authentication Support
 - Renamed "Azure Authentication" to "Cloud Provider Authentication"
 - Added Provider dropdown (Azure enabled, AWS coming soon)

@@ -21,31 +21,32 @@ function Get-PSUInstalledEnvironment {
 
     # Return cached value if available
     if ($script:PSUEnvironment) {
-        return $script:PSUEnvironment
-    }
-
-    # Azure App Service environment variables
-    $websiteSiteName = [System.Environment]::GetEnvironmentVariable('WEBSITE_SITE_NAME')
-    $websiteInstanceId = [System.Environment]::GetEnvironmentVariable('WEBSITE_INSTANCE_ID')
-
-    $isAzureWebApp = $null -ne $websiteSiteName -or $null -ne $websiteInstanceId
-
-    if ($isAzureWebApp) {
-        $script:PSUEnvironment = [PSCustomObject]@{
-            Environment             = 'AzureWebApp'
-            SupportsManagedIdentity = $true
-            Description             = 'Running in Azure App Service. Managed Identity authentication is available.'
-            WebsiteName             = $websiteSiteName
-        }
+        $script:PSUEnvironment
     }
     else {
-        $script:PSUEnvironment = [PSCustomObject]@{
-            Environment             = 'OnPremises'
-            SupportsManagedIdentity = $false
-            Description             = 'Running on-premises. Use Service Principal or Interactive authentication for Azure access.'
-            WebsiteName             = $null
-        }
-    }
+        # Azure App Service environment variables
+        $websiteSiteName = [System.Environment]::GetEnvironmentVariable('WEBSITE_SITE_NAME')
+        $websiteInstanceId = [System.Environment]::GetEnvironmentVariable('WEBSITE_INSTANCE_ID')
 
-    return $script:PSUEnvironment
+        $isAzureWebApp = $null -ne $websiteSiteName -or $null -ne $websiteInstanceId
+
+        if ($isAzureWebApp) {
+            $script:PSUEnvironment = [PSCustomObject]@{
+                Environment             = 'AzureWebApp'
+                SupportsManagedIdentity = $true
+                Description             = 'Running in Azure App Service. Managed Identity authentication is available.'
+                WebsiteName             = $websiteSiteName
+            }
+        }
+        else {
+            $script:PSUEnvironment = [PSCustomObject]@{
+                Environment             = 'OnPremises'
+                SupportsManagedIdentity = $false
+                Description             = 'Running on-premises. Use Service Principal or Interactive authentication for Azure access.'
+                WebsiteName             = $null
+            }
+        }
+
+        $script:PSUEnvironment
+    }
 }
