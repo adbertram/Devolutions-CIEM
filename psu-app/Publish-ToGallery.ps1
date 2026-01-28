@@ -4,9 +4,9 @@
 .SYNOPSIS
     Publish Devolutions.CIEM module to PowerShell Gallery
 .DESCRIPTION
-    Validates and publishes the Devolutions.CIEM module to PowerShell Gallery.
-    Once published, the module appears in PSU Gallery (any PSU server) due to
-    the 'PowerShellUniversal' tag.
+    Automatically bumps the version and publishes the Devolutions.CIEM module to
+    PowerShell Gallery. Once published, the module appears in PSU Gallery (any PSU
+    server) due to the 'PowerShellUniversal' tag.
 
     Users install via: PSU Admin Console > Platform > Gallery > Search "Devolutions.CIEM"
 
@@ -23,22 +23,27 @@
     PowerShell Gallery API key. If not provided, checks $env:NUGET_API_KEY
 .PARAMETER ModulePath
     Path to Devolutions.CIEM module (optional, auto-detected if not specified)
+.PARAMETER BumpVersion
+    Version component to increment: Patch (default), Minor, or Major.
+    - Patch: 0.2.0 -> 0.2.1
+    - Minor: 0.2.0 -> 0.3.0
+    - Major: 0.2.0 -> 1.0.0
 .PARAMETER WhatIf
     Show what would be published without actually publishing
 .PARAMETER SkipValidation
     Skip module validation (not recommended)
 .EXAMPLE
-    ./Deploy-PSUApp.ps1 -NuGetApiKey 'your-api-key'
+    ./Publish-ToGallery.ps1
+    # Auto-bumps patch version and publishes (uses $env:NUGET_API_KEY)
 .EXAMPLE
-    # Using environment variable
-    $env:NUGET_API_KEY = 'your-api-key'
-    ./Deploy-PSUApp.ps1
+    ./Publish-ToGallery.ps1 -BumpVersion Minor
+    # Bumps minor version (0.2.0 -> 0.3.0) and publishes
 .EXAMPLE
-    # Dry run
-    ./Deploy-PSUApp.ps1 -WhatIf
+    ./Publish-ToGallery.ps1 -WhatIf
+    # Shows what version would be published without actually publishing
 .NOTES
     Author: Adam Bertram
-    Version: 6.0.0
+    Version: 7.0.0
 
     Prerequisites:
     - PowerShell Gallery API key (get from https://www.powershellgallery.com/account/apikeys)
@@ -63,6 +68,10 @@ param(
 
     [Parameter()]
     [string]$ModulePath,
+
+    [Parameter()]
+    [ValidateSet('Patch', 'Minor', 'Major')]
+    [string]$BumpVersion = 'Patch',
 
     [Parameter()]
     [switch]$SkipValidation
@@ -114,14 +123,35 @@ foreach ($file in $requiredFiles) {
 }
 
 # ============================================================================
-# Step 2: Read Module Manifest (no validation)
+# Step 2: Read Current Version and Bump
 # ============================================================================
 Write-Host ''
-Write-Host 'Step 2: Reading module manifest...' -ForegroundColor Yellow
+Write-Host 'Step 2: Reading and bumping version...' -ForegroundColor Yellow
 
 $manifest = Import-PowerShellDataFile -Path $ManifestPath
-Write-Host "  [OK] Module: Devolutions.CIEM" -ForegroundColor Green
-Write-Host "  [OK] Version: $($manifest.ModuleVersion)" -ForegroundColor Green
+$currentVersion = [version]$manifest.ModuleVersion
+Write-Host "  Current version: $currentVersion" -ForegroundColor Gray
+
+# Calculate new version
+$newVersion = switch ($BumpVersion) {
+    'Major' { [version]::new($currentVersion.Major + 1, 0, 0) }
+    'Minor' { [version]::new($currentVersion.Major, $currentVersion.Minor + 1, 0) }
+    'Patch' { [version]::new($currentVersion.Major, $currentVersion.Minor, $currentVersion.Build + 1) }
+}
+
+Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
+
+# Update the manifest file
+$manifestContent = Get-Content -Path $ManifestPath -Raw
+$updatedContent = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
+
+if ($PSCmdlet.ShouldProcess($ManifestPath, "Update ModuleVersion to $newVersion")) {
+    Set-Content -Path $ManifestPath -Value $updatedContent -NoNewline
+    Write-Host "  [OK] Updated $ManifestPath" -ForegroundColor Green
+}
+
+# Re-read manifest to get updated values
+$manifest = Import-PowerShellDataFile -Path $ManifestPath
 $tags = $manifest.PrivateData.PSData.Tags
 Write-Host "  [OK] Tags: $($tags -join ', ')" -ForegroundColor Green
 
@@ -135,6 +165,21 @@ if (-not $NuGetApiKey) {
     $NuGetApiKey = $env:NUGET_API_KEY
 }
 
+# Try to load from .env file if not set
+if (-not $NuGetApiKey) {
+    $envFile = Join-Path $ProjectRoot '.env'
+    if (Test-Path $envFile) {
+        Write-Host '  Loading from .env file...' -ForegroundColor Gray
+        $envContent = Get-Content $envFile -ErrorAction SilentlyContinue
+        foreach ($line in $envContent) {
+            if ($line -match '^NUGET_API_KEY=(.+)$') {
+                $NuGetApiKey = $Matches[1].Trim()
+                break
+            }
+        }
+    }
+}
+
 if (-not $NuGetApiKey) {
     Write-Host ''
     Write-Host 'ERROR: NuGet API key required.' -ForegroundColor Red
@@ -142,7 +187,8 @@ if (-not $NuGetApiKey) {
     Write-Host 'Options:' -ForegroundColor Yellow
     Write-Host '  1. Pass as parameter: -NuGetApiKey ''your-key''' -ForegroundColor Cyan
     Write-Host '  2. Set environment variable: $env:NUGET_API_KEY = ''your-key''' -ForegroundColor Cyan
-    Write-Host '  3. Get a key from: https://www.powershellgallery.com/account/apikeys' -ForegroundColor Cyan
+    Write-Host '  3. Add NUGET_API_KEY=your-key to .env file' -ForegroundColor Cyan
+    Write-Host '  4. Get a key from: https://www.powershellgallery.com/account/apikeys' -ForegroundColor Cyan
     Write-Host ''
     throw 'NuGet API key required for publishing'
 }
@@ -150,13 +196,13 @@ if (-not $NuGetApiKey) {
 Write-Host '  [OK] API key provided' -ForegroundColor Green
 
 # ============================================================================
-# Step 4: Check if Version Already Exists
+# Step 4: Check PowerShell Gallery
 # ============================================================================
 Write-Host ''
 Write-Host 'Step 4: Checking PowerShell Gallery...' -ForegroundColor Yellow
 
 $moduleName = 'Devolutions.CIEM'
-$moduleVersion = $manifest.ModuleVersion.ToString()
+$moduleVersion = $newVersion.ToString()
 if ($manifest.PrivateData.PSData.Prerelease) {
     $fullVersion = "$moduleVersion-$($manifest.PrivateData.PSData.Prerelease)"
 } else {
@@ -167,13 +213,10 @@ try {
     $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
     if ($existing) {
         Write-Host "  [INFO] Latest published version: $($existing.Version)" -ForegroundColor Cyan
-        if ($existing.Version -eq $fullVersion) {
-            throw "Version $fullVersion already exists in PowerShell Gallery. Bump the version in the manifest."
-        }
     } else {
         Write-Host '  [INFO] Module not yet published (first release)' -ForegroundColor Cyan
     }
-} catch [Microsoft.PowerShell.PackageManagement.Cmdlets.FindPackage.ModuleNotFound] {
+} catch {
     Write-Host '  [INFO] Module not yet published (first release)' -ForegroundColor Cyan
 }
 
@@ -233,6 +276,71 @@ if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerS
             Write-Host "  Find-Module -Name '$moduleName' -AllowPrerelease" -ForegroundColor Cyan
         }
 
+        # ============================================================================
+        # Step 7: Update PSU Server
+        # ============================================================================
+        Write-Host ''
+        Write-Host 'Step 7: Updating PSU server...' -ForegroundColor Yellow
+
+        # Load PSU credentials from .env
+        $psuUrl = $env:PSU_URL
+        $psuToken = $env:PSU_TOKEN
+
+        if (-not $psuUrl -or -not $psuToken) {
+            $envFile = Join-Path $ProjectRoot '.env'
+            if (Test-Path $envFile) {
+                $envContent = Get-Content $envFile -ErrorAction SilentlyContinue
+                foreach ($line in $envContent) {
+                    if ($line -match '^PSU_URL=(.+)$') {
+                        $psuUrl = $Matches[1].Trim()
+                    }
+                    if ($line -match '^PSU_TOKEN=(.+)$') {
+                        $psuToken = $Matches[1].Trim()
+                    }
+                }
+            }
+        }
+
+        if (-not $psuUrl -or -not $psuToken) {
+            Write-Host '  [SKIP] PSU_URL or PSU_TOKEN not found in environment or .env file' -ForegroundColor Yellow
+            Write-Host '  Manual update required: PSU Admin Console > Platform > Gallery' -ForegroundColor Yellow
+        } else {
+            try {
+                $headers = @{
+                    'Authorization' = "Bearer $psuToken"
+                    'Content-Type'  = 'application/json'
+                }
+
+                # Install/update module on PSU server
+                Write-Host "  Installing $moduleName $fullVersion on PSU server..." -ForegroundColor Gray
+                $moduleBody = @{ name = $moduleName; version = $fullVersion } | ConvertTo-Json
+                $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/module" -Method POST -Headers $headers -Body $moduleBody
+                Write-Host "  [OK] Module installed" -ForegroundColor Green
+
+                # Get the dashboard/app ID
+                Write-Host '  Finding Devolutions CIEM app...' -ForegroundColor Gray
+                $dashboards = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard" -Method GET -Headers $headers
+                $ciemApp = $dashboards | Where-Object { $_.name -eq 'Devolutions CIEM' }
+
+                if ($ciemApp) {
+                    $appId = $ciemApp.id
+                    Write-Host "  [OK] Found app (ID: $appId)" -ForegroundColor Green
+
+                    # Restart app (stop then start)
+                    Write-Host '  Restarting app...' -ForegroundColor Gray
+                    $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard/$appId/status" -Method DELETE -Headers $headers
+                    Start-Sleep -Seconds 2
+                    $null = Invoke-RestMethod -Uri "$psuUrl/api/v1/dashboard/$appId/status" -Method PUT -Headers $headers
+                    Write-Host "  [OK] App restarted" -ForegroundColor Green
+                } else {
+                    Write-Host '  [WARN] Devolutions CIEM app not found on PSU server' -ForegroundColor Yellow
+                }
+            } catch {
+                Write-Host "  [ERROR] Failed to update PSU server: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host '  Manual update required: PSU Admin Console > Platform > Gallery' -ForegroundColor Yellow
+            }
+        }
+
         Write-Host ''
         Write-Host '========================================' -ForegroundColor Cyan
         Write-Host 'Publication Successful!' -ForegroundColor Green
@@ -244,13 +352,12 @@ if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerS
         Write-Host 'PowerShell Gallery:' -ForegroundColor Cyan
         Write-Host "  https://www.powershellgallery.com/packages/$moduleName" -ForegroundColor White
         Write-Host ''
-        Write-Host 'PSU Installation (any PSU server):' -ForegroundColor Cyan
-        Write-Host '  1. PSU Admin Console > Platform > Gallery' -ForegroundColor White
-        Write-Host "  2. Search '$moduleName'" -ForegroundColor White
-        Write-Host '  3. Click Install' -ForegroundColor White
-        Write-Host '  4. App appears at /ciem' -ForegroundColor White
-        Write-Host ''
-        Write-Host 'Note: PSU Gallery syncs every ~5 minutes' -ForegroundColor DarkGray
+        Write-Host 'PSU Server:' -ForegroundColor Cyan
+        if ($psuUrl) {
+            Write-Host "  $psuUrl/ciem/ciem/findings" -ForegroundColor White
+        } else {
+            Write-Host '  (not configured)' -ForegroundColor Gray
+        }
     } catch {
         throw "Failed to publish module: $($_.Exception.Message)"
     }
@@ -258,7 +365,8 @@ if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerS
     Write-Host ''
     Write-Host '[DRY RUN] Would publish:' -ForegroundColor Yellow
     Write-Host "  Module: $moduleName"
-    Write-Host "  Version: $fullVersion"
+    Write-Host "  Current version: $currentVersion"
+    Write-Host "  New version: $fullVersion"
     Write-Host "  Path: $ModulePath"
     Write-Host "  Repository: PSGallery"
 }

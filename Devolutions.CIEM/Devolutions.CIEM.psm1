@@ -316,7 +316,88 @@ function New-DevolutionsCIEMApp {
                     Show-UDToast -Message 'Redirecting to Devolutions PAM for remediation...' -Duration 3000
                 }
             }
-        }
+        } -OnExport {
+            if ($EventData.Type -eq 'JSON') {
+                # Build hierarchical structure: providers -> services -> findings
+                $providers = @{}
+                $severityCounts = @{ CRITICAL = 0; HIGH = 0; MEDIUM = 0; LOW = 0; INFO = 0 }
+
+                foreach ($finding in $SampleFindings) {
+                    $provider = $finding.Provider
+                    $service = $finding.Service
+
+                    # Initialize provider if not exists
+                    if (-not $providers.ContainsKey($provider)) {
+                        $providers[$provider] = @{}
+                    }
+
+                    # Initialize service if not exists
+                    if (-not $providers[$provider].ContainsKey($service)) {
+                        $providers[$provider][$service] = @{
+                            findings = @()
+                            summary = @{ total = 0; failed = 0; passed = 0 }
+                        }
+                    }
+
+                    # Add finding to service
+                    $providers[$provider][$service].findings += @{
+                        id = $finding.Id
+                        checkId = $finding.CheckId
+                        title = $finding.Title
+                        severity = $finding.Severity
+                        status = $finding.Status
+                        resourceName = $finding.ResourceName
+                        description = $finding.Description
+                        remediation = $finding.Remediation
+                    }
+
+                    # Update service summary
+                    $providers[$provider][$service].summary.total++
+                    if ($finding.Status -eq 'FAIL') {
+                        $providers[$provider][$service].summary.failed++
+                    } else {
+                        $providers[$provider][$service].summary.passed++
+                    }
+
+                    # Update severity counts
+                    if ($severityCounts.ContainsKey($finding.Severity)) {
+                        $severityCounts[$finding.Severity]++
+                    }
+                }
+
+                # Build final export structure
+                $ExportData = @{
+                    metadata = @{
+                        exportedAt = (Get-Date).ToString('o')
+                        totalFindings = $SampleFindings.Count
+                        summary = $severityCounts
+                    }
+                    providers = $providers
+                }
+
+                $JsonContent = $ExportData | ConvertTo-Json -Depth 10
+                Out-UDDataGridExport -Data $JsonContent -FileName 'ciem-findings.json'
+            }
+            elseif ($EventData.Type -eq 'CSV') {
+                # CSV remains flat for spreadsheet compatibility
+                $CsvData = $SampleFindings | ForEach-Object {
+                    @{
+                        id = $_.Id
+                        checkId = $_.CheckId
+                        title = $_.Title
+                        severity = $_.Severity
+                        status = $_.Status
+                        provider = $_.Provider
+                        service = $_.Service
+                        resourceName = $_.ResourceName
+                        description = $_.Description
+                        remediation = $_.Remediation
+                    }
+                }
+                $CsvContent = $CsvData | ConvertTo-Csv -NoTypeInformation | Out-String
+                Out-UDDataGridExport -Data $CsvContent -FileName 'ciem-findings.csv'
+            }
+        } -ExportOptions @('CSV', 'JSON')
     } -Navigation $Navigation -NavigationLayout permanent
 
     # Page: Scan
