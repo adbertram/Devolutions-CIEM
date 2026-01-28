@@ -64,6 +64,9 @@ $script:IAMService = @{}
 $script:KeyVaultService = @{}
 $script:StorageService = @{}
 
+# Initialize PSU environment detection (populated on first access)
+$script:PSUEnvironment = $null
+
 # Get public, private, and check function definition files
 $Public = @(Get-ChildItem -Path $PSScriptRoot\Public\*.ps1 -ErrorAction SilentlyContinue)
 $Private = @(Get-ChildItem -Path $PSScriptRoot\Private\*.ps1 -ErrorAction SilentlyContinue)
@@ -504,8 +507,33 @@ function New-DevolutionsCIEMApp {
             }
         }
 
+        # Get PSU environment
+        $envInfo = Get-PSUInstalledEnvironment
+
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure CIEM scan settings, authentication, and integrations' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
+
+        # Deployment Environment section
+        New-UDCard -Title 'Deployment Environment' -Style @{ marginBottom = '20px' } -Content {
+            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                if ($envInfo.Environment -eq 'AzureWebApp') {
+                    New-UDChip -Label 'Azure Web App' -Icon (New-UDIcon -Icon 'Cloud') -Style @{
+                        backgroundColor = '#1976d2'
+                        color = 'white'
+                    }
+                }
+                else {
+                    New-UDChip -Label 'On-Premises' -Icon (New-UDIcon -Icon 'Server') -Style @{
+                        backgroundColor = '#4caf50'
+                        color = 'white'
+                    }
+                }
+                New-UDTypography -Text $envInfo.Description -Variant 'body2' -Style @{ marginLeft = '16px' }
+            }
+            if ($envInfo.WebsiteName) {
+                New-UDTypography -Text "Site: $($envInfo.WebsiteName)" -Variant 'caption' -Style @{ color = '#666'; marginTop = '8px' }
+            }
+        }
 
         New-UDGrid -Container -Spacing 3 -Content {
             New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
@@ -519,8 +547,20 @@ function New-DevolutionsCIEMApp {
                         } -DefaultValue $CurrentConfig.azure.authentication.method -FullWidth -OnChange { Sync-UDElement -Id 'spFieldsContainer' }
                     } -Attributes @{ style = @{ marginBottom = '16px' } }
 
+                    # Warning when on-prem and ManagedIdentity might be selected
+                    if (-not $envInfo.SupportsManagedIdentity) {
+                        New-UDAlert -Severity 'info' -Text 'Managed Identity is only available in Azure App Service deployments.' -Dense -Style @{ marginBottom = '8px' }
+                    }
+
                     New-UDDynamic -Id 'spFieldsContainer' -Content {
                         $selectedMethod = (Get-UDElement -Id 'authMethod').value
+
+                        # Warning if ManagedIdentity selected on-prem
+                        $envCheck = Get-PSUInstalledEnvironment
+                        if ($selectedMethod -eq 'ManagedIdentity' -and -not $envCheck.SupportsManagedIdentity) {
+                            New-UDAlert -Severity 'warning' -Text 'Managed Identity will not work in on-premises deployments. Please choose a different authentication method.' -Style @{ marginBottom = '16px' }
+                        }
+
                         if ($selectedMethod -eq 'ServicePrincipal') {
                             New-UDElement -Tag 'div' -Content { New-UDTextbox -Id 'spTenantId' -Label 'Tenant ID' -Value $CurrentConfig.azure.authentication.servicePrincipal.tenantId -FullWidth -Placeholder 'Enter Azure AD Tenant ID' } -Attributes @{ style = @{ marginBottom = '16px' } }
                             New-UDElement -Tag 'div' -Content { New-UDTextbox -Id 'spClientId' -Label 'Client ID (App ID)' -Value $CurrentConfig.azure.authentication.servicePrincipal.clientId -FullWidth -Placeholder 'Enter Service Principal Client ID' } -Attributes @{ style = @{ marginBottom = '16px' } }
@@ -561,6 +601,14 @@ function New-DevolutionsCIEMApp {
                 New-UDButton -Text 'Save Configuration' -Variant 'contained' -Color 'primary' -OnClick {
                     try {
                         $authMethod = (Get-UDElement -Id 'authMethod').value
+
+                        # Validate ManagedIdentity is only saved when supported
+                        $envInfo = Get-PSUInstalledEnvironment
+                        if ($authMethod -eq 'ManagedIdentity' -and -not $envInfo.SupportsManagedIdentity) {
+                            Show-UDToast -Message 'Managed Identity is not available in on-premises deployments. Please choose a different authentication method.' -Duration 8000 -BackgroundColor '#f44336'
+                            return
+                        }
+
                         $subscriptionFilterRaw = (Get-UDElement -Id 'subscriptionFilter').value
                         $throttleLimit = [int](Get-UDElement -Id 'throttleLimit').value
                         $timeoutSeconds = [int](Get-UDElement -Id 'timeoutSeconds').value

@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.11'
+    ModuleVersion = '0.2.13'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -38,6 +38,7 @@
         'Get-CIEMAuthenticationContext',
         'Get-CIEMCheck',
         'Get-CIEMProvider',
+        'Get-PSUInstalledEnvironment',
         'Get-ProwlerCheck',
         'Invoke-CIEMScan',
         'New-DevolutionsCIEMApp',
@@ -128,6 +129,7 @@
         'Public/Get-CIEMAuthenticationContext.ps1',
         'Public/Get-CIEMCheck.ps1',
         'Public/Get-CIEMProvider.ps1',
+        'Public/Get-PSUInstalledEnvironment.ps1',
         'Public/Get-ProwlerCheck.ps1',
         'Public/Invoke-CIEMScan.ps1',
         'Public/Sync-ProwlerCheck.ps1'
@@ -150,6 +152,12 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+## 0.2.12 - PSU Environment Auto-Detection
+- Added Get-PSUInstalledEnvironment function to detect Azure Web App vs on-premises deployment
+- Configuration page now displays deployment environment with visual indicator
+- Managed Identity auth option shows warning when running on-premises
+- Prevents saving Managed Identity configuration in unsupported environments
+
 ## 0.2.7 - PSResourceGet Publishing Fix
 - Switched from Publish-Module to Publish-PSResource for publishing
 - Root cause: PowerShellGet v2's Publish-Module uses Get-ChildItem WITHOUT -Force
