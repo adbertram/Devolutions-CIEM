@@ -63,6 +63,7 @@ htmlcov/
 **/mcp-config.json
 **/mcpServers.json
 .mcp/
+.playwright-mcp/
 
 # AI Coding Assistants - Cursor
 .cursorignore
