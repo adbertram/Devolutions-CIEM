@@ -32,6 +32,54 @@ slack dm read mamoreau --limit 50
 
 ---
 
+## PSU Research Delegation (MANDATORY)
+
+**ALL PowerShell Universal research tasks MUST be delegated to the `psu-expert` agent.**
+
+Do NOT attempt to answer PSU questions by:
+- Using WebSearch to find PSU documentation
+- Using microsoft_docs_search or other MCP tools
+- Guessing based on general PowerShell knowledge
+
+Instead, invoke the psu-expert agent via the Task tool. The psu-expert has:
+- Local PSU v5 documentation at `docs/psu-docs/`
+- Access to the Azure PSU server filesystem
+- Deep knowledge of PSU APIs, cmdlets, and configuration
+
+**Examples of questions to delegate:**
+- "How do I programmatically import modules in PSU?"
+- "What REST API endpoints does PSU provide?"
+- "How do I configure PSU app authentication?"
+- "Why isn't my PSU dashboard loading?"
+
+**When to delegate:** Any question about PSU features, APIs, configuration, troubleshooting, or best practices.
+
+---
+
+## Module Deployment Workflow (CRITICAL)
+
+**NEVER upload module files directly to the Azure PSU instance.** The correct workflow is:
+
+1. Make changes to `Devolutions.CIEM/` module
+2. Bump version in `Devolutions.CIEM/Devolutions.CIEM.psd1`
+3. Publish to PowerShell Gallery using `psu-app/Publish-ToGallery.ps1`
+4. User manually imports the new version via PSU Admin Console > Platform > Gallery
+
+```bash
+# WRONG - Never do this
+./scripts/azure_psu_file_manager.sh upload Devolutions.CIEM/ Repository/Modules/
+
+# CORRECT - Always use the publish script
+pwsh psu-app/Publish-ToGallery.ps1 -WhatIf  # Dry run first
+pwsh psu-app/Publish-ToGallery.ps1          # Actual publish
+```
+
+**Why:** The PSU Gallery is the distribution mechanism. Direct uploads bypass version control, break the upgrade path for users, and don't follow the intended distribution model.
+
+**Note:** The file manager scripts (`azure_psu_file_manager.sh`, `invoke_command_in_azure_webapp.sh`) are for **troubleshooting and inspection only** - never for deploying module code.
+
+---
+
 ## PowerShell Universal (PSU) Server
 
 A PSU v5 server is deployed in Azure for this project.
