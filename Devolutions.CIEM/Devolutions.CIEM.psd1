@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.13'
+    ModuleVersion = '0.2.17'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -152,6 +152,20 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+## 0.2.14 - Multi-Provider Authentication Support
+- Renamed "Azure Authentication" to "Cloud Provider Authentication"
+- Added Provider dropdown (Azure enabled, AWS coming soon)
+- Added comprehensive Azure authentication methods:
+  - Current Context (existing Az PowerShell session)
+  - Service Principal with Client Secret
+  - Service Principal with Certificate (thumbprint or file path)
+  - Managed Identity (system-assigned or user-assigned)
+  - Device Code (for MFA/restricted environments)
+  - Interactive Browser
+- Dynamic input fields based on selected authentication method
+- Updated config.json schema for multi-provider support
+- Prepared AWS configuration structure for future release
+
 ## 0.2.12 - PSU Environment Auto-Detection
 - Added Get-PSUInstalledEnvironment function to detect Azure Web App vs on-premises deployment
 - Configuration page now displays deployment environment with visual indicator

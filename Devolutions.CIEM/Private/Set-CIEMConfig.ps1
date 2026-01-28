@@ -29,7 +29,7 @@ function Set-CIEMConfig {
     .EXAMPLE
         # Reset to defaults
         $defaults = @{
-            'azure.authentication.method' = 'CurrentContext'
+            'azure.authentication.method' = 'ServicePrincipalSecret'
             'azure.subscriptionFilter' = @()
             'scan.throttleLimit' = 10
             'scan.timeoutSeconds' = 300

@@ -46,14 +46,7 @@ function Get-AzureAuthContext {
     $context = Get-AzContext -ErrorAction SilentlyContinue
 
     switch ($authMethod) {
-        'CurrentContext' {
-            # Use existing Az PowerShell context (from Connect-AzAccount)
-            if (-not $context) {
-                throw "Authentication method is 'CurrentContext' but no Az PowerShell context found. Run Connect-AzAccount first."
-            }
-            Write-Verbose "Using existing Az PowerShell context: $($context.Account.Id)"
-        }
-        'ServicePrincipal' {
+        'ServicePrincipalSecret' {
             $spConfig = $script:Config.azure.authentication.servicePrincipal
             if (-not $spConfig.clientId -or -not $spConfig.clientSecret -or -not $spConfig.tenantId) {
                 throw "Authentication method is 'ServicePrincipal' but tenantId, clientId, or clientSecret not set in config.json"
@@ -84,7 +77,7 @@ function Get-AzureAuthContext {
             Write-Verbose "Using context: $($context.Account.Id)"
         }
         default {
-            throw "Unknown authentication method '$authMethod'. Valid values: CurrentContext, ServicePrincipal, ManagedIdentity, Interactive"
+            throw "Unknown authentication method '$authMethod'. Valid values: ServicePrincipalSecret, ServicePrincipalCertificate, ManagedIdentity, DeviceCode, Interactive"
         }
     }
 

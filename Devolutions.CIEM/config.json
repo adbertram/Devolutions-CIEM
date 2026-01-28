@@ -4,14 +4,24 @@
     "upstreamRemote": "upstream"
   },
   "checksPath": "Private",
+  "cloudProvider": "Azure",
   "azure": {
     "authentication": {
-      "_comment": "method: CurrentContext | ServicePrincipal | ManagedIdentity | Interactive",
-      "method": "CurrentContext",
+      "_comment": "method: ServicePrincipalSecret | ServicePrincipalCertificate | ManagedIdentity | DeviceCode | Interactive",
+      "method": "ServicePrincipalSecret",
+      "tenantId": null,
       "servicePrincipal": {
-        "tenantId": null,
         "clientId": null,
         "clientSecret": null
+      },
+      "certificate": {
+        "clientId": null,
+        "thumbprint": null,
+        "path": null,
+        "password": null
+      },
+      "managedIdentity": {
+        "clientId": null
       }
     },
     "subscriptionFilter": [],
@@ -19,6 +29,23 @@
       "graphApi": "https://graph.microsoft.com/v1.0",
       "armApi": "https://management.azure.com"
     }
+  },
+  "aws": {
+    "authentication": {
+      "_comment": "method: CurrentProfile | AccessKey | AssumeRole | InstanceProfile (future)",
+      "method": "CurrentProfile",
+      "profile": null,
+      "region": null,
+      "accessKey": {
+        "accessKeyId": null,
+        "secretAccessKey": null
+      },
+      "assumeRole": {
+        "roleArn": null,
+        "externalId": null
+      }
+    },
+    "accountFilter": []
   },
   "scan": {
     "throttleLimit": 10,
