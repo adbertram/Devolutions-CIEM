@@ -967,13 +967,14 @@ function Publish-PSUModule {
         - Minor: 0.2.0 -> 0.3.0
         - Major: 0.2.0 -> 1.0.0
 
-    .PARAMETER UpdatePSU
-        After publishing, import the module to the connected PSU instance and
-        restart the associated app. Requires an active PSU connection (Connect-PSU).
-
     .PARAMETER AppName
-        Name of the PSU app to restart after updating. Used with -UpdatePSU.
+        Name of the PSU app to restart after updating the module.
         If not specified, no app restart is performed.
+
+    .PARAMETER SkipPSUUpdate
+        Skip automatically importing the module to the connected PSU instance.
+        By default, if connected to PSU (via Connect-PSU), the module is
+        automatically imported after publishing.
 
     .PARAMETER SkipValidation
         Skip module structure validation (not recommended).
@@ -991,8 +992,8 @@ function Publish-PSUModule {
         # Bumps minor version and publishes
 
     .EXAMPLE
-        Publish-PSUModule -ModulePath ./Devolutions.CIEM -UpdatePSU -AppName "Devolutions CIEM"
-        # Publishes, imports to PSU, and restarts the app
+        Connect-PSU; Publish-PSUModule -ModulePath ./Devolutions.CIEM -AppName "Devolutions CIEM"
+        # Publishes, automatically imports to PSU, and restarts the app
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf
@@ -1011,10 +1012,10 @@ function Publish-PSUModule {
         [string]$BumpVersion = 'Patch',
 
         [Parameter()]
-        [switch]$UpdatePSU,
+        [string]$AppName,
 
         [Parameter()]
-        [string]$AppName,
+        [switch]$SkipPSUUpdate,
 
         [Parameter()]
         [switch]$SkipValidation,
@@ -1244,31 +1245,33 @@ NuGet API key required. Options:
         }
 
         # ====================================================================
-        # Step 7: Update PSU (if requested)
+        # Step 7: Update PSU (automatic if connected)
         # ====================================================================
-        if ($UpdatePSU) {
+        $updatedPSU = $false
+        if (-not $SkipPSUUpdate -and $script:PSUConnection.Url) {
             Write-Host ''
             Write-Host 'Step 7: Updating PSU server...' -ForegroundColor Yellow
 
-            if (-not $script:PSUConnection.Url) {
-                Write-Host '  [SKIP] Not connected to PSU. Run Connect-PSU first.' -ForegroundColor Yellow
-            }
-            else {
-                try {
-                    Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
-                    Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
-                    Write-Host "  [OK] Module imported" -ForegroundColor Green
+            try {
+                Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
+                Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
+                Write-Host "  [OK] Module imported" -ForegroundColor Green
+                $updatedPSU = $true
 
-                    if ($AppName) {
-                        Write-Host "  Restarting app '$AppName'..." -ForegroundColor Gray
-                        Restart-PSUApp -Name $AppName
-                        Write-Host "  [OK] App restarted" -ForegroundColor Green
-                    }
-                }
-                catch {
-                    Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red
+                if ($AppName) {
+                    Write-Host "  Restarting app '$AppName'..." -ForegroundColor Gray
+                    Restart-PSUApp -Name $AppName
+                    Write-Host "  [OK] App restarted" -ForegroundColor Green
                 }
             }
+            catch {
+                Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red
+            }
+        }
+        elseif (-not $SkipPSUUpdate -and -not $script:PSUConnection.Url) {
+            Write-Host ''
+            Write-Host 'Step 7: PSU update skipped (not connected)' -ForegroundColor Gray
+            Write-Host '  Run Connect-PSU first to auto-update PSU after publishing' -ForegroundColor Gray
         }
 
         Write-Host ''
@@ -1281,7 +1284,7 @@ NuGet API key required. Options:
             ModuleName  = $moduleName
             Version     = $fullVersion
             GalleryUrl  = "https://www.powershellgallery.com/packages/$moduleName"
-            UpdatedPSU  = $UpdatePSU -and $script:PSUConnection.Url
+            UpdatedPSU  = $updatedPSU
             Status      = 'Published'
         }
     }
