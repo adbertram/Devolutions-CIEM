@@ -79,12 +79,8 @@ function Invoke-CIEMScan {
 
     Write-Verbose "Starting CIEM scan for provider: $Provider"
 
-    # Step 1: Authenticate
-    Write-Verbose "Authenticating to Azure..."
-    $authParams = @{}
-    if ($TenantId) { $authParams.TenantId = $TenantId }
-
-    $authContext = Get-AzureAuthContext @authParams
+    # Step 1: Verify authentication (must call Connect-CIEM first)
+    $authContext = Assert-CIEMAuthenticated -Provider $Provider
 
     Write-Verbose "Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
     Write-Verbose "Tenant: $($authContext.TenantId)"
@@ -118,7 +114,7 @@ function Invoke-CIEMScan {
     Write-Verbose "Checks to execute: $(@($checks).Count)"
 
     # Step 5: Load check scripts
-    $checkScriptsPath = Join-Path -Path $PSScriptRoot -ChildPath '../Private/Azure/Checks'
+    $checkScriptsPath = Join-Path -Path $PSScriptRoot -ChildPath '../Checks/Azure'
     $checkScripts = Get-ChildItem -Path "$checkScriptsPath/*.ps1"
 
     if (-not $checkScripts -or $checkScripts.Count -eq 0) {

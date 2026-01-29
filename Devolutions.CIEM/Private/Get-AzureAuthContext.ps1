@@ -47,15 +47,16 @@ function Get-AzureAuthContext {
 
     switch ($authMethod) {
         'ServicePrincipalSecret' {
-            $spConfig = $script:Config.azure.authentication.servicePrincipal
-            if (-not $spConfig.clientId -or -not $spConfig.clientSecret -or -not $spConfig.tenantId) {
-                throw "Authentication method is 'ServicePrincipal' but tenantId, clientId, or clientSecret not set in config.json"
+            $authConfig = $script:Config.azure.authentication
+            $spConfig = $authConfig.servicePrincipal
+            if (-not $spConfig.clientId -or -not $spConfig.clientSecret -or -not $authConfig.tenantId) {
+                throw "Authentication method is 'ServicePrincipalSecret' but tenantId, clientId, or clientSecret not set in config.json"
             }
 
             $secureSecret = ConvertTo-SecureString $spConfig.clientSecret -AsPlainText -Force
             $credential = New-Object System.Management.Automation.PSCredential($spConfig.clientId, $secureSecret)
 
-            Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $spConfig.tenantId -ErrorAction Stop | Out-Null
+            Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $authConfig.tenantId -ErrorAction Stop | Out-Null
             $context = Get-AzContext -ErrorAction Stop
             Write-Verbose "Authenticated as service principal: $($spConfig.clientId)"
         }

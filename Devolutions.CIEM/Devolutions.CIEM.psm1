@@ -78,6 +78,9 @@ if (-not $script:Config) {
 $script:EntraService = @{}
 $script:IAMService = @{}
 $script:KeyVaultService = @{}
+
+# Initialize authentication context (populated by Connect-CIEM)
+$script:AuthContext = @{}
 $script:StorageService = @{}
 
 # Initialize PSU environment detection (populated on first access)
