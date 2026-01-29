@@ -7,22 +7,8 @@
   "cloudProvider": "Azure",
   "azure": {
     "authentication": {
-      "_comment": "method: ServicePrincipalSecret | ServicePrincipalCertificate | ManagedIdentity | DeviceCode | Interactive",
-      "method": "ServicePrincipalSecret",
-      "tenantId": null,
-      "servicePrincipal": {
-        "clientId": null,
-        "clientSecret": null
-      },
-      "certificate": {
-        "clientId": null,
-        "thumbprint": null,
-        "path": null,
-        "password": null
-      },
-      "managedIdentity": {
-        "clientId": null
-      }
+      "_comment": "method: ServicePrincipalSecret | ServicePrincipalCertificate | ManagedIdentity | DeviceCode | Interactive. Credentials are stored in .env (local dev) or PSU secrets (production).",
+      "method": "ServicePrincipalSecret"
     },
     "subscriptionFilter": [],
     "endpoints": {
@@ -32,18 +18,10 @@
   },
   "aws": {
     "authentication": {
-      "_comment": "method: CurrentProfile | AccessKey | AssumeRole | InstanceProfile (future)",
+      "_comment": "method: CurrentProfile | AccessKey | AssumeRole | InstanceProfile (future). Credentials are stored in .env (local dev) or PSU secrets (production).",
       "method": "CurrentProfile",
       "profile": null,
-      "region": null,
-      "accessKey": {
-        "accessKeyId": null,
-        "secretAccessKey": null
-      },
-      "assumeRole": {
-        "roleArn": null,
-        "externalId": null
-      }
+      "region": null
     },
     "accountFilter": []
   },

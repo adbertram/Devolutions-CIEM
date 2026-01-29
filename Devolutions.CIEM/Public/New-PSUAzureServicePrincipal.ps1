@@ -392,75 +392,128 @@ $(if ($kvRoles.Count -gt 0) {
     }
     #endregion
 
-    #region Update config.json
-    if ($PSCmdlet.ShouldProcess("config.json", "Update with new service principal credentials")) {
-        Write-Verbose "Updating config.json with new service principal credentials..."
+    #region Store Credentials in PSU Secrets
+    $secretsCreated = $false
+    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
 
-        # Update the in-memory config
-        $script:Config.azure.authentication.tenantId = $tenantId
+    if ($inPSUContext) {
+        if ($PSCmdlet.ShouldProcess("PSU Secrets", "Create CIEM_Azure credentials")) {
+            Write-Verbose "PSU context detected, creating secrets..."
+
+            try {
+                # Create secrets in Database vault
+                New-PSUVariable -Name 'CIEM_Azure_TenantId' -Value $tenantId -Vault 'Database' -ErrorAction Stop
+                New-PSUVariable -Name 'CIEM_Azure_ClientId' -Value $app.AppId -Vault 'Database' -ErrorAction Stop
+
+                if ($CredentialType -eq 'ClientSecret') {
+                    New-PSUVariable -Name 'CIEM_Azure_ClientSecret' -Value $credential -Vault 'Database' -ErrorAction Stop
+                }
+                else {
+                    New-PSUVariable -Name 'CIEM_Azure_CertThumbprint' -Value $certificateThumbprint -Vault 'Database' -ErrorAction Stop
+                }
+
+                $secretsCreated = $true
+                Write-Verbose "PSU secrets created successfully"
+                Write-Host "`nSecrets stored in PSU Database vault:" -ForegroundColor Green
+                Write-Host "  - CIEM_Azure_TenantId"
+                Write-Host "  - CIEM_Azure_ClientId"
+                if ($CredentialType -eq 'ClientSecret') {
+                    Write-Host "  - CIEM_Azure_ClientSecret"
+                }
+                else {
+                    Write-Host "  - CIEM_Azure_CertThumbprint"
+                }
+            }
+            catch {
+                Write-Warning "Failed to create PSU secrets: $_"
+                Write-Warning "You may need to create secrets manually via PSU Admin UI."
+            }
+        }
+    }
+    else {
+        # Write to .env file for local development
+        $envPath = Join-Path -Path $script:ModuleRoot -ChildPath '.env'
+
+        if ($PSCmdlet.ShouldProcess($envPath, "Update .env file with credentials")) {
+            Write-Verbose "Writing credentials to .env file..."
+
+            $envContent = @"
+# CIEM Azure Service Principal Credentials
+# This file is for local development only - do not commit to source control
+# In PSU deployments, use PSU secrets instead (Platform > Variables > Secrets)
+
+CIEM_AZURE_TENANT_ID=$tenantId
+CIEM_AZURE_CLIENT_ID=$($app.AppId)
+$(if ($CredentialType -eq 'ClientSecret') {
+"CIEM_AZURE_CLIENT_SECRET=$credential"
+} else {
+"# CIEM_AZURE_CLIENT_SECRET=
+CIEM_AZURE_CERT_THUMBPRINT=$certificateThumbprint"
+})
+
+# AWS credentials (future)
+# CIEM_AWS_ACCESS_KEY_ID=
+# CIEM_AWS_SECRET_ACCESS_KEY=
+# CIEM_AWS_REGION=
+"@
+            Set-Content -Path $envPath -Value $envContent -Encoding UTF8
+            $secretsCreated = $true
+            Write-Host "`nCredentials written to .env file: $envPath" -ForegroundColor Green
+        }
+
+        Write-Host "`nFor PSU deployment, create these secrets in PSU Admin UI:" -ForegroundColor Yellow
+        Write-Host "  Platform > Variables > Create Secret Variable (Database vault)" -ForegroundColor Gray
+        Write-Host "  - CIEM_Azure_TenantId = $tenantId"
+        Write-Host "  - CIEM_Azure_ClientId = $($app.AppId)"
         if ($CredentialType -eq 'ClientSecret') {
-            $script:Config.azure.authentication.servicePrincipal.clientId = $app.AppId
-            $script:Config.azure.authentication.servicePrincipal.clientSecret = $credential
+            Write-Host "  - CIEM_Azure_ClientSecret = <see .env file>"
         }
         else {
-            $script:Config.azure.authentication.certificate.clientId = $app.AppId
-            $script:Config.azure.authentication.certificate.thumbprint = $certificateThumbprint
+            Write-Host "  - CIEM_Azure_CertThumbprint = $certificateThumbprint"
         }
-
-        # Write to config.json file
-        $configPath = Join-Path -Path $script:ModuleRoot -ChildPath 'config.json'
-        $script:Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configPath -Encoding UTF8
-        Write-Verbose "config.json updated successfully"
     }
     #endregion
 
     #region Build Output
     $output = [PSCustomObject]@{
-        DisplayName          = $DisplayName
-        ApplicationId        = $app.AppId
-        ObjectId             = $app.Id
-        ServicePrincipalId   = $sp.Id
-        TenantId             = $tenantId
-        ClientSecret         = $credential
+        DisplayName           = $DisplayName
+        ApplicationId         = $app.AppId
+        ObjectId              = $app.Id
+        ServicePrincipalId    = $sp.Id
+        TenantId              = $tenantId
+        ClientSecret          = $credential
         CertificateThumbprint = $certificateThumbprint
-        Scope                = $Scope
-        Permissions          = [PSCustomObject]@{
+        Scope                 = $Scope
+        SecretsCreated        = $secretsCreated
+        Permissions           = [PSCustomObject]@{
             Graph             = $permissions.Graph
             ARM               = $permissions.ARM
             KeyVaultDataPlane = $permissions.KeyVaultDataPlane
             CheckCount        = $permissions.CheckCount
         }
-        ConfigurationSample  = @"
-# Add this to your CIEM configuration:
-`$config = @{
-    azure = @{
-        authentication = @{
-            method = '$(if ($CredentialType -eq 'ClientSecret') { 'ServicePrincipalSecret' } else { 'ServicePrincipalCertificate' })'
-            tenantId = '$tenantId'
-            $(if ($CredentialType -eq 'ClientSecret') {
-                "servicePrincipal = @{
-                clientId = '$($app.AppId)'
-                clientSecret = '<stored-securely>'
-            }"
-            } else {
-                "certificate = @{
-                clientId = '$($app.AppId)'
-                thumbprint = '$certificateThumbprint'
-            }"
-            })
-        }
-    }
-}
+        PSUSecrets            = @"
+# Credentials are stored as PSU secrets (Database vault):
+#   - CIEM_Azure_TenantId
+#   - CIEM_Azure_ClientId
+#   - CIEM_Azure_ClientSecret (or CIEM_Azure_CertThumbprint)
+#
+# Connect-CIEM will automatically use these secrets when running in PSU.
+# For local development, credentials fall back to config.json values.
 "@
     }
 
     Write-Host "`nService principal created successfully!" -ForegroundColor Green
     Write-Host "Application (client) ID: $($app.AppId)"
     Write-Host "Tenant ID: $tenantId"
-    if ($credential) {
+
+    if ($secretsCreated) {
+        Write-Host "`nCredentials stored in PSU secrets - ready to use with Connect-CIEM" -ForegroundColor Green
+    }
+    elseif ($credential) {
         Write-Host "`nIMPORTANT: Save the client secret now - it cannot be retrieved later!" -ForegroundColor Yellow
         Write-Host "Client Secret: $credential"
     }
+
     if ($certificateThumbprint) {
         Write-Host "Certificate Thumbprint: $certificateThumbprint"
         Write-Host "Certificate Location: Cert:\CurrentUser\My\$certificateThumbprint"

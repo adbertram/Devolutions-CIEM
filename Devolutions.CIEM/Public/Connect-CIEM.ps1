@@ -147,10 +147,16 @@ function Connect-CIEMAzure {
     <#
     .SYNOPSIS
         Internal function to establish Azure authentication.
+
+    .DESCRIPTION
+        Credential resolution order:
+        1. PSU secrets (when running in PowerShell Universal)
+        2. .env file in module directory (for local development)
+        3. config.json values (legacy, typically null)
     #>
     [CmdletBinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '',
-        Justification = 'Secret is already in memory from config file; conversion to SecureString is required for Connect-AzAccount')]
+        Justification = 'Secret is already in memory from secure source; conversion to SecureString is required for Connect-AzAccount')]
     [OutputType([PSCustomObject])]
     param()
 
@@ -161,45 +167,104 @@ function Connect-CIEMAzure {
 
     Write-Verbose "Azure authentication method: $authMethod"
 
+    # Check if running in PSU context (Secret: drive available)
+    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+
+    # Load .env file for local development
+    $envVars = @{}
+    $envPath = Join-Path -Path $script:ModuleRoot -ChildPath '.env'
+    if (Test-Path $envPath) {
+        Write-Verbose "Loading credentials from .env file..."
+        Get-Content $envPath | ForEach-Object {
+            if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+                $envVars[$matches[1].Trim()] = $matches[2].Trim()
+            }
+        }
+    }
+
     switch ($authMethod) {
         'ServicePrincipalSecret' {
-            $spConfig = $authConfig.servicePrincipal
-            if (-not $spConfig.clientId -or -not $spConfig.clientSecret -or -not $authConfig.tenantId) {
-                throw "Authentication method is 'ServicePrincipalSecret' but tenantId, clientId, or clientSecret not set in config.json"
+            $tenantId = $null
+            $clientId = $null
+            $clientSecret = $null
+
+            # Priority 1: PSU secrets
+            if ($inPSUContext) {
+                Write-Verbose "PSU context detected, checking for secrets..."
+                $tenantId = $Secret:CIEM_Azure_TenantId
+                $clientId = $Secret:CIEM_Azure_ClientId
+                $clientSecret = $Secret:CIEM_Azure_ClientSecret
             }
 
-            $secureSecret = ConvertTo-SecureString $spConfig.clientSecret -AsPlainText -Force
-            $credential = New-Object System.Management.Automation.PSCredential($spConfig.clientId, $secureSecret)
+            # Priority 2: .env file
+            if (-not $tenantId) { $tenantId = $envVars['CIEM_AZURE_TENANT_ID'] }
+            if (-not $clientId) { $clientId = $envVars['CIEM_AZURE_CLIENT_ID'] }
+            if (-not $clientSecret) { $clientSecret = $envVars['CIEM_AZURE_CLIENT_SECRET'] }
 
-            Write-Verbose "Connecting as service principal: $($spConfig.clientId)"
-            Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $authConfig.tenantId -ErrorAction Stop | Out-Null
+            # Priority 3: config.json (legacy fallback)
+            if (-not $tenantId) { $tenantId = $authConfig.tenantId }
+            if (-not $clientId) { $clientId = $authConfig.servicePrincipal.clientId }
+            if (-not $clientSecret) { $clientSecret = $authConfig.servicePrincipal.clientSecret }
+
+            if (-not $clientId -or -not $clientSecret -or -not $tenantId) {
+                $errorMsg = @"
+Authentication method is 'ServicePrincipalSecret' but credentials not found.
+
+Credential sources checked (in order):
+$(if ($inPSUContext) { "  1. PSU secrets: CIEM_Azure_TenantId, CIEM_Azure_ClientId, CIEM_Azure_ClientSecret" } else { "  1. PSU secrets: (not in PSU context)" })
+  2. .env file: $(if (Test-Path $envPath) { $envPath } else { '(not found)' })
+  3. config.json: tenantId, servicePrincipal.clientId, servicePrincipal.clientSecret
+
+For local development, create a .env file in the module directory with:
+  CIEM_AZURE_TENANT_ID=<tenant-id>
+  CIEM_AZURE_CLIENT_ID=<client-id>
+  CIEM_AZURE_CLIENT_SECRET=<client-secret>
+"@
+                throw $errorMsg
+            }
+
+            $secureSecret = ConvertTo-SecureString $clientSecret -AsPlainText -Force
+            $credential = New-Object System.Management.Automation.PSCredential($clientId, $secureSecret)
+
+            Write-Verbose "Connecting as service principal: $clientId"
+            Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $tenantId -ErrorAction Stop | Out-Null
         }
         'ServicePrincipalCertificate' {
-            $certConfig = $authConfig.certificate
-            if (-not $certConfig.clientId -or -not $authConfig.tenantId) {
-                throw "Authentication method is 'ServicePrincipalCertificate' but tenantId or clientId not set in config.json"
+            $tenantId = $null
+            $clientId = $null
+            $thumbprint = $null
+
+            # Priority 1: PSU secrets
+            if ($inPSUContext) {
+                Write-Verbose "PSU context detected, checking for certificate secrets..."
+                $tenantId = $Secret:CIEM_Azure_TenantId
+                $clientId = $Secret:CIEM_Azure_ClientId
+                $thumbprint = $Secret:CIEM_Azure_CertThumbprint
+            }
+
+            # Priority 2: .env file
+            if (-not $tenantId) { $tenantId = $envVars['CIEM_AZURE_TENANT_ID'] }
+            if (-not $clientId) { $clientId = $envVars['CIEM_AZURE_CLIENT_ID'] }
+            if (-not $thumbprint) { $thumbprint = $envVars['CIEM_AZURE_CERT_THUMBPRINT'] }
+
+            if (-not $clientId -or -not $tenantId) {
+                throw "Authentication method is 'ServicePrincipalCertificate' but tenantId or clientId not found in PSU secrets or .env file"
             }
 
             $connectParams = @{
-                ServicePrincipal        = $true
-                ApplicationId           = $certConfig.clientId
-                TenantId                = $authConfig.tenantId
+                ServicePrincipal = $true
+                ApplicationId    = $clientId
+                TenantId         = $tenantId
             }
 
-            if ($certConfig.thumbprint) {
-                $connectParams.CertificateThumbprint = $certConfig.thumbprint
-            }
-            elseif ($certConfig.path) {
-                $connectParams.CertificatePath = $certConfig.path
-                if ($certConfig.password) {
-                    $connectParams.CertificatePassword = ConvertTo-SecureString $certConfig.password -AsPlainText -Force
-                }
+            if ($thumbprint) {
+                $connectParams.CertificateThumbprint = $thumbprint
             }
             else {
-                throw "Certificate authentication requires either thumbprint or path in config.json"
+                throw "Certificate authentication requires thumbprint in PSU secrets (CIEM_Azure_CertThumbprint) or .env file (CIEM_AZURE_CERT_THUMBPRINT)"
             }
 
-            Write-Verbose "Connecting with certificate for: $($certConfig.clientId)"
+            Write-Verbose "Connecting with certificate for: $clientId"
             Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
         }
         'ManagedIdentity' {
