@@ -1076,20 +1076,48 @@ function Publish-PSUModule {
     }
 
     # ========================================================================
-    # Step 2: Read Current Version and Bump
+    # Step 2: Query Gallery and Calculate New Version
     # ========================================================================
     Write-Host ''
-    Write-Host 'Step 2: Reading and bumping version...' -ForegroundColor Yellow
+    Write-Host 'Step 2: Querying PowerShell Gallery for current version...' -ForegroundColor Yellow
 
     $manifest = Import-PowerShellDataFile -Path $manifestPath
-    $currentVersion = [version]$manifest.ModuleVersion
-    Write-Host "  Current version: $currentVersion" -ForegroundColor Gray
+    $localVersion = [version]$manifest.ModuleVersion
+    Write-Host "  Local manifest version: $localVersion" -ForegroundColor Gray
+
+    # Query PowerShell Gallery for the published version
+    $galleryVersion = $null
+    try {
+        $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
+        if ($existing) {
+            # Handle prerelease versions (e.g., "0.2.23-beta" -> "0.2.23")
+            $versionString = $existing.Version -replace '-.*$', ''
+            $galleryVersion = [version]$versionString
+            Write-Host "  Gallery version: $galleryVersion" -ForegroundColor Cyan
+        }
+        else {
+            Write-Host '  Gallery version: Not published yet (first release)' -ForegroundColor Cyan
+        }
+    }
+    catch {
+        Write-Host '  Gallery version: Not published yet (first release)' -ForegroundColor Cyan
+    }
+
+    # Use the higher of gallery or local version as the base
+    if ($galleryVersion) {
+        $baseVersion = if ($galleryVersion -gt $localVersion) { $galleryVersion } else { $localVersion }
+        Write-Host "  Base version for bump: $baseVersion" -ForegroundColor Gray
+    }
+    else {
+        $baseVersion = $localVersion
+        Write-Host "  Base version for bump: $baseVersion (local)" -ForegroundColor Gray
+    }
 
     # Calculate new version
     $newVersion = switch ($BumpVersion) {
-        'Major' { [version]::new($currentVersion.Major + 1, 0, 0) }
-        'Minor' { [version]::new($currentVersion.Major, $currentVersion.Minor + 1, 0) }
-        'Patch' { [version]::new($currentVersion.Major, $currentVersion.Minor, $currentVersion.Build + 1) }
+        'Major' { [version]::new($baseVersion.Major + 1, 0, 0) }
+        'Minor' { [version]::new($baseVersion.Major, $baseVersion.Minor + 1, 0) }
+        'Patch' { [version]::new($baseVersion.Major, $baseVersion.Minor, $baseVersion.Build + 1) }
     }
 
     Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
@@ -1152,10 +1180,10 @@ NuGet API key required. Options:
     Write-Host '  [OK] API key provided' -ForegroundColor Green
 
     # ========================================================================
-    # Step 4: Check PowerShell Gallery
+    # Step 4: Prepare Version String
     # ========================================================================
     Write-Host ''
-    Write-Host 'Step 4: Checking PowerShell Gallery...' -ForegroundColor Yellow
+    Write-Host 'Step 4: Preparing to publish...' -ForegroundColor Yellow
 
     $moduleVersion = $newVersion.ToString()
     if ($manifest.PrivateData.PSData.Prerelease) {
@@ -1165,20 +1193,7 @@ NuGet API key required. Options:
         $fullVersion = $moduleVersion
     }
 
-    try {
-        $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
-        if ($existing) {
-            Write-Host "  [INFO] Latest published version: $($existing.Version)" -ForegroundColor Cyan
-        }
-        else {
-            Write-Host '  [INFO] Module not yet published (first release)' -ForegroundColor Cyan
-        }
-    }
-    catch {
-        Write-Host '  [INFO] Module not yet published (first release)' -ForegroundColor Cyan
-    }
-
-    Write-Host "  [OK] Publishing version: $fullVersion" -ForegroundColor Green
+    Write-Host "  [OK] Will publish version: $fullVersion" -ForegroundColor Green
 
     # ========================================================================
     # Step 5: Publish to PowerShell Gallery
