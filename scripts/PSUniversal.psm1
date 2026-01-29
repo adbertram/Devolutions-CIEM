@@ -971,11 +971,6 @@ function Publish-PSUModule {
         Name of the PSU app to restart after updating the module.
         If not specified, no app restart is performed.
 
-    .PARAMETER SkipPSUUpdate
-        Skip automatically importing the module to the connected PSU instance.
-        By default, if connected to PSU (via Connect-PSU), the module is
-        automatically imported after publishing.
-
     .PARAMETER SkipValidation
         Skip module structure validation (not recommended).
 
@@ -992,8 +987,8 @@ function Publish-PSUModule {
         # Bumps minor version and publishes
 
     .EXAMPLE
-        Connect-PSU; Publish-PSUModule -ModulePath ./Devolutions.CIEM -AppName "Devolutions CIEM"
-        # Publishes, automatically imports to PSU, and restarts the app
+        Publish-PSUModule -ModulePath ./Devolutions.CIEM -AppName "Devolutions CIEM"
+        # Publishes, auto-connects to PSU, imports the module, and restarts the app
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf
@@ -1013,9 +1008,6 @@ function Publish-PSUModule {
 
         [Parameter()]
         [string]$AppName,
-
-        [Parameter()]
-        [switch]$SkipPSUUpdate,
 
         [Parameter()]
         [switch]$SkipValidation,
@@ -1245,13 +1237,26 @@ NuGet API key required. Options:
         }
 
         # ====================================================================
-        # Step 7: Update PSU (automatic if connected)
+        # Step 7: Update PSU (always - auto-connect if needed)
         # ====================================================================
         $updatedPSU = $false
-        if (-not $SkipPSUUpdate -and $script:PSUConnection.Url) {
-            Write-Host ''
-            Write-Host 'Step 7: Updating PSU server...' -ForegroundColor Yellow
+        Write-Host ''
+        Write-Host 'Step 7: Updating PSU server...' -ForegroundColor Yellow
 
+        # Auto-connect to PSU if not already connected
+        if (-not $script:PSUConnection.Url) {
+            Write-Host '  Not connected to PSU. Attempting auto-connect...' -ForegroundColor Gray
+            try {
+                $null = Connect-PSU -ErrorAction Stop
+                Write-Host '  [OK] Connected to PSU' -ForegroundColor Green
+            }
+            catch {
+                Write-Host "  [WARN] Could not auto-connect to PSU: $_" -ForegroundColor Yellow
+                Write-Host '  Ensure PSU_URL and PSU_TOKEN are set in .env file' -ForegroundColor Gray
+            }
+        }
+
+        if ($script:PSUConnection.Url) {
             try {
                 Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
                 Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
@@ -1267,11 +1272,6 @@ NuGet API key required. Options:
             catch {
                 Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red
             }
-        }
-        elseif (-not $SkipPSUUpdate -and -not $script:PSUConnection.Url) {
-            Write-Host ''
-            Write-Host 'Step 7: PSU update skipped (not connected)' -ForegroundColor Gray
-            Write-Host '  Run Connect-PSU first to auto-update PSU after publishing' -ForegroundColor Gray
         }
 
         Write-Host ''
