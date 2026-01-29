@@ -72,14 +72,16 @@ function Get-CIEMRequiredPermission {
         $kvPermissions = @()
 
         foreach ($check in $checks) {
-            if ($check.permissions.graph) {
-                $graphPermissions += $check.permissions.graph
+            # Use safe property access since not all checks have all permission types
+            $perms = $check.permissions
+            if ($perms.PSObject.Properties['graph'] -and $perms.graph) {
+                $graphPermissions += $perms.graph
             }
-            if ($check.permissions.arm) {
-                $armPermissions += $check.permissions.arm
+            if ($perms.PSObject.Properties['arm'] -and $perms.arm) {
+                $armPermissions += $perms.arm
             }
-            if ($check.permissions.keyvaultDataPlane) {
-                $kvPermissions += $check.permissions.keyvaultDataPlane
+            if ($perms.PSObject.Properties['keyvaultDataPlane'] -and $perms.keyvaultDataPlane) {
+                $kvPermissions += $perms.keyvaultDataPlane
             }
         }
 
