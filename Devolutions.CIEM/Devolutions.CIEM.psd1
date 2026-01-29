@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.24'
+    ModuleVersion = '0.2.26'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -110,7 +110,7 @@
         'Devolutions.CIEM.psm1',
         'Private/Convert-ProwlerCheck.ps1',
         'Private/Get-AllGraphPage.ps1',
-        'Private/Get-CIEMConfigPath.ps1',
+        'Public/Get-CIEMConfigPath.ps1',
         'Private/Get-AzureAuthContext.ps1',
         'Private/Get-CheckMetadata.ps1',
         'Private/Get-CIEMConfig.ps1',

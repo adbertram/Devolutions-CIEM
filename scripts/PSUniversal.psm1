@@ -455,7 +455,7 @@ function Sync-PSUConfiguration {
         'Accept'        = 'application/json'
     }
 
-    $uri = "$($script:PSUConnection.Url)/api/v1/configuration/sync"
+    $uri = "$($script:PSUConnection.Url)/api/v1/configuration"
     if ($Reset) {
         $uri += "?reset=true"
     }
