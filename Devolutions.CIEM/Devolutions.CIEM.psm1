@@ -567,6 +567,14 @@ function New-DevolutionsCIEMApp {
             # Cloud Provider Authentication Card (full width)
             New-UDGrid -Item -ExtraSmallSize 12 -Content {
                 New-UDCard -Title 'Cloud Provider Authentication' -Content {
+                    # Show credential storage location indicator
+                    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+                    if ($inPSUContext) {
+                        New-UDAlert -Severity 'success' -Text 'Credentials are stored securely in PSU secrets (encrypted in database).' -Dense -Style @{ marginBottom = '16px' }
+                    } else {
+                        New-UDAlert -Severity 'info' -Text 'Running outside PSU context. Credentials should be stored in the .env file in the module directory.' -Dense -Style @{ marginBottom = '16px' }
+                    }
+
                     # Provider Selection
                     New-UDElement -Tag 'div' -Content {
                         New-UDSelect -Id 'cloudProvider' -Label 'Cloud Provider' -Option {
@@ -627,34 +635,49 @@ function New-DevolutionsCIEMApp {
                             New-UDAlert -Severity 'warning' -Text 'Managed Identity will not work in on-premises deployments. Please choose a different authentication method.' -Style @{ marginBottom = '16px' }
                         }
 
+                        # Load credentials from PSU secrets if available
+                        $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+                        $storedCreds = @{
+                            TenantId = $null
+                            ClientId = $null
+                            CertThumbprint = $null
+                            ManagedIdentityClientId = $null
+                        }
+                        if ($inPSUContext) {
+                            $storedCreds.TenantId = $Secret:CIEM_Azure_TenantId
+                            $storedCreds.ClientId = $Secret:CIEM_Azure_ClientId
+                            $storedCreds.CertThumbprint = $Secret:CIEM_Azure_CertThumbprint
+                            $storedCreds.ManagedIdentityClientId = $Secret:CIEM_Azure_ManagedIdentityClientId
+                        }
+
                         if ($selectedProvider -eq 'Azure') {
                             switch ($selectedMethod) {
                                 'ServicePrincipalSecret' {
                                     New-UDGrid -Container -Spacing 2 -Content {
                                         New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $CurrentConfig.azure.authentication.tenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $storedCreds.TenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
                                         }
                                         New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azSpClientId' -Label 'Client ID (Application ID)' -Value $CurrentConfig.azure.authentication.servicePrincipal.clientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                            New-UDTextbox -Id 'azSpClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
                                         }
                                         New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                            New-UDTextbox -Id 'azSpClientSecret' -Label 'Client Secret' -Type 'password' -FullWidth -Placeholder 'Enter service principal client secret'
+                                            New-UDTextbox -Id 'azSpClientSecret' -Label 'Client Secret' -Type 'password' -FullWidth -Placeholder 'Enter service principal client secret (leave empty to keep existing)'
                                         }
                                     }
                                 }
                                 'ServicePrincipalCertificate' {
                                     New-UDGrid -Container -Spacing 2 -Content {
                                         New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $CurrentConfig.azure.authentication.tenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $storedCreds.TenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
                                         }
                                         New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azCertClientId' -Label 'Client ID (Application ID)' -Value $CurrentConfig.azure.authentication.certificate.clientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                            New-UDTextbox -Id 'azCertClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
                                         }
                                         New-UDGrid -Item -ExtraSmallSize 12 -Content {
                                             New-UDTypography -Text 'Provide either a certificate thumbprint (for certificates in the local store) or a certificate file path:' -Variant 'caption' -Style @{ color = '#666'; marginTop = '8px'; marginBottom = '8px' }
                                         }
                                         New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azCertThumbprint' -Label 'Certificate Thumbprint' -Value $CurrentConfig.azure.authentication.certificate.thumbprint -FullWidth -Placeholder 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+                                            New-UDTextbox -Id 'azCertThumbprint' -Label 'Certificate Thumbprint' -Value $storedCreds.CertThumbprint -FullWidth -Placeholder 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
                                         }
                                         New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
                                             New-UDTextbox -Id 'azCertPath' -Label 'Certificate File Path (.pfx)' -Value $CurrentConfig.azure.authentication.certificate.path -FullWidth -Placeholder '/path/to/certificate.pfx'
@@ -666,15 +689,15 @@ function New-DevolutionsCIEMApp {
                                 }
                                 'ManagedIdentity' {
                                     New-UDAlert -Severity 'info' -Text 'System-assigned managed identity requires no additional configuration. For user-assigned identity, provide the Client ID below.' -Dense -Style @{ marginBottom = '16px' }
-                                    New-UDTextbox -Id 'azMiClientId' -Label 'User-Assigned Identity Client ID (Optional)' -Value $CurrentConfig.azure.authentication.managedIdentity.clientId -FullWidth -Placeholder 'Leave empty for system-assigned identity'
+                                    New-UDTextbox -Id 'azMiClientId' -Label 'User-Assigned Identity Client ID (Optional)' -Value $storedCreds.ManagedIdentityClientId -FullWidth -Placeholder 'Leave empty for system-assigned identity'
                                 }
                                 'DeviceCode' {
                                     New-UDAlert -Severity 'info' -Text 'Device Code authentication will prompt you to visit microsoft.com/devicelogin and enter a code. Useful for environments with strict MFA policies or where browser-based login is restricted.' -Dense -Style @{ marginBottom = '16px' }
-                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $CurrentConfig.azure.authentication.tenantId -FullWidth -Placeholder 'Leave empty for default tenant'
+                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
                                 }
                                 'Interactive' {
                                     New-UDAlert -Severity 'info' -Text 'Interactive authentication opens a browser window for you to sign in. Supports MFA and all authentication policies.' -Dense -Style @{ marginBottom = '16px' }
-                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $CurrentConfig.azure.authentication.tenantId -FullWidth -Placeholder 'Leave empty for default tenant'
+                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
                                 }
                             }
 
@@ -784,6 +807,9 @@ function New-DevolutionsCIEMApp {
                             return
                         }
 
+                        # Check if running in PSU context (Secret: drive available)
+                        $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+
                         $subscriptionFilterRaw = (Get-UDElement -Id 'subscriptionFilter').value
                         $throttleLimit = [int](Get-UDElement -Id 'throttleLimit').value
                         $timeoutSeconds = [int](Get-UDElement -Id 'timeoutSeconds').value
@@ -793,7 +819,8 @@ function New-DevolutionsCIEMApp {
 
                         $subscriptionFilter = if ([string]::IsNullOrWhiteSpace($subscriptionFilterRaw)) { @() } else { $subscriptionFilterRaw -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } }
 
-                        $settings = @{
+                        # Non-sensitive settings go to config.json
+                        $configSettings = @{
                             'cloudProvider' = $provider
                             'azure.authentication.method' = $authMethod
                             'azure.subscriptionFilter' = $subscriptionFilter
@@ -804,36 +831,57 @@ function New-DevolutionsCIEMApp {
                             'pam.remediationUrl' = $pamUrl
                         }
 
-                        # Get tenant ID if available (used by multiple methods)
+                        # Collect credentials based on auth method
+                        $credentials = @{}
                         $tenantIdElement = Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue
-                        if ($tenantIdElement) {
-                            $settings['azure.authentication.tenantId'] = $tenantIdElement.value
+                        if ($tenantIdElement -and $tenantIdElement.value) {
+                            $credentials['TenantId'] = $tenantIdElement.value
                         }
 
-                        # Add auth-method-specific settings
                         switch ($authMethod) {
                             'ServicePrincipalSecret' {
-                                $settings['azure.authentication.servicePrincipal.clientId'] = (Get-UDElement -Id 'azSpClientId').value
-                                $spClientSecret = (Get-UDElement -Id 'azSpClientSecret').value
-                                if (-not [string]::IsNullOrEmpty($spClientSecret)) {
-                                    $settings['azure.authentication.servicePrincipal.clientSecret'] = $spClientSecret
-                                }
+                                $clientId = (Get-UDElement -Id 'azSpClientId').value
+                                $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
+                                if ($clientId) { $credentials['ClientId'] = $clientId }
+                                if ($clientSecret) { $credentials['ClientSecret'] = $clientSecret }
                             }
                             'ServicePrincipalCertificate' {
-                                $settings['azure.authentication.certificate.clientId'] = (Get-UDElement -Id 'azCertClientId').value
-                                $settings['azure.authentication.certificate.thumbprint'] = (Get-UDElement -Id 'azCertThumbprint').value
-                                $settings['azure.authentication.certificate.path'] = (Get-UDElement -Id 'azCertPath').value
-                                $certPassword = (Get-UDElement -Id 'azCertPassword').value
-                                if (-not [string]::IsNullOrEmpty($certPassword)) {
-                                    $settings['azure.authentication.certificate.password'] = $certPassword
-                                }
+                                $clientId = (Get-UDElement -Id 'azCertClientId').value
+                                $thumbprint = (Get-UDElement -Id 'azCertThumbprint').value
+                                if ($clientId) { $credentials['ClientId'] = $clientId }
+                                if ($thumbprint) { $credentials['CertThumbprint'] = $thumbprint }
                             }
                             'ManagedIdentity' {
                                 $miClientId = (Get-UDElement -Id 'azMiClientId').value
-                                $settings['azure.authentication.managedIdentity.clientId'] = $miClientId
+                                if ($miClientId) { $credentials['ManagedIdentityClientId'] = $miClientId }
                             }
                         }
 
+                        # Save credentials to PSU secrets (if in PSU context)
+                        if ($inPSUContext -and $credentials.Count -gt 0) {
+                            $secretsCreated = @()
+                            foreach ($key in $credentials.Keys) {
+                                $secretName = "CIEM_Azure_$key"
+                                $secretValue = $credentials[$key]
+                                if (-not [string]::IsNullOrEmpty($secretValue)) {
+                                    # Check if secret exists
+                                    $existingVar = Get-PSUVariable -Name $secretName -ErrorAction SilentlyContinue
+                                    if ($existingVar) {
+                                        Set-PSUVariable -Variable $existingVar -Value $secretValue
+                                    } else {
+                                        New-PSUVariable -Name $secretName -Value $secretValue -Secret
+                                    }
+                                    $secretsCreated += $secretName
+                                }
+                            }
+                            if ($secretsCreated.Count -gt 0) {
+                                Show-UDToast -Message "Saved $($secretsCreated.Count) credential(s) to PSU secrets: $($secretsCreated -join ', ')" -Duration 5000 -BackgroundColor '#2196f3'
+                            }
+                        } elseif (-not $inPSUContext -and $credentials.Count -gt 0) {
+                            Show-UDToast -Message 'Not running in PSU context. Credentials were not saved. Use .env file for local development.' -Duration 8000 -BackgroundColor '#ff9800'
+                        }
+
+                        # Save non-sensitive config to config.json
                         $ConfigPath = Get-CIEMConfigPath
                         if (-not $ConfigPath) { throw 'Configuration file not found. Ensure the Devolutions.CIEM module is installed.' }
                         $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json -AsHashtable
@@ -844,7 +892,7 @@ function New-DevolutionsCIEMApp {
                             $current[$parts[-1]] = $Value
                         }
 
-                        foreach ($key in $settings.Keys) { Set-NestedValue -Hashtable $config -Path $key -Value $settings[$key] }
+                        foreach ($key in $configSettings.Keys) { Set-NestedValue -Hashtable $config -Path $key -Value $configSettings[$key] }
 
                         $jsonContent = $config | ConvertTo-Json -Depth 10
                         Set-Content -Path $ConfigPath -Value $jsonContent -Encoding UTF8
