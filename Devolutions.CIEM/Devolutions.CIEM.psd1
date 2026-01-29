@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.19'
+    ModuleVersion = '0.2.21'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -110,6 +110,7 @@
         'Devolutions.CIEM.psm1',
         'Private/Convert-ProwlerCheck.ps1',
         'Private/Get-AllGraphPage.ps1',
+        'Private/Get-CIEMConfigPath.ps1',
         'Private/Get-AzureAuthContext.ps1',
         'Private/Get-CheckMetadata.ps1',
         'Private/Get-CIEMConfig.ps1',
@@ -154,6 +155,11 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+## 0.2.20 - Dashboard Function Scope Fix
+- Fixed: Get-CIEMConfigPath not found at dashboard runtime
+- Moved Get-CIEMConfigPath from nested function to Private module function
+- Function is now dot-sourced at module load, available to PSU dashboard pages
+
 ## 0.2.19 - Code Quality Improvements
 - Renamed Get-CIEMRequiredPermissions to Get-CIEMRequiredPermission (singular noun)
 - Fixed PSScriptAnalyzer warnings for return statements

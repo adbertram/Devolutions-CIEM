@@ -123,20 +123,8 @@ function New-DevolutionsCIEMApp {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidReturnStatement', '', Justification = 'Return statements required for early exit in PSU OnClick handlers')]
     param()
 
-    # Helper function to find config.json path
-    function Get-CIEMConfigPath {
-        $configPath = $null
-        $module = Get-Module -Name 'Devolutions.CIEM' -ErrorAction SilentlyContinue
-        if ($module) {
-            $modulePath = Join-Path $module.ModuleBase 'config.json'
-            if (Test-Path $modulePath) { $configPath = $modulePath }
-        }
-        if (-not $configPath -and $script:ModuleRoot) {
-            $rootPath = Join-Path $script:ModuleRoot 'config.json'
-            if (Test-Path $rootPath) { $configPath = $rootPath }
-        }
-        $configPath
-    }
+    # Note: Get-CIEMConfigPath is a private module function (see Private/Get-CIEMConfigPath.ps1)
+    # It's available at dashboard runtime because private functions are dot-sourced at module load.
 
     # Sample findings data for PoC demonstration
     $SampleFindings = @(
