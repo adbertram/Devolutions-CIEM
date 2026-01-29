@@ -942,6 +942,352 @@ function Restart-PSUApp {
     }
 }
 
+function Publish-PSUModule {
+    <#
+    .SYNOPSIS
+        Publishes a PowerShell module to the PowerShell Gallery.
+
+    .DESCRIPTION
+        Automatically bumps the version and publishes a module to PowerShell Gallery.
+        Modules with the 'PowerShellUniversal' tag appear in the PSU Gallery.
+
+        Optionally imports the published module to a connected PSU instance and
+        restarts the associated app.
+
+    .PARAMETER ModulePath
+        Path to the module directory. Required.
+
+    .PARAMETER NuGetApiKey
+        PowerShell Gallery API key. If not provided, checks NUGET_API_KEY from
+        environment variable or .env file.
+
+    .PARAMETER BumpVersion
+        Version component to increment: Patch (default), Minor, or Major.
+        - Patch: 0.2.0 -> 0.2.1
+        - Minor: 0.2.0 -> 0.3.0
+        - Major: 0.2.0 -> 1.0.0
+
+    .PARAMETER UpdatePSU
+        After publishing, import the module to the connected PSU instance and
+        restart the associated app. Requires an active PSU connection (Connect-PSU).
+
+    .PARAMETER AppName
+        Name of the PSU app to restart after updating. Used with -UpdatePSU.
+        If not specified, no app restart is performed.
+
+    .PARAMETER SkipValidation
+        Skip module structure validation (not recommended).
+
+    .PARAMETER EnvFilePath
+        Path to .env file for loading NuGetApiKey. Defaults to .env in module
+        parent directory.
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./Devolutions.CIEM
+        # Bumps patch version and publishes
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./Devolutions.CIEM -BumpVersion Minor
+        # Bumps minor version and publishes
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./Devolutions.CIEM -UpdatePSU -AppName "Devolutions CIEM"
+        # Publishes, imports to PSU, and restarts the app
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf
+        # Shows what would be published without actually publishing
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory, Position = 0)]
+        [string]$ModulePath,
+
+        [Parameter()]
+        [string]$NuGetApiKey,
+
+        [Parameter()]
+        [ValidateSet('Patch', 'Minor', 'Major')]
+        [string]$BumpVersion = 'Patch',
+
+        [Parameter()]
+        [switch]$UpdatePSU,
+
+        [Parameter()]
+        [string]$AppName,
+
+        [Parameter()]
+        [switch]$SkipValidation,
+
+        [Parameter()]
+        [string]$EnvFilePath
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    # Resolve module path
+    $ModulePath = Resolve-Path $ModulePath -ErrorAction Stop | Select-Object -ExpandProperty Path
+
+    # Find manifest
+    $moduleName = Split-Path $ModulePath -Leaf
+    $manifestPath = Join-Path $ModulePath "$moduleName.psd1"
+
+    if (-not (Test-Path $manifestPath)) {
+        throw "Module manifest not found: $manifestPath"
+    }
+
+    Write-Host '========================================' -ForegroundColor Cyan
+    Write-Host "Publishing $moduleName to PowerShell Gallery" -ForegroundColor Cyan
+    Write-Host '========================================' -ForegroundColor Cyan
+    Write-Host "Module: $ModulePath"
+    Write-Host ''
+
+    # ========================================================================
+    # Step 1: Validate Module Structure
+    # ========================================================================
+    if (-not $SkipValidation) {
+        Write-Host 'Step 1: Validating module structure...' -ForegroundColor Yellow
+
+        $requiredFiles = @(
+            "$moduleName.psm1"
+        )
+
+        foreach ($file in $requiredFiles) {
+            $fullPath = Join-Path $ModulePath $file
+            if (Test-Path $fullPath) {
+                Write-Host "  [OK] $file" -ForegroundColor Green
+            }
+            else {
+                throw "Missing required file: $file"
+            }
+        }
+
+        # Check for PSU-specific files (optional but noted)
+        $psuFiles = @('.universal/dashboards.ps1', 'config.json')
+        foreach ($file in $psuFiles) {
+            $fullPath = Join-Path $ModulePath $file
+            if (Test-Path $fullPath) {
+                Write-Host "  [OK] $file (PSU)" -ForegroundColor Green
+            }
+        }
+    }
+    else {
+        Write-Host 'Step 1: Skipping validation...' -ForegroundColor Yellow
+    }
+
+    # ========================================================================
+    # Step 2: Read Current Version and Bump
+    # ========================================================================
+    Write-Host ''
+    Write-Host 'Step 2: Reading and bumping version...' -ForegroundColor Yellow
+
+    $manifest = Import-PowerShellDataFile -Path $manifestPath
+    $currentVersion = [version]$manifest.ModuleVersion
+    Write-Host "  Current version: $currentVersion" -ForegroundColor Gray
+
+    # Calculate new version
+    $newVersion = switch ($BumpVersion) {
+        'Major' { [version]::new($currentVersion.Major + 1, 0, 0) }
+        'Minor' { [version]::new($currentVersion.Major, $currentVersion.Minor + 1, 0) }
+        'Patch' { [version]::new($currentVersion.Major, $currentVersion.Minor, $currentVersion.Build + 1) }
+    }
+
+    Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
+
+    # Update the manifest file
+    $manifestContent = Get-Content -Path $manifestPath -Raw
+    $updatedContent = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
+
+    if ($PSCmdlet.ShouldProcess($manifestPath, "Update ModuleVersion to $newVersion")) {
+        Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
+        Write-Host "  [OK] Updated $manifestPath" -ForegroundColor Green
+    }
+
+    # Re-read manifest to get updated values
+    $manifest = Import-PowerShellDataFile -Path $manifestPath
+    $tags = $manifest.PrivateData.PSData.Tags
+    if ($tags) {
+        Write-Host "  [OK] Tags: $($tags -join ', ')" -ForegroundColor Green
+    }
+
+    # ========================================================================
+    # Step 3: Get API Key
+    # ========================================================================
+    Write-Host ''
+    Write-Host 'Step 3: Checking API key...' -ForegroundColor Yellow
+
+    if (-not $NuGetApiKey) {
+        $NuGetApiKey = $env:NUGET_API_KEY
+    }
+
+    # Try to load from .env file if not set
+    if (-not $NuGetApiKey) {
+        if (-not $EnvFilePath) {
+            $projectRoot = Split-Path $ModulePath -Parent
+            $EnvFilePath = Join-Path $projectRoot '.env'
+        }
+
+        if (Test-Path $EnvFilePath) {
+            Write-Host "  Loading from .env file..." -ForegroundColor Gray
+            $envContent = Get-Content $EnvFilePath -ErrorAction SilentlyContinue
+            foreach ($line in $envContent) {
+                if ($line -match '^NUGET_API_KEY=(.+)$') {
+                    $NuGetApiKey = $Matches[1].Trim()
+                    break
+                }
+            }
+        }
+    }
+
+    if (-not $NuGetApiKey) {
+        throw @"
+NuGet API key required. Options:
+  1. Pass as parameter: -NuGetApiKey 'your-key'
+  2. Set environment variable: `$env:NUGET_API_KEY = 'your-key'
+  3. Add NUGET_API_KEY=your-key to .env file
+  4. Get a key from: https://www.powershellgallery.com/account/apikeys
+"@
+    }
+
+    Write-Host '  [OK] API key provided' -ForegroundColor Green
+
+    # ========================================================================
+    # Step 4: Check PowerShell Gallery
+    # ========================================================================
+    Write-Host ''
+    Write-Host 'Step 4: Checking PowerShell Gallery...' -ForegroundColor Yellow
+
+    $moduleVersion = $newVersion.ToString()
+    if ($manifest.PrivateData.PSData.Prerelease) {
+        $fullVersion = "$moduleVersion-$($manifest.PrivateData.PSData.Prerelease)"
+    }
+    else {
+        $fullVersion = $moduleVersion
+    }
+
+    try {
+        $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
+        if ($existing) {
+            Write-Host "  [INFO] Latest published version: $($existing.Version)" -ForegroundColor Cyan
+        }
+        else {
+            Write-Host '  [INFO] Module not yet published (first release)' -ForegroundColor Cyan
+        }
+    }
+    catch {
+        Write-Host '  [INFO] Module not yet published (first release)' -ForegroundColor Cyan
+    }
+
+    Write-Host "  [OK] Publishing version: $fullVersion" -ForegroundColor Green
+
+    # ========================================================================
+    # Step 5: Publish to PowerShell Gallery
+    # ========================================================================
+    Write-Host ''
+    Write-Host 'Step 5: Publishing to PowerShell Gallery...' -ForegroundColor Yellow
+    Write-Host '  Using Publish-PSResource (PSResourceGet) to include hidden directories' -ForegroundColor Gray
+
+    if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerShell Gallery")) {
+        $publishParams = @{
+            Path        = $ModulePath
+            ApiKey      = $NuGetApiKey
+            Repository  = 'PSGallery'
+            ErrorAction = 'Stop'
+        }
+
+        Publish-PSResource @publishParams
+
+        # ====================================================================
+        # Step 6: Verify Publication
+        # ====================================================================
+        Write-Host ''
+        Write-Host 'Step 6: Verifying publication...' -ForegroundColor Yellow
+
+        $maxRetries = 6
+        $retryDelay = 10
+        $verified = $false
+
+        for ($i = 1; $i -le $maxRetries; $i++) {
+            Write-Host "  Checking PowerShell Gallery (attempt $i/$maxRetries)..." -ForegroundColor Gray
+            $published = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
+            if ($published -and $published.Version -eq $fullVersion) {
+                $verified = $true
+                break
+            }
+            if ($i -lt $maxRetries) {
+                Write-Host "  Not found yet, waiting ${retryDelay}s..." -ForegroundColor Gray
+                Start-Sleep -Seconds $retryDelay
+            }
+        }
+
+        if ($verified) {
+            Write-Host "  [OK] Verified: $moduleName $fullVersion is available" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  [WARN] Could not verify within $($maxRetries * $retryDelay)s" -ForegroundColor Yellow
+            Write-Host "  The module may still be propagating." -ForegroundColor Yellow
+        }
+
+        # ====================================================================
+        # Step 7: Update PSU (if requested)
+        # ====================================================================
+        if ($UpdatePSU) {
+            Write-Host ''
+            Write-Host 'Step 7: Updating PSU server...' -ForegroundColor Yellow
+
+            if (-not $script:PSUConnection.Url) {
+                Write-Host '  [SKIP] Not connected to PSU. Run Connect-PSU first.' -ForegroundColor Yellow
+            }
+            else {
+                try {
+                    Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
+                    Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
+                    Write-Host "  [OK] Module imported" -ForegroundColor Green
+
+                    if ($AppName) {
+                        Write-Host "  Restarting app '$AppName'..." -ForegroundColor Gray
+                        Restart-PSUApp -Name $AppName
+                        Write-Host "  [OK] App restarted" -ForegroundColor Green
+                    }
+                }
+                catch {
+                    Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red
+                }
+            }
+        }
+
+        Write-Host ''
+        Write-Host '========================================' -ForegroundColor Cyan
+        Write-Host 'Publication Successful!' -ForegroundColor Green
+        Write-Host '========================================' -ForegroundColor Cyan
+
+        # Return result object
+        [PSCustomObject]@{
+            ModuleName  = $moduleName
+            Version     = $fullVersion
+            GalleryUrl  = "https://www.powershellgallery.com/packages/$moduleName"
+            UpdatedPSU  = $UpdatePSU -and $script:PSUConnection.Url
+            Status      = 'Published'
+        }
+    }
+    else {
+        Write-Host ''
+        Write-Host '[DRY RUN] Would publish:' -ForegroundColor Yellow
+        Write-Host "  Module: $moduleName"
+        Write-Host "  Current version: $currentVersion"
+        Write-Host "  New version: $fullVersion"
+        Write-Host "  Path: $ModulePath"
+
+        [PSCustomObject]@{
+            ModuleName  = $moduleName
+            Version     = $fullVersion
+            GalleryUrl  = "https://www.powershellgallery.com/packages/$moduleName"
+            UpdatedPSU  = $false
+            Status      = 'DryRun'
+        }
+    }
+}
+
 function Assert-PSUConnection {
     <#
     .SYNOPSIS
@@ -961,6 +1307,7 @@ Export-ModuleMember -Function @(
     'Get-PSUApp',
     'Get-PSUModule',
     'Import-PSUModule',
+    'Publish-PSUModule',
     'Remove-PSUModule',
     'Restart-PSUApp',
     'Start-PSUApp',

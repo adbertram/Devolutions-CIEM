@@ -61,17 +61,23 @@ Instead, invoke the psu-expert agent via the Task tool. The psu-expert has:
 **NEVER upload module files directly to the Azure PSU instance.** The correct workflow is:
 
 1. Make changes to `Devolutions.CIEM/` module
-2. Bump version in `Devolutions.CIEM/Devolutions.CIEM.psd1`
-3. Publish to PowerShell Gallery using `psu-app/Publish-ToGallery.ps1`
-4. User manually imports the new version via PSU Admin Console > Platform > Gallery
+2. Publish using `Publish-PSUModule` (auto-bumps version)
+3. Optionally use `-UpdatePSU` to auto-import to PSU instance
 
-```bash
+```powershell
+# Load the PSU management module
+Import-Module ./scripts/PSUniversal.psm1
+
 # WRONG - Never do this
 ./scripts/azure_psu_file_manager.sh upload Devolutions.CIEM/ Repository/Modules/
 
-# CORRECT - Always use the publish script
-pwsh psu-app/Publish-ToGallery.ps1 -WhatIf  # Dry run first
-pwsh psu-app/Publish-ToGallery.ps1          # Actual publish
+# CORRECT - Use Publish-PSUModule
+Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf  # Dry run first
+Publish-PSUModule -ModulePath ./Devolutions.CIEM          # Publish to Gallery
+
+# BETTER - Publish and update PSU in one command
+Connect-PSU
+Publish-PSUModule -ModulePath ./Devolutions.CIEM -UpdatePSU -AppName "Devolutions CIEM"
 ```
 
 **Why:** The PSU Gallery is the distribution mechanism. Direct uploads bypass version control, break the upgrade path for users, and don't follow the intended distribution model.
