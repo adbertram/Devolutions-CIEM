@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.26'
+    ModuleVersion = '0.2.29'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -33,18 +33,8 @@
     # Az.Accounts is auto-installed by the module loader (psm1) if not present
     RequiredModules = @()
 
-    # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-    FunctionsToExport = @(
-        'Get-CIEMAuthenticationContext',
-        'Get-CIEMCheck',
-        'Get-CIEMProvider',
-        'Get-CIEMRequiredPermission',
-        'Get-PSUInstalledEnvironment',
-        'Get-ProwlerCheck',
-        'Invoke-CIEMScan',
-        'New-DevolutionsCIEMApp',
-        'Sync-ProwlerCheck'
-    )
+    # Functions to export from this module - controlled by Export-ModuleMember in the .psm1 file
+    FunctionsToExport = @('*')
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
     CmdletsToExport = @()
@@ -108,6 +98,7 @@
         'config.json',
         'Devolutions.CIEM.psd1',
         'Devolutions.CIEM.psm1',
+        'Private/Assert-CIEMAuthenticated.ps1',
         'Private/Convert-ProwlerCheck.ps1',
         'Private/Get-AllGraphPage.ps1',
         'Public/Get-CIEMConfigPath.ps1',
@@ -128,14 +119,17 @@
         'Private/Test-GitRemote.ps1',
         'Private/Test-KeyVaultItemExpiration.ps1',
         'Private/Test-StorageAccountProperty.ps1',
+        'Public/Connect-CIEM.ps1',
         'Public/Get-CIEMAuthenticationContext.ps1',
         'Public/Get-CIEMCheck.ps1',
         'Public/Get-CIEMProvider.ps1',
         'Public/Get-CIEMRequiredPermission.ps1',
         'Public/Get-PSUInstalledEnvironment.ps1',
+        'Public/New-PSUAzureServicePrincipal.ps1',
         'Public/Get-ProwlerCheck.ps1',
         'Public/Invoke-CIEMScan.ps1',
-        'Public/Sync-ProwlerCheck.ps1'
+        'Public/Sync-ProwlerCheck.ps1',
+        'Public/Test-CIEMAuthenticated.ps1'
     )
 
     # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
