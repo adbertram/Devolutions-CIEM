@@ -53,7 +53,7 @@
     "checkScript": "Test-EntraNonPrivilegedUserHasMfa.ps1",
     "dependsOn": [],
     "permissions": {
-      "graph": ["User.Read.All", "RoleManagement.Read.Directory", "UserAuthenticationMethod.Read.All"]
+      "graph": ["User.Read.All", "RoleManagement.Read.Directory", "UserAuthenticationMethod.Read.All", "AuditLog.Read.All"]
     }
   },
   {
@@ -205,7 +205,7 @@
     "checkScript": "Test-EntraPrivilegedUserHasMfa.ps1",
     "dependsOn": [],
     "permissions": {
-      "graph": ["RoleManagement.Read.Directory", "UserAuthenticationMethod.Read.All"]
+      "graph": ["RoleManagement.Read.Directory", "UserAuthenticationMethod.Read.All", "AuditLog.Read.All"]
     }
   },
   {
@@ -262,7 +262,7 @@
     "checkScript": "Test-EntraUserWithVmAccessHasMfa.ps1",
     "dependsOn": [],
     "permissions": {
-      "graph": ["UserAuthenticationMethod.Read.All"],
+      "graph": ["UserAuthenticationMethod.Read.All", "AuditLog.Read.All"],
       "arm": ["Microsoft.Authorization/roleAssignments/read"]
     }
   },

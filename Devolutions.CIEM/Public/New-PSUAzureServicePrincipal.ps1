@@ -1,0 +1,471 @@
+function New-PSUAzureServicePrincipal {
+    <#
+    .SYNOPSIS
+        Creates an Azure service principal with all permissions required for CIEM security checks.
+
+    .DESCRIPTION
+        Creates an Azure AD app registration and service principal configured with all permissions
+        required to run Devolutions CIEM security checks. This includes:
+        - Microsoft Graph API application permissions
+        - Azure Resource Manager RBAC role assignment (Reader)
+        - Key Vault data plane permissions (documented for manual configuration)
+
+        The function uses Get-CIEMRequiredPermission to determine the exact permissions needed.
+
+    .PARAMETER DisplayName
+        The display name for the app registration and service principal.
+        Default: "Devolutions-CIEM-Scanner"
+
+    .PARAMETER Scope
+        The scope for the ARM RBAC role assignment. Can be a subscription or management group.
+        Examples:
+        - "/subscriptions/<subscription-id>"
+        - "/providers/Microsoft.Management/managementGroups/<mg-name>"
+
+    .PARAMETER CredentialType
+        The type of credential to create for authentication.
+        - ClientSecret: Creates a client secret (default)
+        - Certificate: Creates a self-signed certificate
+
+    .PARAMETER CertificateValidityYears
+        Number of years the certificate is valid. Only used when CredentialType is Certificate.
+        Default: 1
+
+    .PARAMETER SkipRoleAssignment
+        Skip the ARM RBAC role assignment. Useful if you want to assign at a different scope later.
+
+    .PARAMETER SkipAdminConsent
+        Skip granting admin consent for Graph API permissions. You will need to grant consent manually
+        in the Azure Portal.
+
+    .OUTPUTS
+        [PSCustomObject] Object containing:
+        - ApplicationId: The app registration client ID
+        - ObjectId: The app registration object ID
+        - ServicePrincipalId: The service principal object ID
+        - TenantId: The Azure AD tenant ID
+        - ClientSecret: The client secret (if CredentialType is ClientSecret)
+        - CertificateThumbprint: The certificate thumbprint (if CredentialType is Certificate)
+        - Permissions: The permissions configured
+
+    .EXAMPLE
+        New-PSUAzureServicePrincipal -Scope "/subscriptions/12345678-1234-1234-1234-123456789012"
+        # Creates a service principal with client secret for the specified subscription
+
+    .EXAMPLE
+        New-PSUAzureServicePrincipal -DisplayName "CIEM-Prod" -CredentialType Certificate -Scope "/subscriptions/12345678-1234-1234-1234-123456789012"
+        # Creates a service principal with certificate authentication
+
+    .EXAMPLE
+        New-PSUAzureServicePrincipal -Scope "/providers/Microsoft.Management/managementGroups/my-mg" -SkipAdminConsent
+        # Creates a service principal at management group scope, skipping admin consent
+
+    .NOTES
+        Required modules (auto-installed if not present):
+        - Az.Accounts (for Connect-AzAccount)
+        - Az.Resources (for app/SP/role cmdlets)
+        - Microsoft.Graph.Applications (for Graph API permission grants, unless -SkipAdminConsent)
+
+        Required Azure permissions:
+        - Global Administrator or Privileged Role Administrator role (for admin consent)
+        - Owner or User Access Administrator role on the target scope (for role assignment)
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter()]
+        [string]$DisplayName = "Devolutions-CIEM-Scanner",
+
+        [Parameter(Mandatory)]
+        [ValidatePattern('^/(subscriptions/[a-f0-9-]+|providers/Microsoft\.Management/managementGroups/.+)$')]
+        [string]$Scope,
+
+        [Parameter()]
+        [ValidateSet('ClientSecret', 'Certificate')]
+        [string]$CredentialType = 'ClientSecret',
+
+        [Parameter()]
+        [ValidateRange(1, 10)]
+        [int]$CertificateValidityYears = 1,
+
+        [Parameter()]
+        [switch]$SkipRoleAssignment,
+
+        [Parameter()]
+        [switch]$SkipAdminConsent
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    #region Prerequisites Check
+    Write-Verbose "Checking prerequisites..."
+
+    # Install required modules if not present
+    $requiredModules = @('Az.Accounts', 'Az.Resources')
+    if (-not $SkipAdminConsent) {
+        $requiredModules += 'Microsoft.Graph.Applications'
+    }
+
+    foreach ($moduleName in $requiredModules) {
+        if (-not (Get-Module -ListAvailable -Name $moduleName)) {
+            Write-Verbose "Installing required module: $moduleName"
+            Install-Module -Name $moduleName -Scope CurrentUser -Force -AllowClobber
+        }
+        Import-Module -Name $moduleName -ErrorAction Stop
+    }
+
+    # Check Azure connection
+    $context = Get-AzContext
+    if (-not $context) {
+        throw "Not connected to Azure. Run Connect-AzAccount first."
+    }
+
+    $tenantId = $context.Tenant.Id
+    Write-Verbose "Connected to tenant: $tenantId"
+    #endregion
+
+    #region Get Required Permissions
+    Write-Verbose "Getting required permissions from CIEM checks..."
+    $permissions = Get-CIEMRequiredPermission
+    Write-Verbose "Found $($permissions.CheckCount) checks requiring permissions"
+    Write-Verbose "Graph permissions: $($permissions.Graph.Count)"
+    Write-Verbose "ARM permissions: $($permissions.ARM.Count)"
+    Write-Verbose "Key Vault data plane permissions: $($permissions.KeyVaultDataPlane.Count)"
+    #endregion
+
+    #region Create App Registration
+    if ($PSCmdlet.ShouldProcess($DisplayName, "Create Azure AD app registration")) {
+        Write-Verbose "Creating app registration: $DisplayName"
+
+        # Check if app already exists
+        $existingApp = Get-AzADApplication -DisplayName $DisplayName -ErrorAction SilentlyContinue
+        if ($existingApp) {
+            throw "An app registration with name '$DisplayName' already exists (AppId: $($existingApp.AppId)). Choose a different name or remove the existing app."
+        }
+
+        # Create the app registration
+        $appParams = @{
+            DisplayName    = $DisplayName
+            SignInAudience = 'AzureADMyOrg'
+        }
+        $app = New-AzADApplication @appParams
+        Write-Verbose "Created app registration: $($app.AppId)"
+    }
+    #endregion
+
+    #region Create Service Principal
+    if ($PSCmdlet.ShouldProcess($DisplayName, "Create service principal")) {
+        Write-Verbose "Creating service principal..."
+        $sp = New-AzADServicePrincipal -ApplicationId $app.AppId
+        Write-Verbose "Created service principal: $($sp.Id)"
+
+        # Wait for replication
+        Write-Verbose "Waiting for Azure AD replication..."
+        Start-Sleep -Seconds 10
+    }
+    #endregion
+
+    #region Create Credential
+    $credential = $null
+    $certificateThumbprint = $null
+
+    if ($CredentialType -eq 'ClientSecret') {
+        if ($PSCmdlet.ShouldProcess($DisplayName, "Create client secret")) {
+            Write-Verbose "Creating client secret..."
+            $endDate = (Get-Date).AddYears(1)
+            $secretCredential = New-AzADAppCredential -ApplicationId $app.AppId -EndDate $endDate
+            $credential = $secretCredential.SecretText
+            Write-Verbose "Created client secret (expires: $endDate)"
+        }
+    }
+    else {
+        if ($PSCmdlet.ShouldProcess($DisplayName, "Create self-signed certificate")) {
+            Write-Verbose "Creating self-signed certificate..."
+            $certName = "CN=$DisplayName"
+            $endDate = (Get-Date).AddYears($CertificateValidityYears)
+
+            # Create self-signed certificate
+            $cert = New-SelfSignedCertificate `
+                -Subject $certName `
+                -CertStoreLocation "Cert:\CurrentUser\My" `
+                -KeyExportPolicy Exportable `
+                -KeySpec Signature `
+                -KeyLength 2048 `
+                -KeyAlgorithm RSA `
+                -HashAlgorithm SHA256 `
+                -NotAfter $endDate
+
+            $certificateThumbprint = $cert.Thumbprint
+            Write-Verbose "Created certificate with thumbprint: $certificateThumbprint"
+
+            # Upload certificate to app registration
+            $certBase64 = [System.Convert]::ToBase64String($cert.GetRawCertData())
+            New-AzADAppCredential -ApplicationId $app.AppId -CertValue $certBase64 -EndDate $endDate
+            Write-Verbose "Uploaded certificate to app registration"
+        }
+    }
+    #endregion
+
+    #region Add Graph API Permissions
+    if ($permissions.Graph.Count -gt 0) {
+        if ($PSCmdlet.ShouldProcess($DisplayName, "Add Microsoft Graph API permissions")) {
+            Write-Verbose "Adding Microsoft Graph API permissions..."
+
+            # Microsoft Graph app ID (well-known)
+            $graphAppId = "00000003-0000-0000-c000-000000000000"
+
+            # Get Microsoft Graph service principal to look up permission IDs
+            $graphSp = Get-AzADServicePrincipal -ApplicationId $graphAppId
+
+            foreach ($permissionName in $permissions.Graph) {
+                Write-Verbose "  Adding permission: $permissionName"
+
+                # Find the permission ID from the Graph service principal's app roles
+                $appRole = $graphSp.AppRole | Where-Object { $_.Value -eq $permissionName }
+                if (-not $appRole) {
+                    Write-Warning "Could not find Graph permission: $permissionName"
+                    continue
+                }
+
+                # Add the permission to the app registration
+                Add-AzADAppPermission `
+                    -ApplicationId $app.AppId `
+                    -ApiId $graphAppId `
+                    -PermissionId $appRole.Id `
+                    -Type Role
+            }
+            Write-Verbose "Added $($permissions.Graph.Count) Graph API permissions"
+        }
+    }
+    #endregion
+
+    #region Grant Admin Consent
+    if (-not $SkipAdminConsent -and $permissions.Graph.Count -gt 0) {
+        if ($PSCmdlet.ShouldProcess($DisplayName, "Grant admin consent for Graph API permissions")) {
+            Write-Verbose "Granting admin consent for Graph API permissions..."
+            Write-Verbose "Getting access token from current Az context..."
+
+            try {
+                # Get Graph token from current Az context (admin user or SP with admin permissions)
+                $graphToken = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
+
+                # Handle both string and SecureString token formats (Az.Accounts version differences)
+                if ($graphToken.Token -is [System.Security.SecureString]) {
+                    $secureToken = $graphToken.Token
+                } else {
+                    $secureToken = ConvertTo-SecureString $graphToken.Token -AsPlainText -Force
+                }
+
+                Connect-MgGraph -AccessToken $secureToken -NoWelcome -ErrorAction Stop
+
+                # Microsoft Graph service principal
+                $graphAppId = "00000003-0000-0000-c000-000000000000"
+                $graphSp = Get-MgServicePrincipal -Filter "appId eq '$graphAppId'"
+
+                # Get our service principal
+                $ourSp = Get-MgServicePrincipal -Filter "appId eq '$($app.AppId)'"
+
+                foreach ($permissionName in $permissions.Graph) {
+                    $appRole = $graphSp.AppRoles | Where-Object { $_.Value -eq $permissionName }
+                    if (-not $appRole) {
+                        Write-Warning "Could not find Graph permission for consent: $permissionName"
+                        continue
+                    }
+
+                    Write-Verbose "  Granting consent for: $permissionName"
+                    try {
+                        New-MgServicePrincipalAppRoleAssignment `
+                            -ServicePrincipalId $ourSp.Id `
+                            -PrincipalId $ourSp.Id `
+                            -ResourceId $graphSp.Id `
+                            -AppRoleId $appRole.Id `
+                            -ErrorAction Stop | Out-Null
+                    }
+                    catch {
+                        if ($_.Exception.Message -notlike "*already exists*") {
+                            Write-Warning "Failed to grant consent for $permissionName : $_"
+                        }
+                    }
+                }
+                Write-Verbose "Admin consent granted for Graph API permissions"
+
+                Disconnect-MgGraph -ErrorAction SilentlyContinue | Out-Null
+            }
+            catch {
+                Write-Warning "Failed to grant admin consent: $_"
+                Write-Warning "Ensure you are logged in as an admin user (Connect-AzAccount) with permission to grant consent."
+                Write-Warning "Or grant admin consent manually: Azure Portal > App registrations > $DisplayName > API permissions > Grant admin consent"
+            }
+        }
+    }
+    elseif ($permissions.Graph.Count -gt 0) {
+        Write-Warning @"
+Admin consent was skipped. You must grant admin consent manually:
+1. Go to Azure Portal > App registrations > $DisplayName > API permissions
+2. Click 'Grant admin consent for <tenant>'
+
+Or run: Connect-MgGraph -Scopes 'Application.ReadWrite.All' and grant consent programmatically.
+"@
+    }
+    #endregion
+
+    #region Assign Reader Role
+    if (-not $SkipRoleAssignment) {
+        if ($PSCmdlet.ShouldProcess($Scope, "Assign Reader role to service principal")) {
+            Write-Verbose "Assigning Reader role at scope: $Scope"
+
+            # Check if assignment already exists
+            $existingAssignment = Get-AzRoleAssignment `
+                -ObjectId $sp.Id `
+                -Scope $Scope `
+                -RoleDefinitionName "Reader" `
+                -ErrorAction SilentlyContinue
+
+            if ($existingAssignment) {
+                Write-Verbose "Reader role already assigned at this scope"
+            }
+            else {
+                New-AzRoleAssignment `
+                    -ObjectId $sp.Id `
+                    -Scope $Scope `
+                    -RoleDefinitionName "Reader" | Out-Null
+                Write-Verbose "Reader role assigned successfully"
+            }
+        }
+    }
+    else {
+        $kvRoles = @()
+        if ($permissions.KeyVaultDataPlane -contains 'secrets/list') { $kvRoles += 'Key Vault Secrets User' }
+        if ($permissions.KeyVaultDataPlane -contains 'keys/list') { $kvRoles += 'Key Vault Crypto User' }
+
+        Write-Warning @"
+Role assignment was skipped. You must assign roles manually:
+  New-AzRoleAssignment -ObjectId '$($sp.Id)' -Scope '<scope>' -RoleDefinitionName 'Reader'
+$(if ($kvRoles.Count -gt 0) {
+$kvRoles | ForEach-Object { "  New-AzRoleAssignment -ObjectId '$($sp.Id)' -Scope '<scope>' -RoleDefinitionName '$_'" }
+})
+
+The Reader role covers these ARM permissions:
+$($permissions.ARM -join "`n")
+$(if ($kvRoles.Count -gt 0) {
+"`nKey Vault data plane roles required: $($kvRoles -join ', ')"
+})
+"@
+    }
+    #endregion
+
+    #region Assign Key Vault Data Plane Roles
+    if (-not $SkipRoleAssignment -and $permissions.KeyVaultDataPlane.Count -gt 0) {
+        # Map data plane permissions to RBAC roles
+        $kvRolesToAssign = @()
+        if ($permissions.KeyVaultDataPlane -contains 'secrets/list') {
+            $kvRolesToAssign += 'Key Vault Secrets User'
+        }
+        if ($permissions.KeyVaultDataPlane -contains 'keys/list') {
+            $kvRolesToAssign += 'Key Vault Crypto User'
+        }
+
+        foreach ($roleName in $kvRolesToAssign) {
+            if ($PSCmdlet.ShouldProcess($Scope, "Assign $roleName role to service principal")) {
+                Write-Verbose "Assigning $roleName role at scope: $Scope"
+
+                $existingAssignment = Get-AzRoleAssignment `
+                    -ObjectId $sp.Id `
+                    -Scope $Scope `
+                    -RoleDefinitionName $roleName `
+                    -ErrorAction SilentlyContinue
+
+                if ($existingAssignment) {
+                    Write-Verbose "$roleName role already assigned at this scope"
+                }
+                else {
+                    New-AzRoleAssignment `
+                        -ObjectId $sp.Id `
+                        -Scope $Scope `
+                        -RoleDefinitionName $roleName | Out-Null
+                    Write-Verbose "$roleName role assigned successfully"
+                }
+            }
+        }
+
+        Write-Verbose "Key Vault RBAC roles assigned. Note: This only works for vaults using Azure RBAC authorization mode."
+    }
+    #endregion
+
+    #region Update config.json
+    if ($PSCmdlet.ShouldProcess("config.json", "Update with new service principal credentials")) {
+        Write-Verbose "Updating config.json with new service principal credentials..."
+
+        # Update the in-memory config
+        $script:Config.azure.authentication.tenantId = $tenantId
+        if ($CredentialType -eq 'ClientSecret') {
+            $script:Config.azure.authentication.servicePrincipal.clientId = $app.AppId
+            $script:Config.azure.authentication.servicePrincipal.clientSecret = $credential
+        }
+        else {
+            $script:Config.azure.authentication.certificate.clientId = $app.AppId
+            $script:Config.azure.authentication.certificate.thumbprint = $certificateThumbprint
+        }
+
+        # Write to config.json file
+        $configPath = Join-Path -Path $script:ModuleRoot -ChildPath 'config.json'
+        $script:Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configPath -Encoding UTF8
+        Write-Verbose "config.json updated successfully"
+    }
+    #endregion
+
+    #region Build Output
+    $output = [PSCustomObject]@{
+        DisplayName          = $DisplayName
+        ApplicationId        = $app.AppId
+        ObjectId             = $app.Id
+        ServicePrincipalId   = $sp.Id
+        TenantId             = $tenantId
+        ClientSecret         = $credential
+        CertificateThumbprint = $certificateThumbprint
+        Scope                = $Scope
+        Permissions          = [PSCustomObject]@{
+            Graph             = $permissions.Graph
+            ARM               = $permissions.ARM
+            KeyVaultDataPlane = $permissions.KeyVaultDataPlane
+            CheckCount        = $permissions.CheckCount
+        }
+        ConfigurationSample  = @"
+# Add this to your CIEM configuration:
+`$config = @{
+    azure = @{
+        authentication = @{
+            method = '$(if ($CredentialType -eq 'ClientSecret') { 'ServicePrincipalSecret' } else { 'ServicePrincipalCertificate' })'
+            tenantId = '$tenantId'
+            $(if ($CredentialType -eq 'ClientSecret') {
+                "servicePrincipal = @{
+                clientId = '$($app.AppId)'
+                clientSecret = '<stored-securely>'
+            }"
+            } else {
+                "certificate = @{
+                clientId = '$($app.AppId)'
+                thumbprint = '$certificateThumbprint'
+            }"
+            })
+        }
+    }
+}
+"@
+    }
+
+    Write-Host "`nService principal created successfully!" -ForegroundColor Green
+    Write-Host "Application (client) ID: $($app.AppId)"
+    Write-Host "Tenant ID: $tenantId"
+    if ($credential) {
+        Write-Host "`nIMPORTANT: Save the client secret now - it cannot be retrieved later!" -ForegroundColor Yellow
+        Write-Host "Client Secret: $credential"
+    }
+    if ($certificateThumbprint) {
+        Write-Host "Certificate Thumbprint: $certificateThumbprint"
+        Write-Host "Certificate Location: Cert:\CurrentUser\My\$certificateThumbprint"
+    }
+
+    $output
+    #endregion
+}
