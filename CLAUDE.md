@@ -181,6 +181,39 @@ Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem via 
 
 **Note:** The `exec` command runs in the Kudu sidecar container (Debian), not the PSU container. Use `list` and `read` commands to inspect PSU files.
 
+### PSU Log Script
+
+Use `scripts/get-psu-logs.sh` to query logs from all PSU sources:
+
+```bash
+# Basic usage - last 50 lines from all sources
+./scripts/get-psu-logs.sh
+
+# More lines
+./scripts/get-psu-logs.sh 100
+
+# Filter by source
+./scripts/get-psu-logs.sh 100 --db-only      # App-level logs (LogEntry table)
+./scripts/get-psu-logs.sh 100 --docker-only  # Azure container stdout
+./scripts/get-psu-logs.sh 100 --api-only     # PSU REST API logs
+
+# Search across all logs
+./scripts/get-psu-logs.sh 100 --search "CIEM"
+./scripts/get-psu-logs.sh 100 --search "error"
+
+# Include rotated log files
+./scripts/get-psu-logs.sh 500 --all-files
+```
+
+**Log sources:**
+| Source | Content | Format |
+|--------|---------|--------|
+| Database | App-level logs (`[App-*]` messages) | `[timestamp] [Level] [App-Name] Message` |
+| Docker | Azure container stdout (ASP.NET Core) | Infrastructure logs |
+| API | PSU `/api/v1/log` endpoint | Infrastructure logs |
+
+**Note:** Database logs are the most useful for debugging app startup issues - they show `[App-Devolutions CIEM]` errors.
+
 ### PSU Troubleshooting Script
 
 Use `scripts/invoke_command_in_azure_webapp.sh` for troubleshooting the PSU web app:
