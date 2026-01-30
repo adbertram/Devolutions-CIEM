@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.30'
+    ModuleVersion = '0.2.41'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -125,6 +125,7 @@
         'Public/Get-CIEMProvider.ps1',
         'Public/Get-CIEMRequiredPermission.ps1',
         'Public/Get-PSUInstalledEnvironment.ps1',
+        'Public/New-CIEMAzureManagedIdentity.ps1',
         'Public/New-PSUAzureServicePrincipal.ps1',
         'Public/Get-ProwlerCheck.ps1',
         'Public/Invoke-CIEMScan.ps1',
