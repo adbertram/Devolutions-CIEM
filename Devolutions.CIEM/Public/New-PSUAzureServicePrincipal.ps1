@@ -309,63 +309,9 @@ Or run: Connect-MgGraph -Scopes 'Application.ReadWrite.All' and grant consent pr
     }
     #endregion
 
-    #region Assign Reader Role
-    if (-not $SkipRoleAssignment) {
-        if ($PSCmdlet.ShouldProcess($Scope, "Assign Reader role to service principal")) {
-            Write-Verbose "Assigning Reader role at scope: $Scope"
-
-            # Check if assignment already exists
-            $existingAssignment = Get-AzRoleAssignment `
-                -ObjectId $sp.Id `
-                -Scope $Scope `
-                -RoleDefinitionName "Reader" `
-                -ErrorAction SilentlyContinue
-
-            if ($existingAssignment) {
-                Write-Verbose "Reader role already assigned at this scope"
-            }
-            else {
-                New-AzRoleAssignment `
-                    -ObjectId $sp.Id `
-                    -Scope $Scope `
-                    -RoleDefinitionName "Reader" | Out-Null
-                Write-Verbose "Reader role assigned successfully"
-            }
-        }
-    }
-    else {
-        $kvRoles = @()
-        if ($permissions.KeyVaultDataPlane -contains 'secrets/list') { $kvRoles += 'Key Vault Secrets User' }
-        if ($permissions.KeyVaultDataPlane -contains 'keys/list') { $kvRoles += 'Key Vault Crypto User' }
-
-        Write-Warning @"
-Role assignment was skipped. You must assign roles manually:
-  New-AzRoleAssignment -ObjectId '$($sp.Id)' -Scope '<scope>' -RoleDefinitionName 'Reader'
-$(if ($kvRoles.Count -gt 0) {
-$kvRoles | ForEach-Object { "  New-AzRoleAssignment -ObjectId '$($sp.Id)' -Scope '<scope>' -RoleDefinitionName '$_'" }
-})
-
-The Reader role covers these ARM permissions:
-$($permissions.ARM -join "`n")
-$(if ($kvRoles.Count -gt 0) {
-"`nKey Vault data plane roles required: $($kvRoles -join ', ')"
-})
-"@
-    }
-    #endregion
-
-    #region Assign Key Vault Data Plane Roles
-    if (-not $SkipRoleAssignment -and $permissions.KeyVaultDataPlane.Count -gt 0) {
-        # Map data plane permissions to RBAC roles
-        $kvRolesToAssign = @()
-        if ($permissions.KeyVaultDataPlane -contains 'secrets/list') {
-            $kvRolesToAssign += 'Key Vault Secrets User'
-        }
-        if ($permissions.KeyVaultDataPlane -contains 'keys/list') {
-            $kvRolesToAssign += 'Key Vault Crypto User'
-        }
-
-        foreach ($roleName in $kvRolesToAssign) {
+    #region Assign Azure RBAC Roles
+    if (-not $SkipRoleAssignment -and $permissions.AzureRoles.Count -gt 0) {
+        foreach ($roleName in $permissions.AzureRoles) {
             if ($PSCmdlet.ShouldProcess($Scope, "Assign $roleName role to service principal")) {
                 Write-Verbose "Assigning $roleName role at scope: $Scope"
 
@@ -388,7 +334,17 @@ $(if ($kvRoles.Count -gt 0) {
             }
         }
 
-        Write-Verbose "Key Vault RBAC roles assigned. Note: This only works for vaults using Azure RBAC authorization mode."
+        # Note about Key Vault RBAC mode
+        $kvRoles = $permissions.AzureRoles | Where-Object { $_ -like 'Key Vault*' }
+        if ($kvRoles.Count -gt 0) {
+            Write-Verbose "Key Vault RBAC roles assigned. Note: This only works for vaults using Azure RBAC authorization mode."
+        }
+    }
+    elseif ($SkipRoleAssignment -and $permissions.AzureRoles.Count -gt 0) {
+        Write-Warning @"
+Role assignment was skipped. You must assign these roles manually:
+$($permissions.AzureRoles | ForEach-Object { "  New-AzRoleAssignment -ObjectId '$($sp.Id)' -Scope '<scope>' -RoleDefinitionName '$_'" } | Out-String)
+"@
     }
     #endregion
 
@@ -489,6 +445,7 @@ CIEM_AZURE_CERT_THUMBPRINT=$certificateThumbprint"
             Graph             = $permissions.Graph
             ARM               = $permissions.ARM
             KeyVaultDataPlane = $permissions.KeyVaultDataPlane
+            AzureRoles        = $permissions.AzureRoles
             CheckCount        = $permissions.CheckCount
         }
         PSUSecrets            = @"
