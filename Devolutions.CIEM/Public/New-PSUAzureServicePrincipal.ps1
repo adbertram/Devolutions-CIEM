@@ -61,7 +61,7 @@ function New-PSUAzureServicePrincipal {
         # Creates a service principal at management group scope, skipping admin consent
 
     .NOTES
-        Required modules (auto-installed if not present):
+        Required modules:
         - Az.Accounts (for Connect-AzAccount)
         - Az.Resources (for app/SP/role cmdlets)
         - Microsoft.Graph.Applications (for Graph API permission grants, unless -SkipAdminConsent)

@@ -1305,6 +1305,268 @@ NuGet API key required. Options:
     }
 }
 
+function Invoke-PSUCommand {
+    <#
+    .SYNOPSIS
+        Executes a PowerShell command on the PSU server and returns the output.
+
+    .DESCRIPTION
+        Creates a temporary script on the PSU server, executes it, waits for completion,
+        retrieves the output, and cleans up the temporary script. This is useful for
+        debugging and running ad-hoc commands on the PSU server.
+
+    .PARAMETER Command
+        The PowerShell command to execute as a string.
+
+    .PARAMETER ScriptBlock
+        The PowerShell command to execute as a script block.
+
+    .PARAMETER TimeoutSeconds
+        Maximum time to wait for the command to complete. Defaults to 120 seconds.
+
+    .PARAMETER KeepScript
+        If specified, does not delete the temporary script after execution.
+        Useful for debugging.
+
+    .PARAMETER Environment
+        The PSU environment to run the script in. If not specified, uses the default.
+
+    .EXAMPLE
+        Invoke-PSUCommand -Command 'Get-Module -ListAvailable'
+        # Lists available modules on the PSU server
+
+    .EXAMPLE
+        Invoke-PSUCommand -Command 'Import-Module Devolutions.CIEM -Verbose' -TimeoutSeconds 60
+        # Imports a module with verbose output
+
+    .EXAMPLE
+        Invoke-PSUCommand -ScriptBlock { Get-Process | Select-Object -First 5 }
+        # Gets first 5 processes from PSU server
+
+    .EXAMPLE
+        Connect-PSU
+        Invoke-PSUCommand -Command '$PSVersionTable'
+        # Shows PowerShell version on the PSU server
+    #>
+    [CmdletBinding(DefaultParameterSetName = 'Command')]
+    param(
+        [Parameter(Mandatory, ParameterSetName = 'Command', Position = 0)]
+        [string]$Command,
+
+        [Parameter(Mandatory, ParameterSetName = 'ScriptBlock')]
+        [scriptblock]$ScriptBlock,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = 120,
+
+        [Parameter()]
+        [switch]$KeepScript,
+
+        [Parameter()]
+        [string]$Environment
+    )
+
+    # Auto-connect if not connected
+    if (-not $script:PSUConnection.Url -or -not $script:PSUConnection.Token) {
+        Write-Verbose "Not connected to PSU. Attempting auto-connect..."
+        try {
+            $null = Connect-PSU -ErrorAction Stop
+            Write-Verbose "Connected to PSU."
+        }
+        catch {
+            throw "Not connected to PSU and auto-connect failed: $_"
+        }
+    }
+
+    # Convert ScriptBlock to Command string if needed
+    if ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
+        $Command = $ScriptBlock.ToString()
+    }
+
+    $headers = @{
+        'Authorization' = "Bearer $($script:PSUConnection.Token)"
+        'Accept'        = 'application/json'
+        'Content-Type'  = 'application/json'
+    }
+
+    $baseUrl = $script:PSUConnection.Url
+    $scriptId = $null
+    $jobId = $null
+
+    try {
+        # ====================================================================
+        # Step 1: Create a temporary script
+        # ====================================================================
+        $scriptName = "InvokePSUCommand_$(Get-Date -Format 'yyyyMMdd_HHmmss')_$([guid]::NewGuid().ToString('N').Substring(0, 8)).ps1"
+
+        Write-Verbose "Creating temporary script: $scriptName"
+
+        $scriptBody = @{
+            name        = $scriptName
+            fullPath    = $scriptName
+            content     = $Command
+            description = 'Temporary script created by Invoke-PSUCommand'
+            maxHistory  = 1
+        }
+
+        if ($Environment) {
+            $scriptBody.environment = $Environment
+        }
+
+        $scriptJson = $scriptBody | ConvertTo-Json -Depth 10
+
+        $createScriptUri = "$baseUrl/api/v1/script"
+        $script = Invoke-RestMethod -Uri $createScriptUri -Headers $headers -Method Post -Body $scriptJson -ErrorAction Stop
+        $scriptId = $script.id
+
+        Write-Verbose "Created script with ID: $scriptId"
+
+        # ====================================================================
+        # Step 2: Invoke the script
+        # ====================================================================
+        Write-Verbose "Invoking script..."
+
+        $invokeUri = "$baseUrl/api/v1/script/$scriptId"
+        $invokeBody = @{} | ConvertTo-Json
+
+        $jobResponse = Invoke-RestMethod -Uri $invokeUri -Headers $headers -Method Post -Body $invokeBody -ErrorAction Stop
+
+        # The API returns just the job ID as an integer
+        if ($jobResponse -is [int] -or $jobResponse -is [long]) {
+            $jobId = $jobResponse
+        }
+        elseif ($jobResponse.id) {
+            $jobId = $jobResponse.id
+        }
+        else {
+            throw "Unexpected job response format: $($jobResponse | ConvertTo-Json -Compress)"
+        }
+
+        Write-Verbose "Started job with ID: $jobId"
+
+        # ====================================================================
+        # Step 3: Poll for job completion
+        # ====================================================================
+        Write-Verbose "Waiting for job to complete (timeout: ${TimeoutSeconds}s)..."
+
+        $startTime = Get-Date
+        $jobStatus = $null
+        # PSU Job Status enum: 0=Queued, 1=Running, 2=Completed, 3=Failed, 4=WaitingOnFeedback,
+        # 5=Canceled, 6=Canceling, 7=Historical, 8=Active, 9=TimedOut, 10=Warning
+        $terminalStatuses = @(2, 3, 5, 9, 10)  # Completed, Failed, Canceled, TimedOut, Warning
+        $statusNames = @{
+            0  = 'Queued'
+            1  = 'Running'
+            2  = 'Completed'
+            3  = 'Failed'
+            4  = 'WaitingOnFeedback'
+            5  = 'Canceled'
+            6  = 'Canceling'
+            7  = 'Historical'
+            8  = 'Active'
+            9  = 'TimedOut'
+            10 = 'Warning'
+        }
+
+        do {
+            Start-Sleep -Milliseconds 500
+
+            $jobUri = "$baseUrl/api/v1/job/$jobId"
+            $jobDetails = Invoke-RestMethod -Uri $jobUri -Headers $headers -Method Get -ErrorAction Stop
+            $jobStatus = [int]$jobDetails.status
+            $statusName = $statusNames[$jobStatus]
+
+            $elapsed = (Get-Date) - $startTime
+            if ($elapsed.TotalSeconds -ge $TimeoutSeconds) {
+                Write-Warning "Job timed out after ${TimeoutSeconds}s. Status: $statusName"
+                break
+            }
+
+            Write-Verbose "Job status: $statusName (elapsed: $([math]::Round($elapsed.TotalSeconds, 1))s)"
+
+        } while ($jobStatus -notin $terminalStatuses)
+
+        $finalStatusName = $statusNames[$jobStatus]
+        Write-Verbose "Job completed with status: $finalStatusName"
+
+        # ====================================================================
+        # Step 4: Get job output
+        # ====================================================================
+        $outputUri = "$baseUrl/api/v1/job/$jobId/output"
+        $output = Invoke-RestMethod -Uri $outputUri -Headers $headers -Method Get -ErrorAction Stop
+
+        # Also get pipeline output if available
+        $pipelineUri = "$baseUrl/api/v1/job/$jobId/pipelineOutput"
+        $pipelineOutput = $null
+        try {
+            $pipelineOutput = Invoke-RestMethod -Uri $pipelineUri -Headers $headers -Method Get -ErrorAction SilentlyContinue
+        }
+        catch {
+            Write-Verbose "No pipeline output available or error retrieving it."
+        }
+
+        # Build result object
+        $result = [PSCustomObject]@{
+            JobId          = $jobId
+            ScriptId       = $scriptId
+            Status         = $finalStatusName
+            Output         = $output
+            PipelineOutput = $pipelineOutput
+            StartTime      = $jobDetails.startTime
+            EndTime        = $jobDetails.endTime
+        }
+
+        # Format and return output
+        if ($output) {
+            Write-Host "`n--- Command Output ---" -ForegroundColor Cyan
+            $output | ForEach-Object {
+                if ($_ -is [string]) {
+                    Write-Host $_
+                }
+                elseif ($_.message) {
+                    # PSU output format has 'message' field with actual output
+                    Write-Host $_.message
+                }
+                elseif ($_.data) {
+                    Write-Host $_.data
+                }
+                else {
+                    Write-Host ($_ | Out-String)
+                }
+            }
+            Write-Host "--- End Output ---`n" -ForegroundColor Cyan
+        }
+
+        if ($pipelineOutput) {
+            Write-Verbose "Pipeline output available. Access via result.PipelineOutput"
+        }
+
+        return $result
+    }
+    catch {
+        throw "Failed to execute command on PSU: $_"
+    }
+    finally {
+        # ====================================================================
+        # Step 5: Clean up temporary script (unless -KeepScript)
+        # ====================================================================
+        if ($scriptId -and -not $KeepScript) {
+            Write-Verbose "Cleaning up temporary script (ID: $scriptId)..."
+            try {
+                $deleteUri = "$baseUrl/api/v1/script/$scriptId"
+                $null = Invoke-RestMethod -Uri $deleteUri -Headers $headers -Method Delete -ErrorAction SilentlyContinue
+                Write-Verbose "Temporary script deleted."
+            }
+            catch {
+                Write-Warning "Failed to delete temporary script: $_"
+            }
+        }
+        elseif ($KeepScript -and $scriptId) {
+            Write-Verbose "Keeping temporary script (ID: $scriptId, Name: $scriptName)"
+        }
+    }
+}
+
 function Assert-PSUConnection {
     <#
     .SYNOPSIS
@@ -1324,6 +1586,7 @@ Export-ModuleMember -Function @(
     'Get-PSUApp',
     'Get-PSUModule',
     'Import-PSUModule',
+    'Invoke-PSUCommand',
     'Publish-PSUModule',
     'Remove-PSUModule',
     'Restart-PSUApp',

@@ -30,8 +30,14 @@
     PowerShellVersion = '7.4'
 
     # Modules that must be imported into the global environment prior to importing this module
-    # Note: Dependencies are auto-installed by the PSM1 for PSU Gallery compatibility
-    RequiredModules = @()
+    # IMPORTANT: Az.Accounts pinned to 4.1.0 due to PSU compatibility issues.
+    # See: https://forums.ironmansoftware.com/t/cannot-connect-to-azure-in-automation-job-script/12793
+    RequiredModules = @(
+        @{ ModuleName = 'Az.Accounts'; ModuleVersion = '4.1.0' }
+        @{ ModuleName = 'Az.Resources'; ModuleVersion = '7.0.0' }
+        @{ ModuleName = 'Az.Websites'; ModuleVersion = '3.0.0' }
+        @{ ModuleName = 'Microsoft.Graph.Applications'; ModuleVersion = '2.0.0' }
+    )
 
     # Functions to export from this module - controlled by Export-ModuleMember in the .psm1 file
     FunctionsToExport = @('*')
@@ -201,18 +207,6 @@
 - Fixed: Include .universal directory in published module
 - PSU now auto-discovers and creates the CIEM app when module is installed
 - App registration uses -Module/-Command pattern for PSU Gallery compatibility
-
-## 0.2.3 - Az.Accounts Auto-Install
-- Auto-installs Az.Accounts when module loads if not present
-- Removed RequiredModules dependency (PSU Gallery does not auto-install dependencies)
-- Removed runtime checks from individual functions (handled at module load)
-- Module now works out-of-the-box when installed from PSU Gallery
-
-## 0.2.2 - PSU App Load Fix
-- Removed Az.Accounts from RequiredModules to fix PSU app loading
-- Az.Accounts was preventing module import on servers without Azure modules
-- Added runtime module checks to Get-CIEMAuthenticationContext and Invoke-CIEMScan
-- PSU app now loads without Azure modules; scans require Az.Accounts at runtime
 
 ## 0.2.0 - PSU App Integration
 - Added New-DevolutionsCIEMApp function for PSU module-based discovery

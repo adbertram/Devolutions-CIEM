@@ -55,7 +55,7 @@ function New-CIEMAzureManagedIdentity {
         # Configures at management group scope, skipping admin consent (grant manually later)
 
     .NOTES
-        Required modules (auto-installed if not present):
+        Required modules:
         - Az.Accounts (for Connect-AzAccount)
         - Az.Resources (for role assignment cmdlets)
         - Az.Websites (for web app cmdlets)

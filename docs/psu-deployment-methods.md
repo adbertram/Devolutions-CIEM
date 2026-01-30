@@ -383,7 +383,6 @@ Devolutions.CIEM.PSU/
     ModuleVersion = '1.0.0'
     Description = 'Devolutions CIEM for PowerShell Universal'
 
-    # Dependencies auto-installed
     RequiredModules = @(
         'Devolutions.CIEM',
         'Az.Accounts',
@@ -512,7 +511,6 @@ Devolutions.CIEM.PSUApp/
     CompanyName = 'Devolutions Inc.'
     Description = 'Cloud Infrastructure Entitlement Management app for PowerShell Universal'
 
-    # Dependencies - PSU loads in order but does NOT auto-install
     RequiredModules = @('Devolutions.CIEM')
 
     # Include .universal folder
@@ -551,63 +549,6 @@ New-PSUApp -Name 'Devolutions CIEM' `
 |-----|---------|
 | `PowerShellUniversal` | **Required** - Makes module discoverable in PSU Gallery |
 | `app` | Categorizes as containing an App/Dashboard |
-
-### Critical: RequiredModules Does NOT Auto-Install
-
-**PSU does NOT automatically install `RequiredModules` dependencies.**
-
-What PSU does:
-- ✅ Loads dependencies in correct order (if already installed)
-- ✅ Shows errors if dependencies missing
-- ❌ Does NOT install missing modules from PowerShell Gallery
-
-### Options for Handling Dependencies
-
-#### Option A: Single Module (Recommended)
-
-Bundle everything in one module:
-
-```
-Devolutions.CIEM/
-├── .universal/
-│   └── dashboards.ps1
-├── pages/
-│   └── *.ps1
-├── Checks/
-│   └── *.ps1              # Check functions bundled here
-├── Private/
-│   └── *.ps1
-├── Public/
-│   └── *.ps1
-├── Devolutions.CIEM.psd1
-└── Devolutions.CIEM.psm1
-```
-
-**Pros:** Single install, no dependency issues
-**Cons:** Users who only want CLI can't use checks without PSU
-
-#### Option B: Two Modules (Current Architecture)
-
-Keep modules separate:
-1. `Devolutions.CIEM` - Core check logic (no PSU dependency)
-2. `Devolutions.CIEM.PSUApp` - PSU App with `RequiredModules`
-
-**User installation flow:**
-```powershell
-# In PSU Admin Console > Gallery
-# 1. Search and install "Devolutions.CIEM"
-# 2. Search and install "Devolutions.CIEM.PSUApp"
-```
-
-**Pros:** Modular, checks usable without PSU
-**Cons:** Two-step install, dependency confusion
-
-#### Option C: Document Dependencies Clearly
-
-In module description and README:
-```
-PREREQUISITES: Install 'Devolutions.CIEM' module first.
-```
 
 ### Publishing to PowerShell Gallery
 

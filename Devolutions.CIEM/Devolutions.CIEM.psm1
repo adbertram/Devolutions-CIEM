@@ -5,40 +5,6 @@ Set-StrictMode -Version Latest
 # Module root path for use by all functions
 $script:ModuleRoot = $PSScriptRoot
 
-# ============================================================================
-# Auto-install required modules if not present
-# ============================================================================
-# PSU Gallery does not auto-install RequiredModules dependencies, so we handle
-# installation here to ensure the module works when installed from PSU Gallery.
-# IMPORTANT: Az.Accounts pinned to 4.1.0 due to PSU compatibility issues.
-# See: https://forums.ironmansoftware.com/t/cannot-connect-to-azure-in-automation-job-script/12793
-
-$requiredModules = @(
-    @{ Name = 'Az.Accounts'; Version = '4.1.0' }
-    @{ Name = 'Az.Resources'; Version = '7.0.0' }
-    @{ Name = 'Az.Websites'; Version = '3.0.0' }
-    @{ Name = 'Microsoft.Graph.Applications'; Version = '2.0.0' }
-)
-
-foreach ($module in $requiredModules) {
-    $installed = Get-Module -ListAvailable -Name $module.Name | Where-Object { $_.Version -eq $module.Version }
-    if (-not $installed) {
-        Write-Verbose "Devolutions.CIEM: $($module.Name) v$($module.Version) not found. Installing..."
-        try {
-            # Remove other versions first to avoid conflicts
-            Get-Module -ListAvailable -Name $module.Name | ForEach-Object {
-                Write-Verbose "Devolutions.CIEM: Removing $($module.Name) v$($_.Version)..."
-                Remove-Module -Name $module.Name -Force -ErrorAction SilentlyContinue
-            }
-            Install-Module -Name $module.Name -RequiredVersion $module.Version -Force -AllowClobber -Repository PSGallery -ErrorAction Stop
-            Write-Verbose "Devolutions.CIEM: $($module.Name) $($module.Version) installed successfully."
-        }
-        catch {
-            throw "$($module.Name) v$($module.Version) is required but could not be installed: $($_.Exception.Message). Install manually: Install-Module $($module.Name) -RequiredVersion $($module.Version)"
-        }
-    }
-}
-
 # Load configuration into script-scoped variable
 $script:configFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'config.json'
 if (Test-Path $script:configFilePath) {
