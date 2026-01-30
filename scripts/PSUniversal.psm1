@@ -1250,6 +1250,23 @@ NuGet API key required. Options:
                 Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
                 Write-Host "  [OK] Module imported" -ForegroundColor Green
                 $updatedPSU = $true
+
+                # Find and restart the app defined by this module
+                $dashboardsPath = Join-Path $ModulePath '.universal' 'dashboards.ps1'
+                if (Test-Path $dashboardsPath) {
+                    $dashboardContent = Get-Content $dashboardsPath -Raw
+                    if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
+                        $appName = $matches[1]
+                        Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
+                        try {
+                            Restart-PSUApp -Name $appName
+                            Write-Host "  [OK] App restarted" -ForegroundColor Green
+                        }
+                        catch {
+                            Write-Host "  [WARN] Could not restart app: $_" -ForegroundColor Yellow
+                        }
+                    }
+                }
             }
             catch {
                 Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red

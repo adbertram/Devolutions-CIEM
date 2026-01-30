@@ -100,20 +100,6 @@ function New-PSUAzureServicePrincipal {
     #region Prerequisites Check
     Write-Verbose "Checking prerequisites..."
 
-    # Install required modules if not present
-    $requiredModules = @('Az.Accounts', 'Az.Resources')
-    if (-not $SkipAdminConsent) {
-        $requiredModules += 'Microsoft.Graph.Applications'
-    }
-
-    foreach ($moduleName in $requiredModules) {
-        if (-not (Get-Module -ListAvailable -Name $moduleName)) {
-            Write-Verbose "Installing required module: $moduleName"
-            Install-Module -Name $moduleName -Scope CurrentUser -Force -AllowClobber
-        }
-        Import-Module -Name $moduleName -ErrorAction Stop
-    }
-
     # Check Azure connection
     $context = Get-AzContext
     if (-not $context) {

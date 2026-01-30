@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.41'
+    ModuleVersion = '0.2.44'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -30,7 +30,7 @@
     PowerShellVersion = '7.4'
 
     # Modules that must be imported into the global environment prior to importing this module
-    # Az.Accounts is auto-installed by the module loader (psm1) if not present
+    # Note: Dependencies are auto-installed by the PSM1 for PSU Gallery compatibility
     RequiredModules = @()
 
     # Functions to export from this module - controlled by Export-ModuleMember in the .psm1 file

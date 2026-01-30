@@ -6,20 +6,36 @@ Set-StrictMode -Version Latest
 $script:ModuleRoot = $PSScriptRoot
 
 # ============================================================================
-# Auto-install Az.Accounts if not present
+# Auto-install required modules if not present
 # ============================================================================
-# Az.Accounts is required for Azure authentication and API calls (Invoke-AzRestMethod).
-# Auto-installing here ensures the module works when installed from PSU Gallery,
-# which does not auto-install RequiredModules dependencies.
+# PSU Gallery does not auto-install RequiredModules dependencies, so we handle
+# installation here to ensure the module works when installed from PSU Gallery.
+# IMPORTANT: Az.Accounts pinned to 4.1.0 due to PSU compatibility issues.
+# See: https://forums.ironmansoftware.com/t/cannot-connect-to-azure-in-automation-job-script/12793
 
-if (-not (Get-Module -ListAvailable -Name 'Az.Accounts')) {
-    Write-Verbose 'Devolutions.CIEM: Az.Accounts module not found. Installing...'
-    try {
-        Install-Module -Name 'Az.Accounts' -Force -AllowClobber -Repository PSGallery -ErrorAction Stop
-        Write-Verbose 'Devolutions.CIEM: Az.Accounts installed successfully.'
-    }
-    catch {
-        throw "Az.Accounts is required but could not be installed: $($_.Exception.Message). Install manually: Install-Module Az.Accounts"
+$requiredModules = @(
+    @{ Name = 'Az.Accounts'; Version = '4.1.0' }
+    @{ Name = 'Az.Resources'; Version = '7.0.0' }
+    @{ Name = 'Az.Websites'; Version = '3.0.0' }
+    @{ Name = 'Microsoft.Graph.Applications'; Version = '2.0.0' }
+)
+
+foreach ($module in $requiredModules) {
+    $installed = Get-Module -ListAvailable -Name $module.Name | Where-Object { $_.Version -eq $module.Version }
+    if (-not $installed) {
+        Write-Verbose "Devolutions.CIEM: $($module.Name) v$($module.Version) not found. Installing..."
+        try {
+            # Remove other versions first to avoid conflicts
+            Get-Module -ListAvailable -Name $module.Name | ForEach-Object {
+                Write-Verbose "Devolutions.CIEM: Removing $($module.Name) v$($_.Version)..."
+                Remove-Module -Name $module.Name -Force -ErrorAction SilentlyContinue
+            }
+            Install-Module -Name $module.Name -RequiredVersion $module.Version -Force -AllowClobber -Repository PSGallery -ErrorAction Stop
+            Write-Verbose "Devolutions.CIEM: $($module.Name) $($module.Version) installed successfully."
+        }
+        catch {
+            throw "$($module.Name) v$($module.Version) is required but could not be installed: $($_.Exception.Message). Install manually: Install-Module $($module.Name) -RequiredVersion $($module.Version)"
+        }
     }
 }
 
@@ -419,8 +435,6 @@ function New-DevolutionsCIEMApp {
         New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
         New-UDCard -Title 'Scan Configuration' -Content {
-            New-UDAlert -Severity 'info' -Text 'This is a PoC demonstration. In production, this would connect to actual Azure subscriptions using the Devolutions.CIEM module.'
-
             New-UDElement -Tag 'div' -Content {
                 New-UDSelect -Id 'provider' -Label 'Cloud Provider' -Option {
                     New-UDSelectOption -Name 'Azure' -Value 'azure'
@@ -436,14 +450,6 @@ function New-DevolutionsCIEMApp {
                 New-UDCheckbox -Id 'includePassedChecks' -Label 'Include Passed Checks in Results' -Checked $true
             } -Attributes @{ style = @{ marginBottom = '16px' } }
 
-            New-UDElement -Tag 'div' -Content {
-                New-UDSelect -Id 'outputFormat' -Label 'Output Format' -Option {
-                    New-UDSelectOption -Name 'Dashboard (Default)' -Value 'dashboard'
-                    New-UDSelectOption -Name 'JSON Export' -Value 'json'
-                    New-UDSelectOption -Name 'CSV Export' -Value 'csv'
-                } -DefaultValue 'dashboard' -FullWidth
-            } -Attributes @{ style = @{ marginBottom = '24px' } }
-
             New-UDStack -Direction 'row' -Spacing 2 -Content {
                 New-UDButton -Text 'Start Scan' -Variant 'contained' -Color 'primary' -OnClick {
                     $Provider = (Get-UDElement -Id 'provider').value
@@ -457,30 +463,24 @@ function New-DevolutionsCIEMApp {
                     $Provider = (Get-UDElement -Id 'provider').value
                     Show-UDToast -Message "Testing $Provider authentication..." -Duration 3000
                     try {
-                        switch ($Provider) {
-                            'azure' {
-                                $context = Get-AzContext -ErrorAction Stop
-                                if ($context) {
-                                    $message = "Azure authentication successful!`nAccount: $($context.Account.Id)`nSubscription: $($context.Subscription.Name)`nTenant: $($context.Tenant.Id)"
-                                    Show-UDToast -Message $message -Duration 8000 -BackgroundColor '#4caf50'
-                                } else {
-                                    Show-UDToast -Message "Azure: Not authenticated. Run Connect-AzAccount first." -Duration 5000 -BackgroundColor '#f44336'
-                                }
+                        $result = Connect-CIEM -Provider $Provider -Force
+                        $providerResult = $result.Providers | Select-Object -First 1
+
+                        if ($providerResult.Status -eq 'Connected') {
+                            $message = "$Provider authentication successful!`nAccount: $($providerResult.Account)`nTenant: $($providerResult.TenantId)"
+                            if ($providerResult.Subscriptions) {
+                                $message += "`nSubscriptions: $($providerResult.Subscriptions)"
                             }
-                            'aws' {
-                                $identity = Get-STSCallerIdentity -ErrorAction Stop
-                                if ($identity) {
-                                    $message = "AWS authentication successful!`nAccount: $($identity.Account)`nARN: $($identity.Arn)`nUserId: $($identity.UserId)"
-                                    Show-UDToast -Message $message -Duration 8000 -BackgroundColor '#4caf50'
-                                } else {
-                                    Show-UDToast -Message "AWS: Not authenticated. Configure AWS credentials first." -Duration 5000 -BackgroundColor '#f44336'
-                                }
-                            }
-                            default {
-                                Show-UDToast -Message "Provider '$Provider' is not yet supported for authentication testing." -Duration 5000 -BackgroundColor '#ff9800'
-                            }
+                            Show-UDToast -Message $message -Duration 8000 -BackgroundColor '#4caf50'
                         }
-                    } catch {
+                        elseif ($providerResult.Status -eq 'NotSupported') {
+                            Show-UDToast -Message "$Provider`: $($providerResult.Message)" -Duration 5000 -BackgroundColor '#ff9800'
+                        }
+                        else {
+                            Show-UDToast -Message "$Provider authentication failed: $($providerResult.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                        }
+                    }
+                    catch {
                         $errorMsg = $_.Exception.Message
                         Show-UDToast -Message "Authentication failed for $Provider`: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
                     }
@@ -826,9 +826,6 @@ function New-DevolutionsCIEMApp {
                                     }
                                     $secretsCreated += $secretName
                                 }
-                            }
-                            if ($secretsCreated.Count -gt 0) {
-                                Show-UDToast -Message "Saved $($secretsCreated.Count) credential(s) to PSU secrets: $($secretsCreated -join ', ')" -Duration 5000 -BackgroundColor '#2196f3'
                             }
                         } elseif (-not $inPSUContext -and $credentials.Count -gt 0) {
                             Show-UDToast -Message 'Not running in PSU context. Credentials were not saved. Use .env file for local development.' -Duration 8000 -BackgroundColor '#ff9800'
