@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.44'
+    ModuleVersion = '0.2.48'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -29,15 +29,8 @@
     # Minimum version of the PowerShell engine required by this module
     PowerShellVersion = '7.4'
 
-    # Modules that must be imported into the global environment prior to importing this module
-    # IMPORTANT: Az.Accounts pinned to 4.1.0 due to PSU compatibility issues.
-    # See: https://forums.ironmansoftware.com/t/cannot-connect-to-azure-in-automation-job-script/12793
-    RequiredModules = @(
-        @{ ModuleName = 'Az.Accounts'; ModuleVersion = '4.1.0' }
-        @{ ModuleName = 'Az.Resources'; ModuleVersion = '7.0.0' }
-        @{ ModuleName = 'Az.Websites'; ModuleVersion = '3.0.0' }
-        @{ ModuleName = 'Microsoft.Graph.Applications'; ModuleVersion = '2.0.0' }
-    )
+    # Required modules are auto-installed at runtime in Devolutions.CIEM.psm1
+    # This avoids PSGallery dependency resolution issues during module installation
 
     # Functions to export from this module - controlled by Export-ModuleMember in the .psm1 file
     FunctionsToExport = @('*')

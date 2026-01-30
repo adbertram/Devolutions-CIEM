@@ -5,6 +5,16 @@ Set-StrictMode -Version Latest
 # Module root path for use by all functions
 $script:ModuleRoot = $PSScriptRoot
 
+# Auto-install and import required modules
+# This replaces RequiredModules in the manifest to handle installation at runtime
+foreach ($moduleName in @('Az.Accounts', 'Az.Resources', 'Az.Websites', 'Microsoft.Graph.Applications')) {
+    if (-not (Get-Module -ListAvailable -Name $moduleName)) {
+        Write-Warning "Installing required module: $moduleName"
+        Install-PSResource -Name $moduleName -Scope AllUsers -TrustRepository
+    }
+    Import-Module -Name $moduleName -Force
+}
+
 # Load configuration into script-scoped variable
 $script:configFilePath = Join-Path -Path $PSScriptRoot -ChildPath 'config.json'
 if (Test-Path $script:configFilePath) {
@@ -429,26 +439,21 @@ function New-DevolutionsCIEMApp {
                     $Provider = (Get-UDElement -Id 'provider').value
                     Show-UDToast -Message "Testing $Provider authentication..." -Duration 3000
                     try {
-                        $result = Connect-CIEM -Provider $Provider -Force
-                        $providerResult = $result.Providers | Select-Object -First 1
+                        $result = Test-CIEMAuthenticated -Provider $Provider | Select-Object -First 1
 
-                        if ($providerResult.Status -eq 'Connected') {
-                            $message = "$Provider authentication successful!`nAccount: $($providerResult.Account)`nTenant: $($providerResult.TenantId)"
-                            if ($providerResult.Subscriptions) {
-                                $message += "`nSubscriptions: $($providerResult.Subscriptions)"
-                            }
-                            Show-UDToast -Message $message -Duration 8000 -BackgroundColor '#4caf50'
+                        if (-not $result.Enabled) {
+                            Show-UDToast -Message "$Provider is not enabled in configuration" -Duration 5000 -BackgroundColor '#ff9800'
                         }
-                        elseif ($providerResult.Status -eq 'NotSupported') {
-                            Show-UDToast -Message "$Provider`: $($providerResult.Message)" -Duration 5000 -BackgroundColor '#ff9800'
+                        elseif ($result.Authenticated) {
+                            Show-UDToast -Message "$Provider authentication successful!" -Duration 5000 -BackgroundColor '#4caf50'
                         }
                         else {
-                            Show-UDToast -Message "$Provider authentication failed: $($providerResult.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                            Show-UDToast -Message "$Provider is not authenticated. Run Connect-CIEM first." -Duration 5000 -BackgroundColor '#f44336'
                         }
                     }
                     catch {
                         $errorMsg = $_.Exception.Message
-                        Show-UDToast -Message "Authentication failed for $Provider`: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
+                        Show-UDToast -Message "Authentication test failed for $Provider`: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
                     }
                 }
             }

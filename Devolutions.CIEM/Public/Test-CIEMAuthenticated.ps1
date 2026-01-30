@@ -1,66 +1,63 @@
 function Test-CIEMAuthenticated {
     <#
     .SYNOPSIS
-        Tests if CIEM is authenticated to a specific cloud provider.
+        Tests if CIEM is authenticated to cloud providers.
 
     .DESCRIPTION
-        Checks if Connect-CIEM has been called and authentication is established
-        for the specified provider. Returns $true if authenticated, $false otherwise.
+        Checks authentication status for each provider.
+        For Azure, checks Get-AzContext directly (persists across sessions).
+        Returns an array of objects with provider name and status.
 
     .PARAMETER Provider
-        The cloud provider to check. Defaults to the provider in config.json.
+        Optional. Check only specific provider(s). If not specified, checks all providers.
 
     .OUTPUTS
-        [bool] True if authenticated, false otherwise.
+        [PSCustomObject[]] Array of objects with Provider, Enabled, and Authenticated properties.
 
     .EXAMPLE
         Test-CIEMAuthenticated
-        # Returns $true if connected to default provider
+        # Returns status for all providers
 
     .EXAMPLE
         Test-CIEMAuthenticated -Provider Azure
-        # Returns $true if connected to Azure
-
-    .EXAMPLE
-        if (-not (Test-CIEMAuthenticated)) { Connect-CIEM }
-        # Connect if not already authenticated
+        # Returns status for Azure only
     #>
     [CmdletBinding()]
-    [OutputType([bool])]
+    [OutputType([PSCustomObject[]])]
     param(
         [Parameter()]
-        [ValidateSet('Azure', 'AWS')]
-        [string]$Provider
+        [string[]]$Provider
     )
 
-    if (-not $Provider) {
-        $Provider = $script:Config.cloudProvider
+    $providers = Get-CIEMProvider
+    if ($Provider) {
+        $providers = $providers | Where-Object { $Provider -contains $_.Name }
     }
 
-    if (-not $script:AuthContext) {
-        return $false
-    }
+    $results = @()
 
-    $authContext = $script:AuthContext[$Provider]
-    if (-not $authContext) {
-        return $false
-    }
-
-    # For Azure, also verify the context is still valid
-    if ($Provider -eq 'Azure') {
-        try {
-            $context = Get-AzContext -ErrorAction SilentlyContinue
-            if (-not $context -or $context.Account.Id -ne $authContext.AccountId) {
-                # Context was cleared or changed
-                $script:AuthContext[$Provider] = $null
-                return $false
+    foreach ($p in $providers) {
+        $authenticated = switch ($p.Name) {
+            'Azure' {
+                try {
+                    $context = Get-AzContext -ErrorAction SilentlyContinue
+                    $null -ne $context -and $null -ne $context.Account
+                }
+                catch {
+                    $false
+                }
+            }
+            default {
+                $false
             }
         }
-        catch {
-            $script:AuthContext[$Provider] = $null
-            return $false
+
+        $results += [PSCustomObject]@{
+            Provider      = $p.Name
+            Enabled       = $p.Enabled
+            Authenticated = $authenticated
         }
     }
 
-    return $true
+    $results
 }

@@ -4,23 +4,23 @@ function Get-CIEMProvider {
         Lists available CIEM cloud providers.
 
     .DESCRIPTION
-        Returns information about cloud providers supported by the CIEM module.
-        Currently supports Azure only (V1).
+        Returns information about cloud providers configured in config.json.
+        Dynamically reads provider sections and creates objects with all
+        properties found in the config plus computed properties.
 
     .OUTPUTS
-        [PSCustomObject[]] Array of provider objects with properties:
-        - Name: Provider name
-        - Description: Provider description
+        [PSCustomObject[]] Array of provider objects with config properties plus:
+        - Name: Provider name (title case)
+        - IsDefault: Whether this is the default provider
         - CheckCount: Number of checks for this provider
-        - Services: Array of service names
 
     .EXAMPLE
         Get-CIEMProvider
-        # Returns Azure provider information
+        # Returns all configured providers
 
     .EXAMPLE
-        (Get-CIEMProvider).Services
-        # Returns array: Entra, IAM, KeyVault, Storage
+        Get-CIEMProvider | Where-Object Enabled
+        # Returns only enabled providers
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject[]])]
@@ -28,14 +28,27 @@ function Get-CIEMProvider {
 
     $ErrorActionPreference = 'Stop'
 
-    # Get actual check count from metadata
-    $checks = Get-CheckMetadata
-    $checkCount = @($checks).Count
+    $supportedProviders = Get-SupportedProvider
 
-    [PSCustomObject]@{
-        Name = 'Azure'
-        Description = 'Microsoft Azure identity and access management checks'
-        CheckCount = $checkCount
-        Services = @('Entra', 'IAM', 'KeyVault', 'Storage')
+    foreach ($providerName in $supportedProviders) {
+        $providerConfig = $script:Config.$providerName
+        $displayName = (Get-Culture).TextInfo.ToTitleCase($providerName)
+
+        $checksPath = Join-Path -Path $script:ModuleRoot -ChildPath "Checks/$displayName"
+        $checkCount = if (Test-Path $checksPath) { @(Get-ChildItem -Path "$checksPath/*.ps1").Count } else { 0 }
+
+        # Start with computed properties
+        $obj = [ordered]@{
+            Name       = $displayName
+            IsDefault  = ($script:Config.cloudProvider -eq $displayName)
+            CheckCount = $checkCount
+        }
+
+        # Add all properties from config
+        foreach ($prop in $providerConfig.PSObject.Properties) {
+            $obj[$prop.Name] = $prop.Value
+        }
+
+        [PSCustomObject]$obj
     }
 }

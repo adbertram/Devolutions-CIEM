@@ -6,6 +6,7 @@
   "checksPath": "Private",
   "cloudProvider": "Azure",
   "azure": {
+    "enabled": true,
     "authentication": {
       "_comment": "method: ServicePrincipalSecret | ServicePrincipalCertificate | ManagedIdentity | DeviceCode | Interactive. Credentials are stored in .env (local dev) or PSU secrets (production).",
       "method": "ServicePrincipalSecret"
@@ -17,6 +18,7 @@
     }
   },
   "aws": {
+    "enabled": false,
     "authentication": {
       "_comment": "method: CurrentProfile | AccessKey | AssumeRole | InstanceProfile (future). Credentials are stored in .env (local dev) or PSU secrets (production).",
       "method": "CurrentProfile",
