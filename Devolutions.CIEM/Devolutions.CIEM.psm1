@@ -539,252 +539,222 @@ function New-DevolutionsCIEMApp {
         $currentProvider = if ($CurrentConfig.cloudProvider) { $CurrentConfig.cloudProvider } else { 'Azure' }
 
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
-        New-UDTypography -Text 'Configure CIEM scan settings, authentication, and integrations' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
+        New-UDTypography -Text 'Configure cloud provider authentication for CIEM security scans' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
-        # Deployment Environment section
-        New-UDCard -Title 'Deployment Environment' -Style @{ marginBottom = '20px' } -Content {
-            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                if ($envInfo.Environment -eq 'AzureWebApp') {
-                    New-UDChip -Label 'Azure Web App' -Icon (New-UDIcon -Icon 'Cloud') -Style @{
-                        backgroundColor = '#1976d2'
-                        color = 'white'
+        New-UDCard -Title 'Cloud Provider Authentication' -Content {
+            # Environment detection indicator (integrated into auth card)
+            New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
+                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                    New-UDTypography -Text 'Detected Environment:' -Variant 'body2' -Style @{ color = '#666' }
+                    if ($envInfo.Environment -eq 'AzureWebApp') {
+                        New-UDChip -Label 'Azure Web App' -Icon (New-UDIcon -Icon 'Cloud') -Size 'small' -Style @{
+                            backgroundColor = '#1976d2'
+                            color = 'white'
+                        }
                     }
+                    else {
+                        New-UDChip -Label 'On-Premises' -Icon (New-UDIcon -Icon 'Server') -Size 'small' -Style @{
+                            backgroundColor = '#4caf50'
+                            color = 'white'
+                        }
+                    }
+                }
+            }
+
+            # Provider Selection
+            New-UDElement -Tag 'div' -Content {
+                New-UDSelect -Id 'cloudProvider' -Label 'Cloud Provider' -Option {
+                    New-UDSelectOption -Name 'Azure' -Value 'Azure'
+                    New-UDSelectOption -Name 'AWS (Coming Soon)' -Value 'AWS'
+                } -DefaultValue $currentProvider -FullWidth -OnChange {
+                    Sync-UDElement -Id 'authMethodContainer'
+                    Sync-UDElement -Id 'authFieldsContainer'
+                }
+            } -Attributes @{ style = @{ marginBottom = '16px' } }
+
+            # Dynamic Authentication Method dropdown based on provider
+            New-UDDynamic -Id 'authMethodContainer' -Content {
+                $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
+                if (-not $selectedProvider) { $selectedProvider = 'Azure' }
+
+                if ($selectedProvider -eq 'AWS') {
+                    # AWS is disabled - show coming soon message
+                    New-UDAlert -Severity 'info' -Text 'AWS support is coming soon. Please select Azure as your cloud provider.' -Style @{ marginBottom = '16px' }
+                    New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
+                        New-UDSelectOption -Name 'Current Profile (AWS CLI)' -Value 'CurrentProfile'
+                    } -DefaultValue 'CurrentProfile' -FullWidth -Disabled
                 }
                 else {
-                    New-UDChip -Label 'On-Premises' -Icon (New-UDIcon -Icon 'Server') -Style @{
-                        backgroundColor = '#4caf50'
-                        color = 'white'
+                    # Azure authentication methods
+                    $azureAuthMethod = if ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
+
+                    New-UDElement -Tag 'div' -Content {
+                        New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
+                            New-UDSelectOption -Name 'Service Principal (Client Secret)' -Value 'ServicePrincipalSecret'
+                            New-UDSelectOption -Name 'Service Principal (Certificate)' -Value 'ServicePrincipalCertificate'
+                            New-UDSelectOption -Name 'Managed Identity' -Value 'ManagedIdentity'
+                            New-UDSelectOption -Name 'Device Code' -Value 'DeviceCode'
+                            New-UDSelectOption -Name 'Interactive Browser' -Value 'Interactive'
+                        } -DefaultValue $azureAuthMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
+                    } -Attributes @{ style = @{ marginBottom = '8px' } }
+
+                    # Info about authentication methods
+                    New-UDTypography -Text 'Select the authentication method that matches your environment and security requirements.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '16px' }
+                }
+            }
+
+            # Warning when on-prem and ManagedIdentity might be selected
+            if (-not $envInfo.SupportsManagedIdentity) {
+                New-UDAlert -Severity 'info' -Text 'Managed Identity is only available in Azure App Service deployments.' -Dense -Style @{ marginBottom = '8px' }
+            }
+
+            # Dynamic fields based on selected authentication method
+            New-UDDynamic -Id 'authFieldsContainer' -Content {
+                # Read from UI if available (after user interaction), otherwise fall back to config
+                $uiProvider = (Get-UDElement -Id 'cloudProvider').value
+                $uiMethod = (Get-UDElement -Id 'authMethod').value
+                $selectedProvider = if ($uiProvider) { $uiProvider } elseif ($CurrentConfig.cloudProvider) { $CurrentConfig.cloudProvider } else { 'Azure' }
+                $selectedMethod = if ($uiMethod) { $uiMethod } elseif ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
+
+                # Check for ManagedIdentity warning
+                $envCheck = Get-PSUInstalledEnvironment
+                if ($selectedMethod -eq 'ManagedIdentity' -and -not $envCheck.SupportsManagedIdentity) {
+                    New-UDAlert -Severity 'warning' -Text 'Managed Identity will not work in on-premises deployments. Please choose a different authentication method.' -Style @{ marginBottom = '16px' }
+                }
+
+                # Load credentials from PSU secrets if available
+                $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+                $storedCreds = @{
+                    TenantId = $null
+                    ClientId = $null
+                    ClientSecretExists = $false
+                    CertThumbprint = $null
+                    CertPasswordExists = $false
+                    ManagedIdentityClientId = $null
+                }
+                if ($inPSUContext) {
+                    $storedCreds.TenantId = $Secret:CIEM_Azure_TenantId
+                    $storedCreds.ClientId = $Secret:CIEM_Azure_ClientId
+                    $storedCreds.ClientSecretExists = -not [string]::IsNullOrEmpty($Secret:CIEM_Azure_ClientSecret)
+                    $storedCreds.CertThumbprint = $Secret:CIEM_Azure_CertThumbprint
+                    $storedCreds.CertPasswordExists = -not [string]::IsNullOrEmpty($Secret:CIEM_Azure_CertPassword)
+                    $storedCreds.ManagedIdentityClientId = $Secret:CIEM_Azure_ManagedIdentityClientId
+                }
+
+                if ($selectedProvider -eq 'Azure') {
+                    switch ($selectedMethod) {
+                        'ServicePrincipalSecret' {
+                            New-UDGrid -Container -Spacing 2 -Content {
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $storedCreds.TenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'azSpClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                                    $secretPlaceholder = if ($storedCreds.ClientSecretExists) { 'Secret is stored. Leave empty to keep existing, or enter new value to replace.' } else { 'Enter service principal client secret' }
+                                    $secretValue = if ($storedCreds.ClientSecretExists) { '********' } else { '' }
+                                    New-UDTextbox -Id 'azSpClientSecret' -Label 'Client Secret' -Type 'password' -Value $secretValue -FullWidth -Placeholder $secretPlaceholder
+                                }
+                            }
+                        }
+                        'ServicePrincipalCertificate' {
+                            New-UDGrid -Container -Spacing 2 -Content {
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $storedCreds.TenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'azCertClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                                    New-UDTypography -Text 'Provide either a certificate thumbprint (for certificates in the local store) or a certificate file path:' -Variant 'caption' -Style @{ color = '#666'; marginTop = '8px'; marginBottom = '8px' }
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'azCertThumbprint' -Label 'Certificate Thumbprint' -Value $storedCreds.CertThumbprint -FullWidth -Placeholder 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'azCertPath' -Label 'Certificate File Path (.pfx)' -Value $CurrentConfig.azure.authentication.certificate.path -FullWidth -Placeholder '/path/to/certificate.pfx'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    $certPwdPlaceholder = if ($storedCreds.CertPasswordExists) { 'Password is stored. Leave empty to keep existing.' } else { 'Certificate file password' }
+                                    $certPwdValue = if ($storedCreds.CertPasswordExists) { '********' } else { '' }
+                                    New-UDTextbox -Id 'azCertPassword' -Label 'Certificate Password (if applicable)' -Type 'password' -Value $certPwdValue -FullWidth -Placeholder $certPwdPlaceholder
+                                }
+                            }
+                        }
+                        'ManagedIdentity' {
+                            # No configuration needed - system-assigned managed identity is used automatically
+                        }
+                        'DeviceCode' {
+                            New-UDAlert -Severity 'info' -Text 'Device Code authentication will prompt you to visit microsoft.com/devicelogin and enter a code. Useful for environments with strict MFA policies or where browser-based login is restricted.' -Dense -Style @{ marginBottom = '16px' }
+                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
+                        }
+                        'Interactive' {
+                            New-UDAlert -Severity 'info' -Text 'Interactive authentication opens a browser window for you to sign in. Supports MFA and all authentication policies.' -Dense -Style @{ marginBottom = '16px' }
+                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
+                        }
                     }
                 }
-                New-UDTypography -Text $envInfo.Description -Variant 'body2' -Style @{ marginLeft = '16px' }
+                elseif ($selectedProvider -eq 'AWS') {
+                    # AWS fields (disabled for now)
+                    New-UDTypography -Text 'AWS authentication configuration will be available in a future release.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic' }
+                }
             }
-            if ($envInfo.WebsiteName) {
-                New-UDTypography -Text "Site: $($envInfo.WebsiteName)" -Variant 'caption' -Style @{ color = '#666'; marginTop = '8px' }
-            }
-        }
 
-        New-UDGrid -Container -Spacing 3 -Content {
-            # Cloud Provider Authentication Card (full width)
-            New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                New-UDCard -Title 'Cloud Provider Authentication' -Content {
-                    # Show credential storage location indicator
-                    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-                    if ($inPSUContext) {
-                        New-UDAlert -Severity 'success' -Text 'Credentials are stored securely in PSU secrets (encrypted in database).' -Dense -Style @{ marginBottom = '16px' }
-                    } else {
-                        New-UDAlert -Severity 'info' -Text 'Running outside PSU context. Credentials should be stored in the .env file in the module directory.' -Dense -Style @{ marginBottom = '16px' }
-                    }
+            # Required Permissions Button with tooltip
+            New-UDElement -Tag 'div' -Content {
+                New-UDTooltip -TooltipContent {
+                    New-UDTypography -Text 'View the Azure API permissions and RBAC roles required for the service principal to run all CIEM security checks.'
+                } -Content {
+                    New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
+                        try {
+                            $permissions = Get-CIEMRequiredPermission
+                            Show-UDModal -Header {
+                                New-UDTypography -Text 'Required Permissions for CIEM Scans' -Variant 'h6'
+                            } -Content {
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text "The following permissions are required for the service principal to run all $($permissions.CheckCount) security checks:" -Variant 'body2' -Style @{ marginBottom = '16px' }
 
-                    # Provider Selection
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDSelect -Id 'cloudProvider' -Label 'Cloud Provider' -Option {
-                            New-UDSelectOption -Name 'Azure' -Value 'Azure'
-                            New-UDSelectOption -Name 'AWS (Coming Soon)' -Value 'AWS'
-                        } -DefaultValue $currentProvider -FullWidth -OnChange {
-                            Sync-UDElement -Id 'authMethodContainer'
-                            Sync-UDElement -Id 'authFieldsContainer'
-                        }
-                    } -Attributes @{ style = @{ marginBottom = '16px' } }
-
-                    # Dynamic Authentication Method dropdown based on provider
-                    New-UDDynamic -Id 'authMethodContainer' -Content {
-                        $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
-                        if (-not $selectedProvider) { $selectedProvider = 'Azure' }
-
-                        if ($selectedProvider -eq 'AWS') {
-                            # AWS is disabled - show coming soon message
-                            New-UDAlert -Severity 'info' -Text 'AWS support is coming soon. Please select Azure as your cloud provider.' -Style @{ marginBottom = '16px' }
-                            New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
-                                New-UDSelectOption -Name 'Current Profile (AWS CLI)' -Value 'CurrentProfile'
-                            } -DefaultValue 'CurrentProfile' -FullWidth -Disabled
-                        }
-                        else {
-                            # Azure authentication methods
-                            $azureAuthMethod = if ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
-
-                            New-UDElement -Tag 'div' -Content {
-                                New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
-                                    New-UDSelectOption -Name 'Service Principal (Client Secret)' -Value 'ServicePrincipalSecret'
-                                    New-UDSelectOption -Name 'Service Principal (Certificate)' -Value 'ServicePrincipalCertificate'
-                                    New-UDSelectOption -Name 'Managed Identity' -Value 'ManagedIdentity'
-                                    New-UDSelectOption -Name 'Device Code' -Value 'DeviceCode'
-                                    New-UDSelectOption -Name 'Interactive Browser' -Value 'Interactive'
-                                } -DefaultValue $azureAuthMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
-                            } -Attributes @{ style = @{ marginBottom = '8px' } }
-
-                            # Info about authentication methods
-                            New-UDTypography -Text 'Select the authentication method that matches your environment and security requirements.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '16px' }
-                        }
-                    }
-
-                    # Warning when on-prem and ManagedIdentity might be selected
-                    if (-not $envInfo.SupportsManagedIdentity) {
-                        New-UDAlert -Severity 'info' -Text 'Managed Identity is only available in Azure App Service deployments.' -Dense -Style @{ marginBottom = '8px' }
-                    }
-
-                    # Dynamic fields based on selected authentication method
-                    New-UDDynamic -Id 'authFieldsContainer' -Content {
-                        $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
-                        if (-not $selectedProvider) { $selectedProvider = 'Azure' }
-                        $selectedMethod = (Get-UDElement -Id 'authMethod').value
-                        if (-not $selectedMethod) { $selectedMethod = 'ServicePrincipalSecret' }
-
-                        # Check for ManagedIdentity warning
-                        $envCheck = Get-PSUInstalledEnvironment
-                        if ($selectedMethod -eq 'ManagedIdentity' -and -not $envCheck.SupportsManagedIdentity) {
-                            New-UDAlert -Severity 'warning' -Text 'Managed Identity will not work in on-premises deployments. Please choose a different authentication method.' -Style @{ marginBottom = '16px' }
-                        }
-
-                        # Load credentials from PSU secrets if available
-                        $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-                        $storedCreds = @{
-                            TenantId = $null
-                            ClientId = $null
-                            CertThumbprint = $null
-                            ManagedIdentityClientId = $null
-                        }
-                        if ($inPSUContext) {
-                            $storedCreds.TenantId = $Secret:CIEM_Azure_TenantId
-                            $storedCreds.ClientId = $Secret:CIEM_Azure_ClientId
-                            $storedCreds.CertThumbprint = $Secret:CIEM_Azure_CertThumbprint
-                            $storedCreds.ManagedIdentityClientId = $Secret:CIEM_Azure_ManagedIdentityClientId
-                        }
-
-                        if ($selectedProvider -eq 'Azure') {
-                            switch ($selectedMethod) {
-                                'ServicePrincipalSecret' {
-                                    New-UDGrid -Container -Spacing 2 -Content {
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $storedCreds.TenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azSpClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                            New-UDTextbox -Id 'azSpClientSecret' -Label 'Client Secret' -Type 'password' -FullWidth -Placeholder 'Enter service principal client secret (leave empty to keep existing)'
+                                    if ($permissions.Graph.Count -gt 0) {
+                                        New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                        New-UDTypography -Text 'Grant these in Azure Portal > App Registrations > API Permissions > Add > Microsoft Graph > Application permissions' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                        New-UDList -Content {
+                                            foreach ($perm in $permissions.Graph) {
+                                                New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Key' -Size 'sm')
+                                            }
                                         }
                                     }
-                                }
-                                'ServicePrincipalCertificate' {
-                                    New-UDGrid -Container -Spacing 2 -Content {
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID' -Value $storedCreds.TenantId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azCertClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                            New-UDTypography -Text 'Provide either a certificate thumbprint (for certificates in the local store) or a certificate file path:' -Variant 'caption' -Style @{ color = '#666'; marginTop = '8px'; marginBottom = '8px' }
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azCertThumbprint' -Label 'Certificate Thumbprint' -Value $storedCreds.CertThumbprint -FullWidth -Placeholder 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azCertPath' -Label 'Certificate File Path (.pfx)' -Value $CurrentConfig.azure.authentication.certificate.path -FullWidth -Placeholder '/path/to/certificate.pfx'
-                                        }
-                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                            New-UDTextbox -Id 'azCertPassword' -Label 'Certificate Password (if applicable)' -Type 'password' -FullWidth -Placeholder 'Certificate file password'
+
+                                    if ($permissions.ARM.Count -gt 0) {
+                                        New-UDTypography -Text 'Azure Resource Manager RBAC Actions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                        New-UDTypography -Text 'Assign the Reader role at the subscription or management group level to cover these permissions.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                        New-UDList -Content {
+                                            foreach ($perm in $permissions.ARM) {
+                                                New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
+                                            }
                                         }
                                     }
-                                }
-                                'ManagedIdentity' {
-                                    New-UDAlert -Severity 'info' -Text 'System-assigned managed identity requires no additional configuration. For user-assigned identity, provide the Client ID below.' -Dense -Style @{ marginBottom = '16px' }
-                                    New-UDTextbox -Id 'azMiClientId' -Label 'User-Assigned Identity Client ID (Optional)' -Value $storedCreds.ManagedIdentityClientId -FullWidth -Placeholder 'Leave empty for system-assigned identity'
-                                }
-                                'DeviceCode' {
-                                    New-UDAlert -Severity 'info' -Text 'Device Code authentication will prompt you to visit microsoft.com/devicelogin and enter a code. Useful for environments with strict MFA policies or where browser-based login is restricted.' -Dense -Style @{ marginBottom = '16px' }
-                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
-                                }
-                                'Interactive' {
-                                    New-UDAlert -Severity 'info' -Text 'Interactive authentication opens a browser window for you to sign in. Supports MFA and all authentication policies.' -Dense -Style @{ marginBottom = '16px' }
-                                    New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
-                                }
-                            }
 
-                            # Subscription filter (shown for all Azure auth methods)
-                            New-UDElement -Tag 'div' -Content {
-                                $filterValue = if ($CurrentConfig.azure.subscriptionFilter -is [array]) { $CurrentConfig.azure.subscriptionFilter -join ', ' } else { '' }
-                                New-UDTextbox -Id 'subscriptionFilter' -Label 'Subscription Filter' -Value $filterValue -FullWidth -Placeholder 'Comma-separated subscription IDs (leave empty for all)'
-                            } -Attributes @{ style = @{ marginTop = '16px' } }
+                                    if ($permissions.KeyVaultDataPlane.Count -gt 0) {
+                                        New-UDTypography -Text 'Key Vault Data Plane Permissions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                        New-UDTypography -Text 'Configure Key Vault access policy or RBAC for data plane access.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                        New-UDList -Content {
+                                            foreach ($perm in $permissions.KeyVaultDataPlane) {
+                                                New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Lock' -Size 'sm')
+                                            }
+                                        }
+                                    }
+                                } -Attributes @{ style = @{ maxHeight = '60vh'; overflowY = 'auto' } }
+                            } -Footer {
+                                New-UDButton -Text 'Close' -OnClick { Hide-UDModal }
+                            } -Persistent -FullWidth -MaxWidth 'md'
                         }
-                        elseif ($selectedProvider -eq 'AWS') {
-                            # AWS fields (disabled for now)
-                            New-UDTypography -Text 'AWS authentication configuration will be available in a future release.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic' }
+                        catch {
+                            Show-UDToast -Message "Failed to get permissions: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
                         }
                     }
-
-                    # Required Permissions Button
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
-                            try {
-                                $permissions = Get-CIEMRequiredPermission
-                                Show-UDModal -Header {
-                                    New-UDTypography -Text 'Required Permissions for CIEM Scans' -Variant 'h6'
-                                } -Content {
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text "The following permissions are required for the service principal to run all $($permissions.CheckCount) security checks:" -Variant 'body2' -Style @{ marginBottom = '16px' }
-
-                                        if ($permissions.Graph.Count -gt 0) {
-                                            New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
-                                            New-UDTypography -Text 'Grant these in Azure Portal > App Registrations > API Permissions > Add > Microsoft Graph > Application permissions' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
-                                            New-UDList -Content {
-                                                foreach ($perm in $permissions.Graph) {
-                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Key' -Size 'sm')
-                                                }
-                                            }
-                                        }
-
-                                        if ($permissions.ARM.Count -gt 0) {
-                                            New-UDTypography -Text 'Azure Resource Manager RBAC Actions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
-                                            New-UDTypography -Text 'Assign the Reader role at the subscription or management group level to cover these permissions.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
-                                            New-UDList -Content {
-                                                foreach ($perm in $permissions.ARM) {
-                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
-                                                }
-                                            }
-                                        }
-
-                                        if ($permissions.KeyVaultDataPlane.Count -gt 0) {
-                                            New-UDTypography -Text 'Key Vault Data Plane Permissions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
-                                            New-UDTypography -Text 'Configure Key Vault access policy or RBAC for data plane access.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
-                                            New-UDList -Content {
-                                                foreach ($perm in $permissions.KeyVaultDataPlane) {
-                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Lock' -Size 'sm')
-                                                }
-                                            }
-                                        }
-                                    } -Attributes @{ style = @{ maxHeight = '60vh'; overflowY = 'auto' } }
-                                } -Footer {
-                                    New-UDButton -Text 'Close' -OnClick { Hide-UDModal }
-                                } -Persistent -FullWidth -MaxWidth 'md'
-                            }
-                            catch {
-                                Show-UDToast -Message "Failed to get permissions: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                            }
-                        }
-                    } -Attributes @{ style = @{ marginTop = '16px' } }
                 }
-            }
-
-            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                New-UDCard -Title 'Scan Settings' -Content {
-                    New-UDElement -Tag 'div' -Content { New-UDTextbox -Id 'throttleLimit' -Label 'Throttle Limit' -Value $CurrentConfig.scan.throttleLimit -FullWidth -Placeholder '1-100' -Type 'number' } -Attributes @{ style = @{ marginBottom = '16px' } }
-                    New-UDElement -Tag 'div' -Content { New-UDTextbox -Id 'timeoutSeconds' -Label 'Timeout (Seconds)' -Value $CurrentConfig.scan.timeoutSeconds -FullWidth -Placeholder 'Scan timeout in seconds' -Type 'number' } -Attributes @{ style = @{ marginBottom = '16px' } }
-                    New-UDElement -Tag 'div' -Content { New-UDCheckbox -Id 'continueOnError' -Label 'Continue on Error' -Checked $CurrentConfig.scan.continueOnError }
-                }
-            }
-
-            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                New-UDCard -Title 'PAM Integration' -Content {
-                    New-UDElement -Tag 'div' -Content { New-UDTextbox -Id 'pamUrl' -Label 'Remediation URL' -Value $CurrentConfig.pam.remediationUrl -FullWidth -Placeholder 'URL for Devolutions PAM integration' }
-                }
-            }
-
-            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                New-UDCard -Title 'Output Settings' -Content {
-                    New-UDElement -Tag 'div' -Content { New-UDCheckbox -Id 'verboseLogging' -Label 'Verbose Logging' -Checked $CurrentConfig.output.verboseLogging }
-                }
-            }
+            } -Attributes @{ style = @{ marginTop = '16px' } }
         }
 
         New-UDElement -Tag 'div' -Content {
@@ -810,25 +780,10 @@ function New-DevolutionsCIEMApp {
                         # Check if running in PSU context (Secret: drive available)
                         $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
 
-                        $subscriptionFilterRaw = (Get-UDElement -Id 'subscriptionFilter').value
-                        $throttleLimit = [int](Get-UDElement -Id 'throttleLimit').value
-                        $timeoutSeconds = [int](Get-UDElement -Id 'timeoutSeconds').value
-                        $continueOnError = (Get-UDElement -Id 'continueOnError').checked
-                        $verboseLogging = (Get-UDElement -Id 'verboseLogging').checked
-                        $pamUrl = (Get-UDElement -Id 'pamUrl').value
-
-                        $subscriptionFilter = if ([string]::IsNullOrWhiteSpace($subscriptionFilterRaw)) { @() } else { $subscriptionFilterRaw -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } }
-
                         # Non-sensitive settings go to config.json
                         $configSettings = @{
                             'cloudProvider' = $provider
                             'azure.authentication.method' = $authMethod
-                            'azure.subscriptionFilter' = $subscriptionFilter
-                            'scan.throttleLimit' = $throttleLimit
-                            'scan.timeoutSeconds' = $timeoutSeconds
-                            'scan.continueOnError' = $continueOnError
-                            'output.verboseLogging' = $verboseLogging
-                            'pam.remediationUrl' = $pamUrl
                         }
 
                         # Collect credentials based on auth method
@@ -843,7 +798,8 @@ function New-DevolutionsCIEMApp {
                                 $clientId = (Get-UDElement -Id 'azSpClientId').value
                                 $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
                                 if ($clientId) { $credentials['ClientId'] = $clientId }
-                                if ($clientSecret) { $credentials['ClientSecret'] = $clientSecret }
+                                # Only save client secret if user entered a new value (not the placeholder asterisks)
+                                if ($clientSecret -and $clientSecret -ne '********') { $credentials['ClientSecret'] = $clientSecret }
                             }
                             'ServicePrincipalCertificate' {
                                 $clientId = (Get-UDElement -Id 'azCertClientId').value
@@ -851,10 +807,7 @@ function New-DevolutionsCIEMApp {
                                 if ($clientId) { $credentials['ClientId'] = $clientId }
                                 if ($thumbprint) { $credentials['CertThumbprint'] = $thumbprint }
                             }
-                            'ManagedIdentity' {
-                                $miClientId = (Get-UDElement -Id 'azMiClientId').value
-                                if ($miClientId) { $credentials['ManagedIdentityClientId'] = $miClientId }
-                            }
+                            # ManagedIdentity requires no credentials - uses system-assigned identity
                         }
 
                         # Save credentials to PSU secrets (if in PSU context)
@@ -869,7 +822,7 @@ function New-DevolutionsCIEMApp {
                                     if ($existingVar) {
                                         Set-PSUVariable -Variable $existingVar -Value $secretValue
                                     } else {
-                                        New-PSUVariable -Name $secretName -Value $secretValue -Secret
+                                        New-PSUVariable -Name $secretName -Value $secretValue -Vault 'Database'
                                     }
                                     $secretsCreated += $secretName
                                 }
@@ -906,12 +859,6 @@ function New-DevolutionsCIEMApp {
                     try {
                         Set-UDElement -Id 'cloudProvider' -Properties @{ value = 'Azure' }
                         Set-UDElement -Id 'authMethod' -Properties @{ value = 'ServicePrincipalSecret' }
-                        Set-UDElement -Id 'subscriptionFilter' -Properties @{ value = '' }
-                        Set-UDElement -Id 'throttleLimit' -Properties @{ value = '10' }
-                        Set-UDElement -Id 'timeoutSeconds' -Properties @{ value = '300' }
-                        Set-UDElement -Id 'continueOnError' -Properties @{ checked = $true }
-                        Set-UDElement -Id 'verboseLogging' -Properties @{ checked = $false }
-                        Set-UDElement -Id 'pamUrl' -Properties @{ value = 'https://devolutions.net/pam' }
                         Sync-UDElement -Id 'authMethodContainer'
                         Sync-UDElement -Id 'authFieldsContainer'
                         Show-UDToast -Message 'Form reset to default values. Click Save to apply.' -Duration 5000 -BackgroundColor '#ff9800'
