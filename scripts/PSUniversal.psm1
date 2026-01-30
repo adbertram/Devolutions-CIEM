@@ -923,8 +923,14 @@ function Restart-PSUApp {
     Write-Verbose "Restarting app '$appName' (ID: $Id)..."
 
     try {
-        $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -ErrorAction Stop
+        # Use a timeout to prevent hanging if the restart takes too long
+        # The restart endpoint may wait for the app to fully restart before returning
+        $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -TimeoutSec 30 -ErrorAction Stop
         Write-Verbose "App restarted successfully."
+    }
+    catch [System.Threading.Tasks.TaskCanceledException] {
+        # Timeout occurred - the restart was likely initiated but took too long to confirm
+        Write-Verbose "Restart request timed out after 30s. The app restart may still be in progress."
     }
     catch {
         throw "Failed to restart app '$appName'. Error: $_"
