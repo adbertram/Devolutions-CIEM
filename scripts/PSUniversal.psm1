@@ -951,8 +951,7 @@ function Publish-PSUModule {
         Automatically bumps the version and publishes a module to PowerShell Gallery.
         Modules with the 'PowerShellUniversal' tag appear in the PSU Gallery.
 
-        Optionally imports the published module to a connected PSU instance and
-        restarts the associated app.
+        Optionally imports the published module to a connected PSU instance.
 
     .PARAMETER ModulePath
         Path to the module directory. Required.
@@ -966,10 +965,6 @@ function Publish-PSUModule {
         - Patch: 0.2.0 -> 0.2.1
         - Minor: 0.2.0 -> 0.3.0
         - Major: 0.2.0 -> 1.0.0
-
-    .PARAMETER AppName
-        Name of the PSU app to restart after updating the module.
-        If not specified, no app restart is performed.
 
     .PARAMETER SkipValidation
         Skip module structure validation (not recommended).
@@ -987,10 +982,6 @@ function Publish-PSUModule {
         # Bumps minor version and publishes
 
     .EXAMPLE
-        Publish-PSUModule -ModulePath ./Devolutions.CIEM -AppName "Devolutions CIEM"
-        # Publishes, auto-connects to PSU, imports the module, and restarts the app
-
-    .EXAMPLE
         Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf
         # Shows what would be published without actually publishing
     #>
@@ -1005,9 +996,6 @@ function Publish-PSUModule {
         [Parameter()]
         [ValidateSet('Patch', 'Minor', 'Major')]
         [string]$BumpVersion = 'Patch',
-
-        [Parameter()]
-        [string]$AppName,
 
         [Parameter()]
         [switch]$SkipValidation,
@@ -1262,12 +1250,6 @@ NuGet API key required. Options:
                 Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
                 Write-Host "  [OK] Module imported" -ForegroundColor Green
                 $updatedPSU = $true
-
-                if ($AppName) {
-                    Write-Host "  Restarting app '$AppName'..." -ForegroundColor Gray
-                    Restart-PSUApp -Name $AppName
-                    Write-Host "  [OK] App restarted" -ForegroundColor Green
-                }
             }
             catch {
                 Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red
