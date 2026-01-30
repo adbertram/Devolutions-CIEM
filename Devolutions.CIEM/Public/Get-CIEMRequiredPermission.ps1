@@ -19,6 +19,7 @@ function Get-CIEMRequiredPermission {
         - Graph: Array of Microsoft Graph API permissions (e.g., "User.Read.All")
         - ARM: Array of Azure Resource Manager RBAC actions (e.g., "Microsoft.Storage/storageAccounts/read")
         - KeyVaultDataPlane: Array of Key Vault data plane permissions (e.g., "secrets/list")
+        - AzureRoles: Array of Azure RBAC role names required to satisfy ARM and KeyVault permissions
         - Summary: Human-readable summary text
 
     .EXAMPLE
@@ -62,6 +63,8 @@ function Get-CIEMRequiredPermission {
             Graph             = @()
             ARM               = @()
             KeyVaultDataPlane = @()
+            AzureRoles        = @()
+            CheckCount        = 0
             Summary           = "No checks found."
         }
     }
@@ -85,10 +88,37 @@ function Get-CIEMRequiredPermission {
             }
         }
 
-        # Get unique and sort
-        $graphPermissions = $graphPermissions | Select-Object -Unique | Sort-Object
-        $armPermissions = $armPermissions | Select-Object -Unique | Sort-Object
-        $kvPermissions = $kvPermissions | Select-Object -Unique | Sort-Object
+        # Get unique and sort (wrap in @() to ensure arrays)
+        $graphPermissions = @($graphPermissions | Select-Object -Unique | Sort-Object)
+        $armPermissions = @($armPermissions | Select-Object -Unique | Sort-Object)
+        $kvPermissions = @($kvPermissions | Select-Object -Unique | Sort-Object)
+
+        # Determine required Azure RBAC roles based on permissions
+        $azureRoles = @()
+
+        # ARM permissions: Reader role covers all */read actions
+        if ($armPermissions.Count -gt 0) {
+            # Check if all ARM permissions are read-only (end with /read or /*/read)
+            $nonReadPermissions = @($armPermissions | Where-Object { $_ -notmatch '/read$' })
+            if ($nonReadPermissions.Count -eq 0) {
+                $azureRoles += 'Reader'
+            }
+            else {
+                # Some write permissions detected - would need Contributor or custom role
+                $azureRoles += 'Reader'  # Still include Reader for read permissions
+                Write-Warning "Some ARM permissions require write access. Review permissions and assign appropriate roles."
+            }
+        }
+
+        # Key Vault data plane permissions: Map to specific RBAC roles
+        if ($kvPermissions -contains 'secrets/list' -or $kvPermissions -contains 'secrets/get') {
+            $azureRoles += 'Key Vault Secrets User'
+        }
+        if ($kvPermissions -contains 'keys/list' -or $kvPermissions -contains 'keys/get') {
+            $azureRoles += 'Key Vault Crypto User'
+        }
+
+        $azureRoles = @($azureRoles | Select-Object -Unique | Sort-Object)
 
         # Build summary
         $summaryParts = @()
@@ -108,8 +138,6 @@ function Get-CIEMRequiredPermission {
             foreach ($perm in $armPermissions) {
                 $summaryParts += "  - $perm"
             }
-            $summaryParts += ""
-            $summaryParts += "  Tip: Assign the 'Reader' role at the subscription/management group level to cover most ARM permissions."
         }
 
         if ($kvPermissions.Count -gt 0) {
@@ -118,14 +146,21 @@ function Get-CIEMRequiredPermission {
             foreach ($perm in $kvPermissions) {
                 $summaryParts += "  - $perm"
             }
+        }
+
+        if ($azureRoles.Count -gt 0) {
             $summaryParts += ""
-            $summaryParts += "  Tip: Assign 'Key Vault Reader' role and configure access policy or RBAC for data plane access."
+            $summaryParts += "Required Azure RBAC Roles:"
+            foreach ($role in $azureRoles) {
+                $summaryParts += "  - $role"
+            }
         }
 
         [PSCustomObject]@{
             Graph             = @($graphPermissions)
             ARM               = @($armPermissions)
             KeyVaultDataPlane = @($kvPermissions)
+            AzureRoles        = @($azureRoles)
             CheckCount        = $checks.Count
             Summary           = $summaryParts -join "`n"
         }
