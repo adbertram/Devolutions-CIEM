@@ -34,8 +34,6 @@ function Test-CIEMAuthenticated {
         $providers = $providers | Where-Object { $Provider -contains $_.Name }
     }
 
-    $results = @()
-
     foreach ($p in $providers) {
         $authenticated = switch ($p.Name) {
             'Azure' {
@@ -52,12 +50,10 @@ function Test-CIEMAuthenticated {
             }
         }
 
-        $results += [PSCustomObject]@{
+        [PSCustomObject]@{
             Provider      = $p.Name
             Enabled       = $p.Enabled
             Authenticated = $authenticated
         }
     }
-
-    $results
 }

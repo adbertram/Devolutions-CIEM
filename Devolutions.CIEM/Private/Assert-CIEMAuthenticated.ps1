@@ -9,7 +9,7 @@ function Assert-CIEMAuthenticated {
         authenticated.
 
     .PARAMETER Provider
-        The cloud provider to check. Defaults to the provider in config.json.
+        The cloud provider to check. Defaults to the provider in CIEM config.
 
     .EXAMPLE
         Assert-CIEMAuthenticated

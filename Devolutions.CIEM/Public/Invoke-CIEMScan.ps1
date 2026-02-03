@@ -12,9 +12,6 @@ function Invoke-CIEMScan {
     .PARAMETER Provider
         Cloud provider to scan. Currently only 'Azure' is supported.
 
-    .PARAMETER TenantId
-        Optional Azure tenant ID. If not specified, uses current context or config.
-
     .PARAMETER CheckId
         Optional array of check IDs to run. If not specified, runs all checks.
 
@@ -57,9 +54,6 @@ function Invoke-CIEMScan {
         [Parameter()]
         [ValidateSet('Azure')]
         [string]$Provider = 'Azure',
-
-        [Parameter()]
-        [string]$TenantId,
 
         [Parameter()]
         [string[]]$CheckId,

@@ -6,7 +6,7 @@
     RootModule = 'Devolutions.CIEM.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.2.48'
+    ModuleVersion = '0.2.76'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Core')
@@ -32,8 +32,27 @@
     # Required modules are auto-installed at runtime in Devolutions.CIEM.psm1
     # This avoids PSGallery dependency resolution issues during module installation
 
-    # Functions to export from this module - controlled by Export-ModuleMember in the .psm1 file
-    FunctionsToExport = @('*')
+    # Functions to export from this module
+    FunctionsToExport = @(
+        'Connect-CIEM',
+        'Get-CIEMAuthenticationContext',
+        'Get-CIEMCheck',
+        'Get-CIEMConfig',
+        'Get-CIEMDefaultConfig',
+        'Get-CIEMProvider',
+        'Get-CIEMRequiredPermission',
+        'Get-ProwlerCheck',
+        'Get-PSUInstalledEnvironment',
+        'Invoke-CIEMScan',
+        'New-CIEMAzureManagedIdentity',
+        'New-DevolutionsCIEMApp',
+        'New-PSUAzureServicePrincipal',
+        'Reset-CIEMConfig',
+        'Set-CIEMConfig',
+        'Sync-ProwlerCheck',
+        'Test-CIEMAuthenticated',
+        'Write-CIEMLog'
+    )
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
     CmdletsToExport = @()
@@ -94,30 +113,30 @@
         'Checks/Azure/Test-StorageSecureTransferRequiredIsEnabled.ps1',
         'Checks/Azure/Test-StorageSmbChannelEncryptionWithSecureAlgorithm.ps1',
         'Checks/Azure/Test-StorageSmbProtocolVersionIsLatest.ps1',
-        'config.json',
         'Devolutions.CIEM.psd1',
         'Devolutions.CIEM.psm1',
         'Private/Assert-CIEMAuthenticated.ps1',
         'Private/Convert-ProwlerCheck.ps1',
         'Private/Get-AllGraphPage.ps1',
-        'Public/Get-CIEMConfigPath.ps1',
         'Private/Get-AzureAuthContext.ps1',
         'Private/Get-CheckMetadata.ps1',
-        'Private/Get-CIEMConfig.ps1',
-        'Private/Get-SupportedProvider.ps1',
+        'Public/Get-CIEMConfig.ps1',
+        'Public/Get-CIEMDefaultConfig.ps1',
         'Private/Initialize-EntraService.ps1',
         'Private/Initialize-IAMService.ps1',
         'Private/Initialize-KeyVaultService.ps1',
         'Private/Initialize-StorageService.ps1',
         'Private/Invoke-AzureApi.ps1',
         'Private/New-CIEMFinding.ps1',
-        'Private/Set-CIEMConfig.ps1',
+        'Public/Set-CIEMConfig.ps1',
         'Private/Test-AzureChecksSchema.ps1',
         'Private/Test-AzureConnection.ps1',
         'Private/Test-EntraAuthorizationPolicyBooleanSetting.ps1',
         'Private/Test-GitRemote.ps1',
         'Private/Test-KeyVaultItemExpiration.ps1',
         'Private/Test-StorageAccountProperty.ps1',
+        'Public/Write-CIEMLog.ps1',
+        'Public/New-DevolutionsCIEMApp.ps1',
         'Public/Connect-CIEM.ps1',
         'Public/Get-CIEMAuthenticationContext.ps1',
         'Public/Get-CIEMCheck.ps1',
@@ -128,6 +147,7 @@
         'Public/New-PSUAzureServicePrincipal.ps1',
         'Public/Get-ProwlerCheck.ps1',
         'Public/Invoke-CIEMScan.ps1',
+        'Public/Reset-CIEMConfig.ps1',
         'Public/Sync-ProwlerCheck.ps1',
         'Public/Test-CIEMAuthenticated.ps1'
     )
@@ -149,6 +169,14 @@
 
             # ReleaseNotes of this module
             ReleaseNotes = @'
+## 0.2.65 - PSU Cache Configuration Storage
+- Migrated configuration from config.json to PSU persistent cache
+- Config is now stored in PSU cache with key 'CIEM:Config'
+- Added Get-CIEMDefaultConfig (Private) - returns hardcoded defaults
+- Added Reset-CIEMConfig (Public) - resets config to defaults
+- Removed config.json file and Get-CIEMConfigPath function
+- Configuration automatically initializes with defaults on first run
+
 ## 0.2.20 - Dashboard Function Scope Fix
 - Fixed: Get-CIEMConfigPath not found at dashboard runtime
 - Moved Get-CIEMConfigPath from nested function to Private module function

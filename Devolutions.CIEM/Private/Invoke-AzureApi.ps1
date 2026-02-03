@@ -8,11 +8,19 @@ function Invoke-AzureApi {
         Handles common response patterns including single objects and collections,
         and provides consistent error messaging for common HTTP status codes.
 
+        By default, non-success responses result in warnings (silent failure).
+        Use -ErrorAction Stop to throw terminating errors on non-success responses.
+
     .PARAMETER Uri
         The full API URI to call.
 
     .PARAMETER ResourceName
         A friendly name for the resource being loaded, used in verbose/warning messages.
+
+    .OUTPUTS
+        [PSObject] The API response content. For collection endpoints, returns the
+        'value' array. For single-resource endpoints, returns the full response object.
+        Returns nothing on error (unless -ErrorAction Stop is specified).
 
     .EXAMPLE
         $params = @{
@@ -27,8 +35,13 @@ function Invoke-AzureApi {
             ResourceName = "KeyVaults ($subId)"
         }
         Invoke-AzureApi @params
+
+    .EXAMPLE
+        # Throw on error instead of warning
+        Invoke-AzureApi -Uri $uri -ResourceName 'Critical Resource' -ErrorAction Stop
     #>
     [CmdletBinding()]
+    [OutputType([PSObject])]
     param(
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -44,8 +57,15 @@ function Invoke-AzureApi {
     Write-Verbose "Loading $ResourceName..."
     $response = Invoke-AzRestMethod -Uri $Uri -Method GET
 
+    # Determine if caller wants errors to throw (respects -ErrorAction parameter)
+    $shouldThrow = $ErrorActionPreference -eq 'Stop'
+
     if (-not $response) {
-        Write-Warning "Failed to load $ResourceName - No response"
+        $msg = "Failed to load $ResourceName - No response"
+        if ($shouldThrow) {
+            throw $msg
+        }
+        Write-Warning $msg
     }
     else {
         switch ($response.StatusCode) {
@@ -58,9 +78,21 @@ function Invoke-AzureApi {
                     $content
                 }
             }
-            403 { Write-Warning "Access denied loading $ResourceName - missing permissions" }
-            404 { Write-Verbose "Resource not found: $ResourceName" }
-            default { Write-Warning "Failed to load $ResourceName - Status: $($response.StatusCode)" }
+            403 {
+                $msg = "Access denied loading $ResourceName - missing permissions"
+                if ($shouldThrow) { throw $msg }
+                Write-Warning $msg
+            }
+            404 {
+                $msg = "Resource not found: $ResourceName"
+                if ($shouldThrow) { throw $msg }
+                Write-Verbose $msg
+            }
+            default {
+                $msg = "Failed to load $ResourceName - Status: $($response.StatusCode)"
+                if ($shouldThrow) { throw $msg }
+                Write-Warning $msg
+            }
         }
     }
 }

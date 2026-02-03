@@ -12,7 +12,7 @@ function Get-AzureAuthContext {
 
     .PARAMETER TenantId
         Optional tenant ID to use. If not specified, uses the current context tenant
-        or the tenant from config.json.
+        or the tenant from CIEM config.
 
     .OUTPUTS
         [hashtable] Authentication context containing:
@@ -50,7 +50,7 @@ function Get-AzureAuthContext {
             $authConfig = $script:Config.azure.authentication
             $spConfig = $authConfig.servicePrincipal
             if (-not $spConfig.clientId -or -not $spConfig.clientSecret -or -not $authConfig.tenantId) {
-                throw "Authentication method is 'ServicePrincipalSecret' but tenantId, clientId, or clientSecret not set in config.json"
+                throw "Authentication method is 'ServicePrincipalSecret' but tenantId, clientId, or clientSecret not set in CIEM config"
             }
 
             $secureSecret = ConvertTo-SecureString $spConfig.clientSecret -AsPlainText -Force

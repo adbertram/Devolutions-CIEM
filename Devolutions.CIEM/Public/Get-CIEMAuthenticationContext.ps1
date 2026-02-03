@@ -14,7 +14,7 @@ function Get-CIEMAuthenticationContext {
     .OUTPUTS
         [PSCustomObject] Object containing:
         - Provider: The cloud provider name
-        - ConfiguredMethod: Authentication method from config.json
+        - ConfiguredMethod: Authentication method from CIEM config
         - IsAuthenticated: Whether a valid context exists
         - AccountId: The authenticated account identifier
         - AccountType: Type of account (User, ServicePrincipal, ManagedIdentity)

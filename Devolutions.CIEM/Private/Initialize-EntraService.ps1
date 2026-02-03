@@ -43,11 +43,11 @@ function Initialize-EntraService {
     }
 
     # Load paginated resources
-    Write-Verbose "Loading users..."
+    Write-CIEMLog -Severity DEBUG -Message "Loading users..."
     $usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType"
     $script:EntraService.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
 
-    Write-Verbose "Loading user MFA status..."
+    Write-CIEMLog -Severity DEBUG -Message "Loading user MFA status..."
     $mfaUri = "$graphApiBase/reports/authenticationMethods/userRegistrationDetails"
     $script:EntraService.UserMFAStatus = @(Get-AllGraphPage -Uri $mfaUri -ResourceName "UserMFAStatus")
 
@@ -87,5 +87,5 @@ function Initialize-EntraService {
         Policies = if ($script:EntraService.ConditionalAccessPolicies) { $script:EntraService.ConditionalAccessPolicies.Count } else { 0 }
     }
 
-    Write-Verbose "Entra service initialized: $($counts.Users) users, $($counts.Roles) roles, $($counts.Policies) conditional access policies"
+    Write-CIEMLog -Severity DEBUG -Message "Entra service initialized: $($counts.Users) users, $($counts.Roles) roles, $($counts.Policies) conditional access policies"
 }

@@ -27,9 +27,9 @@ function New-CIEMAzureManagedIdentity {
         - "/subscriptions/<subscription-id>"
         - "/providers/Microsoft.Management/managementGroups/<mg-name>"
 
-    .PARAMETER EnableSystemAssignedIdentity
-        If the web app does not have a system-assigned managed identity enabled, enable it.
-        Default: $true
+    .PARAMETER SkipSystemAssignedIdentity
+        If the web app does not have a system-assigned managed identity enabled, skip enabling it.
+        By default, the function will enable system-assigned identity if not already enabled.
 
     .PARAMETER SkipRoleAssignment
         Skip the ARM RBAC role assignment. Useful if you want to assign at a different scope later.
@@ -67,6 +67,10 @@ function New-CIEMAzureManagedIdentity {
         - Contributor on the web app (if enabling managed identity)
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '',
+        Justification = 'Required for Az/MgGraph interop - credentials passed to Azure APIs')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'CLI tooling requires colored user feedback for setup progress')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -80,7 +84,7 @@ function New-CIEMAzureManagedIdentity {
         [string]$Scope,
 
         [Parameter()]
-        [switch]$EnableSystemAssignedIdentity = $true,
+        [switch]$SkipSystemAssignedIdentity,
 
         [Parameter()]
         [switch]$SkipRoleAssignment,
@@ -128,25 +132,24 @@ function New-CIEMAzureManagedIdentity {
     }
 
     if (-not $principalId) {
-        if ($EnableSystemAssignedIdentity) {
-            if ($PSCmdlet.ShouldProcess($WebAppName, "Enable system-assigned managed identity")) {
-                Write-Verbose "Enabling system-assigned managed identity on web app..."
-                $webApp = Set-AzWebApp -Name $WebAppName -ResourceGroupName $ResourceGroupName -AssignIdentity $true
-                $principalId = $webApp.Identity.PrincipalId
-
-                if (-not $principalId) {
-                    throw "Failed to enable system-assigned managed identity on web app '$WebAppName'."
-                }
-
-                Write-Verbose "System-assigned managed identity enabled. Principal ID: $principalId"
-
-                # Wait for replication
-                Write-Verbose "Waiting for Azure AD replication..."
-                Start-Sleep -Seconds 15
-            }
+        if ($SkipSystemAssignedIdentity.IsPresent) {
+            throw "Web app '$WebAppName' does not have a system-assigned managed identity enabled. Remove -SkipSystemAssignedIdentity or enable it manually."
         }
-        else {
-            throw "Web app '$WebAppName' does not have a system-assigned managed identity enabled. Use -EnableSystemAssignedIdentity or enable it manually."
+
+        if ($PSCmdlet.ShouldProcess($WebAppName, "Enable system-assigned managed identity")) {
+            Write-Verbose "Enabling system-assigned managed identity on web app..."
+            $webApp = Set-AzWebApp -Name $WebAppName -ResourceGroupName $ResourceGroupName -AssignIdentity $true
+            $principalId = $webApp.Identity.PrincipalId
+
+            if (-not $principalId) {
+                throw "Failed to enable system-assigned managed identity on web app '$WebAppName'."
+            }
+
+            Write-Verbose "System-assigned managed identity enabled. Principal ID: $principalId"
+
+            # Wait for replication
+            Write-Verbose "Waiting for Azure AD replication..."
+            Start-Sleep -Seconds 15
         }
     }
     else {
@@ -199,12 +202,14 @@ function New-CIEMAzureManagedIdentity {
 
                     Write-Verbose "  Granting consent for: $permissionName"
                     try {
-                        New-MgServicePrincipalAppRoleAssignment `
-                            -ServicePrincipalId $miSp.Id `
-                            -PrincipalId $miSp.Id `
-                            -ResourceId $graphSp.Id `
-                            -AppRoleId $appRole.Id `
-                            -ErrorAction Stop | Out-Null
+                        $appRoleParams = @{
+                            ServicePrincipalId = $miSp.Id
+                            PrincipalId        = $miSp.Id
+                            ResourceId         = $graphSp.Id
+                            AppRoleId          = $appRole.Id
+                            ErrorAction        = 'Stop'
+                        }
+                        New-MgServicePrincipalAppRoleAssignment @appRoleParams | Out-Null
                         $grantedCount++
                     }
                     catch {
@@ -258,20 +263,24 @@ Or use PowerShell:
             if ($PSCmdlet.ShouldProcess($Scope, "Assign $roleName role to managed identity")) {
                 Write-Verbose "Assigning $roleName role at scope: $Scope"
 
-                $existingAssignment = Get-AzRoleAssignment `
-                    -ObjectId $principalId `
-                    -Scope $Scope `
-                    -RoleDefinitionName $roleName `
-                    -ErrorAction SilentlyContinue
+                $getRoleParams = @{
+                    ObjectId           = $principalId
+                    Scope              = $Scope
+                    RoleDefinitionName = $roleName
+                    ErrorAction        = 'SilentlyContinue'
+                }
+                $existingAssignment = Get-AzRoleAssignment @getRoleParams
 
                 if ($existingAssignment) {
                     Write-Verbose "$roleName role already assigned at this scope"
                 }
                 else {
-                    New-AzRoleAssignment `
-                        -ObjectId $principalId `
-                        -Scope $Scope `
-                        -RoleDefinitionName $roleName | Out-Null
+                    $newRoleParams = @{
+                        ObjectId           = $principalId
+                        Scope              = $Scope
+                        RoleDefinitionName = $roleName
+                    }
+                    New-AzRoleAssignment @newRoleParams | Out-Null
                     Write-Verbose "$roleName role assigned successfully"
                 }
             }

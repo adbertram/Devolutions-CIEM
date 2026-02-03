@@ -5,7 +5,7 @@ function Sync-ProwlerCheck {
 
     .DESCRIPTION
         Extracts check files from the upstream Prowler repository that add or modify
-        security checks. Only syncs providers defined in config.json.
+        security checks. Only syncs providers defined in CIEM config.
 
         By default, syncs all available check commits. Use -CherryPick to sync specific commits.
 
@@ -15,7 +15,7 @@ function Sync-ProwlerCheck {
 
     .PARAMETER Provider
         Filter to a specific provider (azure, aws, gcp).
-        If not specified, syncs all providers defined in config.json.
+        If not specified, syncs all providers defined in CIEM config.
 
     .PARAMETER Service
         Filter to a specific service (e.g., entra, iam, storage).
@@ -65,6 +65,7 @@ function Sync-ProwlerCheck {
 
     #region Nested Helper Functions
 
+    # Builds glob patterns for locating check directories in the Prowler repo structure
     function Get-CheckPathPattern {
         param(
             [string[]]$Providers,
@@ -80,6 +81,7 @@ function Sync-ProwlerCheck {
         $patterns
     }
 
+    # Fetches git commits from upstream that add/modify check metadata or implementation files
     function Get-UpstreamCheckCommit {
         param(
             [string[]]$PathPatterns,
@@ -161,6 +163,7 @@ function Sync-ProwlerCheck {
         }
     }
 
+    # Outputs verbose information about found commits for debugging
     function Show-CommitDetail {
         param(
             [array]$Commits,
@@ -176,6 +179,7 @@ function Sync-ProwlerCheck {
         }
     }
 
+    # Extracts check files from upstream commits and creates local commits
     function Invoke-CheckSync {
         param(
             [array]$Commits
@@ -262,6 +266,7 @@ function Sync-ProwlerCheck {
         $results
     }
 
+    # Returns local filesystem paths for newly synced checks that need conversion
     function Get-NewCheckPath {
         param([array]$Commits)
 
@@ -281,6 +286,7 @@ function Sync-ProwlerCheck {
         $checkPaths
     }
 
+    # Converts successfully synced Prowler checks from Python to PowerShell format
     function Invoke-CheckConversion {
         param(
             [array]$Commits,
@@ -321,7 +327,7 @@ function Sync-ProwlerCheck {
         @($Provider)
     }
     else {
-        Get-SupportedProvider
+        (Get-CIEMProvider).Name.ToLower()
     }
 
     Write-Verbose "Syncing Prowler checks..."

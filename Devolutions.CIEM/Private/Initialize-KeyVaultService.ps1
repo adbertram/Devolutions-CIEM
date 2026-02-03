@@ -38,7 +38,7 @@ function Initialize-KeyVaultService {
         $armApiBase = $script:Config.azure.endpoints.armApi
 
         foreach ($subscriptionId in $SubscriptionIds) {
-            Write-Verbose "Loading KeyVault resources for subscription: $subscriptionId"
+            Write-CIEMLog -Severity DEBUG -Message "Loading KeyVault resources for subscription: $subscriptionId"
 
             $script:KeyVaultService[$subscriptionId] = @{
                 KeyVaults          = @()
@@ -91,16 +91,16 @@ function Initialize-KeyVaultService {
                                 $script:KeyVaultService[$subscriptionId][$dp.Key][$vaultName] = $content.value
                             }
                             else {
-                                Write-Verbose "Cannot access $($dp.Key.ToLower()) in vault $vaultName - data plane access denied or not available"
+                                Write-CIEMLog -Severity DEBUG -Message "Cannot access $($dp.Key.ToLower()) in vault $vaultName - data plane access denied or not available"
                             }
                         }
                     }
                 }
 
-                Write-Verbose "KeyVault loaded for $subscriptionId : $($vaults.Count) vaults"
+                Write-CIEMLog -Severity DEBUG -Message "KeyVault loaded for $subscriptionId : $($vaults.Count) vaults"
             }
             else {
-                Write-Verbose "No Key Vaults found in subscription $subscriptionId"
+                Write-CIEMLog -Severity DEBUG -Message "No Key Vaults found in subscription $subscriptionId"
             }
         }
     }

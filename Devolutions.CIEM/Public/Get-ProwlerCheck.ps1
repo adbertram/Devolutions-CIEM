@@ -48,8 +48,8 @@ function Get-ProwlerCheck {
 
     $ErrorActionPreference = 'Stop'
 
-    # Get supported providers from config
-    $supportedProviders = Get-SupportedProvider
+    # Get provider names from config
+    $supportedProviders = (Get-CIEMProvider).Name.ToLower()
 
     # Verify upstream remote
     Test-GitRemote

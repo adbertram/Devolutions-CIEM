@@ -71,6 +71,10 @@ function New-PSUAzureServicePrincipal {
         - Owner or User Access Administrator role on the target scope (for role assignment)
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '',
+        Justification = 'Token is already in memory from Az context; conversion to SecureString required for MgGraph interop')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', 'CredentialType',
+        Justification = 'CredentialType is an enum (ClientSecret/Certificate), not a password value')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
@@ -171,15 +175,17 @@ function New-PSUAzureServicePrincipal {
             $endDate = (Get-Date).AddYears($CertificateValidityYears)
 
             # Create self-signed certificate
-            $cert = New-SelfSignedCertificate `
-                -Subject $certName `
-                -CertStoreLocation "Cert:\CurrentUser\My" `
-                -KeyExportPolicy Exportable `
-                -KeySpec Signature `
-                -KeyLength 2048 `
-                -KeyAlgorithm RSA `
-                -HashAlgorithm SHA256 `
-                -NotAfter $endDate
+            $certParams = @{
+                Subject           = $certName
+                CertStoreLocation = "Cert:\CurrentUser\My"
+                KeyExportPolicy   = 'Exportable'
+                KeySpec           = 'Signature'
+                KeyLength         = 2048
+                KeyAlgorithm      = 'RSA'
+                HashAlgorithm     = 'SHA256'
+                NotAfter          = $endDate
+            }
+            $cert = New-SelfSignedCertificate @certParams
 
             $certificateThumbprint = $cert.Thumbprint
             Write-Verbose "Created certificate with thumbprint: $certificateThumbprint"
@@ -214,11 +220,13 @@ function New-PSUAzureServicePrincipal {
                 }
 
                 # Add the permission to the app registration
-                Add-AzADAppPermission `
-                    -ApplicationId $app.AppId `
-                    -ApiId $graphAppId `
-                    -PermissionId $appRole.Id `
-                    -Type Role
+                $permParams = @{
+                    ApplicationId = $app.AppId
+                    ApiId         = $graphAppId
+                    PermissionId  = $appRole.Id
+                    Type          = 'Role'
+                }
+                Add-AzADAppPermission @permParams
             }
             Write-Verbose "Added $($permissions.Graph.Count) Graph API permissions"
         }
@@ -236,10 +244,14 @@ function New-PSUAzureServicePrincipal {
                 $graphToken = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
 
                 # Handle both string and SecureString token formats (Az.Accounts version differences)
+                # Note: ConvertTo-SecureString with -AsPlainText is required because the token
+                # is already in memory from Az context - no way to avoid this for Az/MgGraph interop
                 if ($graphToken.Token -is [System.Security.SecureString]) {
                     $secureToken = $graphToken.Token
-                } else {
-                    $secureToken = ConvertTo-SecureString $graphToken.Token -AsPlainText -Force
+                }
+                else {
+                    # Suppressing PSAvoidUsingConvertToSecureStringWithPlainText - token is already in memory
+                    $secureToken = $graphToken.Token | ConvertTo-SecureString -AsPlainText -Force
                 }
 
                 Connect-MgGraph -AccessToken $secureToken -NoWelcome -ErrorAction Stop
@@ -260,12 +272,14 @@ function New-PSUAzureServicePrincipal {
 
                     Write-Verbose "  Granting consent for: $permissionName"
                     try {
-                        New-MgServicePrincipalAppRoleAssignment `
-                            -ServicePrincipalId $ourSp.Id `
-                            -PrincipalId $ourSp.Id `
-                            -ResourceId $graphSp.Id `
-                            -AppRoleId $appRole.Id `
-                            -ErrorAction Stop | Out-Null
+                        $roleAssignmentParams = @{
+                            ServicePrincipalId = $ourSp.Id
+                            PrincipalId        = $ourSp.Id
+                            ResourceId         = $graphSp.Id
+                            AppRoleId          = $appRole.Id
+                            ErrorAction        = 'Stop'
+                        }
+                        New-MgServicePrincipalAppRoleAssignment @roleAssignmentParams | Out-Null
                     }
                     catch {
                         if ($_.Exception.Message -notlike "*already exists*") {
@@ -301,20 +315,24 @@ Or run: Connect-MgGraph -Scopes 'Application.ReadWrite.All' and grant consent pr
             if ($PSCmdlet.ShouldProcess($Scope, "Assign $roleName role to service principal")) {
                 Write-Verbose "Assigning $roleName role at scope: $Scope"
 
-                $existingAssignment = Get-AzRoleAssignment `
-                    -ObjectId $sp.Id `
-                    -Scope $Scope `
-                    -RoleDefinitionName $roleName `
-                    -ErrorAction SilentlyContinue
+                $getAssignmentParams = @{
+                    ObjectId           = $sp.Id
+                    Scope              = $Scope
+                    RoleDefinitionName = $roleName
+                    ErrorAction        = 'SilentlyContinue'
+                }
+                $existingAssignment = Get-AzRoleAssignment @getAssignmentParams
 
                 if ($existingAssignment) {
                     Write-Verbose "$roleName role already assigned at this scope"
                 }
                 else {
-                    New-AzRoleAssignment `
-                        -ObjectId $sp.Id `
-                        -Scope $Scope `
-                        -RoleDefinitionName $roleName | Out-Null
+                    $newAssignmentParams = @{
+                        ObjectId           = $sp.Id
+                        Scope              = $Scope
+                        RoleDefinitionName = $roleName
+                    }
+                    New-AzRoleAssignment @newAssignmentParams | Out-Null
                     Write-Verbose "$roleName role assigned successfully"
                 }
             }
@@ -356,14 +374,14 @@ $($permissions.AzureRoles | ForEach-Object { "  New-AzRoleAssignment -ObjectId '
 
                 $secretsCreated = $true
                 Write-Verbose "PSU secrets created successfully"
-                Write-Host "`nSecrets stored in PSU Database vault:" -ForegroundColor Green
-                Write-Host "  - CIEM_Azure_TenantId"
-                Write-Host "  - CIEM_Azure_ClientId"
+                Write-Information "`nSecrets stored in PSU Database vault:" -InformationAction Continue
+                Write-Information "  - CIEM_Azure_TenantId" -InformationAction Continue
+                Write-Information "  - CIEM_Azure_ClientId" -InformationAction Continue
                 if ($CredentialType -eq 'ClientSecret') {
-                    Write-Host "  - CIEM_Azure_ClientSecret"
+                    Write-Information "  - CIEM_Azure_ClientSecret" -InformationAction Continue
                 }
                 else {
-                    Write-Host "  - CIEM_Azure_CertThumbprint"
+                    Write-Information "  - CIEM_Azure_CertThumbprint" -InformationAction Continue
                 }
             }
             catch {
@@ -373,45 +391,26 @@ $($permissions.AzureRoles | ForEach-Object { "  New-AzRoleAssignment -ObjectId '
         }
     }
     else {
-        # Write to .env file for local development
-        $envPath = Join-Path -Path $script:ModuleRoot -ChildPath '.env'
-
-        if ($PSCmdlet.ShouldProcess($envPath, "Update .env file with credentials")) {
-            Write-Verbose "Writing credentials to .env file..."
-
-            $envContent = @"
-# CIEM Azure Service Principal Credentials
-# This file is for local development only - do not commit to source control
-# In PSU deployments, use PSU secrets instead (Platform > Variables > Secrets)
-
-CIEM_AZURE_TENANT_ID=$tenantId
-CIEM_AZURE_CLIENT_ID=$($app.AppId)
-$(if ($CredentialType -eq 'ClientSecret') {
-"CIEM_AZURE_CLIENT_SECRET=$credential"
-} else {
-"# CIEM_AZURE_CLIENT_SECRET=
-CIEM_AZURE_CERT_THUMBPRINT=$certificateThumbprint"
-})
-
-# AWS credentials (future)
-# CIEM_AWS_ACCESS_KEY_ID=
-# CIEM_AWS_SECRET_ACCESS_KEY=
-# CIEM_AWS_REGION=
-"@
-            Set-Content -Path $envPath -Value $envContent -Encoding UTF8
-            $secretsCreated = $true
-            Write-Host "`nCredentials written to .env file: $envPath" -ForegroundColor Green
+        # Write TenantId and ClientId to CIEM config (PSU cache)
+        $configSettings = @{
+            'azure.authentication.tenantId' = $tenantId
+            'azure.authentication.servicePrincipal.clientId' = $app.AppId
         }
 
-        Write-Host "`nFor PSU deployment, create these secrets in PSU Admin UI:" -ForegroundColor Yellow
-        Write-Host "  Platform > Variables > Create Secret Variable (Database vault)" -ForegroundColor Gray
-        Write-Host "  - CIEM_Azure_TenantId = $tenantId"
-        Write-Host "  - CIEM_Azure_ClientId = $($app.AppId)"
+        if ($PSCmdlet.ShouldProcess('CIEM config', "Update with TenantId and ClientId")) {
+            Write-Verbose "Writing TenantId and ClientId to CIEM config..."
+            Set-CIEMConfig -Settings $configSettings
+            $secretsCreated = $true
+            Write-Information "`nTenantId and ClientId written to CIEM config" -InformationAction Continue
+        }
+
+        Write-Warning "`nFor PSU deployment, create this secret in PSU Admin UI:"
+        Write-Verbose "  Platform > Variables > Create Secret Variable (Database vault)"
         if ($CredentialType -eq 'ClientSecret') {
-            Write-Host "  - CIEM_Azure_ClientSecret = <see .env file>"
+            Write-Information "  - CIEM_Azure_ClientSecret = $credential" -InformationAction Continue
         }
         else {
-            Write-Host "  - CIEM_Azure_CertThumbprint = $certificateThumbprint"
+            Write-Information "  - CIEM_Azure_CertThumbprint = $certificateThumbprint" -InformationAction Continue
         }
     }
     #endregion
@@ -441,25 +440,25 @@ CIEM_AZURE_CERT_THUMBPRINT=$certificateThumbprint"
 #   - CIEM_Azure_ClientSecret (or CIEM_Azure_CertThumbprint)
 #
 # Connect-CIEM will automatically use these secrets when running in PSU.
-# For local development, credentials fall back to config.json values.
+# For local development, credentials use in-memory defaults.
 "@
     }
 
-    Write-Host "`nService principal created successfully!" -ForegroundColor Green
-    Write-Host "Application (client) ID: $($app.AppId)"
-    Write-Host "Tenant ID: $tenantId"
+    Write-Information "`nService principal created successfully!" -InformationAction Continue
+    Write-Information "Application (client) ID: $($app.AppId)" -InformationAction Continue
+    Write-Information "Tenant ID: $tenantId" -InformationAction Continue
 
     if ($secretsCreated) {
-        Write-Host "`nCredentials stored in PSU secrets - ready to use with Connect-CIEM" -ForegroundColor Green
+        Write-Information "`nCredentials stored in PSU secrets - ready to use with Connect-CIEM" -InformationAction Continue
     }
     elseif ($credential) {
-        Write-Host "`nIMPORTANT: Save the client secret now - it cannot be retrieved later!" -ForegroundColor Yellow
-        Write-Host "Client Secret: $credential"
+        Write-Warning "`nIMPORTANT: Save the client secret now - it cannot be retrieved later!"
+        Write-Information "Client Secret: $credential" -InformationAction Continue
     }
 
     if ($certificateThumbprint) {
-        Write-Host "Certificate Thumbprint: $certificateThumbprint"
-        Write-Host "Certificate Location: Cert:\CurrentUser\My\$certificateThumbprint"
+        Write-Information "Certificate Thumbprint: $certificateThumbprint" -InformationAction Continue
+        Write-Information "Certificate Location: Cert:\CurrentUser\My\$certificateThumbprint" -InformationAction Continue
     }
 
     $output

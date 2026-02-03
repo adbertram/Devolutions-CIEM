@@ -37,7 +37,7 @@ function Initialize-IAMService {
         $armApiBase = $script:Config.azure.endpoints.armApi
 
         foreach ($subscriptionId in $SubscriptionIds) {
-            Write-Verbose "Loading IAM resources for subscription: $subscriptionId"
+            Write-CIEMLog -Severity DEBUG -Message "Loading IAM resources for subscription: $subscriptionId"
 
             $script:IAMService[$subscriptionId] = @{
                 RoleDefinitions = $null
@@ -75,7 +75,7 @@ function Initialize-IAMService {
                 Assignments = if ($script:IAMService[$subscriptionId].RoleAssignments) { $script:IAMService[$subscriptionId].RoleAssignments.Count } else { 0 }
             }
 
-            Write-Verbose "IAM loaded for $subscriptionId : $($counts.Roles) roles ($($counts.Custom) custom), $($counts.Assignments) assignments"
+            Write-CIEMLog -Severity DEBUG -Message "IAM loaded for $subscriptionId : $($counts.Roles) roles ($($counts.Custom) custom), $($counts.Assignments) assignments"
         }
     }
 }

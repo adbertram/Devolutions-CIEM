@@ -66,6 +66,7 @@ function Convert-ProwlerCheck {
 
     #region Helper Functions
 
+    # Converts snake_case text to PascalCase (e.g., 'my_check_name' -> 'MyCheckName')
     function ConvertTo-PascalCase {
         param([string]$Text)
         ($Text -split '_' | ForEach-Object {
@@ -75,6 +76,7 @@ function Convert-ProwlerCheck {
         }) -join ''
     }
 
+    # Maps Prowler service names to display-friendly names used in the module
     function Get-ServiceDisplayName {
         param([string]$ServiceName)
 
@@ -101,6 +103,7 @@ function Convert-ProwlerCheck {
         }
     }
 
+    # Generates the PowerShell function name from check ID (e.g., 'entra_mfa_check' -> 'Test-EntraMfaCheck')
     function Get-CheckFunctionName {
         param([string]$CheckId)
         $parts = $CheckId -split '_'
@@ -112,6 +115,7 @@ function Convert-ProwlerCheck {
         "Test-$($pascalParts -join '')"
     }
 
+    # Analyzes Prowler Python code to infer required Azure/Graph permissions
     function Get-InferredPermission {
         param(
             [string]$PythonCode,
@@ -195,6 +199,7 @@ function Convert-ProwlerCheck {
         $perms
     }
 
+    # Generates a PowerShell check function scaffold from Prowler metadata
     function ConvertTo-PowerShellCheck {
         param(
             [hashtable]$Metadata,
@@ -237,6 +242,7 @@ function $FunctionName {
         $scriptContent
     }
 
+    # Converts Prowler metadata to CIEM-compatible JSON metadata format
     function ConvertTo-CheckMetadataJson {
         param(
             [hashtable]$Metadata,

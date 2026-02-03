@@ -39,7 +39,7 @@ function Initialize-StorageService {
         $armApiBase = $script:Config.azure.endpoints.armApi
 
         foreach ($subscriptionId in $SubscriptionIds) {
-            Write-Verbose "Loading Storage resources for subscription: $subscriptionId"
+            Write-CIEMLog -Severity DEBUG -Message "Loading Storage resources for subscription: $subscriptionId"
 
             $script:StorageService[$subscriptionId] = @{
                 StorageAccounts = @()
@@ -79,10 +79,10 @@ function Initialize-StorageService {
                     }
                 }
 
-                Write-Verbose "Storage loaded for $subscriptionId : $($accounts.Count) accounts"
+                Write-CIEMLog -Severity DEBUG -Message "Storage loaded for $subscriptionId : $($accounts.Count) accounts"
             }
             else {
-                Write-Verbose "No Storage Accounts found in subscription $subscriptionId"
+                Write-CIEMLog -Severity DEBUG -Message "No Storage Accounts found in subscription $subscriptionId"
             }
         }
     }

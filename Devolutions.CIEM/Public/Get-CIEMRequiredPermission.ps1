@@ -69,22 +69,22 @@ function Get-CIEMRequiredPermission {
         }
     }
     else {
-        # Aggregate unique permissions
-        $graphPermissions = @()
-        $armPermissions = @()
-        $kvPermissions = @()
+        # Aggregate unique permissions using List for efficient collection
+        $graphPermissions = [System.Collections.Generic.List[string]]::new()
+        $armPermissions = [System.Collections.Generic.List[string]]::new()
+        $kvPermissions = [System.Collections.Generic.List[string]]::new()
 
         foreach ($check in $checks) {
             # Use safe property access since not all checks have all permission types
             $perms = $check.permissions
             if ($perms.PSObject.Properties['graph'] -and $perms.graph) {
-                $graphPermissions += $perms.graph
+                foreach ($p in $perms.graph) { $graphPermissions.Add($p) }
             }
             if ($perms.PSObject.Properties['arm'] -and $perms.arm) {
-                $armPermissions += $perms.arm
+                foreach ($p in $perms.arm) { $armPermissions.Add($p) }
             }
             if ($perms.PSObject.Properties['keyvaultDataPlane'] -and $perms.keyvaultDataPlane) {
-                $kvPermissions += $perms.keyvaultDataPlane
+                foreach ($p in $perms.keyvaultDataPlane) { $kvPermissions.Add($p) }
             }
         }
 

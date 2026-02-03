@@ -31,7 +31,7 @@
       "url": "https://devolutions.net/pam"
     },
     "relatedUrl": "https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/best-practices#5-limit-the-number-of-global-administrators-to-less-than-5",
-    "checkScript": "Test-EntraGlobalAdminInLessThanFiveUsers.ps1",
+    "checkScript": "Test-EntraGlobalAdminCountWithinLimit.ps1",
     "dependsOn": [],
     "permissions": {
       "graph": ["RoleManagement.Read.Directory"]
