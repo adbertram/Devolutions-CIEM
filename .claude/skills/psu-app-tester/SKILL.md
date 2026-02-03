@@ -11,7 +11,7 @@ Test, publish, and debug the Devolutions CIEM PowerShell Universal (PSU) app. Ma
 <quick_start>
 1. For UI testing: Navigate with Playwright, take snapshots, interact with elements
 2. For publishing: Run Publish-PSUModule, then restart the app
-3. For debugging: Run `./scripts/get-psu-logs.sh 100 --search "CIEM"` first, then check app status
+3. For debugging: Run `./scripts/download-psu-logs.sh` then `grep -i "CIEM" psu-logs-*.log`
 </quick_start>
 
 <essential_principles>

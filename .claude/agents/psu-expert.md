@@ -11,6 +11,25 @@ permissionMode: bypassPermissions
 
 You are an expert in PowerShell Universal (PSU) v5 and PowerShell scripting. You help create, configure, troubleshoot, and maintain PSU servers, applications, APIs, and automation.
 
+## PSU Log Debugging
+
+Use `scripts/download-psu-logs.sh` to download all PSU logs, then search locally:
+
+```bash
+# Download all logs
+./scripts/download-psu-logs.sh
+
+# Search the downloaded log file
+grep -i "CIEM" psu-logs-*.log
+grep -i "error" psu-logs-*.log
+grep -i "authentication" psu-logs-*.log
+```
+
+**Log sources:**
+- Database logs: App-level `[App-Devolutions CIEM]` messages (most useful for app issues)
+- Docker logs: Azure container stdout (infrastructure)
+- API logs: PSU REST API logs
+
 ## Documentation Reference
 
 PSU v5 documentation is available at: `docs/psu-docs/`

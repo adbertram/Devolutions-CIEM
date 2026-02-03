@@ -183,29 +183,22 @@ Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem via 
 
 ### PSU Log Script
 
-Use `scripts/get-psu-logs.sh` to query logs from all PSU sources:
+Use `scripts/download-psu-logs.sh` to download logs from all PSU sources:
 
 ```bash
-# Basic usage - last 50 lines from all sources
-./scripts/get-psu-logs.sh
+# Download all logs to timestamped file
+./scripts/download-psu-logs.sh
 
-# More lines
-./scripts/get-psu-logs.sh 100
+# Download to specific file
+./scripts/download-psu-logs.sh my-logs.log
 
-# Filter by source
-./scripts/get-psu-logs.sh 100 --db-only      # App-level logs (LogEntry table)
-./scripts/get-psu-logs.sh 100 --docker-only  # Azure container stdout
-./scripts/get-psu-logs.sh 100 --api-only     # PSU REST API logs
-
-# Search across all logs
-./scripts/get-psu-logs.sh 100 --search "CIEM"
-./scripts/get-psu-logs.sh 100 --search "error"
-
-# Include rotated log files
-./scripts/get-psu-logs.sh 500 --all-files
+# Then search locally with grep
+grep -i "CIEM" psu-logs-*.log
+grep -i "error" psu-logs-*.log
+grep -i "authentication" psu-logs-*.log
 ```
 
-**Log sources:**
+**Log sources downloaded:**
 | Source | Content | Format |
 |--------|---------|--------|
 | Database | App-level logs (`[App-*]` messages) | `[timestamp] [Level] [App-Name] Message` |

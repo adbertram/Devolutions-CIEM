@@ -6,30 +6,27 @@ PSU docs location: `./prowler/docs/psu-docs/`
 </required_reading>
 
 <process>
-## Step 1: Query PSU logs (PRIMARY DEBUG TOOL)
+## Step 1: Download and search PSU logs (PRIMARY DEBUG TOOL)
 
-**ALWAYS start here.** The log script queries all PSU log sources:
+**ALWAYS start here.** Download all logs, then search locally:
 
 ```bash
-# Get recent logs from all sources
-./scripts/get-psu-logs.sh 100
+# Download all logs from all sources
+./scripts/download-psu-logs.sh
 
-# Search for CIEM-specific errors
-./scripts/get-psu-logs.sh 100 --search "CIEM"
-
-# App-level logs only (most useful for app startup issues)
-./scripts/get-psu-logs.sh 100 --db-only
-
-# Infrastructure logs only
-./scripts/get-psu-logs.sh 100 --docker-only
+# Search the downloaded log file
+grep -i "CIEM" psu-logs-*.log          # CIEM-specific entries
+grep -i "error" psu-logs-*.log         # All errors
+grep -i "authentication" psu-logs-*.log # Auth issues
+grep -i "App-Devolutions" psu-logs-*.log # App startup issues
 ```
 
-**Log sources:**
-| Source | Flag | Content |
-|--------|------|---------|
-| Database | `--db-only` | App-level: `[App-Devolutions CIEM]` messages |
-| Docker | `--docker-only` | Azure container stdout (ASP.NET Core) |
-| API | `--api-only` | PSU REST API logs |
+**Log sources (all downloaded to single file):**
+| Source | Content |
+|--------|---------|
+| Database | App-level: `[App-Devolutions CIEM]` messages (most useful) |
+| Docker | Azure container stdout (ASP.NET Core infrastructure) |
+| API | PSU REST API logs |
 
 ## Step 2: Identify the symptom
 
