@@ -294,129 +294,130 @@ function Remove-PSUModule {
 
     $targetDesc = if ($Version) { "$Name v$Version" } else { "$Name (all versions: $($modules.version -join ', '))" }
 
+    # Early exit if user declines
     if (-not $Force -and -not $PSCmdlet.ShouldProcess($targetDesc, "Remove module")) {
-        return
+        # User declined - no output
     }
+    else {
+        $results = @()
 
-    $results = @()
+        # Remove each module entry via REST API
+        foreach ($mod in $modules) {
+            Write-Verbose "Removing $($mod.name) v$($mod.version) (ID: $($mod.id)) from PSU database..."
+            $uri = "$($script:PSUConnection.Url)/api/v1/module/$($mod.id)"
 
-    # Remove each module entry via REST API
-    foreach ($mod in $modules) {
-        Write-Verbose "Removing $($mod.name) v$($mod.version) (ID: $($mod.id)) from PSU database..."
-        $uri = "$($script:PSUConnection.Url)/api/v1/module/$($mod.id)"
-
-        try {
-            Invoke-RestMethod -Uri $uri -Headers $headers -Method Delete -ErrorAction Stop
-            Write-Verbose "Database entry removed for $($mod.name) v$($mod.version)"
-        }
-        catch {
-            Write-Warning "Failed to remove database entry for $($mod.name) v$($mod.version): $_"
-        }
-    }
-
-    # For Azure, also remove the filesystem files via Kudu API
-    if ($script:PSUConnection.IsAzure) {
-        Write-Verbose "Azure hosting detected. Removing module files from filesystem..."
-
-        $rg = $script:PSUConnection.ResourceGroup
-        $webApp = $script:PSUConnection.WebAppName
-
-        if (-not $rg -or -not $webApp) {
-            Write-Warning "Azure resource group or webapp name not configured. Filesystem cleanup skipped."
-        }
-        else {
-            # Get Kudu credentials
             try {
-                $publishProfile = az webapp deployment list-publishing-profiles `
-                    --resource-group $rg `
-                    --name $webApp `
-                    --query "[?publishMethod=='MSDeploy']" `
-                    --output json 2>$null | ConvertFrom-Json
-
-                if (-not $publishProfile) {
-                    throw "Could not get publishing profile"
-                }
-
-                $kuduUser = $publishProfile[0].userName
-                $kuduPass = $publishProfile[0].userPWD
-                $kuduBase = "https://$webApp.scm.azurewebsites.net"
-
-                $kuduAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("${kuduUser}:${kuduPass}"))
-                $kuduHeaders = @{
-                    'Authorization' = "Basic $kuduAuth"
-                    'If-Match'      = '*'
-                }
-
-                # Determine what to delete
-                if ($Version) {
-                    $deletePath = "/home/Repository/Modules/$Name/$Version"
-                }
-                else {
-                    $deletePath = "/home/Repository/Modules/$Name"
-                }
-
-                Write-Verbose "Deleting folder: $deletePath"
-
-                # Use Kudu command API for recursive delete (VFS API doesn't support recursive)
-                $cmdUri = "$kuduBase/api/command"
-                $cmdBody = @{
-                    command = "rm -rf `"$deletePath`""
-                    dir     = "/home"
-                } | ConvertTo-Json
-
-                $cmdHeaders = @{
-                    'Authorization' = "Basic $kuduAuth"
-                    'Content-Type'  = 'application/json'
-                }
-
-                $cmdResult = Invoke-RestMethod -Uri $cmdUri -Headers $cmdHeaders -Method Post -Body $cmdBody -ErrorAction Stop
-
-                if ($cmdResult.ExitCode -ne 0) {
-                    throw "Command failed with exit code $($cmdResult.ExitCode): $($cmdResult.Error)"
-                }
-
-                $results += [PSCustomObject]@{
-                    Name    = $Name
-                    Version = if ($Version) { $Version } else { 'All' }
-                    Status  = 'Removed'
-                    Source  = 'Filesystem'
-                }
-
-                Write-Verbose "Filesystem cleanup completed successfully."
+                Invoke-RestMethod -Uri $uri -Headers $headers -Method Delete -ErrorAction Stop
+                Write-Verbose "Database entry removed for $($mod.name) v$($mod.version)"
             }
             catch {
-                Write-Warning "Failed to remove module files from Azure filesystem: $_"
-                Write-Warning "You may need to manually delete: Repository/Modules/$Name/"
+                Write-Warning "Failed to remove database entry for $($mod.name) v$($mod.version): $_"
             }
         }
-    }
-    else {
-        Write-Warning "Non-Azure PSU detected. REST API DELETE only removes database entries."
-        Write-Warning "Module files may still exist on the PSU server filesystem."
-    }
 
-    # Sync configuration to clear PSU's in-memory module cache
-    Write-Verbose "Syncing PSU configuration to clear module cache..."
-    try {
-        Sync-PSUConfiguration -Reset | Out-Null
-        Write-Verbose "Configuration sync completed."
-    }
-    catch {
-        Write-Warning "Failed to sync configuration: $_"
-        Write-Warning "You may need to manually call: Sync-PSUConfiguration -Reset"
-    }
+        # For Azure, also remove the filesystem files via Kudu API
+        if ($script:PSUConnection.IsAzure) {
+            Write-Verbose "Azure hosting detected. Removing module files from filesystem..."
 
-    # Return summary
-    if ($results.Count -eq 0) {
-        [PSCustomObject]@{
-            Name    = $Name
-            Version = if ($Version) { $Version } else { 'All' }
-            Status  = 'RemovedFromDatabase'
-            Note    = 'Filesystem cleanup may be required'
+            $rg = $script:PSUConnection.ResourceGroup
+            $webApp = $script:PSUConnection.WebAppName
+
+            if (-not $rg -or -not $webApp) {
+                Write-Warning "Azure resource group or webapp name not configured. Filesystem cleanup skipped."
+            }
+            else {
+                # Get Kudu credentials
+                try {
+                    $azParams = @(
+                        'webapp', 'deployment', 'list-publishing-profiles',
+                        '--resource-group', $rg,
+                        '--name', $webApp,
+                        '--query', "[?publishMethod=='MSDeploy']",
+                        '--output', 'json'
+                    )
+                    $publishProfile = az @azParams 2>$null | ConvertFrom-Json
+
+                    if (-not $publishProfile) {
+                        throw "Could not get publishing profile"
+                    }
+
+                    $kuduUser = $publishProfile[0].userName
+                    $kuduPass = $publishProfile[0].userPWD
+                    $kuduBase = "https://$webApp.scm.azurewebsites.net"
+
+                    $kuduAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("${kuduUser}:${kuduPass}"))
+
+                    # Determine what to delete
+                    $deletePath = if ($Version) {
+                        "/home/Repository/Modules/$Name/$Version"
+                    }
+                    else {
+                        "/home/Repository/Modules/$Name"
+                    }
+
+                    Write-Verbose "Deleting folder: $deletePath"
+
+                    # Use Kudu command API for recursive delete (VFS API doesn't support recursive)
+                    $cmdUri = "$kuduBase/api/command"
+                    $cmdBody = @{
+                        command = "rm -rf `"$deletePath`""
+                        dir     = "/home"
+                    } | ConvertTo-Json
+
+                    $cmdHeaders = @{
+                        'Authorization' = "Basic $kuduAuth"
+                        'Content-Type'  = 'application/json'
+                    }
+
+                    $cmdResult = Invoke-RestMethod -Uri $cmdUri -Headers $cmdHeaders -Method Post -Body $cmdBody -ErrorAction Stop
+
+                    if ($cmdResult.ExitCode -ne 0) {
+                        throw "Command failed with exit code $($cmdResult.ExitCode): $($cmdResult.Error)"
+                    }
+
+                    $results += [PSCustomObject]@{
+                        Name    = $Name
+                        Version = if ($Version) { $Version } else { 'All' }
+                        Status  = 'Removed'
+                        Source  = 'Filesystem'
+                    }
+
+                    Write-Verbose "Filesystem cleanup completed successfully."
+                }
+                catch {
+                    Write-Warning "Failed to remove module files from Azure filesystem: $_"
+                    Write-Warning "You may need to manually delete: Repository/Modules/$Name/"
+                }
+            }
         }
-    }
-    else {
-        $results
+        else {
+            Write-Warning "Non-Azure PSU detected. REST API DELETE only removes database entries."
+            Write-Warning "Module files may still exist on the PSU server filesystem."
+        }
+
+        # Sync configuration to clear PSU's in-memory module cache
+        Write-Verbose "Syncing PSU configuration to clear module cache..."
+        try {
+            Sync-PSUConfiguration -Reset | Out-Null
+            Write-Verbose "Configuration sync completed."
+        }
+        catch {
+            Write-Warning "Failed to sync configuration: $_"
+            Write-Warning "You may need to manually call: Sync-PSUConfiguration -Reset"
+        }
+
+        # Return summary
+        if ($results.Count -eq 0) {
+            [PSCustomObject]@{
+                Name    = $Name
+                Version = if ($Version) { $Version } else { 'All' }
+                Status  = 'RemovedFromDatabase'
+                Note    = 'Filesystem cleanup may be required'
+            }
+        }
+        else {
+            $results
+        }
     }
 }
 
@@ -476,10 +477,10 @@ function Sync-PSUConfiguration {
     }
 }
 
-function Import-PSUModule {
+function Install-PSUModule {
     <#
     .SYNOPSIS
-        Imports a module from the PowerShell Gallery into PowerShell Universal.
+        Installs a module from the PowerShell Gallery into PowerShell Universal.
 
     .DESCRIPTION
         Installs a module from the PowerShell Gallery (or another repository) into
@@ -487,7 +488,7 @@ function Import-PSUModule {
         the latest version.
 
     .PARAMETER Name
-        The name of the module to import.
+        The name of the module to install.
 
     .PARAMETER Version
         Specific version to install. If not specified, installs the latest version.
@@ -499,20 +500,20 @@ function Import-PSUModule {
         Allow prerelease versions when searching for the latest version.
 
     .PARAMETER NoSync
-        Skip the configuration sync after importing. By default, configuration
+        Skip the configuration sync after installing. By default, configuration
         is synced to ensure the module is immediately available.
 
     .EXAMPLE
-        Import-PSUModule -Name "Devolutions.CIEM"
-        # Imports the latest version from PSGallery
+        Install-PSUModule -Name "Devolutions.CIEM"
+        # Installs the latest version from PSGallery
 
     .EXAMPLE
-        Import-PSUModule -Name "Devolutions.CIEM" -Version "0.2.21"
-        # Imports a specific version
+        Install-PSUModule -Name "Devolutions.CIEM" -Version "0.2.21"
+        # Installs a specific version
 
     .EXAMPLE
-        Import-PSUModule -Name "Az.Accounts" -NoSync
-        # Imports without triggering a configuration sync
+        Install-PSUModule -Name "Az.Accounts" -NoSync
+        # Installs without triggering a configuration sync
     #>
     [CmdletBinding()]
     param(
@@ -711,7 +712,7 @@ function Start-PSUApp {
         Start-PSUApp -Id 2 -PassThru
         # Starts app ID 2 and returns the app object
     #>
-    [CmdletBinding(DefaultParameterSetName = 'ByName')]
+    [CmdletBinding(DefaultParameterSetName = 'ByName', SupportsShouldProcess)]
     param(
         [Parameter(Mandatory, ParameterSetName = 'ByName', Position = 0)]
         [string]$Name,
@@ -749,24 +750,26 @@ function Start-PSUApp {
 
     $uri = "$($script:PSUConnection.Url)/api/v1/dashboard/$Id/status"
 
-    Write-Verbose "Starting app '$appName' (ID: $Id)..."
+    if ($PSCmdlet.ShouldProcess($appName, "Start PSU app")) {
+        Write-Verbose "Starting app '$appName' (ID: $Id)..."
 
-    try {
-        $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -ErrorAction Stop
-        Write-Verbose "App started successfully."
-    }
-    catch {
-        throw "Failed to start app '$appName'. Error: $_"
-    }
+        try {
+            $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -ErrorAction Stop
+            Write-Verbose "App started successfully."
+        }
+        catch {
+            throw "Failed to start app '$appName'. Error: $_"
+        }
 
-    if ($PassThru) {
-        Get-PSUApp -Id $Id
-    }
-    else {
-        [PSCustomObject]@{
-            Id     = $Id
-            Name   = $appName
-            Status = 'Started'
+        if ($PassThru.IsPresent) {
+            Get-PSUApp -Id $Id
+        }
+        else {
+            [PSCustomObject]@{
+                Id     = $Id
+                Name   = $appName
+                Status = 'Started'
+            }
         }
     }
 }
@@ -796,7 +799,7 @@ function Stop-PSUApp {
         Stop-PSUApp -Id 2
         # Stops app ID 2
     #>
-    [CmdletBinding(DefaultParameterSetName = 'ByName')]
+    [CmdletBinding(DefaultParameterSetName = 'ByName', SupportsShouldProcess)]
     param(
         [Parameter(Mandatory, ParameterSetName = 'ByName', Position = 0)]
         [string]$Name,
@@ -834,24 +837,26 @@ function Stop-PSUApp {
 
     $uri = "$($script:PSUConnection.Url)/api/v1/dashboard/$Id/status"
 
-    Write-Verbose "Stopping app '$appName' (ID: $Id)..."
+    if ($PSCmdlet.ShouldProcess($appName, "Stop PSU app")) {
+        Write-Verbose "Stopping app '$appName' (ID: $Id)..."
 
-    try {
-        $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Delete -ErrorAction Stop
-        Write-Verbose "App stopped successfully."
-    }
-    catch {
-        throw "Failed to stop app '$appName'. Error: $_"
-    }
+        try {
+            $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Delete -ErrorAction Stop
+            Write-Verbose "App stopped successfully."
+        }
+        catch {
+            throw "Failed to stop app '$appName'. Error: $_"
+        }
 
-    if ($PassThru) {
-        Get-PSUApp -Id $Id
-    }
-    else {
-        [PSCustomObject]@{
-            Id     = $Id
-            Name   = $appName
-            Status = 'Stopped'
+        if ($PassThru.IsPresent) {
+            Get-PSUApp -Id $Id
+        }
+        else {
+            [PSCustomObject]@{
+                Id     = $Id
+                Name   = $appName
+                Status = 'Stopped'
+            }
         }
     }
 }
@@ -882,7 +887,7 @@ function Restart-PSUApp {
         Restart-PSUApp -Id 2 -PassThru
         # Restarts app ID 2 and returns the app object
     #>
-    [CmdletBinding(DefaultParameterSetName = 'ByName')]
+    [CmdletBinding(DefaultParameterSetName = 'ByName', SupportsShouldProcess)]
     param(
         [Parameter(Mandatory, ParameterSetName = 'ByName', Position = 0)]
         [string]$Name,
@@ -920,30 +925,32 @@ function Restart-PSUApp {
 
     $uri = "$($script:PSUConnection.Url)/api/v1/dashboard/$Id/status/restart"
 
-    Write-Verbose "Restarting app '$appName' (ID: $Id)..."
+    if ($PSCmdlet.ShouldProcess($appName, "Restart PSU app")) {
+        Write-Verbose "Restarting app '$appName' (ID: $Id)..."
 
-    try {
-        # Use a timeout to prevent hanging if the restart takes too long
-        # The restart endpoint may wait for the app to fully restart before returning
-        $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -TimeoutSec 30 -ErrorAction Stop
-        Write-Verbose "App restarted successfully."
-    }
-    catch [System.Threading.Tasks.TaskCanceledException] {
-        # Timeout occurred - the restart was likely initiated but took too long to confirm
-        Write-Verbose "Restart request timed out after 30s. The app restart may still be in progress."
-    }
-    catch {
-        throw "Failed to restart app '$appName'. Error: $_"
-    }
+        try {
+            # Use a timeout to prevent hanging if the restart takes too long
+            # The restart endpoint may wait for the app to fully restart before returning
+            $null = Invoke-RestMethod -Uri $uri -Headers $headers -Method Put -TimeoutSec 30 -ErrorAction Stop
+            Write-Verbose "App restarted successfully."
+        }
+        catch [System.Threading.Tasks.TaskCanceledException] {
+            # Timeout occurred - the restart was likely initiated but took too long to confirm
+            Write-Verbose "Restart request timed out after 30s. The app restart may still be in progress."
+        }
+        catch {
+            throw "Failed to restart app '$appName'. Error: $_"
+        }
 
-    if ($PassThru) {
-        Get-PSUApp -Id $Id
-    }
-    else {
-        [PSCustomObject]@{
-            Id     = $Id
-            Name   = $appName
-            Status = 'Restarted'
+        if ($PassThru.IsPresent) {
+            Get-PSUApp -Id $Id
+        }
+        else {
+            [PSCustomObject]@{
+                Id     = $Id
+                Name   = $appName
+                Status = 'Restarted'
+            }
         }
     }
 }
@@ -992,6 +999,8 @@ function Publish-PSUModule {
         # Shows what would be published without actually publishing
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'CLI tooling requires colored user feedback for step progress and status messages')]
     param(
         [Parameter(Mandatory, Position = 0)]
         [string]$ModulePath,
@@ -1253,12 +1262,12 @@ NuGet API key required. Options:
         if ($script:PSUConnection.Url) {
             try {
                 Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
-                Import-PSUModule -Name $moduleName -Version $fullVersion -NoSync
+                Install-PSUModule -Name $moduleName -Version $fullVersion -NoSync
                 Write-Host "  [OK] Module imported" -ForegroundColor Green
                 $updatedPSU = $true
 
                 # Find and restart the app defined by this module
-                $dashboardsPath = Join-Path $ModulePath '.universal' 'dashboards.ps1'
+                $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
                 if (Test-Path $dashboardsPath) {
                     $dashboardContent = Get-Content $dashboardsPath -Raw
                     if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
@@ -1355,6 +1364,8 @@ function Invoke-PSUCommand {
         # Shows PowerShell version on the PSU server
     #>
     [CmdletBinding(DefaultParameterSetName = 'Command')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+        Justification = 'CLI tooling requires visual output for command results')]
     param(
         [Parameter(Mandatory, ParameterSetName = 'Command', Position = 0)]
         [string]$Command,
@@ -1547,7 +1558,7 @@ function Invoke-PSUCommand {
             Write-Verbose "Pipeline output available. Access via result.PipelineOutput"
         }
 
-        return $result
+        $result
     }
     catch {
         throw "Failed to execute command on PSU: $_"
@@ -1577,6 +1588,21 @@ function Assert-PSUConnection {
     <#
     .SYNOPSIS
         Validates that a PSU connection exists.
+
+    .DESCRIPTION
+        Checks the module-level connection state to ensure a valid connection
+        to PowerShell Universal has been established via Connect-PSU. Throws
+        a terminating error if no connection exists.
+
+        This function is called internally by other PSU cmdlets to ensure
+        a connection is available before making API calls.
+
+    .OUTPUTS
+        None. This function returns nothing on success and throws on failure.
+
+    .EXAMPLE
+        Assert-PSUConnection
+        # Throws if not connected, returns nothing if connected
     #>
     [CmdletBinding()]
     param()
@@ -1586,17 +1612,5 @@ function Assert-PSUConnection {
     }
 }
 
-# Export functions
-Export-ModuleMember -Function @(
-    'Connect-PSU',
-    'Get-PSUApp',
-    'Get-PSUModule',
-    'Import-PSUModule',
-    'Invoke-PSUCommand',
-    'Publish-PSUModule',
-    'Remove-PSUModule',
-    'Restart-PSUApp',
-    'Start-PSUApp',
-    'Stop-PSUApp',
-    'Sync-PSUConfiguration'
-)
+# Export all public functions (those starting with approved verbs)
+Export-ModuleMember -Function *-PSU*
