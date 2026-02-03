@@ -1,4 +1,4 @@
-function Test-EntraGlobalAdminInLessThanFiveUsers {
+function Test-EntraGlobalAdminCountWithinLimit {
     <#
     .SYNOPSIS
         Ensure fewer than 5 users have global administrator assignment.
