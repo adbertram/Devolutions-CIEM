@@ -12,7 +12,7 @@
 RootModule = 'Devolutions.CIEM.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.2.100'
+ModuleVersion = '0.2.103'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Core'
@@ -68,14 +68,9 @@ PowerShellVersion = '7.4'
 # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
 # NestedModules = @()
 
-# Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = 'Connect-CIEM', 'Get-CIEMAuthenticationContext', 'Get-CIEMCheck', 
-               'Get-CIEMConfig', 'Get-CIEMDefaultConfig', 'Get-CIEMProvider', 
-               'Get-CIEMRequiredPermission', 'Get-CIEMSecret', 'Get-ProwlerCheck', 
-               'Get-PSUInstalledEnvironment', 'Invoke-CIEMScan', 
-               'New-CIEMAzureManagedIdentity', 'New-DevolutionsCIEMApp', 
-               'New-PSUAzureServicePrincipal', 'Reset-CIEMConfig', 'Set-CIEMConfig', 
-               'Sync-ProwlerCheck', 'Test-CIEMAuthenticated', 'Write-CIEMLog'
+# Functions to export from this module - using wildcard to let PSM1's Export-ModuleMember control exports dynamically.
+# This prevents drift between the manifest and actual Public/ folder contents.
+FunctionsToExport = @('*')
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
@@ -140,16 +135,20 @@ FileList = '.universal\dashboards.ps1', 'AzureChecks.json',
                'Checks/Azure/Test-StorageSecureTransferRequiredIsEnabled.ps1', 
                'Checks/Azure/Test-StorageSmbChannelEncryptionWithSecureAlgorithm.ps1', 
                'Checks/Azure/Test-StorageSmbProtocolVersionIsLatest.ps1', 
-               'Devolutions.CIEM.psd1', 'Devolutions.CIEM.psm1', 
-               'Private/Convert-ProwlerCheck.ps1', 'Private/Get-AllGraphPage.ps1', 
-               'Private/Get-AzureAuthContext.ps1', 'Private/Get-CIEMToken.ps1', 
-               'Private/Get-CheckMetadata.ps1', 'Public/Get-CIEMConfig.ps1', 
+               'Classes/CIEMScanResult.ps1', 'Devolutions.CIEM.psd1', 'Devolutions.CIEM.psm1',
+               'Private/Convert-ProwlerCheck.ps1', 'Private/Get-AllGraphPage.ps1',
+               'Private/Get-AzureAuthContext.ps1', 'Private/Get-CIEMToken.ps1',
+               'Private/Get-CheckMetadata.ps1',
+               'Private/New-CIEMScanRun.ps1',
+               'Private/Save-CIEMScanRun.ps1',
+               'Private/Update-CIEMScanRun.ps1',
+               'Public/Get-CIEMConfig.ps1', 
                'Public/Get-CIEMDefaultConfig.ps1', 'Public/Get-CIEMSecret.ps1', 
                'Private/Initialize-EntraService.ps1', 
                'Private/Initialize-IAMService.ps1', 
                'Private/Initialize-KeyVaultService.ps1', 
                'Private/Initialize-StorageService.ps1', 
-               'Private/Invoke-AzureApi.ps1', 'Private/New-CIEMFinding.ps1', 
+               'Private/Invoke-AzureApi.ps1', 
                'Private/Save-CIEMToken.ps1', 'Private/Set-CIEMSecret.ps1', 
                'Public/Set-CIEMConfig.ps1', 'Private/Test-AzureChecksSchema.ps1', 
                'Private/Test-EntraAuthorizationPolicyBooleanSetting.ps1', 
@@ -164,9 +163,11 @@ FileList = '.universal\dashboards.ps1', 'AzureChecks.json',
                'Public/Get-PSUInstalledEnvironment.ps1', 
                'Public/New-CIEMAzureManagedIdentity.ps1', 
                'Public/New-PSUAzureServicePrincipal.ps1', 
-               'Public/Get-ProwlerCheck.ps1', 'Public/Invoke-CIEMScan.ps1', 
-               'Public/Reset-CIEMConfig.ps1', 'Public/Sync-ProwlerCheck.ps1', 
-               'Public/Test-CIEMAuthenticated.ps1'
+               'Public/Get-ProwlerCheck.ps1', 'Public/Invoke-CIEMScan.ps1',
+               'Public/Reset-CIEMConfig.ps1', 'Public/Sync-ProwlerCheck.ps1',
+               'Public/Test-CIEMAuthenticated.ps1',
+               'Public/Get-CIEMScanRun.ps1',
+               'Public/Get-CIEMScanResult.ps1'
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{
