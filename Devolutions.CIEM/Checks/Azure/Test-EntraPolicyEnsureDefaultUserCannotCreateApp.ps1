@@ -15,7 +15,7 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
         Test-EntraPolicyEnsureDefaultUserCannotCreateApps -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata

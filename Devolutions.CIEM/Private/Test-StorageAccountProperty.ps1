@@ -27,10 +27,10 @@ function Test-StorageAccountProperty {
         Value to use if property is null.
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata,
@@ -82,28 +82,12 @@ function Test-StorageAccountProperty {
             # Compare to expected value
             if ($propertyValue -eq $ExpectedValue) {
                 $message = $PassMessage -f $accountName, $propertyValue
-                $params = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'PASS'
-                    StatusExtended = $message
-                    ResourceId     = $resourceId
-                    ResourceName   = $accountName
-                    Location       = $location
-                }
-                New-CIEMFinding @params
+                [CIEMScanResult]::Create($CheckMetadata, 'PASS', $message, $resourceId, $accountName, $location)
             }
             else {
                 $displayValue = if ($null -eq $propertyValue) { 'not set' } else { $propertyValue }
                 $message = $FailMessage -f $accountName, $displayValue
-                $params = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'FAIL'
-                    StatusExtended = $message
-                    ResourceId     = $resourceId
-                    ResourceName   = $accountName
-                    Location       = $location
-                }
-                New-CIEMFinding @params
+                [CIEMScanResult]::Create($CheckMetadata, 'FAIL', $message, $resourceId, $accountName, $location)
             }
         }
     }

@@ -33,15 +33,21 @@ $script:StorageService = @{}
 # Initialize PSU environment detection (populated on first access)
 $script:PSUEnvironment = $null
 
-# Get public, private, and check function definition files
+# Get class, public, private, and check function definition files
 # Note: Errors during file enumeration indicate a broken module structure and should fail loudly
+$classesPath = Join-Path -Path $PSScriptRoot -ChildPath 'Classes'
 $privatePath = Join-Path -Path $PSScriptRoot -ChildPath 'Private'
 $publicPath = Join-Path -Path $PSScriptRoot -ChildPath 'Public'
 $checksPath = Join-Path -Path $PSScriptRoot -ChildPath 'Checks'
 
+$Classes = @()
 $Private = @()
 $Public = @()
 $Checks = @()
+
+if (Test-Path -Path $classesPath) {
+    $Classes = @(Get-ChildItem -Path "$classesPath\*.ps1" -ErrorAction Stop)
+}
 
 if (Test-Path -Path $privatePath) {
     $Private = @(Get-ChildItem -Path "$privatePath\*.ps1" -ErrorAction Stop)
@@ -55,8 +61,8 @@ if (Test-Path -Path $checksPath) {
     $Checks = @(Get-ChildItem -Path "$checksPath\*\*.ps1" -ErrorAction Stop)
 }
 
-# Dot source the files
-foreach ($import in @($Private + $Checks + $Public)) {
+# Dot source the files (classes first, then private, checks, public)
+foreach ($import in @($Classes + $Private + $Checks + $Public)) {
     try {
         Write-Verbose "Importing $($import.FullName)"
         . $import.FullName

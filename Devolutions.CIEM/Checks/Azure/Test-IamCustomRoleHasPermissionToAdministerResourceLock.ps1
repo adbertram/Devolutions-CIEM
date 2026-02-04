@@ -24,13 +24,13 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         - severity: Severity level
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
 
     .NOTES
         Data source: $script:IAMService[$subscriptionId].CustomRoles
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -53,14 +53,13 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
 
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'SKIPPED'
-                StatusExtended = "Unable to retrieve role definitions for subscription $subscriptionId"
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'SKIPPED',
+                "Unable to retrieve role definitions for subscription $subscriptionId",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
             continue
         }
 
@@ -70,14 +69,13 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         if (-not $customRoles -or $customRoles.Count -eq 0) {
             # No custom roles exist - this is a FAIL condition
             # The recommendation is to have a dedicated custom role for lock administration
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = "No custom roles exist in subscription $subscriptionId. A dedicated custom role should be created for resource lock administration."
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'FAIL',
+                "No custom roles exist in subscription $subscriptionId. A dedicated custom role should be created for resource lock administration.",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
             continue
         }
 
@@ -151,25 +149,23 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         if ($foundLockAdminRole) {
             # Found custom role(s) with lock permissions - PASS
             $roleNames = ($lockAdminRoles | ForEach-Object { $_.Name }) -join ', '
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "Custom role(s) with resource lock administration permissions found in subscription $subscriptionId`: $roleNames"
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "Custom role(s) with resource lock administration permissions found in subscription $subscriptionId`: $roleNames",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
         }
         else {
             # No custom role has lock permissions - FAIL
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = "No custom role with resource lock administration permissions found in subscription $subscriptionId. Custom roles exist ($($customRoles.Count)) but none have Microsoft.Authorization/locks/* permissions."
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'FAIL',
+                "No custom role with resource lock administration permissions found in subscription $subscriptionId. Custom roles exist ($($customRoles.Count)) but none have Microsoft.Authorization/locks/* permissions.",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
         }
     }
 }

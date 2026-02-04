@@ -12,10 +12,10 @@ function Test-KeyvaultPrivateEndpoint {
         Hashtable containing check metadata (id, service, title, severity).
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -45,38 +45,14 @@ function Test-KeyvaultPrivateEndpoint {
                         ($_.properties.privateEndpoint.id -split '/')[-1]
                     }) -join ', '
 
-                    $params = @{
-                        CheckMetadata  = $CheckMetadata
-                        Status         = 'PASS'
-                        StatusExtended = "Vault '$($vault.name)' has $($approvedEndpoints.Count) approved private endpoint(s): $endpointNames"
-                        ResourceId     = $vault.id
-                        ResourceName   = $vault.name
-                        Location       = $vault.location
-                    }
-                    New-CIEMFinding @params
+                    [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Vault '$($vault.name)' has $($approvedEndpoints.Count) approved private endpoint(s): $endpointNames", $vault.id, $vault.name, $vault.location)
                 }
                 else {
-                    $params = @{
-                        CheckMetadata  = $CheckMetadata
-                        Status         = 'FAIL'
-                        StatusExtended = "Vault '$($vault.name)' has private endpoint connection(s) but none are in 'Approved' state."
-                        ResourceId     = $vault.id
-                        ResourceName   = $vault.name
-                        Location       = $vault.location
-                    }
-                    New-CIEMFinding @params
+                    [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Vault '$($vault.name)' has private endpoint connection(s) but none are in 'Approved' state.", $vault.id, $vault.name, $vault.location)
                 }
             }
             else {
-                $params = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'FAIL'
-                    StatusExtended = "Vault '$($vault.name)' does not have any private endpoints configured. Consider using private endpoints to secure network traffic."
-                    ResourceId     = $vault.id
-                    ResourceName   = $vault.name
-                    Location       = $vault.location
-                }
-                New-CIEMFinding @params
+                [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Vault '$($vault.name)' does not have any private endpoints configured. Consider using private endpoints to secure network traffic.", $vault.id, $vault.name, $vault.location)
             }
         }
     }

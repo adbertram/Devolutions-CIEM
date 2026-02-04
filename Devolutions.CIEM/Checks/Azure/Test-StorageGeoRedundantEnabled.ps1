@@ -11,10 +11,10 @@ function Test-StorageGeoRedundantEnabled {
         Hashtable containing check metadata from AzureChecks.json.
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -44,15 +44,7 @@ function Test-StorageGeoRedundantEnabled {
                 $statusExtended = "Storage account '$accountName' does not have geo-redundant storage enabled (SKU: $skuName). Consider using GRS, RA-GRS, GZRS, or RA-GZRS for critical data."
             }
 
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = $status
-                StatusExtended = $statusExtended
-                ResourceId     = $resourceId
-                ResourceName   = $accountName
-                Location       = $account.location
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

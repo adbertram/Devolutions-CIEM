@@ -18,7 +18,7 @@ function Test-EntraPrivilegedUserHasMfa {
         Test-EntraPrivilegedUserHasMfa -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -28,24 +28,22 @@ function Test-EntraPrivilegedUserHasMfa {
 
     # Check if required data is available
     if (-not $script:EntraService.DirectoryRoles) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve directory roles - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Directory Roles'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve directory roles - missing permissions',
+            'N/A',
+            'Directory Roles'
+        )
     }
     elseif (-not $script:EntraService.UserMFAStatus) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required'
-            ResourceId     = 'N/A'
-            ResourceName   = 'User MFA Status'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required',
+            'N/A',
+            'User MFA Status'
+        )
     }
     else {
         # Build a set of privileged users (users in any directory role)
@@ -73,14 +71,13 @@ function Test-EntraPrivilegedUserHasMfa {
         }
 
         if ($privilegedUsers.Count -eq 0) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = 'No privileged users found in directory roles'
-                ResourceId     = 'privileged-users'
-                ResourceName   = 'Privileged Users'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                'No privileged users found in directory roles',
+                'privileged-users',
+                'Privileged Users'
+            )
         }
         else {
             # Build MFA status lookup
@@ -131,28 +128,26 @@ function Test-EntraPrivilegedUserHasMfa {
             $withoutMfaCount = $usersWithoutMfa.Count
 
             if ($withoutMfaCount -eq 0) {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'PASS'
-                    StatusExtended = "All $totalPrivileged privileged users have MFA enabled"
-                    ResourceId     = 'privileged-users'
-                    ResourceName   = 'Privileged Users'
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'PASS',
+                    "All $totalPrivileged privileged users have MFA enabled",
+                    'privileged-users',
+                    'Privileged Users'
+                )
             }
             else {
                 # Report individual users without MFA
                 foreach ($item in $usersWithoutMfa) {
                     $user = $item.User
                     $roles = $item.Roles -join ', '
-                    $findingParams = @{
-                        CheckMetadata  = $CheckMetadata
-                        Status         = 'FAIL'
-                        StatusExtended = "Privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled. Assigned roles: $roles"
-                        ResourceId     = $user.id
-                        ResourceName   = $user.displayName
-                    }
-                    New-CIEMFinding @findingParams
+                    [CIEMScanResult]::Create(
+                        $CheckMetadata,
+                        'FAIL',
+                        "Privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled. Assigned roles: $roles",
+                        $user.id,
+                        $user.displayName
+                    )
                 }
             }
         }

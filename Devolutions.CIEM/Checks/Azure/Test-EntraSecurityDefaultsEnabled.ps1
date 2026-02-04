@@ -17,7 +17,7 @@ function Test-EntraSecurityDefaultsEnabled {
         Test-EntraSecurityDefaultsEnabled -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -26,38 +26,17 @@ function Test-EntraSecurityDefaultsEnabled {
     $ErrorActionPreference = 'Stop'
 
     if (-not $script:EntraService.SecurityDefaults) {
-        $params = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve Security Defaults policy - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Security Defaults'
-        }
-        New-CIEMFinding @params
+        [CIEMScanResult]::Create($CheckMetadata, 'SKIPPED', 'Unable to retrieve Security Defaults policy - missing permissions', 'N/A', 'Security Defaults')
     }
     else {
         $securityDefaults = $script:EntraService.SecurityDefaults
         $isEnabled = $securityDefaults.isEnabled -eq $true
 
         if ($isEnabled) {
-            $params = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = 'Entra security defaults is enabled.'
-                ResourceId     = $securityDefaults.id
-                ResourceName   = 'Security Defaults'
-            }
-            New-CIEMFinding @params
+            [CIEMScanResult]::Create($CheckMetadata, 'PASS', 'Entra security defaults is enabled.', $securityDefaults.id, 'Security Defaults')
         }
         else {
-            $params = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = 'Entra security defaults is disabled.'
-                ResourceId     = $securityDefaults.id
-                ResourceName   = 'Security Defaults'
-            }
-            New-CIEMFinding @params
+            [CIEMScanResult]::Create($CheckMetadata, 'FAIL', 'Entra security defaults is disabled.', $securityDefaults.id, 'Security Defaults')
         }
     }
 }

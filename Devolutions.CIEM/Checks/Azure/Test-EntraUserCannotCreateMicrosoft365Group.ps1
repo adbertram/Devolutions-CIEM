@@ -17,7 +17,7 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
         Test-EntraUsersCannotCreateMicrosoft365Groups -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -62,12 +62,5 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
         }
     }
 
-    $findingParams = @{
-        CheckMetadata  = $CheckMetadata
-        Status         = $status
-        StatusExtended = $statusExtended
-        ResourceId     = $resourceId
-        ResourceName   = $resourceName
-    }
-    New-CIEMFinding @findingParams
+    [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $resourceName)
 }

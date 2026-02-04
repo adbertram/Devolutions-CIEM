@@ -15,7 +15,7 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
         Test-EntraConditionalAccessPolicyRequireMfaForManagementApi -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -26,14 +26,13 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
 
     # Check if Conditional Access policies data is available
     if (-not $script:EntraService.ConditionalAccessPolicies) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve Conditional Access policies - Azure AD Premium P1/P2 license required'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Conditional Access Policies'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve Conditional Access policies - Azure AD Premium P1/P2 license required',
+            'N/A',
+            'Conditional Access Policies'
+        )
     }
     else {
         # Look for enabled policies that require MFA for Azure Management API
@@ -91,24 +90,22 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
 
         if ($mfaPolicyNames.Count -gt 0) {
             $policyNames = $mfaPolicyNames -join ', '
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "Found $($mfaPolicyNames.Count) Conditional Access policy(ies) requiring MFA for Windows Azure Service Management API: $policyNames"
-                ResourceId     = 'conditional-access-policies'
-                ResourceName   = 'Conditional Access Policies'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "Found $($mfaPolicyNames.Count) Conditional Access policy(ies) requiring MFA for Windows Azure Service Management API: $policyNames",
+                'conditional-access-policies',
+                'Conditional Access Policies'
+            )
         }
         else {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = 'No Conditional Access policy requires MFA for Windows Azure Service Management API (appId: 797f4846-ba00-4fd7-ba43-dac1f8f63013)'
-                ResourceId     = 'conditional-access-policies'
-                ResourceName   = 'Conditional Access Policies'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'FAIL',
+                'No Conditional Access policy requires MFA for Windows Azure Service Management API (appId: 797f4846-ba00-4fd7-ba43-dac1f8f63013)',
+                'conditional-access-policies',
+                'Conditional Access Policies'
+            )
         }
     }
 }

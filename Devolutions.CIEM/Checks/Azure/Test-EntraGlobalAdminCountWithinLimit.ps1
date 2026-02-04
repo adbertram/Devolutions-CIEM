@@ -14,7 +14,7 @@ function Test-EntraGlobalAdminCountWithinLimit {
         Hashtable containing check metadata including id and severity.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -24,12 +24,5 @@ function Test-EntraGlobalAdminCountWithinLimit {
 
     # TODO: Implement check logic based on Prowler check: entra_global_admin_in_less_than_five_users
 
-    $params = @{
-        CheckMetadata  = $CheckMetadata
-        Status         = 'MANUAL'
-        StatusExtended = 'This check requires manual implementation. See Prowler check entra_global_admin_in_less_than_five_users for reference.'
-        ResourceId     = 'N/A'
-        ResourceName   = 'Global Administrator Role'
-    }
-    New-CIEMFinding @params
+    [CIEMScanResult]::Create($CheckMetadata, 'MANUAL', 'This check requires manual implementation. See Prowler check entra_global_admin_in_less_than_five_users for reference.', 'N/A', 'Global Administrator Role')
 }

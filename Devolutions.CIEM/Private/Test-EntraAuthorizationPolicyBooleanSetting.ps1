@@ -21,10 +21,10 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
         Message to display when the check fails (setting is true or not set).
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata,
@@ -42,14 +42,7 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
     $ErrorActionPreference = 'Stop'
 
     if (-not $script:EntraService.AuthorizationPolicy) {
-        $params = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Authorization Policy'
-        }
-        New-CIEMFinding @params
+        [CIEMScanResult]::Create($CheckMetadata, 'SKIPPED', 'Unable to retrieve authorization policy - missing permissions', 'N/A', 'Authorization Policy')
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -64,24 +57,10 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
         $propertyValue = $authPolicy.defaultUserRolePermissions.$PropertyName
 
         if ($propertyValue -eq $false) {
-            $params = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = $PassMessage
-                ResourceId     = $authPolicy.id
-                ResourceName   = 'Authorization Policy'
-            }
-            New-CIEMFinding @params
+            [CIEMScanResult]::Create($CheckMetadata, 'PASS', $PassMessage, $authPolicy.id, 'Authorization Policy')
         }
         else {
-            $params = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = $FailMessage
-                ResourceId     = $authPolicy.id
-                ResourceName   = 'Authorization Policy'
-            }
-            New-CIEMFinding @params
+            [CIEMScanResult]::Create($CheckMetadata, 'FAIL', $FailMessage, $authPolicy.id, 'Authorization Policy')
         }
     }
 }

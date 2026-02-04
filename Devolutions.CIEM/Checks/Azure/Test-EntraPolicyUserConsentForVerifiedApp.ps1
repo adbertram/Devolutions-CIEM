@@ -15,7 +15,7 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
         Test-EntraPolicyUserConsentForVerifiedApps -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -25,14 +25,13 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Authorization Policy'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve authorization policy - missing permissions',
+            'N/A',
+            'Authorization Policy'
+        )
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -73,13 +72,6 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
             }
         }
 
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = $status
-            StatusExtended = $statusExtended
-            ResourceId     = $authPolicy.id
-            ResourceName   = 'Authorization Policy'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $authPolicy.id, 'Authorization Policy')
     }
 }

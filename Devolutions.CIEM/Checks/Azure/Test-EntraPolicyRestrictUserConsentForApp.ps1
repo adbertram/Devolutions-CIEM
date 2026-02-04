@@ -18,7 +18,7 @@ function Test-EntraPolicyRestrictUserConsentForApp {
         Test-EntraPolicyRestrictsUserConsentForApps -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -28,14 +28,7 @@ function Test-EntraPolicyRestrictUserConsentForApp {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Authorization Policy'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create($CheckMetadata, 'SKIPPED', 'Unable to retrieve authorization policy - missing permissions', 'N/A', 'Authorization Policy')
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -73,25 +66,11 @@ function Test-EntraPolicyRestrictUserConsentForApp {
         }
 
         if (-not $hasUserConsentPolicy) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = 'Entra does not allow users to consent apps accessing company data on their behalf'
-                ResourceId     = $authPolicy.id
-                ResourceName   = 'Authorization Policy'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create($CheckMetadata, 'PASS', 'Entra does not allow users to consent apps accessing company data on their behalf', $authPolicy.id, 'Authorization Policy')
         }
         else {
             $policyList = $userConsentPolicies -join ', '
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = "Entra allows users to consent apps accessing company data on their behalf. User consent policies: $policyList"
-                ResourceId     = $authPolicy.id
-                ResourceName   = 'Authorization Policy'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Entra allows users to consent apps accessing company data on their behalf. User consent policies: $policyList", $authPolicy.id, 'Authorization Policy')
         }
     }
 }

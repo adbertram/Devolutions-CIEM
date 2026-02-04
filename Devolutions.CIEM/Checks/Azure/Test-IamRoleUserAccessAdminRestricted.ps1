@@ -18,13 +18,13 @@ function Test-IamRoleUserAccessAdminRestricted {
         - severity: Severity level
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects, one per role assignment.
+        [CIEMScanResult[]] Array of scan result objects, one per role assignment.
 
     .NOTES
         Data source: $script:IAMService[$subscriptionId].RoleAssignments and RoleDefinitions
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -40,14 +40,13 @@ function Test-IamRoleUserAccessAdminRestricted {
 
         # Check if role assignments were loaded
         if (-not $iamData.RoleAssignments) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'SKIPPED'
-                StatusExtended = "Unable to retrieve role assignments for subscription $subscriptionId"
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'SKIPPED',
+                "Unable to retrieve role assignments for subscription $subscriptionId",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
             continue
         }
 
@@ -122,24 +121,22 @@ function Test-IamRoleUserAccessAdminRestricted {
             $isUserAccessAdmin = ($roleName -eq 'User Access Administrator') -or ($roleGuid -eq $userAccessAdminRoleId)
 
             if ($isUserAccessAdmin) {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'FAIL'
-                    StatusExtended = "Role assignment $assignmentName in subscription $subscriptionId grants User Access Administrator role to $principalType $principalId."
-                    ResourceId     = $assignment.id
-                    ResourceName   = $assignmentName
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'FAIL',
+                    "Role assignment $assignmentName in subscription $subscriptionId grants User Access Administrator role to $principalType $principalId.",
+                    $assignment.id,
+                    $assignmentName
+                )
             }
             else {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'PASS'
-                    StatusExtended = "Role assignment $assignmentName in subscription $subscriptionId does not grant User Access Administrator role."
-                    ResourceId     = $assignment.id
-                    ResourceName   = $assignmentName
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'PASS',
+                    "Role assignment $assignmentName in subscription $subscriptionId does not grant User Access Administrator role.",
+                    $assignment.id,
+                    $assignmentName
+                )
             }
         }
     }

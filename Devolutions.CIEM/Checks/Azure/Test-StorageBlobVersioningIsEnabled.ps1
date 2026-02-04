@@ -11,10 +11,10 @@ function Test-StorageBlobVersioningIsEnabled {
         Hashtable containing check metadata from AzureChecks.json.
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -56,15 +56,7 @@ function Test-StorageBlobVersioningIsEnabled {
                 }
             }
 
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = $status
-                StatusExtended = $statusExtended
-                ResourceId     = $resourceId
-                ResourceName   = $accountName
-                Location       = $account.location
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

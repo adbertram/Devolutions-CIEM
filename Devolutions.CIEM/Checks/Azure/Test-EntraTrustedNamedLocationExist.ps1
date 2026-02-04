@@ -16,7 +16,7 @@ function Test-EntraTrustedNamedLocationExist {
         Test-EntraTrustedNamedLocationsExists -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -26,14 +26,13 @@ function Test-EntraTrustedNamedLocationExist {
 
     # Check if Named Locations data is available
     if (-not $script:EntraService.NamedLocations) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'FAIL'
-            StatusExtended = 'There is no trusted location with IP ranges defined.'
-            ResourceId     = 'Named Locations'
-            ResourceName   = 'Named Locations'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'FAIL',
+            'There is no trusted location with IP ranges defined.',
+            'Named Locations',
+            'Named Locations'
+        )
     }
     else {
         # Look for trusted named locations with IP ranges
@@ -78,24 +77,22 @@ function Test-EntraTrustedNamedLocationExist {
             }
 
             $ipRangeList = $ipRangeAddresses -join ', '
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "Exits trusted location with trusted IP ranges, this IPs ranges are: $ipRangeList"
-                ResourceId     = $trustedIpLocation.id
-                ResourceName   = $trustedIpLocation.displayName
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "Exits trusted location with trusted IP ranges, this IPs ranges are: $ipRangeList",
+                $trustedIpLocation.id,
+                $trustedIpLocation.displayName
+            )
         }
         else {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = 'There is no trusted location with IP ranges defined.'
-                ResourceId     = 'Named Locations'
-                ResourceName   = 'Named Locations'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'FAIL',
+                'There is no trusted location with IP ranges defined.',
+                'Named Locations',
+                'Named Locations'
+            )
         }
     }
 }

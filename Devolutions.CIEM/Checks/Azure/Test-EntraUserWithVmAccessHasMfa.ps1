@@ -21,7 +21,7 @@ function Test-EntraUserWithVmAccessHasMfa {
         Test-EntraUserWithVmAccessHasMfa -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -42,24 +42,22 @@ function Test-EntraUserWithVmAccessHasMfa {
 
     # Check if required data is available
     if (-not $script:EntraService.UserMFAStatus) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required'
-            ResourceId     = 'N/A'
-            ResourceName   = 'User MFA Status'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required',
+            'N/A',
+            'User MFA Status'
+        )
     }
     elseif (-not $script:IAMService -or -not $script:IAMService.RoleAssignments) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve IAM role assignments - IAM service not initialized or missing permissions. This check requires cross-reference with Azure Resource Manager role assignments.'
-            ResourceId     = 'N/A'
-            ResourceName   = 'IAM Role Assignments'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve IAM role assignments - IAM service not initialized or missing permissions. This check requires cross-reference with Azure Resource Manager role assignments.',
+            'N/A',
+            'IAM Role Assignments'
+        )
     }
     else {
         # Build MFA status lookup
@@ -103,14 +101,13 @@ function Test-EntraUserWithVmAccessHasMfa {
         }
 
         if ($usersWithVmAccess.Count -eq 0) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = 'No users found with direct VM access role assignments'
-                ResourceId     = 'vm-access-users'
-                ResourceName   = 'VM Access Users'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                'No users found with direct VM access role assignments',
+                'vm-access-users',
+                'VM Access Users'
+            )
         }
         else {
             # Check MFA status for each user with VM access
@@ -150,25 +147,23 @@ function Test-EntraUserWithVmAccessHasMfa {
             $withoutMfaCount = $usersWithoutMfa.Count
 
             if ($withoutMfaCount -eq 0) {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'PASS'
-                    StatusExtended = "All $totalVmUsers users with VM access have MFA enabled"
-                    ResourceId     = 'vm-access-users'
-                    ResourceName   = 'VM Access Users'
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'PASS',
+                    "All $totalVmUsers users with VM access have MFA enabled",
+                    'vm-access-users',
+                    'VM Access Users'
+                )
             }
             else {
                 foreach ($userInfo in $usersWithoutMfa) {
-                    $findingParams = @{
-                        CheckMetadata  = $CheckMetadata
-                        Status         = 'FAIL'
-                        StatusExtended = "User '$($userInfo.UserName)' has VM access but does not have MFA enabled"
-                        ResourceId     = $userInfo.PrincipalId
-                        ResourceName   = $userInfo.UserName
-                    }
-                    New-CIEMFinding @findingParams
+                    [CIEMScanResult]::Create(
+                        $CheckMetadata,
+                        'FAIL',
+                        "User '$($userInfo.UserName)' has VM access but does not have MFA enabled",
+                        $userInfo.PrincipalId,
+                        $userInfo.UserName
+                    )
                 }
             }
         }

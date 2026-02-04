@@ -229,14 +229,7 @@ function $FunctionName {
 
     # TODO: Implement check logic based on Prowler check: $($Metadata.CheckID)
 
-    `$params = @{
-        CheckMetadata  = `$CheckMetadata
-        Status         = 'MANUAL'
-        StatusExtended = 'This check requires manual implementation. See Prowler check $($Metadata.CheckID) for reference.'
-        ResourceId     = 'N/A'
-        ResourceName   = '$($Metadata.ServiceName) Resources'
-    }
-    New-CIEMFinding @params
+    [CIEMScanResult]::Create(`$CheckMetadata, 'MANUAL', 'This check requires manual implementation. See Prowler check $($Metadata.CheckID) for reference.', 'N/A', '$($Metadata.ServiceName) Resources')
 }
 "@
         $scriptContent

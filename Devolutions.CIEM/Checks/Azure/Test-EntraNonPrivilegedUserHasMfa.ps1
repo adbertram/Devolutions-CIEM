@@ -15,7 +15,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
         Test-EntraNonPrivilegedUserHasMfa -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -25,24 +25,22 @@ function Test-EntraNonPrivilegedUserHasMfa {
 
     # Check if required data is available
     if (-not $script:EntraService.Users) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve users - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Users'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve users - missing permissions',
+            'N/A',
+            'Users'
+        )
     }
     elseif (-not $script:EntraService.UserMFAStatus) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required'
-            ResourceId     = 'N/A'
-            ResourceName   = 'User MFA Status'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required',
+            'N/A',
+            'User MFA Status'
+        )
     }
     else {
         # Build a set of privileged user IDs (users in any directory role)
@@ -105,24 +103,22 @@ function Test-EntraNonPrivilegedUserHasMfa {
         $withoutMfaCount = $usersWithoutMfa.Count
 
         if ($withoutMfaCount -eq 0 -and $totalNonPrivileged -gt 0) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "All $totalNonPrivileged non-privileged users have MFA enabled"
-                ResourceId     = 'non-privileged-users'
-                ResourceName   = 'Non-Privileged Users'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "All $totalNonPrivileged non-privileged users have MFA enabled",
+                'non-privileged-users',
+                'Non-Privileged Users'
+            )
         }
         elseif ($totalNonPrivileged -eq 0) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = 'No non-privileged users found to check'
-                ResourceId     = 'non-privileged-users'
-                ResourceName   = 'Non-Privileged Users'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                'No non-privileged users found to check',
+                'non-privileged-users',
+                'Non-Privileged Users'
+            )
         }
         else {
             # Report individual users without MFA (limit to first 10 for readability)
@@ -130,25 +126,23 @@ function Test-EntraNonPrivilegedUserHasMfa {
             $usersToDisplay = $usersWithoutMfa | Select-Object -First $displayLimit
 
             foreach ($user in $usersToDisplay) {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'FAIL'
-                    StatusExtended = "Non-privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled"
-                    ResourceId     = $user.id
-                    ResourceName   = $user.displayName
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'FAIL',
+                    "Non-privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled",
+                    $user.id,
+                    $user.displayName
+                )
             }
 
             if ($withoutMfaCount -gt $displayLimit) {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'FAIL'
-                    StatusExtended = "... and $($withoutMfaCount - $displayLimit) additional non-privileged users without MFA (total: $withoutMfaCount out of $totalNonPrivileged)"
-                    ResourceId     = 'non-privileged-users-summary'
-                    ResourceName   = 'Non-Privileged Users Summary'
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'FAIL',
+                    "... and $($withoutMfaCount - $displayLimit) additional non-privileged users without MFA (total: $withoutMfaCount out of $totalNonPrivileged)",
+                    'non-privileged-users-summary',
+                    'Non-Privileged Users Summary'
+                )
             }
         }
     }

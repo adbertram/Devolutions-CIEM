@@ -12,10 +12,10 @@ function Test-KeyvaultKeyRotationEnabled {
         Hashtable containing check metadata (id, service, title, severity).
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -30,28 +30,12 @@ function Test-KeyvaultKeyRotationEnabled {
             $keys = $kvData.Keys[$vault.name]
 
             if ($null -eq $keys) {
-                $params = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'MANUAL'
-                    StatusExtended = "Cannot access keys in vault '$($vault.name)' - data plane access denied. Manual verification required."
-                    ResourceId     = $vault.id
-                    ResourceName   = $vault.name
-                    Location       = $vault.location
-                }
-                New-CIEMFinding @params
+                [CIEMScanResult]::Create($CheckMetadata, 'MANUAL', "Cannot access keys in vault '$($vault.name)' - data plane access denied. Manual verification required.", $vault.id, $vault.name, $vault.location)
                 continue
             }
 
             if ($keys.Count -eq 0) {
-                $params = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'PASS'
-                    StatusExtended = "Vault '$($vault.name)' has no keys configured."
-                    ResourceId     = $vault.id
-                    ResourceName   = $vault.name
-                    Location       = $vault.location
-                }
-                New-CIEMFinding @params
+                [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Vault '$($vault.name)' has no keys configured.", $vault.id, $vault.name, $vault.location)
                 continue
             }
 
@@ -79,26 +63,10 @@ function Test-KeyvaultKeyRotationEnabled {
                 }
 
                 if ($hasRotationPolicy) {
-                    $params = @{
-                        CheckMetadata  = $CheckMetadata
-                        Status         = 'PASS'
-                        StatusExtended = "Vault '$($vault.name)' has key '$keyName' with rotation policy set."
-                        ResourceId     = $vault.id
-                        ResourceName   = "$($vault.name)/$keyName"
-                        Location       = $vault.location
-                    }
-                    New-CIEMFinding @params
+                    [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Vault '$($vault.name)' has key '$keyName' with rotation policy set.", $vault.id, "$($vault.name)/$keyName", $vault.location)
                 }
                 else {
-                    $params = @{
-                        CheckMetadata  = $CheckMetadata
-                        Status         = 'FAIL'
-                        StatusExtended = "Vault '$($vault.name)' has key '$keyName' without rotation policy set."
-                        ResourceId     = $vault.id
-                        ResourceName   = "$($vault.name)/$keyName"
-                        Location       = $vault.location
-                    }
-                    New-CIEMFinding @params
+                    [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Vault '$($vault.name)' has key '$keyName' without rotation policy set.", $vault.id, "$($vault.name)/$keyName", $vault.location)
                 }
             }
         }

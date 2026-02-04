@@ -11,10 +11,10 @@ function Test-StorageCrossTenantReplicationDisabled {
         Hashtable containing check metadata from AzureChecks.json.
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -48,15 +48,7 @@ function Test-StorageCrossTenantReplicationDisabled {
                 $statusExtended = "Storage account '$accountName' allows cross-tenant replication. Disable cross-tenant replication to prevent data leakage across tenant boundaries."
             }
 
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = $status
-                StatusExtended = $statusExtended
-                ResourceId     = $resourceId
-                ResourceName   = $accountName
-                Location       = $account.location
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

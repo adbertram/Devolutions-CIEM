@@ -15,7 +15,7 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
         Test-EntraPolicyEnsureDefaultUserCannotCreateTenants -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata

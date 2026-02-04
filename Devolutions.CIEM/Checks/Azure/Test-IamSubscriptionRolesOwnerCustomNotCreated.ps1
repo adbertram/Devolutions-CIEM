@@ -23,13 +23,13 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         - severity: Severity level
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
 
     .NOTES
         Data source: $script:IAMService[$subscriptionId].CustomRoles
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -42,14 +42,13 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
 
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'SKIPPED'
-                StatusExtended = "Unable to retrieve role definitions for subscription $subscriptionId"
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'SKIPPED',
+                "Unable to retrieve role definitions for subscription $subscriptionId",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
             continue
         }
 
@@ -58,14 +57,13 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
 
         if (-not $customRoles -or $customRoles.Count -eq 0) {
             # No custom roles exist - PASS (no custom owner roles can exist)
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "No custom roles exist in subscription $subscriptionId. No custom owner roles can exist."
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "No custom roles exist in subscription $subscriptionId. No custom owner roles can exist.",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
             continue
         }
 
@@ -155,26 +153,24 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         if ($customOwnerRoles.Count -gt 0) {
             # Found custom owner role(s) - generate a FAIL finding for each
             foreach ($ownerRole in $customOwnerRoles) {
-                $findingParams = @{
-                    CheckMetadata  = $CheckMetadata
-                    Status         = 'FAIL'
-                    StatusExtended = "Custom owner role '$($ownerRole.Name)' found with full permissions (*) at subscription scope. Custom roles should not have owner-equivalent permissions. Assignable scopes: $($ownerRole.AssignableScopes)"
-                    ResourceId     = $ownerRole.Id
-                    ResourceName   = $ownerRole.Name
-                }
-                New-CIEMFinding @findingParams
+                [CIEMScanResult]::Create(
+                    $CheckMetadata,
+                    'FAIL',
+                    "Custom owner role '$($ownerRole.Name)' found with full permissions (*) at subscription scope. Custom roles should not have owner-equivalent permissions. Assignable scopes: $($ownerRole.AssignableScopes)",
+                    $ownerRole.Id,
+                    $ownerRole.Name
+                )
             }
         }
         else {
             # No custom owner roles found - PASS
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "No custom owner roles found in subscription $subscriptionId. $($customRoles.Count) custom role(s) exist but none have owner-equivalent permissions."
-                ResourceId     = "/subscriptions/$subscriptionId"
-                ResourceName   = "Subscription $subscriptionId"
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "No custom owner roles found in subscription $subscriptionId. $($customRoles.Count) custom role(s) exist but none have owner-equivalent permissions.",
+                "/subscriptions/$subscriptionId",
+                "Subscription $subscriptionId"
+            )
         }
     }
 }

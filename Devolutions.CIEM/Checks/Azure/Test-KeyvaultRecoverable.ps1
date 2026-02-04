@@ -15,10 +15,10 @@ function Test-KeyvaultRecoverable {
         Hashtable containing check metadata (id, service, title, severity).
 
     .OUTPUTS
-        [PSCustomObject[]] Array of finding objects.
+        [CIEMScanResult[]] Array of scan result objects.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -56,15 +56,7 @@ function Test-KeyvaultRecoverable {
                 }
             }
 
-            $params = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = $status
-                StatusExtended = $message
-                ResourceId     = $vault.id
-                ResourceName   = $vault.name
-                Location       = $vault.location
-            }
-            New-CIEMFinding @params
+            [CIEMScanResult]::Create($CheckMetadata, $status, $message, $vault.id, $vault.name, $vault.location)
         }
     }
 }

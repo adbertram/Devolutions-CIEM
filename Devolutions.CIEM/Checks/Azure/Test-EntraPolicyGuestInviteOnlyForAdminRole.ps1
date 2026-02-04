@@ -21,7 +21,7 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
         Test-EntraPolicyGuestInviteOnlyForAdminRoles -CheckMetadata $metadata
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
         [hashtable]$CheckMetadata
@@ -31,14 +31,13 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        $findingParams = @{
-            CheckMetadata  = $CheckMetadata
-            Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve authorization policy - missing permissions'
-            ResourceId     = 'N/A'
-            ResourceName   = 'Authorization Policy'
-        }
-        New-CIEMFinding @findingParams
+        [CIEMScanResult]::Create(
+            $CheckMetadata,
+            'SKIPPED',
+            'Unable to retrieve authorization policy - missing permissions',
+            'N/A',
+            'Authorization Policy'
+        )
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -56,24 +55,22 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
         $acceptableValues = @('none', 'adminsAndGuestInviters')
 
         if ($allowInvitesFrom -in $acceptableValues) {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'PASS'
-                StatusExtended = "Guest invite restrictions are properly configured. Current setting: '$allowInvitesFrom' - only users with admin roles can invite guest users."
-                ResourceId     = $authPolicy.id
-                ResourceName   = 'Authorization Policy'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'PASS',
+                "Guest invite restrictions are properly configured. Current setting: '$allowInvitesFrom' - only users with admin roles can invite guest users.",
+                $authPolicy.id,
+                'Authorization Policy'
+            )
         }
         else {
-            $findingParams = @{
-                CheckMetadata  = $CheckMetadata
-                Status         = 'FAIL'
-                StatusExtended = "Guest invite restrictions are too permissive. Current setting: '$allowInvitesFrom'. Should be 'adminsAndGuestInviters' or 'none' to restrict guest invitations to admin roles only."
-                ResourceId     = $authPolicy.id
-                ResourceName   = 'Authorization Policy'
-            }
-            New-CIEMFinding @findingParams
+            [CIEMScanResult]::Create(
+                $CheckMetadata,
+                'FAIL',
+                "Guest invite restrictions are too permissive. Current setting: '$allowInvitesFrom'. Should be 'adminsAndGuestInviters' or 'none' to restrict guest invitations to admin roles only.",
+                $authPolicy.id,
+                'Authorization Policy'
+            )
         }
     }
 }
