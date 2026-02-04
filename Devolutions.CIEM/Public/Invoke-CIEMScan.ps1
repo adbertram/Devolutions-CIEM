@@ -73,25 +73,33 @@ function Invoke-CIEMScan {
 
     Write-Verbose "Starting CIEM scan for provider: $Provider"
 
-    # Step 1: Verify authentication (must call Connect-CIEM first)
-    $authContext = Assert-CIEMAuthenticated -Provider $Provider
+    # Connect to provider (handles all auth internally, returns context)
+    $connectResult = Connect-CIEM -Provider $Provider -Force
+    $providerResult = $connectResult.Providers | Where-Object { $_.Provider -eq $Provider }
+
+    if ($providerResult.Status -ne 'Connected') {
+        throw "Failed to connect to ${Provider}: $($providerResult.Message)"
+    }
+
+    $authContext = $script:AuthContext[$Provider]
+    $subscriptionIds = $authContext.SubscriptionIds
 
     Write-Verbose "Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
     Write-Verbose "Tenant: $($authContext.TenantId)"
-    Write-Verbose "Subscriptions: $($authContext.SubscriptionIds.Count)"
+    Write-Verbose "Subscriptions: $($subscriptionIds.Count)"
 
     # Step 2: Initialize services
     Write-Verbose "Initializing Entra service..."
     Initialize-EntraService
 
     Write-Verbose "Initializing IAM service..."
-    Initialize-IAMService -SubscriptionIds $authContext.SubscriptionIds
+    Initialize-IAMService -SubscriptionIds $subscriptionIds
 
     Write-Verbose "Initializing KeyVault service..."
-    Initialize-KeyVaultService -SubscriptionIds $authContext.SubscriptionIds
+    Initialize-KeyVaultService -SubscriptionIds $subscriptionIds
 
     Write-Verbose "Initializing Storage service..."
-    Initialize-StorageService -SubscriptionIds $authContext.SubscriptionIds
+    Initialize-StorageService -SubscriptionIds $subscriptionIds
 
     # Step 3: Load check metadata
     $checks = Get-CheckMetadata

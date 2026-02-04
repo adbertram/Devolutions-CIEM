@@ -45,7 +45,7 @@ function Test-EntraUserWithVmAccessHasMfa {
         $findingParams = @{
             CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve user MFA registration details - missing permissions'
+            StatusExtended = 'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required'
             ResourceId     = 'N/A'
             ResourceName   = 'User MFA Status'
         }

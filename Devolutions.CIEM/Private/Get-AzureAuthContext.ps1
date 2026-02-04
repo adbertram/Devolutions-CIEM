@@ -116,9 +116,9 @@ function Get-AzureAuthContext {
     Write-Verbose "Testing Graph API access..."
     $graphApiBase = $script:Config.azure.endpoints.graphApi
     try {
-        $graphTest = Invoke-AzRestMethod -Uri "$graphApiBase/organization" -Method GET -ErrorAction Stop
-        if ($graphTest.StatusCode -ne 200) {
-            Write-Warning "Graph API access may be limited. Status: $($graphTest.StatusCode)"
+        $graphTest = Invoke-AzureApi -Uri "$graphApiBase/organization" -Api Graph -ResourceName 'Organization' -ErrorAction Stop
+        if (-not $graphTest) {
+            Write-Warning "Graph API access may be limited"
         }
     }
     catch {
@@ -128,9 +128,9 @@ function Get-AzureAuthContext {
     Write-Verbose "Testing ARM API access..."
     $armApiBase = $script:Config.azure.endpoints.armApi
     try {
-        $armTest = Invoke-AzRestMethod -Uri "$armApiBase/subscriptions?api-version=2020-01-01" -Method GET -ErrorAction Stop
-        if ($armTest.StatusCode -ne 200) {
-            Write-Warning "ARM API access may be limited. Status: $($armTest.StatusCode)"
+        $armTest = Invoke-AzureApi -Uri "$armApiBase/subscriptions?api-version=2020-01-01" -Api ARM -ResourceName 'Subscriptions' -ErrorAction Stop
+        if (-not $armTest) {
+            Write-Warning "ARM API access may be limited"
         }
     }
     catch {

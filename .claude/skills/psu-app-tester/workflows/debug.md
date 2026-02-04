@@ -5,6 +5,12 @@ When PSU docs don't have the answer, use WebSearch for "PowerShell Universal v5 
 PSU docs location: `./prowler/docs/psu-docs/`
 </required_reading>
 
+<critical_rule>
+**DEBUG BEFORE PUBLISH:** Publishing is slow. ALWAYS test fixes via `Invoke-PSUCommand` BEFORE publishing a new module version.
+
+Workflow: Identify error → Write fix locally → Test fix on PSU via Invoke-PSUCommand → Confirm fix works → THEN publish
+</critical_rule>
+
 <process>
 ## Step 1: Download and search PSU logs (PRIMARY DEBUG TOOL)
 
@@ -73,6 +79,38 @@ If local docs don't help:
 WebSearch: "PowerShell Universal v5 [error message or topic]"
 ```
 
+## Step 9: Test fix via Invoke-PSUCommand BEFORE publishing (MANDATORY)
+
+**Publishing is slow.** Always validate your fix works on the PSU server BEFORE publishing.
+
+```powershell
+# Import the management module
+Import-Module ./scripts/PSUniversal.psm1
+
+# Test your fix directly on PSU (runs in PSU's PowerShell environment)
+Invoke-PSUCommand -ScriptBlock {
+    # Example: Test Get-CIEMSecret fix
+    $item = Get-Item "Secret:CIEM_Azure_TenantId" -ErrorAction SilentlyContinue
+    if ($item) { $item.Value } else { "Secret not found (no error)" }
+}
+
+# Example: Check module version on PSU
+Invoke-PSUCommand -ScriptBlock {
+    (Get-Module Devolutions.CIEM -ListAvailable).Version.ToString()
+}
+
+# Example: Test a function that was failing
+Invoke-PSUCommand -ScriptBlock {
+    Get-CIEMSecret 'CIEM_Azure_TenantId'
+}
+```
+
+**Only after confirming the fix works via Invoke-PSUCommand, proceed to publish:**
+
+```powershell
+Publish-PSUModule -ModulePath ./Devolutions.CIEM
+```
+
 ## Common fixes
 
 **"Page Not Found":**
@@ -86,6 +124,10 @@ WebSearch: "PowerShell Universal v5 [error message or topic]"
 **Module not updating:**
 - Restart the app after publishing
 - Verify new version imported: check `/api/v1/module` endpoint
+
+**"Property 'Value' cannot be found":**
+- Secret doesn't exist or Get-Item returned $null
+- Add null check before accessing .Value property
 </process>
 
 <success_criteria>

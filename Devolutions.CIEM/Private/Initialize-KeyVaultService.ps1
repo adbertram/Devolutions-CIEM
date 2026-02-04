@@ -85,10 +85,10 @@ function Initialize-KeyVaultService {
                         }
 
                         foreach ($dp in $dataPlaneEndpoints.GetEnumerator()) {
-                            $response = Invoke-AzRestMethod -Uri $dp.Value -Method GET
-                            if ($response -and $response.StatusCode -eq 200) {
-                                $content = $response.Content | ConvertFrom-Json
-                                $script:KeyVaultService[$subscriptionId][$dp.Key][$vaultName] = $content.value
+                            # Use SilentlyContinue because 403 is expected when SP lacks data plane access
+                            $items = Invoke-AzureApi -Uri $dp.Value -Api KeyVault -ResourceName "$($dp.Key) ($vaultName)" -ErrorAction SilentlyContinue
+                            if ($items) {
+                                $script:KeyVaultService[$subscriptionId][$dp.Key][$vaultName] = $items
                             }
                             else {
                                 Write-CIEMLog -Severity DEBUG -Message "Cannot access $($dp.Key.ToLower()) in vault $vaultName - data plane access denied or not available"

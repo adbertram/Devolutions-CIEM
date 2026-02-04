@@ -32,8 +32,13 @@ function Write-CIEMLog {
         [string]$Component = 'CIEM'
     )
 
-    # Log file path - in module directory for easy access
-    $logPath = Join-Path -Path $script:ModuleRoot -ChildPath 'ciem.log'
+    # Log file path - use /home/LogFiles on Azure/Linux, module directory otherwise
+    $logDir = if ($IsLinux -and (Test-Path '/home/LogFiles')) {
+        '/home/LogFiles'
+    } else {
+        $script:ModuleRoot
+    }
+    $logPath = Join-Path -Path $logDir -ChildPath 'ciem.log'
 
     # Format timestamp
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'

@@ -47,26 +47,56 @@ function Initialize-EntraService {
     $usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType"
     $script:EntraService.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
 
+    # Load user MFA status - requires Azure AD Premium P1/P2 license
+    # Handle gracefully if tenant doesn't have the required license
     Write-CIEMLog -Severity DEBUG -Message "Loading user MFA status..."
     $mfaUri = "$graphApiBase/reports/authenticationMethods/userRegistrationDetails"
-    $script:EntraService.UserMFAStatus = @(Get-AllGraphPage -Uri $mfaUri -ResourceName "UserMFAStatus")
+    try {
+        $script:EntraService.UserMFAStatus = @(Get-AllGraphPage -Uri $mfaUri -ResourceName "UserMFAStatus")
+    }
+    catch {
+        # Check for common licensing errors
+        if ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license|403') {
+            Write-CIEMLog -Severity WARNING -Message "MFA status data unavailable - Azure AD Premium license required. MFA-related checks will be skipped."
+            $script:EntraService.UserMFAStatus = $null
+            $script:EntraService.MFAStatusUnavailable = $true
+        }
+        else {
+            # Re-throw other errors
+            throw
+        }
+    }
 
     # Define non-paginated API endpoints to load - data-driven pattern
+    # Some endpoints require Azure AD Premium (ConditionalAccessPolicies, NamedLocations)
     $apiEndpoints = @{
-        DirectoryRoles            = 'directoryRoles'
-        SecurityDefaults          = 'policies/identitySecurityDefaultsEnforcementPolicy'
-        AuthorizationPolicy       = 'policies/authorizationPolicy'
-        ConditionalAccessPolicies = 'identity/conditionalAccess/policies'
-        NamedLocations            = 'identity/conditionalAccess/namedLocations'
-        GroupSettings             = 'groupSettings'
+        DirectoryRoles      = @{ Path = 'directoryRoles'; RequiresPremium = $false }
+        SecurityDefaults    = @{ Path = 'policies/identitySecurityDefaultsEnforcementPolicy'; RequiresPremium = $false }
+        AuthorizationPolicy = @{ Path = 'policies/authorizationPolicy'; RequiresPremium = $false }
+        GroupSettings       = @{ Path = 'groupSettings'; RequiresPremium = $false }
+        # Premium-required endpoints
+        ConditionalAccessPolicies = @{ Path = 'identity/conditionalAccess/policies'; RequiresPremium = $true }
+        NamedLocations            = @{ Path = 'identity/conditionalAccess/namedLocations'; RequiresPremium = $true }
     }
 
     foreach ($endpoint in $apiEndpoints.GetEnumerator()) {
         $params = @{
-            Uri          = "$graphApiBase/$($endpoint.Value)"
+            Uri          = "$graphApiBase/$($endpoint.Value.Path)"
             ResourceName = $endpoint.Key
         }
-        $script:EntraService[$endpoint.Key] = Invoke-AzureApi @params
+        try {
+            $script:EntraService[$endpoint.Key] = Invoke-AzureApi @params
+        }
+        catch {
+            if ($endpoint.Value.RequiresPremium -and ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license|403')) {
+                Write-CIEMLog -Severity WARNING -Message "$($endpoint.Key) data unavailable - Azure AD Premium license required."
+                $script:EntraService[$endpoint.Key] = $null
+            }
+            else {
+                # Re-throw non-premium errors
+                throw
+            }
+        }
     }
 
     # Load members for each directory role
@@ -85,7 +115,8 @@ function Initialize-EntraService {
         Users    = if ($script:EntraService.Users) { $script:EntraService.Users.Count } else { 0 }
         Roles    = if ($script:EntraService.DirectoryRoles) { $script:EntraService.DirectoryRoles.Count } else { 0 }
         Policies = if ($script:EntraService.ConditionalAccessPolicies) { $script:EntraService.ConditionalAccessPolicies.Count } else { 0 }
+        MFAData  = if ($script:EntraService.UserMFAStatus) { $script:EntraService.UserMFAStatus.Count } else { 'N/A (Premium required)' }
     }
 
-    Write-CIEMLog -Severity DEBUG -Message "Entra service initialized: $($counts.Users) users, $($counts.Roles) roles, $($counts.Policies) conditional access policies"
+    Write-CIEMLog -Severity DEBUG -Message "Entra service initialized: $($counts.Users) users, $($counts.Roles) roles, $($counts.Policies) CA policies, MFA data: $($counts.MFAData)"
 }

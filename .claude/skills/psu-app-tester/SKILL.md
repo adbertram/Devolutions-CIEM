@@ -15,13 +15,15 @@ Test, publish, and debug the Devolutions CIEM PowerShell Universal (PSU) app. Ma
 </quick_start>
 
 <essential_principles>
+**DEBUG BEFORE PUBLISH:** Always test code fixes via `Invoke-PSUCommand` on the PSU instance BEFORE publishing a new module version. Publishing is slow - validate fixes work first.
+
 ALWAYS restart the PSU app after publishing a new module version.
 
 PSU app URL has double path: `https://devolutions-ciem-psu.azurewebsites.net/ciem/ciem/[page]`
 
 Use `mcp__playwright__browser_snapshot` to see page state (better than screenshots).
 
-Module changes require: edit code → publish → restart app → test.
+Module changes require: edit code → **test on PSU via Invoke-PSUCommand** → publish → restart app → verify.
 
 PSU secrets use `-Vault 'Database'` (not BuiltInLocalVault) on Linux/Azure.
 

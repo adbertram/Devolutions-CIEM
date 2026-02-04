@@ -29,7 +29,7 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
         $findingParams = @{
             CheckMetadata  = $CheckMetadata
             Status         = 'SKIPPED'
-            StatusExtended = 'Unable to retrieve Conditional Access policies - missing permissions or no policies configured'
+            StatusExtended = 'Unable to retrieve Conditional Access policies - Azure AD Premium P1/P2 license required'
             ResourceId     = 'N/A'
             ResourceName   = 'Conditional Access Policies'
         }

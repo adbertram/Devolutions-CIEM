@@ -26,6 +26,8 @@ $script:KeyVaultService = @{}
 
 # Initialize authentication context (populated by Connect-CIEM)
 $script:AuthContext = @{}
+$script:ARMAccessToken = $null
+$script:GraphAccessToken = $null
 $script:StorageService = @{}
 
 # Initialize PSU environment detection (populated on first access)

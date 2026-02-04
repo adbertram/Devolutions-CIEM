@@ -192,17 +192,17 @@ get_kudu_credentials
   echo ""
 
   # ============================================
-  # SECTION 6: Azure Docker Logs (Kudu)
+  # SECTION 6: All Log Files (Kudu)
   # ============================================
-  echo "=== Azure Docker Logs (Kudu) ==="
+  echo "=== Log Files (Kudu) ==="
   echo ""
 
-  # Get all docker log files
+  # Get all log files in LogFiles folder
   ALL_LOG_LIST=$("$SCRIPT_DIR/azure_psu_file_manager.sh" list LogFiles 2>/dev/null || true)
-  LOG_FILES=$(echo "$ALL_LOG_LIST" | grep "_docker.*\.log" | awk '{print $2}' | sort)
+  LOG_FILES=$(echo "$ALL_LOG_LIST" | grep "text/plain" | awk '{print $2}' | sort)
 
   if [ -z "$LOG_FILES" ]; then
-    echo "(no docker log files found)"
+    echo "(no log files found)"
   else
     for logfile in $LOG_FILES; do
       echo "--- $logfile ---"

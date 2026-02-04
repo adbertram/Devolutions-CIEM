@@ -206,12 +206,9 @@ function Connect-CIEMAzure {
             Write-CIEMLog -Message "PSU cache - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             # ClientSecret comes from PSU secret
-            $clientSecret = $null
-            if ($inPSUContext) {
-                Write-CIEMLog -Message "Checking PSU secret for ClientSecret..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-                $clientSecret = $Secret:CIEM_Azure_ClientSecret
-                Write-CIEMLog -Message "PSU secret - ClientSecret: $(if($clientSecret){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
-            }
+            Write-CIEMLog -Message "Checking PSU secret for ClientSecret..." -Severity DEBUG -Component 'Connect-CIEMAzure'
+            $clientSecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
+            Write-CIEMLog -Message "PSU secret - ClientSecret: $(if($clientSecret){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             # Final credential summary
             Write-CIEMLog -Message "Final credentials - TenantId: $(if($tenantId){$tenantId.Substring(0,8)+'...'}else{'MISSING'}), ClientId: $(if($clientId){$clientId.Substring(0,8)+'...'}else{'MISSING'}), ClientSecret: $(if($clientSecret){'SET'}else{'MISSING'})" -Severity INFO -Component 'Connect-CIEMAzure'
@@ -231,23 +228,48 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 throw $errorMsg
             }
 
+            $tokenUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+
             # Get ARM token via REST API (avoids MSAL library issues on Linux)
             Write-CIEMLog -Message "Requesting ARM token via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $tokenUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
-            $body = @{
+            $armBody = @{
                 client_id     = $clientId
                 scope         = 'https://management.azure.com/.default'
                 client_secret = $clientSecret
                 grant_type    = 'client_credentials'
             }
+            $armTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $armBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
+            Write-CIEMLog -Message "ARM token obtained (expires in $($armTokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
 
-            $tokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
-            $armToken = $tokenResponse.access_token
-            Write-CIEMLog -Message "ARM token obtained (expires in $($tokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Get Graph token via REST API (same pattern as ARM token)
+            Write-CIEMLog -Message "Requesting Graph token via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphBody = @{
+                client_id     = $clientId
+                scope         = 'https://graph.microsoft.com/.default'
+                client_secret = $clientSecret
+                grant_type    = 'client_credentials'
+            }
+            $graphTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $graphBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
+            Write-CIEMLog -Message "Graph token obtained (expires in $($graphTokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
 
-            # Inject token into Az context
-            Write-CIEMLog -Message "Injecting token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Connect-AzAccount -AccessToken $armToken -AccountId $clientId -TenantId $tenantId -ErrorAction Stop | Out-Null
+            # Get KeyVault token via REST API (for Key Vault data plane access)
+            Write-CIEMLog -Message "Requesting KeyVault token via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $keyVaultBody = @{
+                client_id     = $clientId
+                scope         = 'https://vault.azure.net/.default'
+                client_secret = $clientSecret
+                grant_type    = 'client_credentials'
+            }
+            $keyVaultTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $keyVaultBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
+            Write-CIEMLog -Message "KeyVault token obtained (expires in $($keyVaultTokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Store tokens via centralized helper
+            Save-CIEMToken -ARMToken $armTokenResponse.access_token -GraphToken $graphTokenResponse.access_token -KeyVaultToken $keyVaultTokenResponse.access_token
+            Write-CIEMLog -Message "Tokens saved" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Inject ARM token into Az context
+            Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            Connect-AzAccount -AccessToken $armTokenResponse.access_token -AccountId $clientId -TenantId $tenantId -ErrorAction Stop | Out-Null
             Write-CIEMLog -Message "Az context established successfully" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         'ServicePrincipalCertificate' {
@@ -259,12 +281,9 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             Write-CIEMLog -Message "PSU cache - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             # Thumbprint comes from PSU secret
-            $thumbprint = $null
-            if ($inPSUContext) {
-                Write-CIEMLog -Message "Checking PSU secret for CertThumbprint..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-                $thumbprint = $Secret:CIEM_Azure_CertThumbprint
-                Write-CIEMLog -Message "PSU secret - CertThumbprint: $(if($thumbprint){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
-            }
+            Write-CIEMLog -Message "Checking PSU secret for CertThumbprint..." -Severity DEBUG -Component 'Connect-CIEMAzure'
+            $thumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
+            Write-CIEMLog -Message "PSU secret - CertThumbprint: $(if($thumbprint){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             Write-CIEMLog -Message "Certificate auth credentials - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'}), Thumbprint: $(if($thumbprint){'found'}else{'null'})" -Severity INFO -Component 'Connect-CIEMAzure'
 
@@ -291,6 +310,12 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             Write-Verbose "Connecting with certificate for: $clientId"
             Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
             Write-CIEMLog -Message "Certificate authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Acquire Graph token using Get-AzAccessToken
+            Write-CIEMLog -Message "Acquiring Graph token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphTokenResponse = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
+            Save-CIEMToken -GraphToken $graphTokenResponse.Token
+            Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         'ManagedIdentity' {
             Write-CIEMLog -Message "Processing ManagedIdentity authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
@@ -315,6 +340,12 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             Write-CIEMLog -Message "Calling Connect-AzAccount with -Identity..." -Severity INFO -Component 'Connect-CIEMAzure'
             Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
             Write-CIEMLog -Message "Managed identity authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Acquire Graph token using Get-AzAccessToken
+            Write-CIEMLog -Message "Acquiring Graph token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphTokenResponse = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
+            Save-CIEMToken -GraphToken $graphTokenResponse.Token
+            Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         'DeviceCode' {
             Write-CIEMLog -Message "Processing DeviceCode authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
@@ -327,6 +358,12 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             Write-Verbose "Connecting with device code authentication"
             Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
             Write-CIEMLog -Message "Device code authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Acquire Graph token using Get-AzAccessToken
+            Write-CIEMLog -Message "Acquiring Graph token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphTokenResponse = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
+            Save-CIEMToken -GraphToken $graphTokenResponse.Token
+            Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         'Interactive' {
             Write-CIEMLog -Message "Processing Interactive authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
@@ -339,6 +376,12 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             Write-Verbose "Connecting with interactive authentication"
             Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
             Write-CIEMLog -Message "Interactive authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Acquire Graph token using Get-AzAccessToken
+            Write-CIEMLog -Message "Acquiring Graph token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphTokenResponse = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
+            Save-CIEMToken -GraphToken $graphTokenResponse.Token
+            Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         default {
             Write-CIEMLog -Message "Unknown authentication method: $authMethod" -Severity ERROR -Component 'Connect-CIEMAzure'
@@ -346,13 +389,43 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         }
     }
 
+    # Get Azure context with retry logic for PSU runspace stability
     Write-CIEMLog -Message "Getting Azure context..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-    $context = Get-AzContext -ErrorAction Stop
+    $context = $null
+    $retryCount = 0
+    $maxRetries = 2
+
+    while (-not $context -and $retryCount -lt $maxRetries) {
+        try {
+            $context = Get-AzContext -ErrorAction Stop
+            if (-not $context -or -not $context.Account) {
+                throw "Az context is empty or invalid"
+            }
+        }
+        catch {
+            $retryCount++
+            Write-CIEMLog -Message "Get-AzContext attempt $retryCount failed: $($_.Exception.Message)" -Severity WARNING -Component 'Connect-CIEMAzure'
+            if ($retryCount -lt $maxRetries) {
+                Write-CIEMLog -Message "Clearing Az context and waiting before retry..." -Severity DEBUG -Component 'Connect-CIEMAzure'
+                Clear-AzContext -Force -ErrorAction SilentlyContinue | Out-Null
+                Start-Sleep -Milliseconds 500
+            }
+            else {
+                throw "Failed to get valid Az context after $maxRetries attempts: $($_.Exception.Message)"
+            }
+        }
+    }
     Write-CIEMLog -Message "Azure context obtained: Account=$($context.Account.Id), Tenant=$($context.Tenant.Id)" -Severity INFO -Component 'Connect-CIEMAzure'
 
-    # Get all accessible subscriptions
+    # Get all accessible subscriptions with error handling
     Write-CIEMLog -Message "Getting accessible subscriptions..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-    $subscriptions = @(Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue)
+    try {
+        $subscriptions = @(Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction Stop)
+    }
+    catch {
+        Write-CIEMLog -Message "Get-AzSubscription failed: $($_.Exception.Message). Continuing with empty subscription list." -Severity WARNING -Component 'Connect-CIEMAzure'
+        $subscriptions = @()
+    }
     Write-CIEMLog -Message "Found $($subscriptions.Count) subscriptions" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
     # Filter to configured subscriptions if specified

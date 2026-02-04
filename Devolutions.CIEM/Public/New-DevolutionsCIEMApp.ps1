@@ -112,6 +112,59 @@ function New-DevolutionsCIEMApp {
             if ($Status -eq 'FAIL') { '#f44336' } else { '#4caf50' }
         }
 
+        # Helper functions for async button progress states
+        function New-CIEMProgressContent {
+            param(
+                [string]$Text = 'Processing...'
+            )
+            New-UDCard -Style @{ backgroundColor = '#f5f5f5'; marginTop = '12px'; marginBottom = '12px' } -Content {
+                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                    New-UDProgress -Circular -Size 'small'
+                    New-UDTypography -Text $Text -Variant 'body2'
+                }
+            }
+        }
+
+        function New-CIEMSuccessContent {
+            param(
+                [string]$Text = 'Complete!',
+                [string]$Details,
+                [scriptblock]$ActionButton
+            )
+            New-UDCard -Style @{ backgroundColor = '#e8f5e9'; marginTop = '12px'; marginBottom = '12px' } -Content {
+                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                    New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
+                    New-UDElement -Tag 'div' -Content {
+                        New-UDTypography -Text $Text -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#2e7d32' }
+                        if ($Details) {
+                            New-UDTypography -Text $Details -Variant 'body2' -Style @{ color = '#666' }
+                        }
+                    }
+                }
+                if ($ActionButton) {
+                    & $ActionButton
+                }
+            }
+        }
+
+        function New-CIEMErrorContent {
+            param(
+                [string]$Text = 'Failed',
+                [string]$Details
+            )
+            New-UDCard -Style @{ backgroundColor = '#ffebee'; marginTop = '12px'; marginBottom = '12px' } -Content {
+                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                    New-UDIcon -Icon 'TimesCircle' -Size 'lg' -Style @{ color = '#f44336' }
+                    New-UDElement -Tag 'div' -Content {
+                        New-UDTypography -Text $Text -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#c62828' }
+                        if ($Details) {
+                            New-UDTypography -Text $Details -Variant 'body2' -Style @{ color = '#666' }
+                        }
+                    }
+                }
+            }
+        }
+
         # Helper function to create navigation items
         function New-CIEMNavigation {
             @(
@@ -128,21 +181,67 @@ function New-DevolutionsCIEMApp {
             param($Navigation, $SampleFindings)
 
             New-UDPage -Name 'Dashboard' -Url '/ciem' -Content {
-                $Findings = $SampleFindings
-                $FailedFindings = $Findings | Where-Object { $_.Status -eq 'FAIL' }
-                $PassedFindings = $Findings | Where-Object { $_.Status -eq 'PASS' }
-                $CriticalCount = ($FailedFindings | Where-Object { $_.Severity -eq 'CRITICAL' }).Count
-                $HighCount = ($FailedFindings | Where-Object { $_.Severity -eq 'HIGH' }).Count
-                $MediumCount = ($FailedFindings | Where-Object { $_.Severity -eq 'MEDIUM' }).Count
-                $LowCount = ($FailedFindings | Where-Object { $_.Severity -eq 'LOW' }).Count
+                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
 
-                New-UDTypography -Text 'Devolutions CIEM Dashboard' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
-                New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Security Findings Overview' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
+                # Use real scan data if available, otherwise sample data
+                $usingSampleData = $false
+                if ($Session:CIEMFindings -and $Session:CIEMFindings.Count -gt 0) {
+                    # Enrich real findings with metadata for display
+                    $checkMetadata = Get-CIEMCheck
+                    $checkLookup = @{}
+                    foreach ($check in $checkMetadata) {
+                        $checkLookup[$check.id] = $check
+                    }
+
+                    $Findings = $Session:CIEMFindings | ForEach-Object {
+                        $finding = $_
+                        $meta = $checkLookup[$finding.CheckId]
+                        [PSCustomObject]@{
+                            Id = $finding.CheckId
+                            CheckId = $finding.CheckId
+                            Title = if ($meta) { $meta.title } else { $finding.CheckId }
+                            Severity = ($finding.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                            Status = $finding.Status
+                            Provider = 'Azure'
+                            Service = if ($meta) { $meta.service } else { 'Unknown' }
+                            ResourceName = $finding.ResourceName
+                        }
+                    }
+                }
+                else {
+                    $Findings = $SampleFindings
+                    $usingSampleData = $true
+                }
+
+                $FailedFindings = @($Findings | Where-Object { $_.Status -eq 'FAIL' })
+                $PassedFindings = @($Findings | Where-Object { $_.Status -eq 'PASS' })
+                $CriticalCount = @($FailedFindings | Where-Object { $_.Severity.ToUpper() -eq 'CRITICAL' }).Count
+                $HighCount = @($FailedFindings | Where-Object { $_.Severity.ToUpper() -eq 'HIGH' }).Count
+                $MediumCount = @($FailedFindings | Where-Object { $_.Severity.ToUpper() -eq 'MEDIUM' }).Count
+                $LowCount = @($FailedFindings | Where-Object { $_.Severity.ToUpper() -eq 'LOW' }).Count
+
+                New-UDTypography -Text 'Devolutions CIEM Dashboard' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
+
+                # Show data source and scan info
+                if ($usingSampleData) {
+                    New-UDAlert -Severity 'info' -Text 'Showing sample data. Run a scan from the Scan page to see real findings.' -Dense -Style @{ marginBottom = '20px' }
+                }
+                else {
+                    $timestampStr = if ($Session:CIEMScanTimestamp) { $Session:CIEMScanTimestamp.ToString('yyyy-MM-dd HH:mm:ss') } else { 'Unknown' }
+                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Style @{ marginBottom = '20px' } -Content {
+                        New-UDChip -Label "Last Scan: $timestampStr" -Icon (New-UDIcon -Icon 'Clock') -Size 'small' -Style @{ backgroundColor = '#e3f2fd' }
+                        New-UDButton -Text 'Run New Scan' -Variant 'outlined' -Size 'small' -OnClick {
+                            Invoke-UDRedirect '/ciem/scan'
+                        }
+                    }
+                }
+
+                New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Security Findings Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
                 New-UDGrid -Container -Content {
                     New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
                         New-UDCard -Title 'Total Findings' -Content {
-                            New-UDTypography -Text $Findings.Count -Variant 'h3' -Style @{ color = '#1976d2'; textAlign = 'center' }
+                            New-UDTypography -Text @($Findings).Count -Variant 'h3' -Style @{ color = '#1976d2'; textAlign = 'center' }
                         } -Style @{ textAlign = 'center' }
                     }
                     New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
@@ -191,20 +290,27 @@ function New-DevolutionsCIEMApp {
                 }
 
                 New-UDCard -Title 'Recent Critical & High Findings' -Style @{ marginTop = '20px' } -Content {
-                    $CriticalHighFindings = $FailedFindings | Where-Object { $_.Severity -in @('CRITICAL', 'HIGH') } | Select-Object -First 5
-                    if ($CriticalHighFindings.Count -gt 0) {
+                    $CriticalHighFindings = $FailedFindings | Where-Object { $_.Severity.ToUpper() -in @('CRITICAL', 'HIGH') } | Select-Object -First 5
+                    if (@($CriticalHighFindings).Count -gt 0) {
                         New-UDTable -Data $CriticalHighFindings -Columns @(
-                            New-UDTableColumn -Property 'Id' -Title 'ID'
+                            New-UDTableColumn -Property 'CheckId' -Title 'Check ID'
                             New-UDTableColumn -Property 'Title' -Title 'Finding'
                             New-UDTableColumn -Property 'Severity' -Title 'Severity' -Render {
-                                $color = switch ($EventData.Severity) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } default { '#666' } }
-                                New-UDChip -Label $EventData.Severity -Style @{ backgroundColor = $color; color = 'white' }
+                                $sev = $EventData.Severity.ToUpper()
+                                $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } default { '#666' } }
+                                New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                             }
                             New-UDTableColumn -Property 'Service' -Title 'Service'
                             New-UDTableColumn -Property 'ResourceName' -Title 'Resource'
                         )
+                        New-UDButton -Text 'View All Findings' -Variant 'outlined' -OnClick {
+                            Invoke-UDRedirect '/ciem/findings'
+                        } -Style @{ marginTop = '12px' }
                     } else {
-                        New-UDTypography -Text 'No critical or high severity findings!' -Style @{ padding = '20px'; color = '#4caf50' }
+                        New-UDStack -Direction 'column' -AlignItems 'center' -Content {
+                            New-UDIcon -Icon 'CheckCircle' -Size '3x' -Style @{ color = '#4caf50'; marginBottom = '12px' }
+                            New-UDTypography -Text 'No critical or high severity findings!' -Style @{ color = '#4caf50' }
+                        } -Style @{ padding = '20px' }
                     }
                 }
             } -Navigation $Navigation -NavigationLayout permanent
@@ -215,55 +321,218 @@ function New-DevolutionsCIEMApp {
             param($Navigation, $SampleFindings)
 
             New-UDPage -Name 'Findings' -Url '/ciem/findings' -Content {
-                New-UDTypography -Text 'Security Findings' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
-                New-UDTypography -Text 'Detailed view of all CIEM security findings' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
+                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
+                # Check for real scan data from session, fall back to sample data
+                $usingSampleData = $false
+                $scanTimestamp = $null
+
+                if ($Session:CIEMFindings -and $Session:CIEMFindings.Count -gt 0) {
+                    # Use real scan findings - enrich with check metadata
+                    $checkMetadata = Get-CIEMCheck
+                    $checkLookup = @{}
+                    foreach ($check in $checkMetadata) {
+                        $checkLookup[$check.id] = $check
+                    }
+
+                    $Findings = $Session:CIEMFindings | ForEach-Object {
+                        $finding = $_
+                        $meta = $checkLookup[$finding.CheckId]
+                        [PSCustomObject]@{
+                            Id = $finding.CheckId
+                            CheckId = $finding.CheckId
+                            Title = if ($meta) { $meta.title } else { $finding.CheckId }
+                            Severity = ($finding.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })  # Capitalize
+                            Status = $finding.Status
+                            Provider = 'Azure'
+                            Service = if ($meta) { $meta.service } else { 'Unknown' }
+                            ResourceId = $finding.ResourceId
+                            ResourceName = $finding.ResourceName
+                            Location = $finding.Location
+                            Description = if ($meta) { $meta.description } else { $finding.StatusExtended }
+                            StatusExtended = $finding.StatusExtended
+                            Remediation = if ($meta -and $meta.remediation) { $meta.remediation.text } else { 'See Devolutions PAM for remediation guidance.' }
+                            RemediationUrl = if ($meta -and $meta.remediation) { $meta.remediation.url } else { 'https://devolutions.net/pam' }
+                            RelatedUrl = if ($meta) { $meta.relatedUrl } else { $null }
+                        }
+                    }
+
+                    # Apply filter for passed checks
+                    if (-not $Session:CIEMIncludePassed) {
+                        $Findings = $Findings | Where-Object { $_.Status -ne 'PASS' }
+                    }
+
+                    $scanTimestamp = $Session:CIEMScanTimestamp
+                }
+                else {
+                    # No real scan data - use sample data
+                    $Findings = $SampleFindings
+                    $usingSampleData = $true
+                }
+
+                New-UDTypography -Text 'Security Findings' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
+
+                # Show data source indicator
+                if ($usingSampleData) {
+                    New-UDAlert -Severity 'info' -Text 'Showing sample data. Run a scan from the Scan page to see real findings.' -Dense -Style @{ marginBottom = '20px' }
+                }
+                else {
+                    $timestampStr = if ($scanTimestamp) { $scanTimestamp.ToString('yyyy-MM-dd HH:mm:ss') } else { 'Unknown' }
+                    $failedCount = @($Findings | Where-Object { $_.Status -eq 'FAIL' }).Count
+                    $passedCount = @($Findings | Where-Object { $_.Status -eq 'PASS' }).Count
+                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Style @{ marginBottom = '20px' } -Content {
+                        New-UDChip -Label "Last Scan: $timestampStr" -Icon (New-UDIcon -Icon 'Clock') -Size 'small' -Style @{ backgroundColor = '#e3f2fd' }
+                        New-UDChip -Label "Failed: $failedCount" -Size 'small' -Style @{ backgroundColor = '#ffebee'; color = '#c62828' }
+                        New-UDChip -Label "Passed: $passedCount" -Size 'small' -Style @{ backgroundColor = '#e8f5e9'; color = '#2e7d32' }
+                        New-UDButton -Text 'New Scan' -Variant 'outlined' -Size 'small' -OnClick {
+                            Invoke-UDRedirect '/ciem/scan'
+                        }
+                    }
+                }
 
                 New-UDDataGrid -LoadRows {
-                    $Data = $SampleFindings | ForEach-Object {
-                        @{ id = $_.Id; checkId = $_.CheckId; title = $_.Title; severity = $_.Severity; status = $_.Status
-                           provider = $_.Provider; service = $_.Service; resourceName = $_.ResourceName
-                           description = $_.Description; remediation = $_.Remediation }
+                    # Re-load findings inside LoadRows to access current session state
+                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
+                    if ($Session:CIEMFindings -and $Session:CIEMFindings.Count -gt 0) {
+                        $checkMetadata = Get-CIEMCheck
+                        $checkLookup = @{}
+                        foreach ($check in $checkMetadata) {
+                            $checkLookup[$check.id] = $check
+                        }
+
+                        $loadedFindings = $Session:CIEMFindings | ForEach-Object {
+                            $finding = $_
+                            $meta = $checkLookup[$finding.CheckId]
+                            @{
+                                id = $finding.CheckId + '_' + ($finding.ResourceId -replace '[^\w]', '_')
+                                checkId = $finding.CheckId
+                                title = if ($meta) { $meta.title } else { $finding.CheckId }
+                                severity = ($finding.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                status = $finding.Status
+                                provider = 'Azure'
+                                service = if ($meta) { $meta.service } else { 'Unknown' }
+                                resourceId = $finding.ResourceId
+                                resourceName = $finding.ResourceName
+                                location = $finding.Location
+                                description = if ($meta) { $meta.description } else { $finding.StatusExtended }
+                                statusExtended = $finding.StatusExtended
+                                remediation = if ($meta -and $meta.remediation) { $meta.remediation.text } else { 'See Devolutions PAM for remediation guidance.' }
+                                relatedUrl = if ($meta) { $meta.relatedUrl } else { $null }
+                            }
+                        }
+
+                        if (-not $Session:CIEMIncludePassed) {
+                            $loadedFindings = $loadedFindings | Where-Object { $_.status -ne 'PASS' }
+                        }
+
+                        $Data = @($loadedFindings)
                     }
+                    else {
+                        $Data = $SampleFindings | ForEach-Object {
+                            @{ id = $_.Id; checkId = $_.CheckId; title = $_.Title; severity = $_.Severity; status = $_.Status
+                               provider = $_.Provider; service = $_.Service; resourceName = $_.ResourceName; resourceId = $_.ResourceId
+                               description = $_.Description; remediation = $_.Remediation; statusExtended = $_.Description }
+                        }
+                    }
+
                     $Data | Out-UDDataGridData -Context $EventData -TotalRows $Data.Count
                 } -Columns @(
-                    New-UDDataGridColumn -Field 'id' -HeaderName 'ID' -Width 120
+                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 200
                     New-UDDataGridColumn -Field 'title' -HeaderName 'Finding' -Flex 1
-                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 120 -Render {
-                        $color = switch ($EventData.severity) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } 'INFO' { '#4caf50' } default { '#666' } }
-                        New-UDChip -Label $EventData.severity -Style @{ backgroundColor = $color; color = 'white' }
+                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
+                        $sev = $EventData.severity.ToUpper()
+                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } 'INFO' { '#4caf50' } default { '#666' } }
+                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                     }
                     New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 100 -Render {
-                        $color = if ($EventData.status -eq 'FAIL') { '#f44336' } else { '#4caf50' }
+                        $statusColors = @{ 'FAIL' = '#f44336'; 'PASS' = '#4caf50'; 'MANUAL' = '#ff9800'; 'SKIPPED' = '#9e9e9e' }
+                        $color = $statusColors[$EventData.status]
+                        if (-not $color) { $color = '#666' }
                         New-UDChip -Label $EventData.status -Style @{ backgroundColor = $color; color = 'white' }
                     }
-                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 120
-                    New-UDDataGridColumn -Field 'resourceName' -HeaderName 'Resource' -Width 150
-                ) -AutoHeight $true -Pagination -ShowQuickFilter -LoadDetailContent {
+                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
+                    New-UDDataGridColumn -Field 'resourceName' -HeaderName 'Resource' -Width 180
+                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
                     New-UDCard -Content {
-                        New-UDTypography -Text "Description" -Variant 'h6'
+                        New-UDTypography -Text "Check Details" -Variant 'h6' -Style @{ marginBottom = '12px' }
+
+                        New-UDGrid -Container -Spacing 2 -Content {
+                            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                New-UDTypography -Text "Resource ID" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
+                                New-UDTypography -Text $EventData.row.resourceId -Variant 'body2' -Style @{ wordBreak = 'break-all'; marginBottom = '12px' }
+                            }
+                            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                New-UDTypography -Text "Location" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
+                                New-UDTypography -Text $(if ($EventData.row.location) { $EventData.row.location } else { 'N/A' }) -Variant 'body2' -Style @{ marginBottom = '12px' }
+                            }
+                        }
+
+                        New-UDTypography -Text "Status Details" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
+                        New-UDTypography -Text $EventData.row.statusExtended -Style @{ marginBottom = '15px'; backgroundColor = '#f5f5f5'; padding = '8px'; borderRadius = '4px' }
+
+                        New-UDTypography -Text "Description" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
                         New-UDTypography -Text $EventData.row.description -Style @{ marginBottom = '15px' }
-                        New-UDTypography -Text "Remediation" -Variant 'h6'
+
+                        New-UDTypography -Text "Remediation" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
                         New-UDTypography -Text $EventData.row.remediation -Style @{ marginBottom = '15px' }
-                        New-UDButton -Text 'View in Devolutions PAM' -Variant 'contained' -OnClick {
-                            Show-UDToast -Message 'Redirecting to Devolutions PAM for remediation...' -Duration 3000
+
+                        New-UDStack -Direction 'row' -Spacing 2 -Content {
+                            New-UDButton -Text 'View in Devolutions PAM' -Variant 'contained' -OnClick {
+                                Show-UDToast -Message 'Redirecting to Devolutions PAM for remediation...' -Duration 3000
+                            }
+                            if ($EventData.row.relatedUrl) {
+                                New-UDButton -Text 'Microsoft Docs' -Variant 'outlined' -Href $EventData.row.relatedUrl -OpenInNewWindow
+                            }
                         }
                     }
                 } -OnExport {
+                    # Re-fetch findings for export
+                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
+                    if ($Session:CIEMFindings -and $Session:CIEMFindings.Count -gt 0) {
+                        $checkMetadata = Get-CIEMCheck
+                        $checkLookup = @{}
+                        foreach ($check in $checkMetadata) {
+                            $checkLookup[$check.id] = $check
+                        }
+
+                        $exportFindings = $Session:CIEMFindings | ForEach-Object {
+                            $finding = $_
+                            $meta = $checkLookup[$finding.CheckId]
+                            [PSCustomObject]@{
+                                CheckId = $finding.CheckId
+                                Title = if ($meta) { $meta.title } else { $finding.CheckId }
+                                Severity = $finding.Severity
+                                Status = $finding.Status
+                                Provider = 'Azure'
+                                Service = if ($meta) { $meta.service } else { 'Unknown' }
+                                ResourceId = $finding.ResourceId
+                                ResourceName = $finding.ResourceName
+                                Location = $finding.Location
+                                StatusExtended = $finding.StatusExtended
+                                Description = if ($meta) { $meta.description } else { $finding.StatusExtended }
+                                Remediation = if ($meta -and $meta.remediation) { $meta.remediation.text } else { 'See Devolutions PAM.' }
+                            }
+                        }
+                    }
+                    else {
+                        $exportFindings = $SampleFindings
+                    }
+
                     if ($EventData.Type -eq 'JSON') {
                         # Build hierarchical structure: providers -> services -> findings
                         $providers = @{}
-                        $severityCounts = @{ CRITICAL = 0; HIGH = 0; MEDIUM = 0; LOW = 0; INFO = 0 }
+                        $severityCounts = @{ critical = 0; high = 0; medium = 0; low = 0 }
 
-                        foreach ($finding in $SampleFindings) {
+                        foreach ($finding in $exportFindings) {
                             $provider = $finding.Provider
                             $service = $finding.Service
 
-                            # Initialize provider if not exists
                             if (-not $providers.ContainsKey($provider)) {
                                 $providers[$provider] = @{}
                             }
 
-                            # Initialize service if not exists
                             if (-not $providers[$provider].ContainsKey($service)) {
                                 $providers[$provider][$service] = @{
                                     findings = @()
@@ -271,19 +540,17 @@ function New-DevolutionsCIEMApp {
                                 }
                             }
 
-                            # Add finding to service
                             $providers[$provider][$service].findings += @{
-                                id = $finding.Id
                                 checkId = $finding.CheckId
                                 title = $finding.Title
                                 severity = $finding.Severity
                                 status = $finding.Status
+                                resourceId = $finding.ResourceId
                                 resourceName = $finding.ResourceName
-                                description = $finding.Description
-                                remediation = $finding.Remediation
+                                location = $finding.Location
+                                statusExtended = $finding.StatusExtended
                             }
 
-                            # Update service summary
                             $providers[$provider][$service].summary.total++
                             if ($finding.Status -eq 'FAIL') {
                                 $providers[$provider][$service].summary.failed++
@@ -291,17 +558,17 @@ function New-DevolutionsCIEMApp {
                                 $providers[$provider][$service].summary.passed++
                             }
 
-                            # Update severity counts
-                            if ($severityCounts.ContainsKey($finding.Severity)) {
-                                $severityCounts[$finding.Severity]++
+                            $sevKey = $finding.Severity.ToLower()
+                            if ($severityCounts.ContainsKey($sevKey)) {
+                                $severityCounts[$sevKey]++
                             }
                         }
 
-                        # Build final export structure
                         $ExportData = @{
                             metadata = @{
                                 exportedAt = (Get-Date).ToString('o')
-                                totalFindings = $SampleFindings.Count
+                                scanTimestamp = if ($Session:CIEMScanTimestamp) { $Session:CIEMScanTimestamp.ToString('o') } else { $null }
+                                totalFindings = @($exportFindings).Count
                                 summary = $severityCounts
                             }
                             providers = $providers
@@ -311,19 +578,18 @@ function New-DevolutionsCIEMApp {
                         Out-UDDataGridExport -Data $JsonContent -FileName 'ciem-findings.json'
                     }
                     elseif ($EventData.Type -eq 'CSV') {
-                        # CSV remains flat for spreadsheet compatibility
-                        $CsvData = $SampleFindings | ForEach-Object {
+                        $CsvData = $exportFindings | ForEach-Object {
                             @{
-                                id = $_.Id
-                                checkId = $_.CheckId
-                                title = $_.Title
-                                severity = $_.Severity
-                                status = $_.Status
-                                provider = $_.Provider
-                                service = $_.Service
-                                resourceName = $_.ResourceName
-                                description = $_.Description
-                                remediation = $_.Remediation
+                                CheckId = $_.CheckId
+                                Title = $_.Title
+                                Severity = $_.Severity
+                                Status = $_.Status
+                                Provider = $_.Provider
+                                Service = $_.Service
+                                ResourceId = $_.ResourceId
+                                ResourceName = $_.ResourceName
+                                Location = $_.Location
+                                StatusExtended = $_.StatusExtended
                             }
                         }
                         $CsvContent = $CsvData | ConvertTo-Csv -NoTypeInformation | Out-String
@@ -338,46 +604,333 @@ function New-DevolutionsCIEMApp {
             param($Navigation)
 
             New-UDPage -Name 'Scan' -Url '/ciem/scan' -Content {
+                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
                 New-UDTypography -Text 'Run CIEM Scan' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
                 New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
+                # Authentication Status Card
+                New-UDCard -Title 'Authentication Status' -Style @{ marginBottom = '20px' } -Content {
+                    New-UDDynamic -Id 'authStatusPanel' -Content {
+                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                        try {
+                            # Check current auth status using Test-CIEMAuthenticated (reads Az context)
+                            $authStatus = Test-CIEMAuthenticated -Provider Azure
+
+                            # Auto-connect if not authenticated but credentials are configured
+                            if (-not $authStatus.Authenticated) {
+                                $config = Get-CIEMConfig
+                                $authMethod = $config.azure.authentication.method
+                                $hasCredentials = $false
+
+                                # Check if credentials are configured based on auth method
+                                switch ($authMethod) {
+                                    'ServicePrincipalSecret' {
+                                        $tenantId = $config.azure.authentication.tenantId
+                                        $clientId = $config.azure.authentication.servicePrincipal.clientId
+                                        $clientSecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
+                                        $hasCredentials = $tenantId -and $clientId -and $clientSecret
+                                    }
+                                    'ServicePrincipalCertificate' {
+                                        $tenantId = $config.azure.authentication.tenantId
+                                        $clientId = $config.azure.authentication.servicePrincipal.clientId
+                                        $thumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
+                                        $hasCredentials = $tenantId -and $clientId -and $thumbprint
+                                    }
+                                    'ManagedIdentity' {
+                                        # Managed identity doesn't need explicit credentials
+                                        $hasCredentials = $true
+                                    }
+                                }
+
+                                if ($hasCredentials) {
+                                    Write-CIEMLog -Message "Auto-connecting on scan page load (method: $authMethod)" -Severity INFO -Component 'PSU-ScanPage'
+                                    try {
+                                        $connectResult = Connect-CIEM -Provider Azure
+                                        $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
+                                        if ($connectAzure.Status -eq 'Connected') {
+                                            # Re-check auth status after connect
+                                            $authStatus = Test-CIEMAuthenticated -Provider Azure
+                                            Write-CIEMLog -Message "Auto-connect successful: $($authStatus.Account)" -Severity INFO -Component 'PSU-ScanPage'
+                                        }
+                                    }
+                                    catch {
+                                        Write-CIEMLog -Message "Auto-connect failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                                    }
+                                }
+                            }
+
+                            if ($authStatus.Authenticated) {
+                                $accountInfo = $authStatus.Account
+                                $tenantInfo = $authStatus.TenantId
+
+                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                    New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
+                                    New-UDElement -Tag 'div' -Content {
+                                        New-UDTypography -Text 'Connected to Azure' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#4caf50' }
+                                        New-UDTypography -Text "Account: $accountInfo" -Variant 'body2' -Style @{ color = '#666' }
+                                        New-UDTypography -Text "Tenant: $tenantInfo" -Variant 'caption' -Style @{ color = '#999' }
+                                    }
+                                }
+                            }
+                            else {
+                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                    New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
+                                    New-UDElement -Tag 'div' -Content {
+                                        New-UDTypography -Text 'Not Connected' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#ff9800' }
+                                        New-UDTypography -Text 'Configure authentication on the Configuration page, then refresh.' -Variant 'body2' -Style @{ color = '#666' }
+                                    }
+                                }
+                            }
+                        }
+                        catch {
+                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                New-UDIcon -Icon 'TimesCircle' -Size 'lg' -Style @{ color = '#f44336' }
+                                New-UDTypography -Text "Error checking auth: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#f44336' }
+                            }
+                        }
+                    }
+
+                    New-UDButton -Id 'refreshStatusBtn' -Text 'Refresh Status' -Variant 'text' -Size 'small' -ShowLoading -OnClick {
+                        Sync-UDElement -Id 'authStatusPanel'
+                    } -Style @{ marginTop = '8px' }
+                }
+
+                # Scan Configuration Card
                 New-UDCard -Title 'Scan Configuration' -Content {
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDSelect -Id 'provider' -Label 'Cloud Provider' -Option {
-                            New-UDSelectOption -Name 'Azure' -Value 'azure'
-                            New-UDSelectOption -Name 'AWS' -Value 'aws'
-                        } -DefaultValue 'azure' -FullWidth
-                    } -Attributes @{ style = @{ marginBottom = '16px'; marginTop = '16px' } }
+                    # Load available checks to show counts
+                    $allChecks = Get-CIEMCheck
+                    $entraCount = @($allChecks | Where-Object { $_.service -eq 'Entra' }).Count
+                    $iamCount = @($allChecks | Where-Object { $_.service -eq 'IAM' }).Count
+                    $kvCount = @($allChecks | Where-Object { $_.service -eq 'KeyVault' }).Count
+                    $storageCount = @($allChecks | Where-Object { $_.service -eq 'Storage' }).Count
 
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDTextbox -Id 'subscriptionId' -Label 'Subscription ID (Optional)' -Placeholder 'Leave empty to scan all accessible subscriptions' -FullWidth
-                    } -Attributes @{ style = @{ marginBottom = '16px' } }
+                    New-UDTypography -Text 'Select Services to Scan' -Variant 'subtitle2' -Style @{ marginBottom = '8px'; marginTop = '8px' }
 
-                    New-UDElement -Tag 'div' -Content {
+                    New-UDGrid -Container -Spacing 2 -Content {
+                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
+                            New-UDCheckbox -Id 'scanEntra' -Label "Entra ID ($entraCount checks)" -Checked $true
+                        }
+                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
+                            New-UDCheckbox -Id 'scanIAM' -Label "IAM ($iamCount checks)" -Checked $true
+                        }
+                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
+                            New-UDCheckbox -Id 'scanKeyVault' -Label "KeyVault ($kvCount checks)" -Checked $true
+                        }
+                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
+                            New-UDCheckbox -Id 'scanStorage' -Label "Storage ($storageCount checks)" -Checked $true
+                        }
+                    }
+
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px'; marginBottom = '16px' } } -Content {
                         New-UDCheckbox -Id 'includePassedChecks' -Label 'Include Passed Checks in Results' -Checked $true
-                    } -Attributes @{ style = @{ marginBottom = '16px' } }
+                    }
 
-                    New-UDButton -Text 'Start Scan' -Variant 'contained' -Color 'primary' -OnClick {
-                        $Provider = (Get-UDElement -Id 'provider').value
-                        Show-UDToast -Message "Scan initiated for $Provider provider..." -Duration 5000
-                        Show-UDToast -Message "PoC Mode: Displaying sample findings data" -Duration 5000 -BackgroundColor '#ff9800'
-                        Start-Sleep -Seconds 2
-                        Invoke-UDRedirect '/ciem/findings'
+                    # Scan Progress Area - stores scan state and results
+                    New-UDElement -Tag 'div' -Id 'scanProgressArea' -Content {
+                        # Initially empty - populated during scan via Set-UDElement
+                    }
+
+                    # Action Buttons
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px' } } -Content {
+                        New-UDButton -Id 'startScanBtn' -Text 'Start Scan' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
+                            try {
+                                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
+
+                                # Connect to Azure (handles all auth internally)
+                                Write-CIEMLog -Message "Connecting to Azure..." -Severity INFO -Component 'PSU-ScanPage'
+                                $connectResult = Connect-CIEM -Provider Azure -Force
+                                $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
+
+                                if ($connectAzure.Status -ne 'Connected') {
+                                    Write-CIEMLog -Message "Connect failed: $($connectAzure.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                                    Show-UDToast -Message "Connection failed: $($connectAzure.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                    Sync-UDElement -Id 'authStatusPanel'
+                                    return
+                                }
+                                Write-CIEMLog -Message "Connected: $($connectAzure.Account)" -Severity INFO -Component 'PSU-ScanPage'
+                                Sync-UDElement -Id 'authStatusPanel'
+
+                                # Get selected services
+                                $selectedServices = @()
+                                if ((Get-UDElement -Id 'scanEntra').checked) { $selectedServices += 'Entra' }
+                                if ((Get-UDElement -Id 'scanIAM').checked) { $selectedServices += 'IAM' }
+                                if ((Get-UDElement -Id 'scanKeyVault').checked) { $selectedServices += 'KeyVault' }
+                                if ((Get-UDElement -Id 'scanStorage').checked) { $selectedServices += 'Storage' }
+
+                                if ($selectedServices.Count -eq 0) {
+                                    Show-UDToast -Message 'Please select at least one service to scan.' -Duration 5000 -BackgroundColor '#ff9800'
+                                    return
+                                }
+
+                                $includePassedChecks = (Get-UDElement -Id 'includePassedChecks').checked
+                                Write-CIEMLog -Message "Scan config: Services=$($selectedServices -join ','), IncludePassed=$includePassedChecks" -Severity INFO -Component 'PSU-ScanPage'
+
+                                # Show progress area
+                                Set-UDElement -Id 'scanProgressArea' -Content {
+                                    New-UDCard -Style @{ backgroundColor = '#f5f5f5'; marginTop = '16px'; marginBottom = '16px' } -Content {
+                                        New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                            New-UDProgress -Circular -Size 'small'
+                                            New-UDTypography -Id 'scanStatusText' -Text 'Initializing scan...' -Variant 'body1'
+                                        }
+                                    }
+                                }
+
+                                # Disable scan button
+                                Set-UDElement -Id 'startScanBtn' -Properties @{ disabled = $true }
+
+                                $scanStart = Get-Date
+
+                                # Update status
+                                Set-UDElement -Id 'scanStatusText' -Properties @{ children = "Scanning $($selectedServices.Count) services..." }
+                                Show-UDToast -Message "Starting CIEM scan for: $($selectedServices -join ', ')" -Duration 3000
+
+                                # Run the actual scan
+                                Write-CIEMLog -Message "Calling Invoke-CIEMScan..." -Severity INFO -Component 'PSU-ScanPage'
+                                try {
+                                    $findings = Invoke-CIEMScan -Provider Azure -Service $selectedServices -Verbose 4>&1 | ForEach-Object {
+                                        if ($_ -is [System.Management.Automation.VerboseRecord]) {
+                                            Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-ScanPage'
+                                        }
+                                        else {
+                                            $_ # Pass through findings
+                                        }
+                                    }
+
+                                    $scanEnd = Get-Date
+                                    $duration = $scanEnd - $scanStart
+                                    $durationStr = if ($duration.TotalMinutes -ge 1) {
+                                        "{0:N0}m {1:N0}s" -f [Math]::Floor($duration.TotalMinutes), ($duration.Seconds)
+                                    } else {
+                                        "{0:N0}s" -f $duration.TotalSeconds
+                                    }
+
+                                    Write-CIEMLog -Message "Scan complete. Findings: $(@($findings).Count), Duration: $durationStr" -Severity INFO -Component 'PSU-ScanPage'
+
+                                    # Process results
+                                    $allFindings = @($findings)
+                                    $failedFindings = @($allFindings | Where-Object { $_.Status -eq 'FAIL' })
+                                    $passedFindings = @($allFindings | Where-Object { $_.Status -eq 'PASS' })
+                                    $skippedFindings = @($allFindings | Where-Object { $_.Status -eq 'SKIPPED' })
+
+                                    # Store findings in session for the findings page
+                                    $Session:CIEMFindings = $allFindings
+                                    $Session:CIEMScanTimestamp = $scanEnd
+                                    $Session:CIEMIncludePassed = $includePassedChecks
+
+                                    # Store scan in history (PSU cache)
+                                    try {
+                                        $scanHistoryKey = 'CIEM:ScanHistory'
+                                        $existingHistory = Get-PSUCache -Key $scanHistoryKey -ErrorAction SilentlyContinue
+                                        if (-not $existingHistory) { $existingHistory = @() }
+
+                                        $scanRecord = @{
+                                            Id = [guid]::NewGuid().ToString()
+                                            Date = $scanEnd.ToString('o')
+                                            Provider = 'Azure'
+                                            Services = $selectedServices
+                                            TotalFindings = $allFindings.Count
+                                            FailedFindings = $failedFindings.Count
+                                            PassedFindings = $passedFindings.Count
+                                            SkippedFindings = $skippedFindings.Count
+                                            Duration = $durationStr
+                                        }
+
+                                        # Keep last 10 scans
+                                        $existingHistory = @($scanRecord) + @($existingHistory) | Select-Object -First 10
+                                        Set-PSUCache -Key $scanHistoryKey -Value $existingHistory -ErrorAction SilentlyContinue
+                                    }
+                                    catch {
+                                        Write-CIEMLog -Message "Failed to save scan history: $($_.Exception.Message)" -Severity WARNING -Component 'PSU-ScanPage'
+                                    }
+
+                                    # Update progress area with results summary
+                                    Set-UDElement -Id 'scanProgressArea' -Content {
+                                        New-UDCard -Style @{ backgroundColor = '#e8f5e9'; marginTop = '16px'; marginBottom = '16px' } -Content {
+                                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
+                                                New-UDElement -Tag 'div' -Content {
+                                                    New-UDTypography -Text 'Scan Complete!' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#2e7d32' }
+                                                    New-UDTypography -Text "Duration: $durationStr | Total: $($allFindings.Count) | Failed: $($failedFindings.Count) | Passed: $($passedFindings.Count)" -Variant 'body2' -Style @{ color = '#666' }
+                                                }
+                                            }
+                                            New-UDButton -Text 'View Findings' -Variant 'contained' -Color 'primary' -OnClick {
+                                                Invoke-UDRedirect '/ciem/findings'
+                                            } -Style @{ marginTop = '12px' }
+                                        }
+                                    }
+
+                                    Show-UDToast -Message "Scan complete! Found $($failedFindings.Count) failed checks." -Duration 5000 -BackgroundColor '#4caf50'
+
+                                    # Refresh scan history
+                                    Sync-UDElement -Id 'scanHistoryPanel'
+                                }
+                                catch {
+                                    Write-CIEMLog -Message "Scan failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                                    Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ScanPage'
+
+                                    Set-UDElement -Id 'scanProgressArea' -Content {
+                                        New-CIEMErrorContent -Text 'Scan Failed' -Details $_.Exception.Message
+                                    }
+
+                                    Show-UDToast -Message "Scan failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                }
+                                finally {
+                                    # Re-enable scan button
+                                    Set-UDElement -Id 'startScanBtn' -Properties @{ disabled = $false }
+                                }
+                            }
+                            catch {
+                                Write-CIEMLog -Message "Scan button handler error: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                                Show-UDToast -Message "Error: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                Set-UDElement -Id 'startScanBtn' -Properties @{ disabled = $false }
+                            }
+                        }
                     }
                 }
 
+                # Scan History Card
                 New-UDCard -Title 'Recent Scan History' -Style @{ marginTop = '20px' } -Content {
-                    $ScanHistory = @(
-                        @{ Id = 1; Date = (Get-Date).AddHours(-2).ToString('yyyy-MM-dd HH:mm'); Provider = 'Azure'; Findings = 6; Duration = '45s' }
-                        @{ Id = 2; Date = (Get-Date).AddDays(-1).ToString('yyyy-MM-dd HH:mm'); Provider = 'Azure'; Findings = 8; Duration = '52s' }
-                        @{ Id = 3; Date = (Get-Date).AddDays(-3).ToString('yyyy-MM-dd HH:mm'); Provider = 'Azure'; Findings = 12; Duration = '1m 10s' }
-                    )
-                    New-UDTable -Data $ScanHistory -Columns @(
-                        New-UDTableColumn -Property 'Date' -Title 'Scan Date'
-                        New-UDTableColumn -Property 'Provider' -Title 'Provider'
-                        New-UDTableColumn -Property 'Findings' -Title 'Failed Findings'
-                        New-UDTableColumn -Property 'Duration' -Title 'Duration'
-                    )
+                    New-UDDynamic -Id 'scanHistoryPanel' -Content {
+                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                        try {
+                            $scanHistory = Get-PSUCache -Key 'CIEM:ScanHistory' -ErrorAction SilentlyContinue
+
+                            if ($scanHistory -and $scanHistory.Count -gt 0) {
+                                $historyData = $scanHistory | ForEach-Object {
+                                    @{
+                                        Date = ([datetime]$_.Date).ToString('yyyy-MM-dd HH:mm')
+                                        Provider = $_.Provider
+                                        Services = ($_.Services -join ', ')
+                                        Failed = $_.FailedFindings
+                                        Passed = $_.PassedFindings
+                                        Duration = $_.Duration
+                                    }
+                                }
+
+                                New-UDTable -Data $historyData -Columns @(
+                                    New-UDTableColumn -Property 'Date' -Title 'Scan Date'
+                                    New-UDTableColumn -Property 'Provider' -Title 'Provider'
+                                    New-UDTableColumn -Property 'Services' -Title 'Services'
+                                    New-UDTableColumn -Property 'Failed' -Title 'Failed' -Render {
+                                        $color = if ($EventData.Failed -gt 0) { '#f44336' } else { '#4caf50' }
+                                        New-UDChip -Label $EventData.Failed -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
+                                    New-UDTableColumn -Property 'Passed' -Title 'Passed' -Render {
+                                        New-UDChip -Label $EventData.Passed -Size 'small' -Style @{ backgroundColor = '#4caf50'; color = 'white' }
+                                    }
+                                    New-UDTableColumn -Property 'Duration' -Title 'Duration'
+                                ) -Dense
+                            }
+                            else {
+                                New-UDTypography -Text 'No scan history available. Run your first scan above!' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic'; padding = '16px' }
+                            }
+                        }
+                        catch {
+                            New-UDTypography -Text 'Unable to load scan history.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic'; padding = '16px' }
+                        }
+                    }
                 }
             } -Navigation $Navigation -NavigationLayout permanent
         }
@@ -402,13 +955,12 @@ function New-DevolutionsCIEMApp {
                 # Store original auth values in session state for change detection on save
                 # Only initialize on first page load (not on dynamic refreshes)
                 if (-not $Session:OriginalAuthValues) {
-                    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
                     $Session:OriginalAuthValues = @{
                         Provider = $currentProvider
                         Method = if ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
-                        TenantId = if ($inPSUContext) { $Secret:CIEM_Azure_TenantId } else { $null }
-                        ClientId = if ($inPSUContext) { $Secret:CIEM_Azure_ClientId } else { $null }
-                        CertThumbprint = if ($inPSUContext) { $Secret:CIEM_Azure_CertThumbprint } else { $null }
+                        TenantId = Get-CIEMSecret 'CIEM_Azure_TenantId'
+                        ClientId = Get-CIEMSecret 'CIEM_Azure_ClientId'
+                        CertThumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
                     }
                 }
 
@@ -513,13 +1065,11 @@ function New-DevolutionsCIEMApp {
                             CertPasswordExists = $false
                             ManagedIdentityClientId = $null
                         }
-                        if ($inPSUContext) {
-                            # Only secrets come from PSU secrets (not TenantId/ClientId which are in cache)
-                            $storedCreds.ClientSecretExists = -not [string]::IsNullOrEmpty($Secret:CIEM_Azure_ClientSecret)
-                            $storedCreds.CertThumbprint = $Secret:CIEM_Azure_CertThumbprint
-                            $storedCreds.CertPasswordExists = -not [string]::IsNullOrEmpty($Secret:CIEM_Azure_CertPassword)
-                            $storedCreds.ManagedIdentityClientId = $Secret:CIEM_Azure_ManagedIdentityClientId
-                        }
+                        # Only secrets come from PSU secrets (not TenantId/ClientId which are in cache)
+                        $storedCreds.ClientSecretExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_Azure_ClientSecret'))
+                        $storedCreds.CertThumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
+                        $storedCreds.CertPasswordExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_Azure_CertPassword'))
+                        $storedCreds.ManagedIdentityClientId = Get-CIEMSecret 'CIEM_Azure_ManagedIdentityClientId'
 
                         if ($selectedProvider -eq 'Azure') {
                             switch ($selectedMethod) {
@@ -633,62 +1183,59 @@ function New-DevolutionsCIEMApp {
                                 }
                             }
 
-                            New-UDButton -Text 'Test Authentication' -Variant 'outlined' -Color 'secondary' -OnClick {
+                            New-UDButton -Id 'testAuthBtn' -Text 'Test Authentication' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
                                 try {
                                     Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                     Write-CIEMLog -Message "Test Authentication button clicked" -Severity INFO -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message 'Testing authentication...' -Duration 2000
 
-                                    # First check if already authenticated
-                                    Write-CIEMLog -Message "Checking existing authentication..." -Severity DEBUG -Component 'PSU-ConfigPage'
-                                    $results = Test-CIEMAuthenticated
-                                    $azureResult = $results | Where-Object { $_.Provider -eq 'Azure' }
-                                    Write-CIEMLog -Message "Current auth state - Authenticated: $($azureResult.Authenticated)" -Severity DEBUG -Component 'PSU-ConfigPage'
+                                    # Show progress
+                                    Set-UDElement -Id 'testAuthProgress' -Content {
+                                        New-CIEMProgressContent -Text 'Connecting to Azure...'
+                                    }
+                                    Set-UDElement -Id 'testAuthBtn' -Properties @{ disabled = $true }
 
-                                    # If not authenticated, try to connect using saved credentials
-                                    if (-not $azureResult -or -not $azureResult.Authenticated) {
-                                        Write-CIEMLog -Message "Not authenticated - attempting Connect-CIEM..." -Severity INFO -Component 'PSU-ConfigPage'
-                                        Show-UDToast -Message 'Connecting to Azure...' -Duration 3000
-                                        try {
-                                            $connectResult = Connect-CIEM -Provider Azure -Force
-                                            $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
-                                            Write-CIEMLog -Message "Connect-CIEM result: Status=$($connectAzure.Status), Account=$($connectAzure.Account), Message=$($connectAzure.Message)" -Severity INFO -Component 'PSU-ConfigPage'
+                                    # Connect handles all auth logic internally
+                                    $connectResult = Connect-CIEM -Provider Azure -Force
+                                    $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
+                                    Write-CIEMLog -Message "Connect-CIEM result: Status=$($connectAzure.Status), Account=$($connectAzure.Account)" -Severity INFO -Component 'PSU-ConfigPage'
 
-                                            if ($connectAzure.Status -eq 'Connected') {
-                                                Write-CIEMLog -Message "Authentication test PASSED - Account: $($connectAzure.Account)" -Severity INFO -Component 'PSU-ConfigPage'
-                                                Show-UDToast -Message "Successfully connected to Azure as $($connectAzure.Account)" -Duration 5000 -BackgroundColor '#4caf50'
-                                            } else {
-                                                Write-CIEMLog -Message "Authentication FAILED: $($connectAzure.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                                Show-UDToast -Message "Authentication failed: $($connectAzure.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                                            }
-                                        } catch {
-                                            Write-CIEMLog -Message "Connect-CIEM exception: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                            Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                            Show-UDToast -Message "Authentication failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                    if ($connectAzure.Status -eq 'Connected') {
+                                        Set-UDElement -Id 'testAuthProgress' -Content {
+                                            New-CIEMSuccessContent -Text 'Authentication Successful' -Details "Connected as $($connectAzure.Account)"
                                         }
                                     } else {
-                                        # Already authenticated - show current account
-                                        $context = Get-AzContext -ErrorAction SilentlyContinue
-                                        $accountInfo = if ($context.Account) { $context.Account.Id } else { 'Unknown' }
-                                        Write-CIEMLog -Message "Already authenticated - Account: $accountInfo" -Severity INFO -Component 'PSU-ConfigPage'
-                                        Show-UDToast -Message "Already connected to Azure as $accountInfo" -Duration 5000 -BackgroundColor '#4caf50'
+                                        Write-CIEMLog -Message "Authentication FAILED: $($connectAzure.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                                        Set-UDElement -Id 'testAuthProgress' -Content {
+                                            New-CIEMErrorContent -Text 'Authentication Failed' -Details $connectAzure.Message
+                                        }
                                     }
                                 } catch {
                                     Write-CIEMLog -Message "Test Authentication exception: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                    Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message "Authentication test failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                    Set-UDElement -Id 'testAuthProgress' -Content {
+                                        New-CIEMErrorContent -Text 'Authentication Failed' -Details $_.Exception.Message
+                                    }
+                                } finally {
+                                    Set-UDElement -Id 'testAuthBtn' -Properties @{ disabled = $false }
                                 }
                             }
                         }
+                        New-UDElement -Id 'testAuthProgress' -Tag 'div'
                     } -Attributes @{ style = @{ marginTop = '16px' } }
                 }
 
                 New-UDElement -Tag 'div' -Content {
                     New-UDStack -Direction 'row' -Spacing 2 -Content {
-                        New-UDButton -Text 'Save Configuration' -Variant 'contained' -Color 'primary' -OnClick {
+                        New-UDButton -Id 'saveConfigBtn' -Text 'Save Configuration' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
                             try {
                                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                 Write-CIEMLog -Message "Save Configuration button clicked" -Severity INFO -Component 'PSU-ConfigPage'
+
+                                # Show progress
+                                Set-UDElement -Id 'saveConfigProgress' -Content {
+                                    New-CIEMProgressContent -Text 'Saving configuration...'
+                                }
+                                Set-UDElement -Id 'saveConfigBtn' -Properties @{ disabled = $true }
+
                                 $provider = (Get-UDElement -Id 'cloudProvider').value
                                 $authMethod = (Get-UDElement -Id 'authMethod').value
                                 Write-CIEMLog -Message "Form values - Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
@@ -696,7 +1243,9 @@ function New-DevolutionsCIEMApp {
                                 # Validate AWS is not selected (coming soon)
                                 if ($provider -eq 'AWS') {
                                     Write-CIEMLog -Message "AWS provider selected but not supported - rejecting" -Severity WARNING -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message 'AWS support is coming soon. Please select Azure as your cloud provider.' -Duration 5000 -BackgroundColor '#ff9800'
+                                    Set-UDElement -Id 'saveConfigProgress' -Content {
+                                        New-CIEMErrorContent -Text 'Not Supported' -Details 'AWS support is coming soon. Please select Azure as your cloud provider.'
+                                    }
                                     return
                                 }
 
@@ -705,7 +1254,9 @@ function New-DevolutionsCIEMApp {
                                 Write-CIEMLog -Message "Environment: $($envInfo.Environment), SupportsManagedIdentity: $($envInfo.SupportsManagedIdentity)" -Severity DEBUG -Component 'PSU-ConfigPage'
                                 if ($authMethod -eq 'ManagedIdentity' -and -not $envInfo.SupportsManagedIdentity) {
                                     Write-CIEMLog -Message "ManagedIdentity selected but not supported in this environment" -Severity WARNING -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message 'Managed Identity is not available in on-premises deployments. Please choose a different authentication method.' -Duration 8000 -BackgroundColor '#f44336'
+                                    Set-UDElement -Id 'saveConfigProgress' -Content {
+                                        New-CIEMErrorContent -Text 'Not Available' -Details 'Managed Identity is not available in on-premises deployments.'
+                                    }
                                     return
                                 }
 
@@ -774,7 +1325,6 @@ function New-DevolutionsCIEMApp {
                                     Write-CIEMLog -Message "Secrets saved: $($secretsCreated -join ', ')" -Severity INFO -Component 'PSU-ConfigPage'
                                 } elseif (-not $inPSUContext -and $credentials.Count -gt 0) {
                                     Write-CIEMLog -Message "Not in PSU context - credentials not saved" -Severity WARNING -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message 'Not running in PSU context. ClientSecret was not saved (requires PSU secret storage).' -Duration 8000 -BackgroundColor '#ff9800'
                                 }
 
                                 # Save non-sensitive config to PSU cache and update in-memory config
@@ -810,14 +1360,18 @@ function New-DevolutionsCIEMApp {
                                 Write-CIEMLog -Message "Auth changed: $authChanged, Provider: $provider" -Severity INFO -Component 'PSU-ConfigPage'
                                 if ($authChanged -and $provider -eq 'Azure') {
                                     Write-CIEMLog -Message "Auth settings changed - initiating Connect-CIEM..." -Severity INFO -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message 'Authentication settings changed. Testing connection...' -Duration 3000
+                                    Set-UDElement -Id 'saveConfigProgress' -Content {
+                                        New-CIEMProgressContent -Text 'Testing authentication...'
+                                    }
                                     try {
                                         # Config already updated by Save-CIEMConfig above
                                         $result = Connect-CIEM -Provider Azure -Force
                                         $azureResult = $result.Providers | Where-Object { $_.Provider -eq 'Azure' }
                                         Write-CIEMLog -Message "Connect-CIEM result: Status=$($azureResult.Status), Account=$($azureResult.Account), Message=$($azureResult.Message)" -Severity INFO -Component 'PSU-ConfigPage'
                                         if ($azureResult.Status -eq 'Connected') {
-                                            Show-UDToast -Message "Configuration saved and authentication successful! Connected as $($azureResult.Account)" -Duration 5000 -BackgroundColor '#4caf50'
+                                            Set-UDElement -Id 'saveConfigProgress' -Content {
+                                                New-CIEMSuccessContent -Text 'Configuration Saved' -Details "Connected as $($azureResult.Account)"
+                                            }
                                             # Update session state with new values
                                             $Session:OriginalAuthValues = @{
                                                 Provider = $provider
@@ -829,37 +1383,67 @@ function New-DevolutionsCIEMApp {
                                             Write-CIEMLog -Message "Session:OriginalAuthValues updated" -Severity DEBUG -Component 'PSU-ConfigPage'
                                         } else {
                                             Write-CIEMLog -Message "Authentication failed: $($azureResult.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                            Show-UDToast -Message "Configuration saved but authentication failed: $($azureResult.Message)" -Duration 8000 -BackgroundColor '#ff9800'
+                                            Set-UDElement -Id 'saveConfigProgress' -Content {
+                                                New-UDCard -Style @{ backgroundColor = '#fff3e0'; marginTop = '12px'; marginBottom = '12px' } -Content {
+                                                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                        New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
+                                                        New-UDElement -Tag 'div' -Content {
+                                                            New-UDTypography -Text 'Configuration Saved (Auth Failed)' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#e65100' }
+                                                            New-UDTypography -Text $azureResult.Message -Variant 'body2' -Style @{ color = '#666' }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     } catch {
                                         Write-CIEMLog -Message "Connect-CIEM exception: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
                                         Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                        Show-UDToast -Message "Configuration saved but authentication test failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#ff9800'
+                                        Set-UDElement -Id 'saveConfigProgress' -Content {
+                                            New-UDCard -Style @{ backgroundColor = '#fff3e0'; marginTop = '12px'; marginBottom = '12px' } -Content {
+                                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                    New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
+                                                    New-UDElement -Tag 'div' -Content {
+                                                        New-UDTypography -Text 'Configuration Saved (Auth Failed)' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#e65100' }
+                                                        New-UDTypography -Text $_.Exception.Message -Variant 'body2' -Style @{ color = '#666' }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 } else {
                                     Write-CIEMLog -Message "No auth change detected or not Azure - skipping Connect-CIEM" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                    Show-UDToast -Message 'Configuration saved successfully!' -Duration 5000 -BackgroundColor '#4caf50'
+                                    Set-UDElement -Id 'saveConfigProgress' -Content {
+                                        New-CIEMSuccessContent -Text 'Configuration Saved'
+                                    }
                                 }
                                 Write-CIEMLog -Message "Save Configuration completed successfully" -Severity INFO -Component 'PSU-ConfigPage'
                             } catch {
                                 Write-CIEMLog -Message "Save Configuration failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
                                 Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                Show-UDToast -Message "Failed to save configuration: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                Set-UDElement -Id 'saveConfigProgress' -Content {
+                                    New-CIEMErrorContent -Text 'Save Failed' -Details $_.Exception.Message
+                                }
+                            } finally {
+                                Set-UDElement -Id 'saveConfigBtn' -Properties @{ disabled = $false }
                             }
                         }
 
-                        New-UDButton -Text 'Reset to Defaults' -Variant 'outlined' -Color 'secondary' -OnClick {
+                        New-UDButton -Id 'resetConfigBtn' -Text 'Reset to Defaults' -Variant 'outlined' -Color 'secondary' -OnClick {
                             try {
                                 Set-UDElement -Id 'cloudProvider' -Properties @{ value = 'Azure' }
                                 Set-UDElement -Id 'authMethod' -Properties @{ value = 'ServicePrincipalSecret' }
                                 Sync-UDElement -Id 'authMethodContainer'
                                 Sync-UDElement -Id 'authFieldsContainer'
+                                # Clear any previous progress messages
+                                Set-UDElement -Id 'saveConfigProgress' -Content { }
+                                Set-UDElement -Id 'testAuthProgress' -Content { }
                                 Show-UDToast -Message 'Form reset to default values. Click Save to apply.' -Duration 5000 -BackgroundColor '#ff9800'
                             } catch {
                                 Show-UDToast -Message "Failed to reset: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
                             }
                         }
                     }
+                    New-UDElement -Id 'saveConfigProgress' -Tag 'div'
                 } -Attributes @{ style = @{ marginTop = '24px' } }
             } -Navigation $Navigation -NavigationLayout permanent
         }
