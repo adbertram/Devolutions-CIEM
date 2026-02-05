@@ -11,9 +11,9 @@
 #   - App configuration - Settings and container config
 #
 # After downloading, search the file locally with grep:
-#   grep -i "CIEM" psu-logs.log
-#   grep -i "error" psu-logs.log
-#   grep -i "VNETFailure" psu-logs.log
+#   grep -i "CIEM" _temp/psu-logs.log
+#   grep -i "error" _temp/psu-logs.log
+#   grep -i "VNETFailure" _temp/psu-logs.log
 
 set -euo pipefail
 
@@ -30,9 +30,12 @@ RESOURCE_GROUP="${RESOURCE_GROUP:-devolutions-ciem-rg}"
 SITE_NAME="${SITE_NAME:-devolutions-ciem-psu}"
 PSU_URL="${PSU_URL:-https://${SITE_NAME}.azurewebsites.net}"
 
-# Output file (default: timestamped filename)
+# Output file (default: _temp/ with timestamped filename)
+PROJECT_ROOT="$SCRIPT_DIR/.."
+TEMP_DIR="$PROJECT_ROOT/_temp"
+mkdir -p "$TEMP_DIR"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-OUTPUT_FILE="${1:-psu-logs-${TIMESTAMP}.log}"
+OUTPUT_FILE="${1:-${TEMP_DIR}/psu-logs-${TIMESTAMP}.log}"
 
 echo "Downloading PSU logs to: $OUTPUT_FILE" >&2
 
@@ -267,7 +270,8 @@ get_kudu_credentials
 LINE_COUNT=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
 echo "Done. Downloaded $LINE_COUNT lines to: $OUTPUT_FILE" >&2
 echo "" >&2
+DISPLAY_PATH=$(python3 -c "import os,sys; print(os.path.relpath(sys.argv[1]))" "$OUTPUT_FILE" 2>/dev/null || echo "$OUTPUT_FILE")
 echo "Search examples:" >&2
-echo "  grep -i 'error' $OUTPUT_FILE" >&2
-echo "  grep -i 'VNETFailure' $OUTPUT_FILE" >&2
-echo "  grep -i 'CIEM' $OUTPUT_FILE" >&2
+echo "  grep -i 'error' $DISPLAY_PATH" >&2
+echo "  grep -i 'VNETFailure' $DISPLAY_PATH" >&2
+echo "  grep -i 'CIEM' $DISPLAY_PATH" >&2

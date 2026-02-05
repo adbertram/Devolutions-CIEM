@@ -73,8 +73,13 @@ foreach ($import in @($Classes + $Private + $Checks + $Public)) {
 }
 
 # Export public functions
+# Parse each public file to find all function definitions and export them
 foreach ($file in $Public) {
-    Export-ModuleMember -Function $file.BaseName
+    $content = Get-Content -Path $file.FullName -Raw
+    $functionNames = [regex]::Matches($content, '(?m)^function\s+([A-Za-z0-9-]+)') | ForEach-Object { $_.Groups[1].Value }
+    foreach ($funcName in $functionNames) {
+        Export-ModuleMember -Function $funcName
+    }
 }
 
 # Initialize configuration from PSU cache (or defaults if not in PSU)

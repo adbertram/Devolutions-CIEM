@@ -16,77 +16,9 @@ function New-DevolutionsCIEMApp {
     param()
 
     begin {
-        # Helper function to get severity color
-        function Get-SeverityColor {
-            param([string]$Severity)
-            switch ($Severity) {
-                'CRITICAL' { '#9c27b0' }
-                'HIGH' { '#f44336' }
-                'MEDIUM' { '#ff9800' }
-                'LOW' { '#2196f3' }
-                'INFO' { '#4caf50' }
-                default { '#666' }
-            }
-        }
-
-        # Helper function to get status color
-        function Get-StatusColor {
-            param([string]$Status)
-            if ($Status -eq 'FAIL') { '#f44336' } else { '#4caf50' }
-        }
-
-        # Helper functions for async button progress states
-        function New-CIEMProgressContent {
-            param(
-                [string]$Text = 'Processing...'
-            )
-            New-UDCard -Style @{ backgroundColor = '#f5f5f5'; marginTop = '12px'; marginBottom = '12px' } -Content {
-                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                    New-UDProgress -Circular -Size 'small'
-                    New-UDTypography -Text $Text -Variant 'body2'
-                }
-            }
-        }
-
-        function New-CIEMSuccessContent {
-            param(
-                [string]$Text = 'Complete!',
-                [string]$Details,
-                [scriptblock]$ActionButton
-            )
-            New-UDCard -Style @{ backgroundColor = '#e8f5e9'; marginTop = '12px'; marginBottom = '12px' } -Content {
-                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                    New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDTypography -Text $Text -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#2e7d32' }
-                        if ($Details) {
-                            New-UDTypography -Text $Details -Variant 'body2' -Style @{ color = '#666' }
-                        }
-                    }
-                }
-                if ($ActionButton) {
-                    & $ActionButton
-                }
-            }
-        }
-
-        function New-CIEMErrorContent {
-            param(
-                [string]$Text = 'Failed',
-                [string]$Details
-            )
-            New-UDCard -Style @{ backgroundColor = '#ffebee'; marginTop = '12px'; marginBottom = '12px' } -Content {
-                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                    New-UDIcon -Icon 'TimesCircle' -Size 'lg' -Style @{ color = '#f44336' }
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDTypography -Text $Text -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#c62828' }
-                        if ($Details) {
-                            New-UDTypography -Text $Details -Variant 'body2' -Style @{ color = '#666' }
-                        }
-                    }
-                }
-            }
-        }
+        # UI helper functions (Get-SeverityColor, Get-StatusColor, New-CIEMProgressContent,
+        # New-CIEMSuccessContent, New-CIEMErrorContent) are in Private/New-CIEMUIContent.ps1
+        # They must be module-level functions to be accessible in PSU page scopes.
 
         # Helper function to create navigation items
         function New-CIEMNavigation {
@@ -282,7 +214,12 @@ function New-DevolutionsCIEMApp {
 
                 # Authentication Status Card
                 New-UDCard -Title 'Authentication Status' -Style @{ marginBottom = '20px' } -Content {
-                    New-UDDynamic -Id 'authStatusPanel' -Content {
+                    New-UDDynamic -Id 'authStatusPanel' -LoadingComponent {
+                        New-UDElement -Tag 'div' -Content {
+                            New-UDProgress -Circular
+                            New-UDTypography -Text 'Checking authentication status...' -Variant 'body2' -Style @{ marginTop = '10px'; color = '#666' }
+                        } -Attributes @{ style = @{ display = 'flex'; flexDirection = 'column'; alignItems = 'center'; padding = '30px' } }
+                    } -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         try {
                             # Check current auth status using Test-CIEMAuthenticated (reads Az context)
@@ -535,12 +472,7 @@ function New-DevolutionsCIEMApp {
                 New-UDCard -Title 'Scan History & Results' -Style @{ marginTop = '20px' } -Content {
                     New-UDTypography -Text 'Click on a scan to expand and view detailed results' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '12px' }
 
-                    New-UDDynamic -Id 'scanHistoryPanel' -LoadingComponent {
-                        New-UDElement -Tag 'div' -Content {
-                            New-UDProgress -Circular
-                            New-UDTypography -Text 'Loading scan history...' -Variant 'body2' -Style @{ marginTop = '10px'; color = '#666' }
-                        } -Attributes @{ style = @{ display = 'flex'; flexDirection = 'column'; alignItems = 'center'; padding = '30px' } }
-                    } -Content {
+                    New-UDDynamic -Id 'scanHistoryPanel' -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         try {
                             $scanRuns = @(Get-CIEMScanRun)
@@ -580,7 +512,56 @@ function New-DevolutionsCIEMApp {
                                         New-UDChip -Label $EventData.passed -Size 'small' -Style @{ backgroundColor = '#4caf50'; color = 'white' }
                                     }
                                     New-UDDataGridColumn -Field 'duration' -HeaderName 'Duration' -Width 100
-                                ) -AutoHeight $true -Pagination -PageSize 10 -LoadDetailContent {
+                                ) -AutoHeight $true -Pagination -PageSize 10 -ExportOptions @('CSV', 'JSON') -OnExport {
+                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                    $runs = @(Get-CIEMScanRun -IncludeResults)
+
+                                    if ($EventData.Type -eq 'CSV') {
+                                        $csvData = $runs | ForEach-Object {
+                                            [PSCustomObject]@{
+                                                Id        = $_.Id
+                                                Provider  = $_.Provider
+                                                Services  = ($_.Services -join ', ')
+                                                Status    = $_.Status.ToString()
+                                                StartTime = $_.StartTime.ToString('yyyy-MM-dd HH:mm:ss')
+                                                EndTime   = if ($_.EndTime) { $_.EndTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+                                                Duration  = $_.Duration
+                                                Failed    = $_.FailedResults
+                                                Passed    = $_.PassedResults
+                                            }
+                                        }
+                                        $exportContent = $csvData | ConvertTo-Csv -NoTypeInformation | Out-String
+                                        Out-UDDataGridExport -Data $exportContent -FileName "ciem-scans-$(Get-Date -Format 'yyyyMMdd-HHmmss').csv"
+                                    }
+                                    elseif ($EventData.Type -eq 'JSON') {
+                                        $jsonData = $runs | ForEach-Object {
+                                            [ordered]@{
+                                                id           = $_.Id
+                                                provider     = $_.Provider
+                                                services     = $_.Services
+                                                status       = $_.Status.ToString()
+                                                startTime    = $_.StartTime.ToString('o')
+                                                endTime      = if ($_.EndTime) { $_.EndTime.ToString('o') } else { $null }
+                                                duration     = $_.Duration
+                                                failedCount  = $_.FailedResults
+                                                passedCount  = $_.PassedResults
+                                                scan_results = @($_.ScanResults | ForEach-Object {
+                                                    [ordered]@{
+                                                        checkId        = $_.CheckId
+                                                        status         = $_.Status
+                                                        severity       = $_.Severity
+                                                        resourceId     = $_.ResourceId
+                                                        resourceName   = $_.ResourceName
+                                                        location       = $_.Location
+                                                        statusExtended = $_.StatusExtended
+                                                    }
+                                                })
+                                            }
+                                        }
+                                        $exportContent = $jsonData | ConvertTo-Json -Depth 10
+                                        Out-UDDataGridExport -Data $exportContent -FileName "ciem-scans-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
+                                    }
+                                } -LoadDetailContent {
                                     # Load scan results for this specific scan run
                                     Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                     $scanRunId = $EventData.row.id
@@ -635,7 +616,10 @@ function New-DevolutionsCIEMApp {
                                                 }
 
                                                 # Results DataGrid - use pre-loaded data from parent scope
-                                                New-UDDataGrid -Data $enrichedResults -Columns @(
+                                                $resultsData = $enrichedResults
+                                                New-UDDataGrid -LoadRows {
+                                                    $resultsData | Out-UDDataGridData -Context $EventData -TotalRows @($resultsData).Count
+                                                } -Columns @(
                                                     New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 200
                                                     New-UDDataGridColumn -Field 'title' -HeaderName 'Finding' -Flex 1
                                                     New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
@@ -651,40 +635,7 @@ function New-DevolutionsCIEMApp {
                                                     }
                                                     New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
                                                     New-UDDataGridColumn -Field 'resourceName' -HeaderName 'Resource' -Width 180
-                                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
-                                                    New-UDCard -Content {
-                                                        New-UDTypography -Text "Check Details" -Variant 'h6' -Style @{ marginBottom = '12px' }
-
-                                                        New-UDGrid -Container -Spacing 2 -Content {
-                                                            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                                                New-UDTypography -Text "Resource ID" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
-                                                                New-UDTypography -Text $EventData.row.resourceId -Variant 'body2' -Style @{ wordBreak = 'break-all'; marginBottom = '12px' }
-                                                            }
-                                                            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                                                New-UDTypography -Text "Location" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
-                                                                New-UDTypography -Text $(if ($EventData.row.location) { $EventData.row.location } else { 'N/A' }) -Variant 'body2' -Style @{ marginBottom = '12px' }
-                                                            }
-                                                        }
-
-                                                        New-UDTypography -Text "Status Details" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
-                                                        New-UDTypography -Text $EventData.row.statusExtended -Style @{ marginBottom = '15px'; backgroundColor = '#f5f5f5'; padding = '8px'; borderRadius = '4px' }
-
-                                                        New-UDTypography -Text "Description" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
-                                                        New-UDTypography -Text $EventData.row.description -Style @{ marginBottom = '15px' }
-
-                                                        New-UDTypography -Text "Remediation" -Variant 'subtitle2' -Style @{ fontWeight = 'bold' }
-                                                        New-UDTypography -Text $EventData.row.remediation -Style @{ marginBottom = '15px' }
-
-                                                        New-UDStack -Direction 'row' -Spacing 2 -Content {
-                                                            New-UDButton -Text 'View in Devolutions PAM' -Variant 'contained' -OnClick {
-                                                                Show-UDToast -Message 'Redirecting to Devolutions PAM for remediation...' -Duration 3000
-                                                            }
-                                                            if ($EventData.row.relatedUrl) {
-                                                                New-UDButton -Text 'Microsoft Docs' -Variant 'outlined' -Href $EventData.row.relatedUrl -OpenInNewWindow
-                                                            }
-                                                        }
-                                                    }
-                                                }
+                                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
                                             }
                                         }
                                         else {

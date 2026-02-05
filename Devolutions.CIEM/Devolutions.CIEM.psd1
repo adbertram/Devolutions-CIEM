@@ -12,7 +12,7 @@
 RootModule = 'Devolutions.CIEM.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.2.105'
+ModuleVersion = '0.3.6'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Core'
@@ -154,7 +154,8 @@ FileList = '.universal\dashboards.ps1', 'AzureChecks.json',
                'Private/Test-EntraAuthorizationPolicyBooleanSetting.ps1', 
                'Private/Test-GitRemote.ps1', 
                'Private/Test-KeyVaultItemExpiration.ps1', 
-               'Private/Test-StorageAccountProperty.ps1', 
+               'Private/Test-StorageAccountProperty.ps1',
+               'Public/New-CIEMUIContent.ps1',
                'Public/Write-CIEMLog.ps1', 'Public/New-DevolutionsCIEMApp.ps1', 
                'Public/Connect-CIEM.ps1', 
                'Public/Get-CIEMAuthenticationContext.ps1', 
