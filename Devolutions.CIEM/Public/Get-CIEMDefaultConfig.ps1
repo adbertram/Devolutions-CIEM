@@ -53,6 +53,7 @@ function Get-CIEMDefaultConfig {
         output = [PSCustomObject]@{
             verboseLogging = $false
         }
+        checksPath = 'Checks'
         pam = [PSCustomObject]@{
             remediationUrl = 'https://devolutions.net/pam'
         }
