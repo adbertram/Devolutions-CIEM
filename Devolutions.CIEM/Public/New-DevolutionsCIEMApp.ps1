@@ -1174,75 +1174,125 @@ function New-DevolutionsCIEMApp {
                 New-UDCard -Title 'Sync Checks from Prowler' -Style @{ marginBottom = '20px' } -Content {
                     New-UDTypography -Text 'Download new security checks from the upstream Prowler GitHub repository. Existing checks are skipped.' -Variant 'body2' -Style @{ color = '#666'; marginBottom = '16px' }
 
-                    New-UDElement -Tag 'div' -Id 'syncProgressArea' -Content {
-                        # Initially empty - populated during sync via Set-UDElement
-                    }
+                    # Filter checkboxes row
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; alignItems = 'center'; gap = '24px'; marginBottom = '16px'; flexWrap = 'wrap' } } -Content {
+                        # Sync button
+                        New-UDButton -Id 'syncChecksBtn' -Text 'Sync Checks' -Variant 'contained' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -ShowLoading -OnClick {
+                            try {
+                                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                Write-CIEMLog -Message "Sync Checks button clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
 
-                    New-UDButton -Id 'syncChecksBtn' -Text 'Sync Checks' -Variant 'contained' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -ShowLoading -OnClick {
-                        try {
-                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                            Write-CIEMLog -Message "Sync Checks button clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
+                                # Read checkbox states
+                                $selectedProviders = @()
+                                if ((Get-UDElement -Id 'chkAzure').checked) { $selectedProviders += 'azure' }
+                                if ((Get-UDElement -Id 'chkAWS').checked) { $selectedProviders += 'aws' }
 
-                            # Show progress
-                            Set-UDElement -Id 'syncProgressArea' -Content {
-                                New-CIEMProgressContent -Text 'Syncing checks from Prowler GitHub repository...'
-                            }
-                            Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $true }
+                                $selectedServices = @()
+                                if ((Get-UDElement -Id 'chkEntra').checked) { $selectedServices += 'entra' }
+                                if ((Get-UDElement -Id 'chkIAM').checked) { $selectedServices += 'iam' }
+                                if ((Get-UDElement -Id 'chkKeyVault').checked) { $selectedServices += 'keyvault' }
+                                if ((Get-UDElement -Id 'chkStorage').checked) { $selectedServices += 'storage' }
 
-                            # Run sync
-                            $syncResult = Sync-ProwlerCheck -Verbose 4>&1 | ForEach-Object {
-                                if ($_ -is [System.Management.Automation.VerboseRecord]) {
-                                    Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-CloudChecksPage'
+                                if ($selectedProviders.Count -eq 0) {
+                                    Show-UDToast -Message 'Select at least one provider.' -Duration 4000 -BackgroundColor '#ff9800'
+                                    return
+                                }
+                                if ($selectedServices.Count -eq 0) {
+                                    Show-UDToast -Message 'Select at least one service.' -Duration 4000 -BackgroundColor '#ff9800'
+                                    return
+                                }
+
+                                # Show progress
+                                Set-UDElement -Id 'syncProgressArea' -Content {
+                                    New-CIEMProgressContent -Text "Syncing checks (Providers: $($selectedProviders -join ', ') | Services: $($selectedServices -join ', '))..."
+                                }
+                                Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $true }
+
+                                # Run sync for each provider/service combination
+                                $allSuccess = [System.Collections.Generic.List[string]]::new()
+                                $allSkipped = [System.Collections.Generic.List[string]]::new()
+                                $allFailed = [System.Collections.Generic.List[string]]::new()
+
+                                foreach ($provider in $selectedProviders) {
+                                    foreach ($service in $selectedServices) {
+                                        try {
+                                            $syncResult = Sync-ProwlerCheck -Provider $provider -Service $service -Verbose 4>&1 | ForEach-Object {
+                                                if ($_ -is [System.Management.Automation.VerboseRecord]) {
+                                                    Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-CloudChecksPage'
+                                                }
+                                                else { $_ }
+                                            }
+                                            if ($syncResult.Success) { $allSuccess.AddRange(@($syncResult.Success)) }
+                                            if ($syncResult.Skipped) { $allSkipped.AddRange(@($syncResult.Skipped)) }
+                                            if ($syncResult.Failed) { $allFailed.AddRange(@($syncResult.Failed)) }
+                                        }
+                                        catch {
+                                            Write-CIEMLog -Message "Sync failed for $provider/$service : $($_.Exception.Message)" -Severity WARN -Component 'PSU-CloudChecksPage'
+                                        }
+                                    }
+                                }
+
+                                $successCount = $allSuccess.Count
+                                $skippedCount = $allSkipped.Count
+                                $failedCount = $allFailed.Count
+
+                                Write-CIEMLog -Message "Sync complete. Downloaded=$successCount, Skipped=$skippedCount, Failed=$failedCount" -Severity INFO -Component 'PSU-CloudChecksPage'
+
+                                if ($successCount -gt 0) {
+                                    $detailParts = @("Downloaded: $successCount")
+                                    if ($skippedCount -gt 0) { $detailParts += "Already existed: $skippedCount" }
+                                    if ($failedCount -gt 0) { $detailParts += "Failed: $failedCount" }
+                                    $detailText = $detailParts -join ' | '
+
+                                    Set-UDElement -Id 'syncProgressArea' -Content {
+                                        New-CIEMSuccessContent -Text 'Sync Complete' -Details $detailText
+                                    }
+
+                                    Show-UDToast -Message "Synced $successCount new check(s) from Prowler." -Duration 5000 -BackgroundColor '#4caf50'
+                                    Sync-UDElement -Id 'checksTablePanel'
+                                }
+                                elseif ($failedCount -gt 0) {
+                                    Set-UDElement -Id 'syncProgressArea' -Content {
+                                        New-CIEMErrorContent -Text 'Sync Failed' -Details "$failedCount check(s) failed to download. Skipped: $skippedCount"
+                                    }
                                 }
                                 else {
-                                    $_ # Pass through result object
+                                    Set-UDElement -Id 'syncProgressArea' -Content {
+                                        New-CIEMSuccessContent -Text 'Already Up to Date' -Details "All $skippedCount upstream check(s) already exist locally."
+                                    }
                                 }
                             }
-
-                            $successCount = @($syncResult.Success).Count
-                            $skippedCount = @($syncResult.Skipped).Count
-                            $failedCount = @($syncResult.Failed).Count
-
-                            Write-CIEMLog -Message "Sync complete. Downloaded=$successCount, Skipped=$skippedCount, Failed=$failedCount" -Severity INFO -Component 'PSU-CloudChecksPage'
-
-                            if ($successCount -gt 0) {
-                                $detailParts = @("Downloaded: $successCount")
-                                if ($skippedCount -gt 0) { $detailParts += "Already existed: $skippedCount" }
-                                if ($failedCount -gt 0) { $detailParts += "Failed: $failedCount" }
-                                $detailText = $detailParts -join ' | '
-
+                            catch {
+                                Write-CIEMLog -Message "Sync failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
                                 Set-UDElement -Id 'syncProgressArea' -Content {
-                                    New-CIEMSuccessContent -Text 'Sync Complete' -Details $detailText
+                                    New-CIEMErrorContent -Text 'Sync Failed' -Details $_.Exception.Message
                                 }
-
-                                Show-UDToast -Message "Synced $successCount new check(s) from Prowler." -Duration 5000 -BackgroundColor '#4caf50'
-
-                                # Refresh the checks table
-                                Sync-UDElement -Id 'checksTablePanel'
+                                Show-UDToast -Message "Sync failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
                             }
-                            elseif ($failedCount -gt 0) {
-                                Set-UDElement -Id 'syncProgressArea' -Content {
-                                    New-CIEMErrorContent -Text 'Sync Failed' -Details "$failedCount check(s) failed to download. Skipped: $skippedCount"
-                                }
-                            }
-                            else {
-                                Set-UDElement -Id 'syncProgressArea' -Content {
-                                    New-CIEMSuccessContent -Text 'Already Up to Date' -Details "All $skippedCount upstream check(s) already exist locally."
-                                }
+                            finally {
+                                Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $false }
                             }
                         }
-                        catch {
-                            Write-CIEMLog -Message "Sync failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
 
-                            Set-UDElement -Id 'syncProgressArea' -Content {
-                                New-CIEMErrorContent -Text 'Sync Failed' -Details $_.Exception.Message
-                            }
+                        # Provider checkboxes
+                        New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; alignItems = 'center'; gap = '4px' } } -Content {
+                            New-UDTypography -Text 'Providers:' -Variant 'body2' -Style @{ fontWeight = 'bold'; marginRight = '4px' }
+                            New-UDCheckBox -Id 'chkAzure' -Label 'Azure' -Checked $true
+                            New-UDCheckBox -Id 'chkAWS' -Label 'AWS' -Checked $true
+                        }
 
-                            Show-UDToast -Message "Sync failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                        # Service checkboxes
+                        New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; alignItems = 'center'; gap = '4px' } } -Content {
+                            New-UDTypography -Text 'Services:' -Variant 'body2' -Style @{ fontWeight = 'bold'; marginRight = '4px' }
+                            New-UDCheckBox -Id 'chkEntra' -Label 'Entra' -Checked $true
+                            New-UDCheckBox -Id 'chkIAM' -Label 'IAM' -Checked $true
+                            New-UDCheckBox -Id 'chkKeyVault' -Label 'KeyVault' -Checked $true
+                            New-UDCheckBox -Id 'chkStorage' -Label 'Storage' -Checked $true
                         }
-                        finally {
-                            Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $false }
-                        }
+                    }
+
+                    New-UDElement -Tag 'div' -Id 'syncProgressArea' -Content {
+                        # Initially empty - populated during sync via Set-UDElement
                     }
                 }
 
