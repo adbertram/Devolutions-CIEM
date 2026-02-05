@@ -10,17 +10,17 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
         The setting is found in the GroupSettings collection under the template
         'Group.Unified' with the name 'EnableGroupCreation'.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraUsersCannotCreateMicrosoft365Groups -CheckMetadata $metadata
+        Test-EntraUsersCannotCreateMicrosoft365Groups -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -62,5 +62,5 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
         }
     }
 
-    [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $resourceName)
+    [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $resourceName)
 }

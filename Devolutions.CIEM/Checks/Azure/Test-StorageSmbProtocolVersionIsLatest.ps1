@@ -7,8 +7,8 @@ function Test-StorageSmbProtocolVersionIsLatest {
         Ensures that SMB file shares are configured to use only the latest
         SMB protocol version (SMB 3.1.1) for security.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageSmbProtocolVersionIsLatest {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -92,7 +92,7 @@ function Test-StorageSmbProtocolVersionIsLatest {
                 }
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

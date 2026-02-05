@@ -7,8 +7,8 @@ function Test-StorageCrossTenantReplicationDisabled {
         Ensures that cross-tenant replication is not enabled on Azure Storage Accounts
         to prevent unintended replication of data across tenant boundaries.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageCrossTenantReplicationDisabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -48,7 +48,7 @@ function Test-StorageCrossTenantReplicationDisabled {
                 $statusExtended = "Storage account '$accountName' allows cross-tenant replication. Disable cross-tenant replication to prevent data leakage across tenant boundaries."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

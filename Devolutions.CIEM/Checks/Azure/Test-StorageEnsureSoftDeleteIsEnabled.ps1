@@ -7,8 +7,8 @@ function Test-StorageEnsureSoftDeleteIsEnabled {
         Ensures that soft delete is enabled for both blobs and containers
         to protect against accidental data loss.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageEnsureSoftDeleteIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -102,7 +102,7 @@ function Test-StorageEnsureSoftDeleteIsEnabled {
                 }
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

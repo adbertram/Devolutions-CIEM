@@ -8,21 +8,21 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
         'defaultUserRolePermissions.allowedToCreateSecurityGroups' is set to false,
         restricting security group creation to administrators only.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraPolicyDefaultUsersCannotCreateSecurityGroups -CheckMetadata $metadata
+        Test-EntraPolicyDefaultUsersCannotCreateSecurityGroups -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyName  = 'allowedToCreateSecurityGroups'
         PassMessage   = 'Users are restricted from creating security groups in Azure portals, API or PowerShell'
         FailMessage   = 'Users can create security groups in Azure portals, API or PowerShell. This should be restricted to administrators only.'

@@ -7,8 +7,8 @@ function Test-StorageKeyRotation90Day {
         Ensures that Storage Account Access Keys are periodically regenerated
         to reduce the risk of unauthorized access from exposed keys.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageKeyRotation90Day {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     # Prowler checks the key_expiration_period_in_days policy setting
@@ -53,7 +53,7 @@ function Test-StorageKeyRotation90Day {
                 $statusExtended = "Storage account $accountName has a key expiration period of $keyExpirationPeriod days."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

@@ -215,21 +215,21 @@ function $FunctionName {
     .DESCRIPTION
         $($Metadata.Description -replace "`n", "`n        ")
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]`$CheckMetadata
+        [CIEMCheck]`$Check
     )
 
     `$ErrorActionPreference = 'Stop'
 
     # TODO: Implement check logic based on Prowler check: $($Metadata.CheckID)
 
-    [CIEMScanResult]::Create(`$CheckMetadata, 'MANUAL', 'This check requires manual implementation. See Prowler check $($Metadata.CheckID) for reference.', 'N/A', '$($Metadata.ServiceName) Resources')
+    [CIEMScanResult]::Create(`$Check, 'MANUAL', 'This check requires manual implementation. See Prowler check $($Metadata.CheckID) for reference.', 'N/A', '$($Metadata.ServiceName) Resources')
 }
 "@
         $scriptContent

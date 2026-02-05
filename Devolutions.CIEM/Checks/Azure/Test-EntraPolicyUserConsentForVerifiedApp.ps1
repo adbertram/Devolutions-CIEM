@@ -8,17 +8,17 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
         consent policy 'ManagePermissionGrantsForSelf.microsoft-user-default-legacy'
         which would allow users to consent to any application.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraPolicyUserConsentForVerifiedApps -CheckMetadata $metadata
+        Test-EntraPolicyUserConsentForVerifiedApps -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -26,7 +26,7 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve authorization policy - missing permissions',
             'N/A',
@@ -72,6 +72,6 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
             }
         }
 
-        [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $authPolicy.id, 'Authorization Policy')
+        [CIEMScanResult]::Create($Check, $status, $statusExtended, $authPolicy.id, 'Authorization Policy')
     }
 }

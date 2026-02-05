@@ -8,21 +8,21 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
         'defaultUserRolePermissions.allowedToCreateTenants' is set to false,
         preventing non-admin users from creating new Azure AD or Azure AD B2C tenants.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraPolicyEnsureDefaultUserCannotCreateTenants -CheckMetadata $metadata
+        Test-EntraPolicyEnsureDefaultUserCannotCreateTenants -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyName  = 'allowedToCreateTenants'
         PassMessage   = 'Non-admin users are restricted from creating new tenants'
         FailMessage   = 'Non-admin users can create new tenants. This should be restricted to administrators only.'

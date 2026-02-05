@@ -7,8 +7,8 @@ function Test-StorageSecureTransferRequiredIsEnabled {
         Ensures that all data transferred between clients and Azure Storage
         accounts is encrypted using the HTTPS protocol.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,11 +17,11 @@ function Test-StorageSecureTransferRequiredIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyPath  = 'properties.supportsHttpsTrafficOnly'
         ExpectedValue = $true
         PassMessage   = "Storage account '{0}' requires secure transfer (HTTPS only)."

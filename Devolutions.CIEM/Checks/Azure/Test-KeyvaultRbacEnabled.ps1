@@ -8,8 +8,8 @@ function Test-KeyvaultRbacEnabled {
         instead of vault access policies. RBAC provides finer-grained access control
         and enables Privileged Identity Management (PIM) for just-in-time access.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -18,7 +18,7 @@ function Test-KeyvaultRbacEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -43,7 +43,7 @@ function Test-KeyvaultRbacEnabled {
                 "Vault '$($vault.name)' uses vault access policies instead of RBAC. Consider enabling RBAC for finer-grained access control and PIM integration."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $message, $vault.id, $vault.name, $vault.location)
+            [CIEMScanResult]::Create($Check, $status, $message, $vault.id, $vault.name, $vault.location)
         }
     }
 }

@@ -14,17 +14,17 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
         - adminsGuestInvitersAndAllMembers: All members and above
         - everyone: Anyone including guests
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraPolicyGuestInviteOnlyForAdminRoles -CheckMetadata $metadata
+        Test-EntraPolicyGuestInviteOnlyForAdminRoles -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -32,7 +32,7 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve authorization policy - missing permissions',
             'N/A',
@@ -56,7 +56,7 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
 
         if ($allowInvitesFrom -in $acceptableValues) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "Guest invite restrictions are properly configured. Current setting: '$allowInvitesFrom' - only users with admin roles can invite guest users.",
                 $authPolicy.id,
@@ -65,7 +65,7 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
         }
         else {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'FAIL',
                 "Guest invite restrictions are too permissive. Current setting: '$allowInvitesFrom'. Should be 'adminsAndGuestInviters' or 'none' to restrict guest invitations to admin roles only.",
                 $authPolicy.id,

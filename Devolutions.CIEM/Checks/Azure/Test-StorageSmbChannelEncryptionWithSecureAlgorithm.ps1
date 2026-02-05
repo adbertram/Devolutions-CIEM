@@ -7,8 +7,8 @@ function Test-StorageSmbChannelEncryptionWithSecureAlgorithm {
         Ensures that SMB channel encryption for file shares uses secure algorithms
         like AES-256-GCM for data confidentiality and integrity in transit.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageSmbChannelEncryptionWithSecureAlgorithm {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -82,7 +82,7 @@ function Test-StorageSmbChannelEncryptionWithSecureAlgorithm {
                 }
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

@@ -7,8 +7,8 @@ function Test-StorageInfrastructureEncryptionIsEnabled {
         Ensures that 'Enable Infrastructure Encryption' is set to 'enabled'
         for Azure Storage accounts to provide double encryption protection.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,11 +17,11 @@ function Test-StorageInfrastructureEncryptionIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyPath  = 'properties.encryption.requireInfrastructureEncryption'
         ExpectedValue = $true
         PassMessage   = "Storage account '{0}' has infrastructure encryption (double encryption) enabled."

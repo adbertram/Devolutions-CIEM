@@ -26,13 +26,12 @@ function Invoke-CIEMScan {
 
     .OUTPUTS
         [CIEMScanResult[]] Array of finding objects with properties:
-        - CheckId: The check identifier
+        - Check: CIEMCheck object with Id, Severity, Title, etc.
         - Status: PASS, FAIL, MANUAL, or SKIPPED
         - StatusExtended: Detailed explanation
         - ResourceId: Azure resource ID
         - ResourceName: Resource display name
         - Location: Resource location
-        - Severity: Check severity level
 
     .EXAMPLE
         $findings = Invoke-CIEMScan
@@ -119,16 +118,18 @@ function Invoke-CIEMScan {
         Write-Verbose "Initializing Storage service..."
         Initialize-StorageService -SubscriptionIds $subscriptionIds
 
-        # Step 3: Load check metadata
-        $checks = Get-CheckMetadata
+        # Step 3: Load check metadata via Get-CIEMCheck (handles filtering)
+        $getCheckParams = @{}
+        if ($CheckId -and $CheckId.Count -eq 1) { $getCheckParams.CheckId = $CheckId[0] }
+        if ($Service -and $Service.Count -eq 1) { $getCheckParams.Service = $Service[0] }
+        $checks = Get-CIEMCheck @getCheckParams
 
-        # Step 4: Filter checks
-        if ($CheckId) {
-            $checks = $checks | Where-Object { $CheckId -contains $_.id }
+        # Apply multi-value filters that Get-CIEMCheck doesn't support
+        if ($CheckId -and $CheckId.Count -gt 1) {
+            $checks = $checks | Where-Object { $CheckId -contains $_.Id }
         }
-
-        if ($Service) {
-            $checks = $checks | Where-Object { $Service -contains $_.service }
+        if ($Service -and $Service.Count -gt 1) {
+            $checks = $checks | Where-Object { $Service -contains $_.Service.ToString() }
         }
 
         Write-Verbose "Checks to execute: $(@($checks).Count)"
@@ -149,12 +150,12 @@ function Invoke-CIEMScan {
         # Build a hashtable of available check functions
         $availableFunctions = @{}
         foreach ($check in $checks) {
-            $functionName = $check.checkScript -replace '\.ps1$', ''
+            $functionName = $check.CheckScript -replace '\.ps1$', ''
             if (Get-Command -Name $functionName -ErrorAction SilentlyContinue) {
-                $availableFunctions[$check.id] = $functionName
+                $availableFunctions[$check.Id] = $functionName
             }
             else {
-                Write-Warning "Check function not found: $functionName for check $($check.id)"
+                Write-Warning "Check function not found: $functionName for check $($check.Id)"
             }
         }
 
@@ -168,30 +169,22 @@ function Invoke-CIEMScan {
         $statusCounts = @{ PASS = 0; FAIL = 0; MANUAL = 0; SKIPPED = 0 }
 
         foreach ($check in $checks) {
-            $functionName = $availableFunctions[$check.id]
+            $functionName = $availableFunctions[$check.Id]
 
             if (-not $functionName) {
-                Write-Verbose "Skipping check $($check.id) - function not available"
+                Write-Verbose "Skipping check $($check.Id) - function not available"
                 $statusCounts['SKIPPED']++
                 $findingCount++
-                $finding = [CIEMScanResult]::Create(@{id = $check.id; severity = $check.severity}, 'SKIPPED', 'Check function not implemented', 'N/A', 'N/A')
+                $finding = [CIEMScanResult]::Create($check, 'SKIPPED', 'Check function not implemented', 'N/A', 'N/A')
                 [void]$allFindings.Add($finding)
                 $finding
             }
             else {
-                Write-Verbose "Running check: $($check.id)"
+                Write-Verbose "Running check: $($check.Id)"
 
                 try {
-                    # Convert check metadata to hashtable for the function
-                    $checkMetadata = @{
-                        id       = $check.id
-                        service  = $check.service
-                        title    = $check.title
-                        severity = $check.severity
-                    }
-
                     # Execute check and stream each finding to the pipeline
-                    foreach ($finding in (& $functionName -CheckMetadata $checkMetadata)) {
+                    foreach ($finding in (& $functionName -Check $check)) {
                         $findingCount++
                         if ($statusCounts.ContainsKey($finding.Status)) {
                             $statusCounts[$finding.Status]++
@@ -202,10 +195,10 @@ function Invoke-CIEMScan {
                 }
                 catch {
                     if ($script:Config.scan.continueOnError) {
-                        Write-Warning "Check $($check.id) failed: $($_.Exception.Message)"
+                        Write-Warning "Check $($check.Id) failed: $($_.Exception.Message)"
                         $statusCounts['SKIPPED']++
                         $findingCount++
-                        $finding = [CIEMScanResult]::Create(@{id = $check.id; severity = $check.severity}, 'SKIPPED', "Check execution failed: $($_.Exception.Message)", 'N/A', 'N/A')
+                        $finding = [CIEMScanResult]::Create($check, 'SKIPPED', "Check execution failed: $($_.Exception.Message)", 'N/A', 'N/A')
                         [void]$allFindings.Add($finding)
                         $finding
                     }

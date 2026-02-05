@@ -7,8 +7,8 @@ function Test-KeyVaultItemExpiration {
         Parameterized helper function that checks expiration dates for keys or secrets
         in either RBAC or non-RBAC vaults. Used by the 4 specific check functions.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .PARAMETER ItemType
         Type of item to check: 'Keys' or 'Secrets'.
@@ -23,7 +23,7 @@ function Test-KeyVaultItemExpiration {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata,
+        [CIEMCheck]$Check,
 
         [Parameter(Mandatory)]
         [ValidateSet('Keys', 'Secrets')]
@@ -63,13 +63,13 @@ function Test-KeyVaultItemExpiration {
 
             # If we couldn't access items (permissions issue), report as manual check
             if ($null -eq $items) {
-                [CIEMScanResult]::Create($CheckMetadata, 'MANUAL', "Cannot access $itemTypeLower in $rbacLabel vault '$vaultName' - data plane access denied. Manual verification required.", $resourceId, $vaultName, $location)
+                [CIEMScanResult]::Create($Check, 'MANUAL', "Cannot access $itemTypeLower in $rbacLabel vault '$vaultName' - data plane access denied. Manual verification required.", $resourceId, $vaultName, $location)
                 continue
             }
 
             # If no items exist, vault passes by default
             if ($items.Count -eq 0) {
-                [CIEMScanResult]::Create($CheckMetadata, 'PASS', "$rbacLabel vault '$vaultName' has no $itemTypeLower configured.", $resourceId, $vaultName, $location)
+                [CIEMScanResult]::Create($Check, 'PASS', "$rbacLabel vault '$vaultName' has no $itemTypeLower configured.", $resourceId, $vaultName, $location)
                 continue
             }
 
@@ -98,13 +98,13 @@ function Test-KeyVaultItemExpiration {
                 # Prowler: if not expires and enabled -> FAIL
                 if (-not $hasExpiration -and $isEnabled) {
                     $hasItemWithoutExpiration = $true
-                    [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Keyvault $vaultName has the $itemTypeSingular $itemName without expiration date set.", $resourceId, $vaultName, $location)
+                    [CIEMScanResult]::Create($Check, 'FAIL', "Keyvault $vaultName has the $itemTypeSingular $itemName without expiration date set.", $resourceId, $vaultName, $location)
                 }
             }
 
             # Prowler: One PASS per vault if no items without expiration
             if (-not $hasItemWithoutExpiration) {
-                [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Keyvault $vaultName has all the $itemTypeLower with expiration date set.", $resourceId, $vaultName, $location)
+                [CIEMScanResult]::Create($Check, 'PASS', "Keyvault $vaultName has all the $itemTypeLower with expiration date set.", $resourceId, $vaultName, $location)
             }
         }
     }

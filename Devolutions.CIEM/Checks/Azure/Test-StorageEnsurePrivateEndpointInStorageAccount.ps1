@@ -7,8 +7,8 @@ function Test-StorageEnsurePrivateEndpointInStorageAccount {
         Ensures that Private Endpoints are configured for Azure Storage accounts
         to allow secure access over an encrypted Private Link.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageEnsurePrivateEndpointInStorageAccount {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -57,7 +57,7 @@ function Test-StorageEnsurePrivateEndpointInStorageAccount {
                 $statusExtended = "Storage account '$accountName' does not have any private endpoints configured. Configure private endpoints for secure network access."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

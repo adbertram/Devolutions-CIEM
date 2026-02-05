@@ -8,8 +8,8 @@ function Test-KeyvaultKeyRotationEnabled {
         Automatic key rotation removes the need for manual administration when keys expire
         and reduces the risk of using outdated cryptographic keys.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -18,7 +18,7 @@ function Test-KeyvaultKeyRotationEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -30,12 +30,12 @@ function Test-KeyvaultKeyRotationEnabled {
             $keys = $kvData.Keys[$vault.name]
 
             if ($null -eq $keys) {
-                [CIEMScanResult]::Create($CheckMetadata, 'MANUAL', "Cannot access keys in vault '$($vault.name)' - data plane access denied. Manual verification required.", $vault.id, $vault.name, $vault.location)
+                [CIEMScanResult]::Create($Check, 'MANUAL', "Cannot access keys in vault '$($vault.name)' - data plane access denied. Manual verification required.", $vault.id, $vault.name, $vault.location)
                 continue
             }
 
             if ($keys.Count -eq 0) {
-                [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Vault '$($vault.name)' has no keys configured.", $vault.id, $vault.name, $vault.location)
+                [CIEMScanResult]::Create($Check, 'PASS', "Vault '$($vault.name)' has no keys configured.", $vault.id, $vault.name, $vault.location)
                 continue
             }
 
@@ -63,10 +63,10 @@ function Test-KeyvaultKeyRotationEnabled {
                 }
 
                 if ($hasRotationPolicy) {
-                    [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Vault '$($vault.name)' has key '$keyName' with rotation policy set.", $vault.id, "$($vault.name)/$keyName", $vault.location)
+                    [CIEMScanResult]::Create($Check, 'PASS', "Vault '$($vault.name)' has key '$keyName' with rotation policy set.", $vault.id, "$($vault.name)/$keyName", $vault.location)
                 }
                 else {
-                    [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Vault '$($vault.name)' has key '$keyName' without rotation policy set.", $vault.id, "$($vault.name)/$keyName", $vault.location)
+                    [CIEMScanResult]::Create($Check, 'FAIL', "Vault '$($vault.name)' has key '$keyName' without rotation policy set.", $vault.id, "$($vault.name)/$keyName", $vault.location)
                 }
             }
         }

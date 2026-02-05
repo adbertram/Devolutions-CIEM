@@ -9,17 +9,17 @@ function Test-EntraTrustedNamedLocationExist {
         locations with IP ranges can be used in Conditional Access policies to enforce
         different access requirements based on the user's location.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraTrustedNamedLocationsExists -CheckMetadata $metadata
+        Test-EntraTrustedNamedLocationsExists -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -27,7 +27,7 @@ function Test-EntraTrustedNamedLocationExist {
     # Check if Named Locations data is available
     if (-not $script:EntraService.NamedLocations) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'FAIL',
             'There is no trusted location with IP ranges defined.',
             'Named Locations',
@@ -78,7 +78,7 @@ function Test-EntraTrustedNamedLocationExist {
 
             $ipRangeList = $ipRangeAddresses -join ', '
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "Exits trusted location with trusted IP ranges, this IPs ranges are: $ipRangeList",
                 $trustedIpLocation.id,
@@ -87,7 +87,7 @@ function Test-EntraTrustedNamedLocationExist {
         }
         else {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'FAIL',
                 'There is no trusted location with IP ranges defined.',
                 'Named Locations',

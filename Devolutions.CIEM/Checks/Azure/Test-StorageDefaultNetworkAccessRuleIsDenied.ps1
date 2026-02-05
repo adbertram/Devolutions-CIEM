@@ -7,8 +7,8 @@ function Test-StorageDefaultNetworkAccessRuleIsDenied {
         Ensures that the default network access rule for storage accounts is set to Deny,
         restricting access to traffic from all networks by default.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageDefaultNetworkAccessRuleIsDenied {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -54,7 +54,7 @@ function Test-StorageDefaultNetworkAccessRuleIsDenied {
                 $statusExtended = "Storage account '$accountName' has default network access rule set to '$defaultAction'. Set the default action to 'Deny' to restrict access."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

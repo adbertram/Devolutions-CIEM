@@ -8,8 +8,8 @@ function Test-KeyvaultLoggingEnabled {
         audit logging. Logging is essential for monitoring access patterns, detecting
         unauthorized access attempts, and maintaining compliance audit trails.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -18,7 +18,7 @@ function Test-KeyvaultLoggingEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -78,7 +78,7 @@ function Test-KeyvaultLoggingEnabled {
                 "Vault '$($vault.name)' does not have diagnostic logging enabled. Enable AuditEvent logging to monitor vault access."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $message, $vault.id, $vault.name, $vault.location)
+            [CIEMScanResult]::Create($Check, $status, $message, $vault.id, $vault.name, $vault.location)
         }
     }
 }

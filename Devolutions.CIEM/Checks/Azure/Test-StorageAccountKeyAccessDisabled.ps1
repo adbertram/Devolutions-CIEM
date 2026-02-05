@@ -7,8 +7,8 @@ function Test-StorageAccountKeyAccessDisabled {
         Ensures that access to Azure Storage Accounts using account keys is disabled,
         enforcing the use of Microsoft Entra ID for authentication.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,11 +17,11 @@ function Test-StorageAccountKeyAccessDisabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyPath  = 'properties.allowSharedKeyAccess'
         ExpectedValue = $false
         PassMessage   = "Storage account '{0}' has shared key access disabled."

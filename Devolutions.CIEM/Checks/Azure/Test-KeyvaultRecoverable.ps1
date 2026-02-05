@@ -11,8 +11,8 @@ function Test-KeyvaultRecoverable {
         Both settings are required to ensure Key Vault data can be recovered from
         accidental or malicious deletion.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -21,7 +21,7 @@ function Test-KeyvaultRecoverable {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -56,7 +56,7 @@ function Test-KeyvaultRecoverable {
                 }
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $message, $vault.id, $vault.name, $vault.location)
+            [CIEMScanResult]::Create($Check, $status, $message, $vault.id, $vault.name, $vault.location)
         }
     }
 }

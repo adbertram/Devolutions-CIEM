@@ -8,17 +8,17 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
         multifactor authentication when accessing the Windows Azure Service Management API
         (appId = 797f4846-ba00-4fd7-ba43-dac1f8f63013).
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraConditionalAccessPolicyRequireMfaForManagementApi -CheckMetadata $metadata
+        Test-EntraConditionalAccessPolicyRequireMfaForManagementApi -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -27,7 +27,7 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
     # Check if Conditional Access policies data is available
     if (-not $script:EntraService.ConditionalAccessPolicies) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve Conditional Access policies - Azure AD Premium P1/P2 license required',
             'N/A',
@@ -91,7 +91,7 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
         if ($mfaPolicyNames.Count -gt 0) {
             $policyNames = $mfaPolicyNames -join ', '
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "Found $($mfaPolicyNames.Count) Conditional Access policy(ies) requiring MFA for Windows Azure Service Management API: $policyNames",
                 'conditional-access-policies',
@@ -100,7 +100,7 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
         }
         else {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'FAIL',
                 'No Conditional Access policy requires MFA for Windows Azure Service Management API (appId: 797f4846-ba00-4fd7-ba43-dac1f8f63013)',
                 'conditional-access-policies',

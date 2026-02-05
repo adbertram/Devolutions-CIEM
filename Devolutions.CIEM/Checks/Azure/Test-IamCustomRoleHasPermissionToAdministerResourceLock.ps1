@@ -18,8 +18,8 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         The check FAILS if no custom role has these permissions (indicating resource
         lock administration is not properly delegated).
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json including:
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
         - id: Check identifier
         - severity: Severity level
 
@@ -33,7 +33,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -54,7 +54,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'SKIPPED',
                 "Unable to retrieve role definitions for subscription $subscriptionId",
                 "/subscriptions/$subscriptionId",
@@ -70,7 +70,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
             # No custom roles exist - this is a FAIL condition
             # The recommendation is to have a dedicated custom role for lock administration
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'FAIL',
                 "No custom roles exist in subscription $subscriptionId. A dedicated custom role should be created for resource lock administration.",
                 "/subscriptions/$subscriptionId",
@@ -150,7 +150,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
             # Found custom role(s) with lock permissions - PASS
             $roleNames = ($lockAdminRoles | ForEach-Object { $_.Name }) -join ', '
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "Custom role(s) with resource lock administration permissions found in subscription $subscriptionId`: $roleNames",
                 "/subscriptions/$subscriptionId",
@@ -160,7 +160,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         else {
             # No custom role has lock permissions - FAIL
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'FAIL',
                 "No custom role with resource lock administration permissions found in subscription $subscriptionId. Custom roles exist ($($customRoles.Count)) but none have Microsoft.Authorization/locks/* permissions.",
                 "/subscriptions/$subscriptionId",

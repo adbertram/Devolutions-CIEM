@@ -7,8 +7,8 @@ function Test-StorageDefaultToEntraAuthorizationEnabled {
         Ensures that the Azure Storage Account setting 'Default to Microsoft Entra
         authorization in the Azure portal' is enabled.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,11 +17,11 @@ function Test-StorageDefaultToEntraAuthorizationEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyPath  = 'properties.defaultToOAuthAuthentication'
         ExpectedValue = $true
         PassMessage   = "Storage account '{0}' defaults to Microsoft Entra ID authorization."

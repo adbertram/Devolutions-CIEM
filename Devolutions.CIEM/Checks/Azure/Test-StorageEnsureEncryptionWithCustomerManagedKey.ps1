@@ -7,8 +7,8 @@ function Test-StorageEnsureEncryptionWithCustomerManagedKey {
         Ensures that Azure Storage accounts are using Customer Managed Keys (CMKs)
         instead of Microsoft Managed Keys for encryption.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageEnsureEncryptionWithCustomerManagedKey {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -54,7 +54,7 @@ function Test-StorageEnsureEncryptionWithCustomerManagedKey {
                 $statusExtended = "Storage account '$accountName' uses Microsoft Managed Keys for encryption (keySource: '$keySource'). Configure Customer Managed Keys from Key Vault for enhanced control."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

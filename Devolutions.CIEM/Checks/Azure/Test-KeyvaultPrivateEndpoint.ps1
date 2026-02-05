@@ -8,8 +8,8 @@ function Test-KeyvaultPrivateEndpoint {
         Private endpoints keep network traffic limited to whitelisted resources and
         prevent exposure of vault data over the public internet.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -18,7 +18,7 @@ function Test-KeyvaultPrivateEndpoint {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -45,14 +45,14 @@ function Test-KeyvaultPrivateEndpoint {
                         ($_.properties.privateEndpoint.id -split '/')[-1]
                     }) -join ', '
 
-                    [CIEMScanResult]::Create($CheckMetadata, 'PASS', "Vault '$($vault.name)' has $($approvedEndpoints.Count) approved private endpoint(s): $endpointNames", $vault.id, $vault.name, $vault.location)
+                    [CIEMScanResult]::Create($Check, 'PASS', "Vault '$($vault.name)' has $($approvedEndpoints.Count) approved private endpoint(s): $endpointNames", $vault.id, $vault.name, $vault.location)
                 }
                 else {
-                    [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Vault '$($vault.name)' has private endpoint connection(s) but none are in 'Approved' state.", $vault.id, $vault.name, $vault.location)
+                    [CIEMScanResult]::Create($Check, 'FAIL', "Vault '$($vault.name)' has private endpoint connection(s) but none are in 'Approved' state.", $vault.id, $vault.name, $vault.location)
                 }
             }
             else {
-                [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Vault '$($vault.name)' does not have any private endpoints configured. Consider using private endpoints to secure network traffic.", $vault.id, $vault.name, $vault.location)
+                [CIEMScanResult]::Create($Check, 'FAIL', "Vault '$($vault.name)' does not have any private endpoints configured. Consider using private endpoints to secure network traffic.", $vault.id, $vault.name, $vault.location)
             }
         }
     }

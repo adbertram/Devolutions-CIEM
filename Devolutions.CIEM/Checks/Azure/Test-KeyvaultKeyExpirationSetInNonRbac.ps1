@@ -8,8 +8,8 @@ function Test-KeyvaultKeyExpirationSetInNonRbac {
         keys have an expiration date configured. Keys without expiration dates can remain
         valid indefinitely, which poses a security risk.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -18,8 +18,8 @@ function Test-KeyvaultKeyExpirationSetInNonRbac {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
-    Test-KeyVaultItemExpiration -CheckMetadata $CheckMetadata -ItemType 'Keys' -RequireRbac $false
+    Test-KeyVaultItemExpiration -Check $Check -ItemType 'Keys' -RequireRbac $false
 }

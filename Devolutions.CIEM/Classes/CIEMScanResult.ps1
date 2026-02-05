@@ -12,48 +12,28 @@ enum CIEMScanRunStatus {
 }
 
 class CIEMScanResult {
-    [string]$CheckId
+    [CIEMCheck]$Check
     [CIEMScanStatus]$Status
     [string]$StatusExtended
     [string]$ResourceId
     [string]$ResourceName
     [string]$Location
-    [string]$Severity
 
     CIEMScanResult() {}
 
-    CIEMScanResult(
-        [string]$CheckId,
-        [CIEMScanStatus]$Status,
-        [string]$StatusExtended,
-        [string]$ResourceId,
-        [string]$ResourceName,
-        [string]$Location,
-        [string]$Severity
-    ) {
-        $this.CheckId = $CheckId
-        $this.Status = $Status
-        $this.StatusExtended = $StatusExtended
-        $this.ResourceId = $ResourceId
-        $this.ResourceName = $ResourceName
-        $this.Location = $Location
-        $this.Severity = $Severity
+    static [CIEMScanResult] Create([CIEMCheck]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName, [string]$Location) {
+        $result = [CIEMScanResult]::new()
+        $result.Check = $Check
+        $result.Status = [CIEMScanStatus]$Status
+        $result.StatusExtended = $StatusExtended
+        $result.ResourceId = $ResourceId
+        $result.ResourceName = $ResourceName
+        $result.Location = $Location
+        return $result
     }
 
-    static [CIEMScanResult] Create([hashtable]$CheckMetadata, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName, [string]$Location) {
-        return [CIEMScanResult]::new(
-            $CheckMetadata.id,
-            [CIEMScanStatus]$Status,
-            $StatusExtended,
-            $ResourceId,
-            $ResourceName,
-            $Location,
-            $CheckMetadata.severity
-        )
-    }
-
-    static [CIEMScanResult] Create([hashtable]$CheckMetadata, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName) {
-        return [CIEMScanResult]::Create($CheckMetadata, $Status, $StatusExtended, $ResourceId, $ResourceName, 'Global')
+    static [CIEMScanResult] Create([CIEMCheck]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName) {
+        return [CIEMScanResult]::Create($Check, $Status, $StatusExtended, $ResourceId, $ResourceName, 'Global')
     }
 }
 
@@ -71,7 +51,7 @@ class CIEMScanRun {
     [int]$PassedResults
     [int]$SkippedResults
     [int]$ManualResults
-    [CIEMScanResult[]]$ScanResults
+    [object[]]$ScanResults
     [string]$ErrorMessage
 
     # Default constructor - generates Id and sets StartTime

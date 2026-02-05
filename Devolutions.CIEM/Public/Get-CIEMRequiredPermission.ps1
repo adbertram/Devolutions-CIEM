@@ -54,7 +54,7 @@ function Get-CIEMRequiredPermission {
     $checks = Get-CIEMCheck @getCheckParams
 
     if ($CheckId) {
-        $checks = $checks | Where-Object { $CheckId -contains $_.id }
+        $checks = $checks | Where-Object { $CheckId -contains $_.Id }
     }
 
     if (-not $checks) {
@@ -75,16 +75,15 @@ function Get-CIEMRequiredPermission {
         $kvPermissions = [System.Collections.Generic.List[string]]::new()
 
         foreach ($check in $checks) {
-            # Use safe property access since not all checks have all permission types
-            $perms = $check.permissions
-            if ($perms.PSObject.Properties['graph'] -and $perms.graph) {
-                foreach ($p in $perms.graph) { $graphPermissions.Add($p) }
+            $perms = $check.Permissions
+            if ($perms.Graph) {
+                foreach ($p in $perms.Graph) { $graphPermissions.Add($p) }
             }
-            if ($perms.PSObject.Properties['arm'] -and $perms.arm) {
-                foreach ($p in $perms.arm) { $armPermissions.Add($p) }
+            if ($perms.ARM) {
+                foreach ($p in $perms.ARM) { $armPermissions.Add($p) }
             }
-            if ($perms.PSObject.Properties['keyvaultDataPlane'] -and $perms.keyvaultDataPlane) {
-                foreach ($p in $perms.keyvaultDataPlane) { $kvPermissions.Add($p) }
+            if ($perms.KeyVaultDataPlane) {
+                foreach ($p in $perms.KeyVaultDataPlane) { $kvPermissions.Add($p) }
             }
         }
 

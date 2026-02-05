@@ -8,17 +8,17 @@ function Test-EntraNonPrivilegedUserHasMfa {
         (non-privileged users) have MFA registered. MFA provides additional security
         by requiring a second form of authentication.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraNonPrivilegedUserHasMfa -CheckMetadata $metadata
+        Test-EntraNonPrivilegedUserHasMfa -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -26,7 +26,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
     # Check if required data is available
     if (-not $script:EntraService.Users) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve users - missing permissions',
             'N/A',
@@ -35,7 +35,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
     }
     elseif (-not $script:EntraService.UserMFAStatus) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required',
             'N/A',
@@ -104,7 +104,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
 
         if ($withoutMfaCount -eq 0 -and $totalNonPrivileged -gt 0) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "All $totalNonPrivileged non-privileged users have MFA enabled",
                 'non-privileged-users',
@@ -113,7 +113,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
         }
         elseif ($totalNonPrivileged -eq 0) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 'No non-privileged users found to check',
                 'non-privileged-users',
@@ -127,7 +127,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
 
             foreach ($user in $usersToDisplay) {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     "Non-privileged user '$($user.displayName)' ($($user.userPrincipalName)) does not have MFA enabled",
                     $user.id,
@@ -137,7 +137,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
 
             if ($withoutMfaCount -gt $displayLimit) {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     "... and $($withoutMfaCount - $displayLimit) additional non-privileged users without MFA (total: $withoutMfaCount out of $totalNonPrivileged)",
                     'non-privileged-users-summary',

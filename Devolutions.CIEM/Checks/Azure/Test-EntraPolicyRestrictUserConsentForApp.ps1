@@ -11,24 +11,24 @@ function Test-EntraPolicyRestrictUserConsentForApp {
         When user consent is restricted, administrators must provide consent for applications
         before users can use them.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraPolicyRestrictsUserConsentForApps -CheckMetadata $metadata
+        Test-EntraPolicyRestrictsUserConsentForApps -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
 
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
-        [CIEMScanResult]::Create($CheckMetadata, 'SKIPPED', 'Unable to retrieve authorization policy - missing permissions', 'N/A', 'Authorization Policy')
+        [CIEMScanResult]::Create($Check, 'SKIPPED', 'Unable to retrieve authorization policy - missing permissions', 'N/A', 'Authorization Policy')
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -66,11 +66,11 @@ function Test-EntraPolicyRestrictUserConsentForApp {
         }
 
         if (-not $hasUserConsentPolicy) {
-            [CIEMScanResult]::Create($CheckMetadata, 'PASS', 'Entra does not allow users to consent apps accessing company data on their behalf', $authPolicy.id, 'Authorization Policy')
+            [CIEMScanResult]::Create($Check, 'PASS', 'Entra does not allow users to consent apps accessing company data on their behalf', $authPolicy.id, 'Authorization Policy')
         }
         else {
             $policyList = $userConsentPolicies -join ', '
-            [CIEMScanResult]::Create($CheckMetadata, 'FAIL', "Entra allows users to consent apps accessing company data on their behalf. User consent policies: $policyList", $authPolicy.id, 'Authorization Policy')
+            [CIEMScanResult]::Create($Check, 'FAIL', "Entra allows users to consent apps accessing company data on their behalf. User consent policies: $policyList", $authPolicy.id, 'Authorization Policy')
         }
     }
 }

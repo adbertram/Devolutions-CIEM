@@ -8,8 +8,8 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
         policy's defaultUserRolePermissions. Used by multiple check functions that verify
         whether certain user actions are restricted.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .PARAMETER PropertyName
         Name of the property to check in defaultUserRolePermissions (e.g., 'allowedToCreateSecurityGroups').
@@ -27,7 +27,7 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata,
+        [CIEMCheck]$Check,
 
         [Parameter(Mandatory)]
         [string]$PropertyName,
@@ -42,7 +42,7 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
     $ErrorActionPreference = 'Stop'
 
     if (-not $script:EntraService.AuthorizationPolicy) {
-        [CIEMScanResult]::Create($CheckMetadata, 'SKIPPED', 'Unable to retrieve authorization policy - missing permissions', 'N/A', 'Authorization Policy')
+        [CIEMScanResult]::Create($Check, 'SKIPPED', 'Unable to retrieve authorization policy - missing permissions', 'N/A', 'Authorization Policy')
     }
     else {
         # Authorization policy can be returned as an array, get the first item
@@ -57,10 +57,10 @@ function Test-EntraAuthorizationPolicyBooleanSetting {
         $propertyValue = $authPolicy.defaultUserRolePermissions.$PropertyName
 
         if ($propertyValue -eq $false) {
-            [CIEMScanResult]::Create($CheckMetadata, 'PASS', $PassMessage, $authPolicy.id, 'Authorization Policy')
+            [CIEMScanResult]::Create($Check, 'PASS', $PassMessage, $authPolicy.id, 'Authorization Policy')
         }
         else {
-            [CIEMScanResult]::Create($CheckMetadata, 'FAIL', $FailMessage, $authPolicy.id, 'Authorization Policy')
+            [CIEMScanResult]::Create($Check, 'FAIL', $FailMessage, $authPolicy.id, 'Authorization Policy')
         }
     }
 }

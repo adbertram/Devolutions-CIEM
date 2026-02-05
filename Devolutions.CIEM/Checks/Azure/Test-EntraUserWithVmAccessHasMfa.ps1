@@ -14,17 +14,17 @@ function Test-EntraUserWithVmAccessHasMfa {
 
         This check requires IAM service data to identify users with VM-related role assignments.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraUserWithVmAccessHasMfa -CheckMetadata $metadata
+        Test-EntraUserWithVmAccessHasMfa -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -43,7 +43,7 @@ function Test-EntraUserWithVmAccessHasMfa {
     # Check if required data is available
     if (-not $script:EntraService.UserMFAStatus) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve user MFA registration details - Azure AD Premium P1/P2 license required',
             'N/A',
@@ -52,7 +52,7 @@ function Test-EntraUserWithVmAccessHasMfa {
     }
     elseif (-not $script:IAMService -or -not $script:IAMService.RoleAssignments) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve IAM role assignments - IAM service not initialized or missing permissions. This check requires cross-reference with Azure Resource Manager role assignments.',
             'N/A',
@@ -102,7 +102,7 @@ function Test-EntraUserWithVmAccessHasMfa {
 
         if ($usersWithVmAccess.Count -eq 0) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 'No users found with direct VM access role assignments',
                 'vm-access-users',
@@ -148,7 +148,7 @@ function Test-EntraUserWithVmAccessHasMfa {
 
             if ($withoutMfaCount -eq 0) {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'PASS',
                     "All $totalVmUsers users with VM access have MFA enabled",
                     'vm-access-users',
@@ -158,7 +158,7 @@ function Test-EntraUserWithVmAccessHasMfa {
             else {
                 foreach ($userInfo in $usersWithoutMfa) {
                     [CIEMScanResult]::Create(
-                        $CheckMetadata,
+                        $Check,
                         'FAIL',
                         "User '$($userInfo.UserName)' has VM access but does not have MFA enabled",
                         $userInfo.PrincipalId,

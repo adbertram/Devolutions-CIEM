@@ -5,7 +5,11 @@ function Get-CIEMCheck {
 
     .DESCRIPTION
         Returns a list of all available security checks from the AzureChecks.json
-        metadata file. Supports filtering by service, severity, and check ID.
+        metadata file as typed CIEMCheck objects. Supports filtering by cloud provider,
+        service, severity, and check ID.
+
+    .PARAMETER CloudProvider
+        Filter checks by cloud provider (Azure, AWS).
 
     .PARAMETER Service
         Filter checks by service name (Entra, IAM, KeyVault, Storage).
@@ -17,13 +21,7 @@ function Get-CIEMCheck {
         Filter to a specific check by ID.
 
     .OUTPUTS
-        [PSCustomObject[]] Array of check objects with properties:
-        - id: Check identifier
-        - service: Service name
-        - title: Check title
-        - description: Full description
-        - severity: Severity level
-        - categories: Category tags
+        [CIEMCheck[]] Array of CIEMCheck objects.
 
     .EXAMPLE
         Get-CIEMCheck
@@ -42,8 +40,12 @@ function Get-CIEMCheck {
         # Returns specific check details
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([CIEMCheck[]])]
     param(
+        [Parameter()]
+        [ValidateSet('Azure', 'AWS')]
+        [string]$CloudProvider,
+
         [Parameter()]
         [ValidateSet('Entra', 'IAM', 'KeyVault', 'Storage')]
         [string]$Service,
@@ -58,20 +60,43 @@ function Get-CIEMCheck {
 
     $ErrorActionPreference = 'Stop'
 
-    # Load checks metadata
-    $checks = Get-CheckMetadata
+    # Load checks from JSON
+    $checksPath = Join-Path $script:ModuleRoot 'AzureChecks.json'
+
+    if (-not (Test-Path $checksPath)) {
+        throw "Checks metadata file not found: $checksPath"
+    }
+
+    $metadata = Get-Content $checksPath -Raw | ConvertFrom-Json
+
+    # Handle both array format and object-with-checks-property format
+    $jsonChecks = if ($metadata.PSObject.Properties.Name -contains 'checks') {
+        @($metadata.checks)
+    }
+    else {
+        @($metadata)
+    }
+
+    # Convert to typed CIEMCheck objects
+    $checks = @($jsonChecks | ForEach-Object {
+        [CIEMCheck]::FromJsonObject($_, [CIEMCloudProvider]::Azure)
+    })
 
     # Apply filters
+    if ($CloudProvider) {
+        $checks = $checks | Where-Object { $_.CloudProvider -eq $CloudProvider }
+    }
+
     if ($Service) {
-        $checks = $checks | Where-Object { $_.service -eq $Service }
+        $checks = $checks | Where-Object { $_.Service -eq $Service }
     }
 
     if ($Severity) {
-        $checks = $checks | Where-Object { $_.severity -eq $Severity }
+        $checks = $checks | Where-Object { $_.Severity -eq $Severity }
     }
 
     if ($CheckId) {
-        $checks = $checks | Where-Object { $_.id -eq $CheckId }
+        $checks = $checks | Where-Object { $_.Id -eq $CheckId }
     }
 
     $checks

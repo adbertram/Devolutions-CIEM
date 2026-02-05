@@ -8,8 +8,8 @@ function Test-KeyvaultPublicNetworkAccessDisabled {
         When using private endpoints, public network access should be disabled to ensure
         all traffic flows through the private connection.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -18,7 +18,7 @@ function Test-KeyvaultPublicNetworkAccessDisabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -70,7 +70,7 @@ function Test-KeyvaultPublicNetworkAccessDisabled {
                 }
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $message, $vault.id, $vault.name, $vault.location)
+            [CIEMScanResult]::Create($Check, $status, $message, $vault.id, $vault.name, $vault.location)
         }
     }
 }

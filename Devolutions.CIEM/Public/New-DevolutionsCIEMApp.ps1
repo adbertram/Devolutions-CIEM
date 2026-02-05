@@ -70,25 +70,16 @@ function New-DevolutionsCIEMApp {
                 New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
                 if ($rawResults -and $rawResults.Count -gt 0) {
-                    # Enrich scan results with check metadata for display
-                    $checkMetadata = Get-CIEMCheck
-                    $checkLookup = @{}
-                    foreach ($check in $checkMetadata) {
-                        $checkLookup[$check.id] = $check
-                    }
-
                     $ScanResults = $rawResults | ForEach-Object {
-                        $result = $_
-                        $meta = $checkLookup[$result.CheckId]
                         [PSCustomObject]@{
-                            Id = $result.CheckId
-                            CheckId = $result.CheckId
-                            Title = if ($meta) { $meta.title } else { $result.CheckId }
-                            Severity = ($result.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
-                            Status = $result.Status
+                            Id = $_.Check.Id
+                            CheckId = $_.Check.Id
+                            Title = $_.Check.Title
+                            Severity = ($_.Check.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                            Status = $_.Status
                             Provider = 'Azure'
-                            Service = if ($meta) { $meta.service } else { 'Unknown' }
-                            ResourceName = $result.ResourceName
+                            Service = $_.Check.Service.ToString()
+                            ResourceName = $_.ResourceName
                         }
                     }
 
@@ -547,9 +538,9 @@ function New-DevolutionsCIEMApp {
                                                 passedCount  = $_.PassedResults
                                                 scan_results = @($_.ScanResults | ForEach-Object {
                                                     [ordered]@{
-                                                        checkId        = $_.CheckId
+                                                        checkId        = $_.Check.Id
                                                         status         = $_.Status
-                                                        severity       = $_.Severity
+                                                        severity       = $_.Check.Severity.ToString()
                                                         resourceId     = $_.ResourceId
                                                         resourceName   = $_.ResourceName
                                                         location       = $_.Location
@@ -571,30 +562,22 @@ function New-DevolutionsCIEMApp {
                                         $rawResults = $scanRun.ScanResults
 
                                         if ($rawResults -and $rawResults.Count -gt 0) {
-                                            # Enrich with check metadata
-                                            $checkMetadata = Get-CIEMCheck
-                                            $checkLookup = @{}
-                                            foreach ($check in $checkMetadata) {
-                                                $checkLookup[$check.id] = $check
-                                            }
-
                                             $enrichedResults = $rawResults | ForEach-Object {
                                                 $result = $_
-                                                $meta = $checkLookup[$result.CheckId]
                                                 @{
-                                                    id = $result.CheckId + '_' + ($result.ResourceId -replace '[^\w]', '_')
-                                                    checkId = $result.CheckId
-                                                    title = if ($meta) { $meta.title } else { $result.CheckId }
-                                                    severity = ($result.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                                    id = $result.Check.Id + '_' + ($result.ResourceId -replace '[^\w]', '_')
+                                                    checkId = $result.Check.Id
+                                                    title = $result.Check.Title
+                                                    severity = ($result.Check.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                                                     status = $result.Status
-                                                    service = if ($meta) { $meta.service } else { 'Unknown' }
+                                                    service = $result.Check.Service.ToString()
                                                     resourceId = $result.ResourceId
                                                     resourceName = $result.ResourceName
                                                     location = $result.Location
-                                                    description = if ($meta) { $meta.description } else { $result.StatusExtended }
+                                                    description = $result.Check.Description
                                                     statusExtended = $result.StatusExtended
-                                                    remediation = if ($meta -and $meta.remediation) { $meta.remediation.text } else { 'See Devolutions PAM for remediation guidance.' }
-                                                    relatedUrl = if ($meta) { $meta.relatedUrl } else { $null }
+                                                    remediation = if ($result.Check.Remediation -and $result.Check.Remediation.Text) { $result.Check.Remediation.Text } else { 'See Devolutions PAM for remediation guidance.' }
+                                                    relatedUrl = $result.Check.RelatedUrl
                                                 }
                                             }
 

@@ -8,8 +8,8 @@ function Test-StorageAccountProperty {
         accounts in all subscriptions. Used by multiple check functions that verify
         whether certain storage account settings are configured correctly.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata (id, service, title, severity).
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .PARAMETER PropertyPath
         Dot-notation path to the property (e.g., 'properties.supportsHttpsTrafficOnly').
@@ -33,7 +33,7 @@ function Test-StorageAccountProperty {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata,
+        [CIEMCheck]$Check,
 
         [Parameter(Mandatory)]
         [string]$PropertyPath,
@@ -82,12 +82,12 @@ function Test-StorageAccountProperty {
             # Compare to expected value
             if ($propertyValue -eq $ExpectedValue) {
                 $message = $PassMessage -f $accountName, $propertyValue
-                [CIEMScanResult]::Create($CheckMetadata, 'PASS', $message, $resourceId, $accountName, $location)
+                [CIEMScanResult]::Create($Check, 'PASS', $message, $resourceId, $accountName, $location)
             }
             else {
                 $displayValue = if ($null -eq $propertyValue) { 'not set' } else { $propertyValue }
                 $message = $FailMessage -f $accountName, $displayValue
-                [CIEMScanResult]::Create($CheckMetadata, 'FAIL', $message, $resourceId, $accountName, $location)
+                [CIEMScanResult]::Create($Check, 'FAIL', $message, $resourceId, $accountName, $location)
             }
         }
     }

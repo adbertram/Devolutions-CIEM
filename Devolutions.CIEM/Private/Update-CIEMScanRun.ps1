@@ -36,7 +36,7 @@ function Update-CIEMScanRun {
         [string]$Status,
 
         [Parameter()]
-        [CIEMScanResult[]]$ScanResults,
+        [object[]]$ScanResults,
 
         [Parameter()]
         [string]$ErrorMessage

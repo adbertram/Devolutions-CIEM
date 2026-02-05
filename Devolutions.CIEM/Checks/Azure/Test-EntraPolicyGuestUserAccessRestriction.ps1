@@ -13,17 +13,17 @@ function Test-EntraPolicyGuestUserAccessRestriction {
         - 2af84b1e-32c8-42b7-82bc-daa82404023b: Guest users have the same access as members (most permissive)
         - a0b1b346-4d3e-4e8b-98f8-753987be4970: Guest user access is restricted to their own directory objects (most restrictive)
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .EXAMPLE
-        Test-EntraPolicyGuestUsersAccessRestrictions -CheckMetadata $metadata
+        Test-EntraPolicyGuestUsersAccessRestrictions -Check $metadata
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -36,7 +36,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
     # Check if Authorization Policy data is available
     if (-not $script:EntraService.AuthorizationPolicy) {
         [CIEMScanResult]::Create(
-            $CheckMetadata,
+            $Check,
             'SKIPPED',
             'Unable to retrieve authorization policy - missing permissions',
             'N/A',
@@ -58,7 +58,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
         switch ($guestUserRoleId) {
             $restrictedRoleId {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'PASS',
                     'Guest user access is properly restricted to properties and memberships of their own directory objects only (most restrictive setting).',
                     $authPolicy.id,
@@ -67,7 +67,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
             }
             $limitedRoleId {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     'Guest users have limited access to properties and memberships of directory objects (default setting). Consider using the most restrictive option to limit guest access to their own directory objects only.',
                     $authPolicy.id,
@@ -76,7 +76,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
             }
             $memberRoleId {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     'Guest users have the same access as members (most permissive setting). This should be changed to restrict guest access to their own directory objects only.',
                     $authPolicy.id,
@@ -85,7 +85,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
             }
             default {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     "Unknown guest user role ID: $guestUserRoleId. Unable to determine guest access restrictions.",
                     $authPolicy.id,

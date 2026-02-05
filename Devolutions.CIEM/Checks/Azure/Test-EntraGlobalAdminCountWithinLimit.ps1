@@ -10,19 +10,19 @@ function Test-EntraGlobalAdminCountWithinLimit {
         Administrators ensures redundancy, while limiting the number to four reduces the
         risk of excessive privileged access.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata including id and severity.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
 
     # TODO: Implement check logic based on Prowler check: entra_global_admin_in_less_than_five_users
 
-    [CIEMScanResult]::Create($CheckMetadata, 'MANUAL', 'This check requires manual implementation. See Prowler check entra_global_admin_in_less_than_five_users for reference.', 'N/A', 'Global Administrator Role')
+    [CIEMScanResult]::Create($Check, 'MANUAL', 'This check requires manual implementation. See Prowler check entra_global_admin_in_less_than_five_users for reference.', 'N/A', 'Global Administrator Role')
 }

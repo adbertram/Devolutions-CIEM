@@ -7,8 +7,8 @@ function Test-StorageBlobPublicAccessLevelIsDisabled {
         Ensures that the 'Public access level' is set to 'Private (no anonymous access)'
         for all blob containers in your storage account.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,12 +17,12 @@ function Test-StorageBlobPublicAccessLevelIsDisabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     # Prowler simply checks the account-level allowBlobPublicAccess property
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyPath  = 'properties.allowBlobPublicAccess'
         ExpectedValue = $false
         PassMessage   = "Storage account '{0}' has allow blob public access disabled."

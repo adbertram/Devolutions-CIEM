@@ -12,7 +12,7 @@
 RootModule = 'Devolutions.CIEM.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.3.7'
+ModuleVersion = '0.3.10'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Core'
@@ -135,10 +135,9 @@ FileList = '.universal\dashboards.ps1', 'AzureChecks.json',
                'Checks/Azure/Test-StorageSecureTransferRequiredIsEnabled.ps1', 
                'Checks/Azure/Test-StorageSmbChannelEncryptionWithSecureAlgorithm.ps1', 
                'Checks/Azure/Test-StorageSmbProtocolVersionIsLatest.ps1', 
-               'Classes/CIEMScanResult.ps1', 'Devolutions.CIEM.psd1', 'Devolutions.CIEM.psm1',
+               'Classes/CIEMCheck.ps1', 'Classes/CIEMScanResult.ps1', 'Devolutions.CIEM.psd1', 'Devolutions.CIEM.psm1',
                'Private/Convert-ProwlerCheck.ps1', 'Private/Get-AllGraphPage.ps1',
                'Private/Get-AzureAuthContext.ps1', 'Private/Get-CIEMToken.ps1',
-               'Private/Get-CheckMetadata.ps1',
                'Private/New-CIEMScanRun.ps1',
                'Private/Save-CIEMScanRun.ps1',
                'Private/Update-CIEMScanRun.ps1',
@@ -150,7 +149,7 @@ FileList = '.universal\dashboards.ps1', 'AzureChecks.json',
                'Private/Initialize-StorageService.ps1', 
                'Private/Invoke-AzureApi.ps1', 
                'Private/Save-CIEMToken.ps1', 'Private/Set-CIEMSecret.ps1', 
-               'Public/Set-CIEMConfig.ps1', 'Private/Test-AzureChecksSchema.ps1', 
+               'Public/Set-CIEMConfig.ps1',
                'Private/Test-EntraAuthorizationPolicyBooleanSetting.ps1', 
                'Private/Test-GitRemote.ps1', 
                'Private/Test-KeyVaultItemExpiration.ps1', 

@@ -12,8 +12,8 @@ function Test-IamRoleUserAccessAdminRestricted {
 
         Built-in User Access Administrator role ID: 18d7d88d-d35e-4fb5-a5c3-7773c20a72d9
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json including:
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
         - id: Check identifier
         - severity: Severity level
 
@@ -27,7 +27,7 @@ function Test-IamRoleUserAccessAdminRestricted {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -41,7 +41,7 @@ function Test-IamRoleUserAccessAdminRestricted {
         # Check if role assignments were loaded
         if (-not $iamData.RoleAssignments) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'SKIPPED',
                 "Unable to retrieve role assignments for subscription $subscriptionId",
                 "/subscriptions/$subscriptionId",
@@ -122,7 +122,7 @@ function Test-IamRoleUserAccessAdminRestricted {
 
             if ($isUserAccessAdmin) {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     "Role assignment $assignmentName in subscription $subscriptionId grants User Access Administrator role to $principalType $principalId.",
                     $assignment.id,
@@ -131,7 +131,7 @@ function Test-IamRoleUserAccessAdminRestricted {
             }
             else {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'PASS',
                     "Role assignment $assignmentName in subscription $subscriptionId does not grant User Access Administrator role.",
                     $assignment.id,

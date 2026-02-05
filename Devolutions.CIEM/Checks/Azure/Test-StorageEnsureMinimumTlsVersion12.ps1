@@ -7,8 +7,8 @@ function Test-StorageEnsureMinimumTlsVersion12 {
         Ensures the 'Minimum TLS version' for storage accounts is set to 'Version 1.2'
         to protect against known vulnerabilities in older TLS versions.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,11 +17,11 @@ function Test-StorageEnsureMinimumTlsVersion12 {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $params = @{
-        CheckMetadata = $CheckMetadata
+        Check = $Check
         PropertyPath  = 'properties.minimumTlsVersion'
         ExpectedValue = 'TLS1_2'
         PassMessage   = "Storage account '{0}' has minimum TLS version set to TLS 1.2."

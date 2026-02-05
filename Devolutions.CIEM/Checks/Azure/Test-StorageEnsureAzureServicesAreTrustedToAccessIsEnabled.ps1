@@ -7,8 +7,8 @@ function Test-StorageEnsureAzureServicesAreTrustedToAccessIsEnabled {
         Ensures that 'Allow trusted Microsoft services to access this storage account'
         is enabled within your Azure Storage account configuration.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageEnsureAzureServicesAreTrustedToAccessIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -59,7 +59,7 @@ function Test-StorageEnsureAzureServicesAreTrustedToAccessIsEnabled {
                 $statusExtended = "Storage account '$accountName' does not allow trusted Microsoft services to access it. Enable 'Allow trusted Microsoft services' in network settings."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }

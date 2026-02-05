@@ -17,8 +17,8 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         The check PASSES if no custom owner roles exist.
         The check FAILS if any custom role has owner-equivalent permissions.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json including:
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
         - id: Check identifier
         - severity: Severity level
 
@@ -32,7 +32,7 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -43,7 +43,7 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'SKIPPED',
                 "Unable to retrieve role definitions for subscription $subscriptionId",
                 "/subscriptions/$subscriptionId",
@@ -58,7 +58,7 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         if (-not $customRoles -or $customRoles.Count -eq 0) {
             # No custom roles exist - PASS (no custom owner roles can exist)
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "No custom roles exist in subscription $subscriptionId. No custom owner roles can exist.",
                 "/subscriptions/$subscriptionId",
@@ -154,7 +154,7 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
             # Found custom owner role(s) - generate a FAIL finding for each
             foreach ($ownerRole in $customOwnerRoles) {
                 [CIEMScanResult]::Create(
-                    $CheckMetadata,
+                    $Check,
                     'FAIL',
                     "Custom owner role '$($ownerRole.Name)' found with full permissions (*) at subscription scope. Custom roles should not have owner-equivalent permissions. Assignable scopes: $($ownerRole.AssignableScopes)",
                     $ownerRole.Id,
@@ -165,7 +165,7 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         else {
             # No custom owner roles found - PASS
             [CIEMScanResult]::Create(
-                $CheckMetadata,
+                $Check,
                 'PASS',
                 "No custom owner roles found in subscription $subscriptionId. $($customRoles.Count) custom role(s) exist but none have owner-equivalent permissions.",
                 "/subscriptions/$subscriptionId",

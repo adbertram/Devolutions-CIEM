@@ -7,8 +7,8 @@ function Test-StorageGeoRedundantEnabled {
         Ensures that geo-redundant storage (GRS) is enabled on critical Azure Storage
         Accounts for data durability and availability during regional outages.
 
-    .PARAMETER CheckMetadata
-        Hashtable containing check metadata from AzureChecks.json.
+    .PARAMETER Check
+        CIEMCheck object containing check metadata.
 
     .OUTPUTS
         [CIEMScanResult[]] Array of scan result objects.
@@ -17,7 +17,7 @@ function Test-StorageGeoRedundantEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [hashtable]$CheckMetadata
+        [CIEMCheck]$Check
     )
 
     $ErrorActionPreference = 'Stop'
@@ -44,7 +44,7 @@ function Test-StorageGeoRedundantEnabled {
                 $statusExtended = "Storage account '$accountName' does not have geo-redundant storage enabled (SKU: $skuName). Consider using GRS, RA-GRS, GZRS, or RA-GZRS for critical data."
             }
 
-            [CIEMScanResult]::Create($CheckMetadata, $status, $statusExtended, $resourceId, $accountName, $account.location)
+            [CIEMScanResult]::Create($Check, $status, $statusExtended, $resourceId, $accountName, $account.location)
         }
     }
 }
