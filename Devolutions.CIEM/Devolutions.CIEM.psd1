@@ -12,7 +12,7 @@
 RootModule = 'Devolutions.CIEM.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.3.13'
+ModuleVersion = '0.3.14'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Core'

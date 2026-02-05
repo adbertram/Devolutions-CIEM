@@ -1227,7 +1227,7 @@ function New-DevolutionsCIEMApp {
                                             if ($syncResult.Failed) { $allFailed.AddRange(@($syncResult.Failed)) }
                                         }
                                         catch {
-                                            Write-CIEMLog -Message "Sync failed for $provider/$service : $($_.Exception.Message)" -Severity WARN -Component 'PSU-CloudChecksPage'
+                                            Write-CIEMLog -Message "Sync failed for $provider/$service : $($_.Exception.Message)" -Severity WARNING -Component 'PSU-CloudChecksPage'
                                         }
                                     }
                                 }
