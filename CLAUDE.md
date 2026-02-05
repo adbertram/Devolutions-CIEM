@@ -105,6 +105,24 @@ A PSU v5 server is deployed in Azure for this project.
 | **PSU Version** | 5.5.4 |
 | **Container Image** | `ironmansoftware/universal:5.5.4-azure` |
 
+### CRITICAL: Startup Time Warning
+
+**The PSU Azure webapp is EXTREMELY SLOW.** Do NOT restart it unless absolutely necessary.
+
+- **Cold start time:** Up to 10 minutes
+- **Loading phases:** PSU loads each configuration type sequentially (Dashboard, Script, Module, Role, etc.)
+- **During loading:** The `/api/v1/alive` endpoint returns `{"loading": true, "loadingInfo": "Loading configuration for X"}`
+
+**Before restarting, consider alternatives:**
+- Use `Restart-PSUApp -Name 'Devolutions CIEM'` to restart just the CIEM app (much faster)
+- Use `Sync-PSUConfiguration` to reload configuration without full restart
+- Test code changes via `Invoke-PSUCommand` before publishing
+
+**If you must restart:** Monitor progress with:
+```bash
+curl -s https://devolutions-ciem-psu.azurewebsites.net/api/v1/alive | jq '.loading, .loadingInfo'
+```
+
 ### First-Time Setup
 
 On first access, PSU will prompt you to create an admin account. Navigate to the URL above and follow the setup wizard.

@@ -318,34 +318,76 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         'ManagedIdentity' {
-            Write-CIEMLog -Message "Processing ManagedIdentity authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $connectParams = @{ Identity = $true }
+            Write-CIEMLog -Message "Processing ManagedIdentity authentication via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
 
             # Check for user-assigned managed identity config (optional)
             $miClientId = $null
             if ($authConfig.PSObject.Properties['managedIdentity'] -and $authConfig.managedIdentity.clientId) {
                 $miClientId = $authConfig.managedIdentity.clientId
-            }
-
-            if ($miClientId) {
-                $connectParams.AccountId = $miClientId
                 Write-CIEMLog -Message "Using user-assigned managed identity: $miClientId" -Severity INFO -Component 'Connect-CIEMAzure'
-                Write-Verbose "Connecting with user-assigned managed identity: $miClientId"
             }
             else {
                 Write-CIEMLog -Message "Using system-assigned managed identity" -Severity INFO -Component 'Connect-CIEMAzure'
-                Write-Verbose "Connecting with system-assigned managed identity"
             }
 
-            Write-CIEMLog -Message "Calling Connect-AzAccount with -Identity..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
-            Write-CIEMLog -Message "Managed identity authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Azure App Service provides MSI endpoint via environment variables
+            $identityEndpoint = $env:IDENTITY_ENDPOINT
+            $identityHeader = $env:IDENTITY_HEADER
 
-            # Acquire Graph token using Get-AzAccessToken
-            Write-CIEMLog -Message "Acquiring Graph token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $graphTokenResponse = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
-            Save-CIEMToken -GraphToken $graphTokenResponse.Token
-            Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
+            if (-not $identityEndpoint -or -not $identityHeader) {
+                Write-CIEMLog -Message "MSI environment variables not found. IDENTITY_ENDPOINT=$(if($identityEndpoint){'set'}else{'not set'}), IDENTITY_HEADER=$(if($identityHeader){'set'}else{'not set'})" -Severity ERROR -Component 'Connect-CIEMAzure'
+                throw "Managed Identity environment not detected. IDENTITY_ENDPOINT and IDENTITY_HEADER must be set (Azure App Service MSI)."
+            }
+
+            Write-CIEMLog -Message "MSI endpoint detected: $identityEndpoint" -Severity DEBUG -Component 'Connect-CIEMAzure'
+
+            # Helper function to get token via MSI endpoint
+            $getMsiToken = {
+                param([string]$Resource)
+                $tokenUri = "$identityEndpoint`?api-version=2019-08-01&resource=$Resource"
+                if ($miClientId) {
+                    $tokenUri += "&client_id=$miClientId"
+                }
+                $headers = @{ 'X-IDENTITY-HEADER' = $identityHeader }
+                $response = Invoke-RestMethod -Uri $tokenUri -Headers $headers -Method Get -ErrorAction Stop
+                return $response
+            }
+
+            # Get ARM token via MSI REST API
+            Write-CIEMLog -Message "Requesting ARM token via MSI REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $armTokenResponse = & $getMsiToken -Resource 'https://management.azure.com/'
+            Write-CIEMLog -Message "ARM token obtained (expires: $($armTokenResponse.expires_on))" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Get Graph token via MSI REST API
+            Write-CIEMLog -Message "Requesting Graph token via MSI REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphTokenResponse = & $getMsiToken -Resource 'https://graph.microsoft.com/'
+            Write-CIEMLog -Message "Graph token obtained (expires: $($graphTokenResponse.expires_on))" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Get KeyVault token via MSI REST API
+            Write-CIEMLog -Message "Requesting KeyVault token via MSI REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $keyVaultTokenResponse = & $getMsiToken -Resource 'https://vault.azure.net/'
+            Write-CIEMLog -Message "KeyVault token obtained (expires: $($keyVaultTokenResponse.expires_on))" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Store tokens via centralized helper
+            Save-CIEMToken -ARMToken $armTokenResponse.access_token -GraphToken $graphTokenResponse.access_token -KeyVaultToken $keyVaultTokenResponse.access_token
+            Write-CIEMLog -Message "Tokens saved" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Extract tenant ID from ARM token (JWT payload contains tid claim)
+            $tokenParts = $armTokenResponse.access_token.Split('.')
+            $payload = $tokenParts[1]
+            # Add padding if needed for base64 decode
+            $padLength = 4 - ($payload.Length % 4)
+            if ($padLength -lt 4) { $payload += ('=' * $padLength) }
+            $decodedPayload = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($payload))
+            $tokenClaims = $decodedPayload | ConvertFrom-Json
+            $tenantId = $tokenClaims.tid
+            $accountId = $tokenClaims.oid  # Object ID of the managed identity
+            Write-CIEMLog -Message "Extracted from token - TenantId: $tenantId, ObjectId: $accountId" -Severity DEBUG -Component 'Connect-CIEMAzure'
+
+            # Inject ARM token into Az context
+            Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            Connect-AzAccount -AccessToken $armTokenResponse.access_token -AccountId $accountId -TenantId $tenantId -ErrorAction Stop | Out-Null
+            Write-CIEMLog -Message "Az context established successfully via Managed Identity" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         'DeviceCode' {
             Write-CIEMLog -Message "Processing DeviceCode authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
