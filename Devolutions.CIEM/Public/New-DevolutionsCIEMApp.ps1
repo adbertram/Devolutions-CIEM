@@ -24,6 +24,7 @@ function New-DevolutionsCIEMApp {
         function New-CIEMNavigation {
             @(
                 New-UDListItem -Label 'Dashboard' -Icon (New-UDIcon -Icon 'Home') -Href '/ciem'
+                New-UDListItem -Label 'Cloud Checks' -Icon (New-UDIcon -Icon 'ListCheck') -Href '/ciem/checks'
                 New-UDListItem -Label 'Scan' -Icon (New-UDIcon -Icon 'Play') -Href '/ciem/scan'
                 New-UDListItem -Label 'Configuration' -Icon (New-UDIcon -Icon 'Cog') -Href '/ciem/config'
                 New-UDListItem -Label 'About' -Icon (New-UDIcon -Icon 'InfoCircle') -Href '/ciem/about'
@@ -1159,6 +1160,212 @@ function New-DevolutionsCIEMApp {
             } -Navigation $Navigation -NavigationLayout permanent
         }
 
+        # Helper function to create the Cloud Checks page
+        function New-CIEMCloudChecksPage {
+            param($Navigation)
+
+            New-UDPage -Name 'Cloud Checks' -Url '/ciem/checks' -Content {
+                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
+                New-UDTypography -Text 'Cloud Checks' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
+                New-UDTypography -Text 'Browse all available CIEM security checks and sync new checks from upstream Prowler' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
+
+                # Sync Checks Card
+                New-UDCard -Title 'Sync Checks from Prowler' -Style @{ marginBottom = '20px' } -Content {
+                    New-UDTypography -Text 'Download new security checks from the upstream Prowler GitHub repository. Existing checks are skipped.' -Variant 'body2' -Style @{ color = '#666'; marginBottom = '16px' }
+
+                    New-UDElement -Tag 'div' -Id 'syncProgressArea' -Content {
+                        # Initially empty - populated during sync via Set-UDElement
+                    }
+
+                    New-UDButton -Id 'syncChecksBtn' -Text 'Sync Checks' -Variant 'contained' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -ShowLoading -OnClick {
+                        try {
+                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                            Write-CIEMLog -Message "Sync Checks button clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
+
+                            # Show progress
+                            Set-UDElement -Id 'syncProgressArea' -Content {
+                                New-CIEMProgressContent -Text 'Syncing checks from Prowler GitHub repository...'
+                            }
+                            Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $true }
+
+                            # Run sync
+                            $syncResult = Sync-ProwlerCheck -Verbose 4>&1 | ForEach-Object {
+                                if ($_ -is [System.Management.Automation.VerboseRecord]) {
+                                    Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-CloudChecksPage'
+                                }
+                                else {
+                                    $_ # Pass through result object
+                                }
+                            }
+
+                            $successCount = @($syncResult.Success).Count
+                            $skippedCount = @($syncResult.Skipped).Count
+                            $failedCount = @($syncResult.Failed).Count
+
+                            Write-CIEMLog -Message "Sync complete. Downloaded=$successCount, Skipped=$skippedCount, Failed=$failedCount" -Severity INFO -Component 'PSU-CloudChecksPage'
+
+                            if ($successCount -gt 0) {
+                                $detailParts = @("Downloaded: $successCount")
+                                if ($skippedCount -gt 0) { $detailParts += "Already existed: $skippedCount" }
+                                if ($failedCount -gt 0) { $detailParts += "Failed: $failedCount" }
+                                $detailText = $detailParts -join ' | '
+
+                                Set-UDElement -Id 'syncProgressArea' -Content {
+                                    New-CIEMSuccessContent -Text 'Sync Complete' -Details $detailText
+                                }
+
+                                Show-UDToast -Message "Synced $successCount new check(s) from Prowler." -Duration 5000 -BackgroundColor '#4caf50'
+
+                                # Refresh the checks table
+                                Sync-UDElement -Id 'checksTablePanel'
+                            }
+                            elseif ($failedCount -gt 0) {
+                                Set-UDElement -Id 'syncProgressArea' -Content {
+                                    New-CIEMErrorContent -Text 'Sync Failed' -Details "$failedCount check(s) failed to download. Skipped: $skippedCount"
+                                }
+                            }
+                            else {
+                                Set-UDElement -Id 'syncProgressArea' -Content {
+                                    New-CIEMSuccessContent -Text 'Already Up to Date' -Details "All $skippedCount upstream check(s) already exist locally."
+                                }
+                            }
+                        }
+                        catch {
+                            Write-CIEMLog -Message "Sync failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
+
+                            Set-UDElement -Id 'syncProgressArea' -Content {
+                                New-CIEMErrorContent -Text 'Sync Failed' -Details $_.Exception.Message
+                            }
+
+                            Show-UDToast -Message "Sync failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                        }
+                        finally {
+                            Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $false }
+                        }
+                    }
+                }
+
+                # Checks Data Table Card
+                New-UDCard -Title 'Available Security Checks' -Content {
+                    New-UDDynamic -Id 'checksTablePanel' -Content {
+                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
+                        try {
+                            $allChecks = @(Get-CIEMCheck)
+
+                            if ($allChecks.Count -gt 0) {
+                                # Summary chips
+                                $entraCount = @($allChecks | Where-Object { $_.Service -eq 'Entra' }).Count
+                                $iamCount = @($allChecks | Where-Object { $_.Service -eq 'IAM' }).Count
+                                $kvCount = @($allChecks | Where-Object { $_.Service -eq 'KeyVault' }).Count
+                                $storageCount = @($allChecks | Where-Object { $_.Service -eq 'Storage' }).Count
+
+                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
+                                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                        New-UDChip -Label "Total: $($allChecks.Count)" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' }
+                                        New-UDChip -Label "Entra: $entraCount" -Size 'small' -Style @{ backgroundColor = '#e8f5e9'; color = '#2e7d32' }
+                                        New-UDChip -Label "IAM: $iamCount" -Size 'small' -Style @{ backgroundColor = '#fff3e0'; color = '#e65100' }
+                                        New-UDChip -Label "KeyVault: $kvCount" -Size 'small' -Style @{ backgroundColor = '#f3e5f5'; color = '#7b1fa2' }
+                                        New-UDChip -Label "Storage: $storageCount" -Size 'small' -Style @{ backgroundColor = '#fce4ec'; color = '#c62828' }
+                                    }
+                                }
+
+                                # Build DataGrid data
+                                New-UDDataGrid -LoadRows {
+                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                    $checks = @(Get-CIEMCheck)
+                                    $checksData = $checks | ForEach-Object {
+                                        @{
+                                            id            = $_.Id
+                                            checkId       = $_.Id
+                                            title         = $_.Title
+                                            cloudProvider = $_.CloudProvider.ToString()
+                                            service       = $_.Service.ToString()
+                                            severity      = ($_.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                            categories    = ($_.Categories -join ', ')
+                                        }
+                                    }
+                                    @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
+                                } -Columns @(
+                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
+                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
+                                    New-UDDataGridColumn -Field 'cloudProvider' -HeaderName 'Provider' -Width 100
+                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
+                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
+                                        $sev = $EventData.severity.ToUpper()
+                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
+                                    New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
+                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
+                                    # Show check details when a row is expanded
+                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                    $checkId = $EventData.row.checkId
+                                    $check = Get-CIEMCheck -CheckId $checkId
+
+                                    if ($check) {
+                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '16px'; backgroundColor = '#fafafa' } } -Content {
+                                            New-UDGrid -Container -Spacing 2 -Content {
+                                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                                    New-UDTypography -Text 'Description' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                                    New-UDTypography -Text $check.Description -Variant 'body2' -Style @{ color = '#333' }
+                                                }
+                                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                                    New-UDTypography -Text 'Risk' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                                    New-UDTypography -Text $check.Risk -Variant 'body2' -Style @{ color = '#333' }
+                                                }
+                                            }
+
+                                            if ($check.Remediation -and $check.Remediation.Text) {
+                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '12px' } } -Content {
+                                                    New-UDTypography -Text 'Remediation' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                                    New-UDTypography -Text $check.Remediation.Text -Variant 'body2' -Style @{ color = '#333' }
+                                                    if ($check.Remediation.Url) {
+                                                        New-UDButton -Text 'Remediation Guide' -Variant 'text' -Size 'small' -Href $check.Remediation.Url -Style @{ marginTop = '4px' }
+                                                    }
+                                                }
+                                            }
+
+                                            if ($check.RelatedUrl) {
+                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '8px' } } -Content {
+                                                    New-UDButton -Text 'Related Documentation' -Variant 'text' -Size 'small' -Href $check.RelatedUrl
+                                                }
+                                            }
+
+                                            if ($check.CheckScript) {
+                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '8px' } } -Content {
+                                                    New-UDTypography -Text 'Check Script' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                                    New-UDChip -Label $check.CheckScript -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; fontFamily = 'monospace' }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else {
+                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
+                                            New-UDTypography -Text 'Check details not available.' -Variant 'body2' -Style @{ color = '#666' }
+                                        }
+                                    }
+                                }
+                            }
+                            else {
+                                New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
+                                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
+                                        New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
+                                        New-UDTypography -Text 'No Checks Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
+                                        New-UDTypography -Text 'Use the Sync Checks button above to download checks from the Prowler repository.' -Variant 'body1' -Style @{ color = '#666' }
+                                    }
+                                }
+                            }
+                        }
+                        catch {
+                            New-UDTypography -Text "Error loading checks: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#f44336'; padding = '16px' }
+                        }
+                    }
+                }
+            } -Navigation $Navigation -NavigationLayout permanent
+        }
+
         # Helper function to create the About page
         function New-CIEMAboutPage {
             param($Navigation)
@@ -1207,6 +1414,7 @@ function New-DevolutionsCIEMApp {
 
         # Create pages
         $DashboardPage = New-CIEMDashboardPage -Navigation $Navigation
+        $CloudChecksPage = New-CIEMCloudChecksPage -Navigation $Navigation
         $ScanPage = New-CIEMScanPage -Navigation $Navigation
         $ConfigPage = New-CIEMConfigPage -Navigation $Navigation
         $AboutPage = New-CIEMAboutPage -Navigation $Navigation
@@ -1214,6 +1422,7 @@ function New-DevolutionsCIEMApp {
         # Return the App
         New-UDApp -Title 'Devolutions CIEM' -Pages @(
             $DashboardPage
+            $CloudChecksPage
             $ScanPage
             $ConfigPage
             $AboutPage
