@@ -1298,55 +1298,7 @@ function New-DevolutionsCIEMApp {
                                         New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                                     }
                                     New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
-                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
-                                    # Show check details when a row is expanded
-                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                    $checkId = $EventData.row.checkId
-                                    $check = Get-CIEMCheck -CheckId $checkId
-
-                                    if ($check) {
-                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '16px'; backgroundColor = '#fafafa' } } -Content {
-                                            New-UDGrid -Container -Spacing 2 -Content {
-                                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                                    New-UDTypography -Text 'Description' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                                    New-UDTypography -Text $check.Description -Variant 'body2' -Style @{ color = '#333' }
-                                                }
-                                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                                    New-UDTypography -Text 'Risk' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                                    New-UDTypography -Text $check.Risk -Variant 'body2' -Style @{ color = '#333' }
-                                                }
-                                            }
-
-                                            if ($check.Remediation -and $check.Remediation.Text) {
-                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '12px' } } -Content {
-                                                    New-UDTypography -Text 'Remediation' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                                    New-UDTypography -Text $check.Remediation.Text -Variant 'body2' -Style @{ color = '#333' }
-                                                    if ($check.Remediation.Url) {
-                                                        New-UDButton -Text 'Remediation Guide' -Variant 'text' -Size 'small' -Href $check.Remediation.Url -Style @{ marginTop = '4px' }
-                                                    }
-                                                }
-                                            }
-
-                                            if ($check.RelatedUrl) {
-                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '8px' } } -Content {
-                                                    New-UDButton -Text 'Related Documentation' -Variant 'text' -Size 'small' -Href $check.RelatedUrl
-                                                }
-                                            }
-
-                                            if ($check.CheckScript) {
-                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '8px' } } -Content {
-                                                    New-UDTypography -Text 'Check Script' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                                    New-UDChip -Label $check.CheckScript -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; fontFamily = 'monospace' }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    else {
-                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
-                                            New-UDTypography -Text 'Check details not available.' -Variant 'body2' -Style @{ color = '#666' }
-                                        }
-                                    }
-                                }
+                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
                             }
                             else {
                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
