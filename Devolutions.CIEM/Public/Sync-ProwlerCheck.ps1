@@ -1,17 +1,15 @@
 function Sync-ProwlerCheck {
     <#
     .SYNOPSIS
-        Syncs new Prowler checks from the upstream repository.
+        Syncs new Prowler checks from the upstream GitHub repository.
 
     .DESCRIPTION
-        Extracts check files from the upstream Prowler repository that add or modify
-        security checks. Only syncs providers defined in CIEM config.
+        Downloads check files from the Prowler GitHub repository that are not yet
+        present locally. No git clone or upstream remote is required.
 
-        By default, syncs all available check commits. Use -CherryPick to sync specific commits.
+        After downloading, new checks are automatically converted to PowerShell format.
 
-        After syncing, new checks are automatically converted to PowerShell format.
-
-        Use Get-ProwlerCheck to preview available commits first.
+        Use Get-ProwlerCheck to preview available checks first.
 
     .PARAMETER Provider
         Filter to a specific provider (azure, aws, gcp).
@@ -20,29 +18,20 @@ function Sync-ProwlerCheck {
     .PARAMETER Service
         Filter to a specific service (e.g., entra, iam, storage).
 
-    .PARAMETER Since
-        Only consider commits since this date. Defaults to 30 days ago.
-        Format: YYYY-MM-DD or relative like "30 days ago"
-
-    .PARAMETER CherryPick
-        Comma-separated list of commit hashes to sync.
-        If not specified, syncs all available commits.
+    .PARAMETER Ref
+        Branch, tag, or commit SHA to sync from. Defaults to 'master'.
 
     .EXAMPLE
         Sync-ProwlerCheck
-        # Syncs all check commits for supported providers
+        # Syncs all check files for supported providers
 
     .EXAMPLE
-        Sync-ProwlerCheck -CherryPick "abc1234,def5678"
-        # Syncs only specific commits
+        Sync-ProwlerCheck -Provider azure -Service entra
+        # Syncs only Entra-related checks
 
     .EXAMPLE
-        Sync-ProwlerCheck -Service entra
-        # Syncs only Entra-related check commits
-
-    .NOTES
-        Requires git and the upstream remote to be configured:
-        git remote add upstream https://github.com/prowler-cloud/prowler.git
+        Sync-ProwlerCheck -Ref 'v4.0.0'
+        # Syncs checks from the v4.0.0 tag
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -55,273 +44,13 @@ function Sync-ProwlerCheck {
         [string]$Service,
 
         [Parameter()]
-        [string]$Since = '30 days ago',
-
-        [Parameter()]
-        [string]$CherryPick
+        [string]$Ref = 'master'
     )
 
     $ErrorActionPreference = 'Stop'
 
-    #region Nested Helper Functions
-
-    # Builds glob patterns for locating check directories in the Prowler repo structure
-    function Get-CheckPathPattern {
-        param(
-            [string[]]$Providers,
-            [string]$Service
-        )
-
-        $patterns = @()
-        foreach ($prov in $Providers) {
-            $servicePath = if ($Service) { $Service } else { '*' }
-            $patterns += "prowler/providers/$prov/services/$servicePath/*/"
-        }
-
-        $patterns
-    }
-
-    # Fetches git commits from upstream that add/modify check metadata or implementation files
-    function Get-UpstreamCheckCommit {
-        param(
-            [string[]]$PathPatterns,
-            [string]$Since,
-            [int]$Limit = 100
-        )
-
-        $upstreamRemote = $script:Config.prowler.upstreamRemote
-
-        Write-Verbose "Fetching from upstream..."
-        git fetch $upstreamRemote --quiet 2>&1 | Out-Null
-
-        $filePatterns = @()
-        foreach ($pattern in $PathPatterns) {
-            $filePatterns += "${pattern}*.metadata.json"
-            $filePatterns += "${pattern}*.py"
-        }
-
-        $gitLogArgs = @(
-            'log',
-            "$upstreamRemote/master",
-            "--since=`"$Since`"",
-            "-n", $Limit,
-            '--pretty=format:%H|%s|%an|%ad|%ar',
-            '--date=short',
-            '--diff-filter=AM',
-            '--'
-        ) + $filePatterns
-
-        $logOutput = & git @gitLogArgs 2>&1
-
-        if ($logOutput) {
-            $commits = $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
-                $parts = $_ -split '\|', 5
-                if ($parts.Count -ge 5) {
-                    [PSCustomObject]@{
-                        Hash         = $parts[0]
-                        ShortHash    = $parts[0].Substring(0, 8)
-                        Subject      = $parts[1]
-                        Author       = $parts[2]
-                        Date         = $parts[3]
-                        RelativeDate = $parts[4]
-                        Files        = @()
-                        NewChecks    = @()
-                        Provider     = ''
-                        Services     = @()
-                    }
-                }
-            }
-
-            foreach ($commit in $commits) {
-                $files = git show --name-only --pretty=format: $commit.Hash -- @filePatterns 2>&1 |
-                    Where-Object { $_ -and $_ -match '\.metadata\.json$|\.py$' }
-
-                $commit.Files = @($files)
-
-                $checkIds = @()
-                $providers = @()
-                $services = @()
-
-                foreach ($file in $files) {
-                    if ($file -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
-                        $prov = $Matches[1]
-                        $svc = $Matches[2]
-                        $checkId = $Matches[3]
-
-                        if ($providers -notcontains $prov) { $providers += $prov }
-                        if ($services -notcontains $svc) { $services += $svc }
-                        if ($checkIds -notcontains $checkId) { $checkIds += $checkId }
-                    }
-                }
-
-                $commit.Provider = $providers -join ', '
-                $commit.Services = $services
-                $commit.NewChecks = $checkIds
-            }
-
-            @($commits | Where-Object { @($_.Files).Count -gt 0 })
-        }
-    }
-
-    # Outputs verbose information about found commits for debugging
-    function Show-CommitDetail {
-        param(
-            [array]$Commits,
-            [string[]]$Providers
-        )
-
-        if ($Commits.Count -eq 0) {
-            Write-Verbose "No check-related commits found."
-            Write-Verbose "Providers searched: $($Providers -join ', ')"
-        }
-        else {
-            Write-Verbose "Found $($Commits.Count) check-related commits"
-        }
-    }
-
-    # Extracts check files from upstream commits and creates local commits
-    function Invoke-CheckSync {
-        param(
-            [array]$Commits
-        )
-
-        $results = [PSCustomObject]@{
-            Success = [System.Collections.Generic.List[string]]::new()
-            Failed  = [System.Collections.Generic.List[string]]::new()
-            Skipped = [System.Collections.Generic.List[string]]::new()
-        }
-
-        # Build regex pattern for check files only
-        # Upstream paths are: prowler/providers/{provider}/services/{service}/{check}/*
-        # Local paths are:    prowler/prowler/providers/{provider}/services/{service}/{check}/*
-        $checkPathRegex = '^prowler/providers/[^/]+/services/[^/]+/[^/]+/'
-
-        foreach ($commit in $Commits) {
-            $hash = if ($commit -is [string]) { $commit } else { $commit.Hash }
-            $shortHash = $hash.Substring(0, [Math]::Min(8, $hash.Length))
-
-            # Get all files changed in this commit
-            $allFiles = @(git show --name-only --pretty=format: $hash 2>&1 | Where-Object { $_ })
-
-            # Filter to ONLY check files (nothing else from the commit)
-            $checkFiles = @($allFiles | Where-Object { $_ -match $checkPathRegex })
-
-            if ($checkFiles.Count -eq 0) {
-                Write-Verbose "  Skipping $shortHash - no check files"
-                $results.Skipped.Add($hash)
-                continue
-            }
-
-            # Check which files need syncing
-            # Map upstream paths (prowler/providers/...) to local paths (prowler/prowler/providers/...)
-            $newFiles = @()
-            foreach ($upstreamFile in $checkFiles) {
-                $localFile = "prowler/$upstreamFile"
-                if (-not (Test-Path $localFile)) {
-                    $newFiles += @{ Upstream = $upstreamFile; Local = $localFile }
-                }
-                # If file exists locally, skip it (delete local file to force re-sync)
-            }
-
-            if ($newFiles.Count -eq 0) {
-                Write-Verbose "  Skipping $shortHash - already synced"
-                $results.Skipped.Add($hash)
-                continue
-            }
-
-            Write-Verbose "  Syncing $shortHash ($($newFiles.Count) file(s))..."
-
-            try {
-                # Extract check files from the commit to local paths
-                foreach ($filePair in $newFiles) {
-                    $localDir = Split-Path $filePair.Local -Parent
-                    if (-not (Test-Path $localDir)) {
-                        New-Item -ItemType Directory -Path $localDir -Force | Out-Null
-                    }
-                    # Get file content from upstream commit and write to local path
-                    $content = git show "${hash}:$($filePair.Upstream)" 2>&1
-                    if ($LASTEXITCODE -ne 0) {
-                        throw "Failed to get content for $($filePair.Upstream)"
-                    }
-                    Set-Content -Path $filePair.Local -Value $content -NoNewline
-                }
-
-                # Stage and commit
-                $localPaths = $newFiles | ForEach-Object { $_.Local }
-                git add $localPaths 2>&1 | Out-Null
-                git commit -m "Sync Prowler check: $shortHash" --no-verify 2>&1 | Out-Null
-
-                Write-Verbose "    Success"
-                $results.Success.Add($hash)
-            }
-            catch {
-                Write-Verbose "    Failed: $_"
-                # Reset any staged changes
-                git reset HEAD 2>&1 | Out-Null
-                git checkout HEAD -- . 2>&1 | Out-Null
-                $results.Failed.Add($hash)
-            }
-        }
-
-        $results
-    }
-
-    # Returns local filesystem paths for newly synced checks that need conversion
-    function Get-NewCheckPath {
-        param([array]$Commits)
-
-        $checkPaths = @()
-
-        foreach ($commit in $Commits) {
-            foreach ($file in $commit.Files) {
-                if ($file -match '(prowler/providers/[^/]+/services/[^/]+/[^/]+)/' ) {
-                    $checkPath = $Matches[1]
-                    if ($checkPaths -notcontains $checkPath -and (Test-Path $checkPath)) {
-                        $checkPaths += $checkPath
-                    }
-                }
-            }
-        }
-
-        $checkPaths
-    }
-
-    # Converts successfully synced Prowler checks from Python to PowerShell format
-    function Invoke-CheckConversion {
-        param(
-            [array]$Commits,
-            [string[]]$SuccessHashes
-        )
-
-        $relevantCommits = @($Commits | Where-Object { $SuccessHashes -contains $_.Hash })
-        $checkPaths = @(Get-NewCheckPath -Commits $relevantCommits)
-
-        if ($checkPaths.Count -gt 0) {
-            Write-Verbose "Converting $($checkPaths.Count) check(s) to PowerShell..."
-
-            foreach ($checkPath in $checkPaths) {
-                $checkId = Split-Path $checkPath -Leaf
-                Write-Verbose "  Converting: $checkId"
-                try {
-                    Convert-ProwlerCheck -CheckPath $checkPath | Out-Null
-                    Write-Verbose "    Done"
-                }
-                catch {
-                    Write-Verbose "    Failed: $_"
-                }
-            }
-        }
-        else {
-            Write-Verbose "No new checks to convert."
-        }
-    }
-
-    #endregion Nested Helper Functions
-
-    #region Main Logic
-
-    # Use shared private functions
-    Test-GitRemote
+    # Resolve local prowler providers path
+    $prowlerProvidersPath = Join-Path $script:ModuleRoot $script:Config.prowler.path
 
     $providersToSync = if ($Provider) {
         @($Provider)
@@ -330,60 +59,84 @@ function Sync-ProwlerCheck {
         (Get-CIEMProvider).Name.ToLower()
     }
 
-    Write-Verbose "Syncing Prowler checks..."
+    Write-Verbose "Syncing Prowler checks from GitHub..."
     Write-Verbose "  Providers: $($providersToSync -join ', ')"
-    Write-Verbose "  Since: $Since"
-    if ($Service) {
-        Write-Verbose "  Service: $Service"
+    if ($Service) { Write-Verbose "  Service: $Service" }
+    Write-Verbose "  Ref: $Ref"
+    Write-Verbose "  Local path: $prowlerProvidersPath"
+
+    # Get available checks from GitHub
+    $splatParams = @{ Ref = $Ref; ErrorAction = 'Stop' }
+    if ($Provider) { $splatParams.Provider = $Provider }
+    if ($Service) { $splatParams.Service = $Service }
+    $availableChecks = @(Get-ProwlerCheck @splatParams)
+
+    if ($availableChecks.Count -eq 0) {
+        Write-Verbose "No checks found upstream."
+        return [PSCustomObject]@{ Success = @(); Failed = @(); Skipped = @() }
     }
 
-    $pathPatterns = Get-CheckPathPattern -Providers $providersToSync -Service $Service
-    $commits = @(Get-UpstreamCheckCommit -PathPatterns $pathPatterns -Since $Since)
+    Write-Verbose "Found $($availableChecks.Count) checks upstream."
 
-    if ($commits.Count -eq 0) {
-        Write-Verbose "No commits to sync."
-        [PSCustomObject]@{ Success = @(); Failed = @(); Skipped = @() }
-    }
-    else {
-        # Determine which commits to sync
-        if ($CherryPick) {
-            $hashes = $CherryPick -split ',' | ForEach-Object { $_.Trim() }
-            $commitsToSync = @(foreach ($hash in $hashes) {
-                    $found = $commits | Where-Object { $_.Hash -like "$hash*" -or $_.ShortHash -eq $hash }
-                    if ($found) {
-                        $found
-                    }
-                    else {
-                        [PSCustomObject]@{
-                            Hash      = $hash
-                            ShortHash = $hash.Substring(0, [Math]::Min(8, $hash.Length))
-                            Files     = @()
-                        }
-                    }
-                })
-        }
-        else {
-            # Sync all by default
-            $commitsToSync = @($commits)
+    $success = [System.Collections.Generic.List[string]]::new()
+    $failed = [System.Collections.Generic.List[string]]::new()
+    $skipped = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($check in $availableChecks) {
+        $localCheckDir = Join-Path $prowlerProvidersPath "$($check.Provider)/services/$($check.Service)/$($check.Name)"
+
+        if (Test-Path $localCheckDir) {
+            Write-Verbose "  Skipping $($check.Name) - already exists locally"
+            $skipped.Add($check.Name)
+            continue
         }
 
-        Show-CommitDetail -Commits $commitsToSync -Providers $providersToSync
+        Write-Verbose "  Downloading $($check.Name) ($($check.Files.Count) files)..."
 
-        Write-Verbose "Syncing $($commitsToSync.Count) commits..."
-        $results = Invoke-CheckSync -Commits $commitsToSync
+        try {
+            foreach ($file in $check.Files) {
+                # Map GitHub path to local path
+                # GitHub: prowler/providers/{provider}/services/{service}/{check}/{file}
+                # Local:  {prowlerProvidersPath}/{provider}/services/{service}/{check}/{file}
+                $relativePath = $file -replace '^prowler/providers/', ''
+                $destination = Join-Path $prowlerProvidersPath $relativePath
 
-        if ($results.Success.Count -gt 0) {
-            Invoke-CheckConversion -Commits $commits -SuccessHashes $results.Success
+                Save-GitHubRepoFile -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path $file -Destination $destination -ErrorAction Stop
+            }
+
+            Write-Verbose "    Downloaded"
+            $success.Add($check.Name)
         }
-
-        Write-Verbose "Summary: Success=$($results.Success.Count), Skipped=$($results.Skipped.Count), Failed=$($results.Failed.Count)"
-
-        [PSCustomObject]@{
-            Success = @($results.Success)
-            Failed  = @($results.Failed)
-            Skipped = @($results.Skipped)
+        catch {
+            Write-Verbose "    Failed: $_"
+            $failed.Add($check.Name)
         }
     }
 
-    #endregion Main Logic
+    # Convert newly downloaded checks to PowerShell
+    if ($success.Count -gt 0) {
+        Write-Verbose "Converting $($success.Count) new check(s) to PowerShell..."
+
+        foreach ($checkName in $success) {
+            $check = $availableChecks | Where-Object { $_.Name -eq $checkName }
+            $localCheckDir = Join-Path $prowlerProvidersPath "$($check.Provider)/services/$($check.Service)/$($check.Name)"
+
+            Write-Verbose "  Converting: $checkName"
+            try {
+                Convert-ProwlerCheck -CheckPath $localCheckDir | Out-Null
+                Write-Verbose "    Done"
+            }
+            catch {
+                Write-Verbose "    Conversion failed: $_"
+            }
+        }
+    }
+
+    Write-Verbose "Summary: Downloaded=$($success.Count), Skipped=$($skipped.Count), Failed=$($failed.Count)"
+
+    [PSCustomObject]@{
+        Success = @($success)
+        Failed  = @($failed)
+        Skipped = @($skipped)
+    }
 }

@@ -1,12 +1,13 @@
 function Get-ProwlerCheck {
     <#
     .SYNOPSIS
-        Lists available Prowler checks from the upstream repository.
+        Lists available Prowler checks from the upstream GitHub repository.
 
     .DESCRIPTION
-        Queries the upstream Prowler repository for security checks that have been
-        added or modified. Returns one object per check with Date, Provider, Service,
-        Name, and associated Files.
+        Queries the Prowler GitHub repository via the Trees API to discover security checks.
+        Returns one object per check with Provider, Service, Name, and associated Files.
+
+        No local git clone or upstream remote is required.
 
     .PARAMETER Provider
         Filter to a specific provider (azure, aws, gcp).
@@ -14,20 +15,17 @@ function Get-ProwlerCheck {
     .PARAMETER Service
         Filter to a specific service (e.g., entra, iam, storage).
 
-    .PARAMETER Since
-        Only show checks since this date. Defaults to 30 days ago.
-
-    .PARAMETER Limit
-        Maximum number of commits to search. Defaults to 50.
+    .PARAMETER Ref
+        Branch, tag, or commit SHA to query. Defaults to 'master'.
 
     .EXAMPLE
         Get-ProwlerCheck
 
     .EXAMPLE
-        Get-ProwlerCheck -Service entra
+        Get-ProwlerCheck -Provider azure -Service entra
 
     .OUTPUTS
-        PSCustomObject with properties: Date, Provider, Service, Name, Files
+        PSCustomObject with properties: Provider, Service, Name, Files
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject[]])]
@@ -40,90 +38,55 @@ function Get-ProwlerCheck {
         [string]$Service,
 
         [Parameter()]
-        [string]$Since = '30 days ago',
-
-        [Parameter()]
-        [int]$Limit = 50
+        [string]$Ref = 'master'
     )
 
+    $shouldThrow = $ErrorActionPreference -eq 'Stop'
     $ErrorActionPreference = 'Stop'
 
-    # Get provider names from config
     $supportedProviders = (Get-CIEMProvider).Name.ToLower()
-
-    # Verify upstream remote
-    Test-GitRemote
-
     $providersToQuery = if ($Provider) { @($Provider) } else { $supportedProviders }
 
-    Write-Verbose "Searching for check commits..."
+    Write-Verbose "Searching for Prowler checks via GitHub API..."
     Write-Verbose "  Providers: $($providersToQuery -join ', ')"
-    Write-Verbose "  Since: $Since"
-    if ($Service) {
-        Write-Verbose "  Service: $Service"
-    }
+    if ($Service) { Write-Verbose "  Service: $Service" }
+    Write-Verbose "  Ref: $Ref"
 
-    # Fetch from upstream
-    $upstreamRemote = $script:Config.prowler.upstreamRemote
-    Write-Verbose "Fetching from upstream..."
-    git fetch $upstreamRemote --quiet 2>&1 | Out-Null
-
-    # Build file patterns
-    $filePatterns = @()
     foreach ($prov in $providersToQuery) {
-        $servicePath = if ($Service) { $Service } else { '*' }
-        $filePatterns += "prowler/providers/$prov/services/$servicePath/*/*.metadata.json"
-        $filePatterns += "prowler/providers/$prov/services/$servicePath/*/*.py"
-    }
+        $path = "prowler/providers/$prov/services"
+        if ($Service) {
+            $path = "prowler/providers/$prov/services/$Service"
+        }
 
-    # Get commits
-    $gitLogArgs = @(
-        'log', "$upstreamRemote/master",
-        "--since=`"$Since`"", "-n", $Limit,
-        '--pretty=format:%H|%s|%an|%ad|%ar',
-        '--date=short', '--diff-filter=AM', '--'
-    ) + $filePatterns
+        try {
+            $tree = Get-GitHubRepoTree -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path $path -ErrorAction Stop
+        }
+        catch {
+            $msg = "Failed to fetch check tree for provider '$prov': $_"
+            if ($shouldThrow) { throw $msg }
+            Write-Warning $msg
+            continue
+        }
 
-    $logOutput = & git @gitLogArgs 2>&1
+        # Checks are identified by having a .metadata.json file
+        $metadataFiles = $tree | Where-Object { $_.Type -eq 'blob' -and $_.Path -match '\.metadata\.json$' }
 
-    if ($logOutput) {
-        # Parse commits and extract check information
-        $logOutput | Where-Object { $_ -and $_ -notmatch '^warning:' } | ForEach-Object {
-            $parts = $_ -split '\|', 5
-            if ($parts.Count -ge 5) {
-                $hash = $parts[0]
-                $date = $parts[3]
+        foreach ($metaFile in $metadataFiles) {
+            if ($metaFile.Path -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
+                $checkProvider = $Matches[1]
+                $checkService = $Matches[2]
+                $checkId = $Matches[3]
 
-                # Get files for this commit
-                $files = git show --name-only --pretty=format: $hash -- @filePatterns 2>&1 |
-                    Where-Object { $_ -and $_ -match '\.metadata\.json$|\.py$' }
+                $checkPrefix = "prowler/providers/$checkProvider/services/$checkService/$checkId/"
+                $checkFiles = @($tree | Where-Object { $_.Type -eq 'blob' -and $_.Path -like "$checkPrefix*" })
 
-                # Extract unique checks from file paths
-                $seenChecks = @{}
-                foreach ($file in $files) {
-                    if ($file -match 'providers/([^/]+)/services/([^/]+)/([^/]+)/') {
-                        $fileProvider = $Matches[1]
-                        $fileService = $Matches[2]
-                        $checkId = $Matches[3]
-
-                        # Create one object per unique check
-                        if (-not $seenChecks.ContainsKey($checkId)) {
-                            $seenChecks[$checkId] = $true
-                            $checkFiles = @($files | Where-Object { $_ -match "/$checkId/" })
-                            [PSCustomObject]@{
-                                Date     = $date
-                                Provider = $fileProvider
-                                Service  = $fileService
-                                Name     = $checkId
-                                Files    = $checkFiles
-                            }
-                        }
-                    }
+                [PSCustomObject]@{
+                    Provider = $checkProvider
+                    Service  = $checkService
+                    Name     = $checkId
+                    Files    = @($checkFiles.Path)
                 }
             }
         }
-    }
-    else {
-        Write-Verbose "No check-related commits found."
     }
 }
