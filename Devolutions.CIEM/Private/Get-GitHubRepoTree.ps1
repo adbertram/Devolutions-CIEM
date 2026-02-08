@@ -66,53 +66,63 @@ function Get-GitHubRepoTree {
 
     $ErrorActionPreference = 'Stop'
 
-    $uri = "https://api.github.com/repos/$Owner/$Repo/git/trees/${Ref}?recursive=1"
-    $headers = @{
-        'User-Agent' = 'Devolutions-CIEM'
-        'Accept'     = 'application/vnd.github+json'
+    # Check cache first - key is Owner/Repo/Ref, stores full tree to avoid repeated API calls
+    $cacheKey = "$Owner/$Repo/$Ref"
+    if ($script:GitHubTreeCache.ContainsKey($cacheKey)) {
+        Write-Verbose "Using cached tree for $cacheKey"
+        $tree = $script:GitHubTreeCache[$cacheKey]
     }
+    else {
+        $uri = "https://api.github.com/repos/$Owner/$Repo/git/trees/${Ref}?recursive=1"
+        $headers = @{
+            'User-Agent' = 'Devolutions-CIEM'
+            'Accept'     = 'application/vnd.github+json'
+        }
 
-    Write-Verbose "Fetching tree for $Owner/$Repo at ref '$Ref'..."
+        Write-Verbose "Fetching tree for $Owner/$Repo at ref '$Ref'..."
 
-    try {
-        $response = Invoke-RestMethod -Uri $uri -Headers $headers -ErrorAction Stop
-    }
-    catch [Microsoft.PowerShell.Commands.HttpResponseException] {
-        $statusCode = [int]$_.Exception.Response.StatusCode
+        try {
+            $response = Invoke-RestMethod -Uri $uri -Headers $headers -ErrorAction Stop
+        }
+        catch [Microsoft.PowerShell.Commands.HttpResponseException] {
+            $statusCode = [int]$_.Exception.Response.StatusCode
 
-        switch ($statusCode) {
-            403 {
-                $msg = "GitHub API rate limit exceeded for $Owner/$Repo. Unauthenticated requests are limited to 60 per hour."
-                if ($shouldThrow) { throw $msg }
-                Write-Warning $msg
-                return
-            }
-            404 {
-                $msg = "Repository not found: $Owner/$Repo (ref: $Ref)"
-                if ($shouldThrow) { throw $msg }
-                Write-Warning $msg
-                return
-            }
-            default {
-                $msg = "GitHub API error ($statusCode) fetching tree for $Owner/$Repo"
-                if ($shouldThrow) { throw $msg }
-                Write-Warning $msg
-                return
+            switch ($statusCode) {
+                403 {
+                    $msg = "GitHub API rate limit exceeded for $Owner/$Repo. Unauthenticated requests are limited to 60 per hour."
+                    if ($shouldThrow) { throw $msg }
+                    Write-Warning $msg
+                    return
+                }
+                404 {
+                    $msg = "Repository not found: $Owner/$Repo (ref: $Ref)"
+                    if ($shouldThrow) { throw $msg }
+                    Write-Warning $msg
+                    return
+                }
+                default {
+                    $msg = "GitHub API error ($statusCode) fetching tree for $Owner/$Repo"
+                    if ($shouldThrow) { throw $msg }
+                    Write-Warning $msg
+                    return
+                }
             }
         }
-    }
-    catch {
-        $msg = "Failed to fetch GitHub tree for $Owner/${Repo}: $_"
-        if ($shouldThrow) { throw $msg }
-        Write-Warning $msg
-        return
-    }
+        catch {
+            $msg = "Failed to fetch GitHub tree for $Owner/${Repo}: $_"
+            if ($shouldThrow) { throw $msg }
+            Write-Warning $msg
+            return
+        }
 
-    if ($response.truncated) {
-        Write-Warning "GitHub tree response was truncated. The repository $Owner/$Repo has more files than the API can return in a single request."
-    }
+        if ($response.truncated) {
+            Write-Warning "GitHub tree response was truncated. The repository $Owner/$Repo has more files than the API can return in a single request."
+        }
 
-    $tree = $response.tree
+        $tree = $response.tree
+        $script:GitHubTreeCache[$cacheKey] = $tree
+        Write-Verbose "Cached tree for $cacheKey ($($tree.Count) entries)"
+    }
 
     # Filter by path prefix if specified
     if ($Path) {

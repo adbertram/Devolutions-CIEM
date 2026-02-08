@@ -4,19 +4,19 @@ function Sync-ProwlerCheck {
         Syncs new Prowler checks from the upstream GitHub repository.
 
     .DESCRIPTION
-        Downloads check files from the Prowler GitHub repository that are not yet
-        present locally. No git clone or upstream remote is required.
+        Uses the GitHub Trees API (single cached request) to discover all checks in the
+        Prowler repository, then downloads only new checks via raw.githubusercontent.com.
+        Each new check requires 2 HTTP requests (metadata.json + .py file).
 
-        After downloading, new checks are automatically converted to PowerShell format.
-
-        Use Get-ProwlerCheck to preview available checks first.
+        For incremental syncs with 0 new checks, this costs a single cached API call.
 
     .PARAMETER Provider
-        Filter to a specific provider (azure, aws, gcp).
-        If not specified, syncs all providers defined in CIEM config.
+        Filter to specific provider(s) (azure, aws, gcp).
+        Accepts one or more values. If not specified, syncs all providers defined in CIEM config.
 
     .PARAMETER Service
-        Filter to a specific service (e.g., entra, iam, storage).
+        Filter to specific service(s) (e.g., entra, iam, storage).
+        Accepts one or more values.
 
     .PARAMETER Ref
         Branch, tag, or commit SHA to sync from. Defaults to 'master'.
@@ -30,6 +30,10 @@ function Sync-ProwlerCheck {
         # Syncs only Entra-related checks
 
     .EXAMPLE
+        Sync-ProwlerCheck -Provider azure, aws -Verbose
+        # Syncs checks for both Azure and AWS providers
+
+    .EXAMPLE
         Sync-ProwlerCheck -Ref 'v4.0.0'
         # Syncs checks from the v4.0.0 tag
     #>
@@ -38,10 +42,10 @@ function Sync-ProwlerCheck {
     param(
         [Parameter()]
         [ValidateSet('azure', 'aws', 'gcp')]
-        [string]$Provider,
+        [string[]]$Provider,
 
         [Parameter()]
-        [string]$Service,
+        [string[]]$Service,
 
         [Parameter()]
         [string]$Ref = 'master'
@@ -49,94 +53,137 @@ function Sync-ProwlerCheck {
 
     $ErrorActionPreference = 'Stop'
 
-    # Resolve local prowler providers path
-    $prowlerProvidersPath = Join-Path $script:ModuleRoot $script:Config.prowler.path
-
     $providersToSync = if ($Provider) {
         @($Provider)
     }
     else {
-        (Get-CIEMProvider).Name.ToLower()
+        @((Get-CIEMProvider).Name.ToLower())
     }
 
     Write-Verbose "Syncing Prowler checks from GitHub..."
     Write-Verbose "  Providers: $($providersToSync -join ', ')"
-    if ($Service) { Write-Verbose "  Service: $Service" }
+    if ($Service) { Write-Verbose "  Services: $($Service -join ', ')" }
     Write-Verbose "  Ref: $Ref"
-    Write-Verbose "  Local path: $prowlerProvidersPath"
 
-    # Get available checks from GitHub
-    $splatParams = @{ Ref = $Ref; ErrorAction = 'Stop' }
-    if ($Provider) { $splatParams.Provider = $Provider }
-    if ($Service) { $splatParams.Service = $Service }
-    $availableChecks = @(Get-ProwlerCheck @splatParams)
+    # 1. Get the full repo tree (single API call, cached)
+    Write-Verbose "Fetching repository tree..."
+    $tree = Get-GitHubRepoTree -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path 'prowler/providers' -ErrorAction Stop
 
-    if ($availableChecks.Count -eq 0) {
-        Write-Verbose "No checks found upstream."
-        return [PSCustomObject]@{ Success = @(); Failed = @(); Skipped = @() }
+    # 2. Find check directories via regex on tree paths
+    #    Pattern: prowler/providers/{provider}/services/{service}/{checkName}/{checkName}.metadata.json
+    $checkEntries = $tree | Where-Object {
+        $_.Type -eq 'blob' -and $_.Path -match '^prowler/providers/([^/]+)/services/([^/]+)/([^/]+)/\3\.metadata\.json$'
     }
 
-    Write-Verbose "Found $($availableChecks.Count) checks upstream."
+    Write-Verbose "Found $($checkEntries.Count) total checks in repository tree"
+
+    # 3. Apply provider and service filters
+    $filteredEntries = $checkEntries | Where-Object {
+        $null = $_.Path -match '^prowler/providers/([^/]+)/services/([^/]+)/([^/]+)/'
+        $entryProvider = $Matches[1]
+        $entryService = $Matches[2]
+
+        $providerMatch = $entryProvider -in $providersToSync
+        $serviceMatch = if ($Service) { $entryService -in $Service } else { $true }
+        $providerMatch -and $serviceMatch
+    }
+
+    Write-Verbose "After filters: $($filteredEntries.Count) checks"
+
+    # 4. Diff against existing checks
+    $existingChecks = @(Get-CIEMCheck)
+    $existingIds = @($existingChecks | ForEach-Object { $_.Id })
+
+    $newEntries = $filteredEntries | Where-Object {
+        $null = $_.Path -match '/([^/]+)/[^/]+\.metadata\.json$'
+        $checkName = $Matches[1]
+        $checkName -notin $existingIds
+    }
+
+    $newEntryList = @($newEntries)
+    $skippedCount = $filteredEntries.Count - $newEntryList.Count
+
+    Write-Verbose "New checks to sync: $($newEntryList.Count), Already exist: $skippedCount"
 
     $success = [System.Collections.Generic.List[string]]::new()
     $failed = [System.Collections.Generic.List[string]]::new()
     $skipped = [System.Collections.Generic.List[string]]::new()
 
-    foreach ($check in $availableChecks) {
-        $localCheckDir = Join-Path $prowlerProvidersPath "$($check.Provider)/services/$($check.Service)/$($check.Name)"
+    # Build skipped list from existing checks that matched filters
+    $filteredEntries | Where-Object {
+        $null = $_.Path -match '/([^/]+)/[^/]+\.metadata\.json$'
+        $Matches[1] -in $existingIds
+    } | ForEach-Object {
+        $null = $_.Path -match '/([^/]+)/[^/]+\.metadata\.json$'
+        $skipped.Add($Matches[1])
+    }
 
-        if (Test-Path $localCheckDir) {
-            Write-Verbose "  Skipping $($check.Name) - already exists locally"
-            $skipped.Add($check.Name)
-            continue
-        }
-
-        Write-Verbose "  Downloading $($check.Name) ($($check.Files.Count) files)..."
-
-        try {
-            foreach ($file in $check.Files) {
-                # Map GitHub path to local path
-                # GitHub: prowler/providers/{provider}/services/{service}/{check}/{file}
-                # Local:  {prowlerProvidersPath}/{provider}/services/{service}/{check}/{file}
-                $relativePath = $file -replace '^prowler/providers/', ''
-                $destination = Join-Path $prowlerProvidersPath $relativePath
-
-                Save-GitHubRepoFile -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path $file -Destination $destination -ErrorAction Stop
-            }
-
-            Write-Verbose "    Downloaded"
-            $success.Add($check.Name)
-        }
-        catch {
-            Write-Verbose "    Failed: $_"
-            $failed.Add($check.Name)
+    if ($newEntryList.Count -eq 0) {
+        Write-Verbose "No new checks to sync."
+        return [PSCustomObject]@{
+            Success = @($success)
+            Failed  = @($failed)
+            Skipped = @($skipped)
         }
     }
 
-    # Convert newly downloaded checks to PowerShell
-    if ($success.Count -gt 0) {
-        Write-Verbose "Converting $($success.Count) new check(s) to PowerShell..."
+    # 5. Download and convert new checks
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "ciem-sync-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
-        foreach ($checkName in $success) {
-            $check = $availableChecks | Where-Object { $_.Name -eq $checkName }
-            $localCheckDir = Join-Path $prowlerProvidersPath "$($check.Provider)/services/$($check.Service)/$($check.Name)"
+    try {
+        foreach ($entry in $newEntryList) {
+            $null = $entry.Path -match '^prowler/providers/([^/]+)/services/([^/]+)/([^/]+)/'
+            $providerName = $Matches[1]
+            $serviceName = $Matches[2]
+            $checkName = $Matches[3]
 
-            Write-Verbose "  Converting: $checkName"
+            Write-Verbose "  Syncing: $checkName ($providerName/$serviceName)"
+
+            # Create temp directory structure that Convert-ProwlerCheck expects
+            $tempCheckDir = Join-Path $tempDir "providers/$providerName/services/$serviceName/$checkName"
+
             try {
-                Convert-ProwlerCheck -CheckPath $localCheckDir | Out-Null
+                # Download metadata.json (required)
+                $metadataRepoPath = "prowler/providers/$providerName/services/$serviceName/$checkName/$checkName.metadata.json"
+                $metadataDest = Join-Path $tempCheckDir "$checkName.metadata.json"
+
+                Save-GitHubRepoFile -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
+                    -Path $metadataRepoPath -Destination $metadataDest -ErrorAction Stop
+
+                # Download .py file (optional, used for permission inference)
+                $pyRepoPath = "prowler/providers/$providerName/services/$serviceName/$checkName/$checkName.py"
+                $pyDest = Join-Path $tempCheckDir "$checkName.py"
+
+                Save-GitHubRepoFile -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
+                    -Path $pyRepoPath -Destination $pyDest
+
+                # Convert to PowerShell
+                Write-Verbose "    Converting: $checkName"
+                Convert-ProwlerCheck -CheckPath $tempCheckDir | Out-Null
                 Write-Verbose "    Done"
+
+                $success.Add($checkName)
             }
             catch {
-                Write-Verbose "    Conversion failed: $_"
+                Write-Verbose "    Failed: $_"
+                $failed.Add($checkName)
             }
         }
+
+        Write-Verbose "Summary: Downloaded=$($success.Count), Skipped=$($skipped.Count), Failed=$($failed.Count)"
+
+        [PSCustomObject]@{
+            Success = @($success)
+            Failed  = @($failed)
+            Skipped = @($skipped)
+        }
     }
-
-    Write-Verbose "Summary: Downloaded=$($success.Count), Skipped=$($skipped.Count), Failed=$($failed.Count)"
-
-    [PSCustomObject]@{
-        Success = @($success)
-        Failed  = @($failed)
-        Skipped = @($skipped)
+    finally {
+        # Clean up temp directory
+        if (Test-Path $tempDir) {
+            Write-Verbose "Cleaning up temp directory..."
+            Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
