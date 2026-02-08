@@ -42,7 +42,7 @@ function Convert-ProwlerCheck {
         [string]$CheckPath,
 
         [Parameter(Mandatory, ParameterSetName = 'ById', Position = 0)]
-        [ValidatePattern('^[a-z]+(_[a-z0-9]+)+$')]
+        [ValidatePattern('^[a-z][a-z0-9]*(_[a-z0-9]+)+$')]
         [string]$CheckId,
 
         [Parameter(Mandatory, ParameterSetName = 'ById')]
