@@ -10,13 +10,6 @@ enum CIEMCheckSeverity {
     critical
 }
 
-enum CIEMCheckService {
-    Entra
-    IAM
-    KeyVault
-    Storage
-}
-
 enum CIEMCheckCategory {
     encryption
     identity
@@ -67,7 +60,7 @@ class CIEMCheckPermissions {
 class CIEMCheck {
     [string]$Id
     [CIEMCloudProvider]$CloudProvider
-    [CIEMCheckService]$Service
+    [string]$Service
     [string]$Title
     [string]$Description
     [string]$Risk
@@ -85,7 +78,7 @@ class CIEMCheck {
         $check = [CIEMCheck]::new()
         $check.Id = $JsonObj.id
         $check.CloudProvider = $Provider
-        $check.Service = [CIEMCheckService]$JsonObj.service
+        $check.Service = $JsonObj.service
         $check.Title = $JsonObj.title
         $check.Description = $JsonObj.description
         $check.Risk = $JsonObj.risk

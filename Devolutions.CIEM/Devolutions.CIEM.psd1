@@ -12,7 +12,7 @@
 RootModule = 'Devolutions.CIEM.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.3.14'
+ModuleVersion = '0.3.28'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Core'
@@ -88,8 +88,7 @@ AliasesToExport = @()
 # ModuleList = @()
 
 # List of all files packaged with this module
-FileList = '.universal\dashboards.ps1', 'AzureChecks.json', 
-               'AzureChecks.schema.json', 
+FileList = '.universal\dashboards.ps1', 'ciem_checks.json',
                'Checks/Azure/Test-EntraConditionalAccessPolicyRequireMfaForManagementApi.ps1', 
                'Checks/Azure/Test-EntraNonPrivilegedUserHasMfa.ps1', 
                'Checks/Azure/Test-EntraPolicyDefaultUserCannotCreateSecurityGroup.ps1', 

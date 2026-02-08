@@ -31,7 +31,7 @@ function Get-CIEMProvider {
     $ErrorActionPreference = 'Stop'
 
     # Get provider names from config - any top-level key with an 'enabled' property is a provider
-    $nonProviderKeys = @('cloudProvider', 'scan', 'output', 'pam')
+    $nonProviderKeys = @('cloudProvider', 'scan', 'output', 'pam', 'checksPath', 'prowler')
     $providerNames = $script:Config.PSObject.Properties.Name | Where-Object { $_ -notin $nonProviderKeys }
 
     foreach ($providerName in $providerNames) {

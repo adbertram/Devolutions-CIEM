@@ -4,15 +4,14 @@ function Get-CIEMCheck {
         Lists available CIEM security checks.
 
     .DESCRIPTION
-        Returns a list of all available security checks from the AzureChecks.json
-        metadata file as typed CIEMCheck objects. Supports filtering by cloud provider,
-        service, severity, and check ID.
+        Reads check metadata from the centralized ciem_checks.json file.
+        The file contains provider-keyed arrays (azure, aws) of check objects.
 
     .PARAMETER CloudProvider
         Filter checks by cloud provider (Azure, AWS).
 
     .PARAMETER Service
-        Filter checks by service name (Entra, IAM, KeyVault, Storage).
+        Filter checks by service name (e.g., Entra, IAM, KeyVault, Storage, iam, s3).
 
     .PARAMETER Severity
         Filter checks by severity level (critical, high, medium, low).
@@ -25,15 +24,15 @@ function Get-CIEMCheck {
 
     .EXAMPLE
         Get-CIEMCheck
-        # Returns all 46 checks
+        # Returns all checks across all providers
 
     .EXAMPLE
-        Get-CIEMCheck -Service Entra
-        # Returns 15 Entra ID checks
+        Get-CIEMCheck -CloudProvider AWS
+        # Returns all AWS checks
 
     .EXAMPLE
-        Get-CIEMCheck -Severity high
-        # Returns all high-severity checks
+        Get-CIEMCheck -Service Entra -Severity high
+        # Returns high-severity Entra checks
 
     .EXAMPLE
         Get-CIEMCheck -CheckId 'entra_security_defaults_enabled'
@@ -47,7 +46,6 @@ function Get-CIEMCheck {
         [string]$CloudProvider,
 
         [Parameter()]
-        [ValidateSet('Entra', 'IAM', 'KeyVault', 'Storage')]
         [string]$Service,
 
         [Parameter()]
@@ -60,44 +58,53 @@ function Get-CIEMCheck {
 
     $ErrorActionPreference = 'Stop'
 
-    # Load checks from JSON
-    $checksPath = Join-Path $script:ModuleRoot 'AzureChecks.json'
-
+    $checksPath = Join-Path $script:ModuleRoot 'ciem_checks.json'
     if (-not (Test-Path $checksPath)) {
-        throw "Checks metadata file not found: $checksPath"
+        Write-Warning "Checks file not found: $checksPath"
+        return @()
     }
 
-    $metadata = Get-Content $checksPath -Raw | ConvertFrom-Json
+    $allData = Get-Content $checksPath -Raw | ConvertFrom-Json
+    # Use ArrayList instead of List[CIEMCheck] to avoid type identity issues
+    # when Import-Module -Force recreates class types in PSU runspaces
+    $checks = [System.Collections.ArrayList]::new()
 
-    # Handle both array format and object-with-checks-property format
-    $jsonChecks = if ($metadata.PSObject.Properties.Name -contains 'checks') {
-        @($metadata.checks)
+    foreach ($providerName in $allData.PSObject.Properties.Name) {
+        try {
+            $providerEnum = [CIEMCloudProvider]$providerName
+        } catch {
+            Write-Warning "Unknown provider '$providerName' in ciem_checks.json, skipping."
+            continue
+        }
+        foreach ($jsonObj in @($allData.$providerName)) {
+            if ($null -eq $jsonObj) { continue }
+            try {
+                $check = [CIEMCheck]::FromJsonObject($jsonObj, $providerEnum)
+                $null = $checks.Add($check)
+            } catch {
+                Write-Warning "Failed to parse check '$($jsonObj.id)' for provider '$providerName': $_"
+            }
+        }
     }
-    else {
-        @($metadata)
-    }
-
-    # Convert to typed CIEMCheck objects
-    $checks = @($jsonChecks | ForEach-Object {
-        [CIEMCheck]::FromJsonObject($_, [CIEMCloudProvider]::Azure)
-    })
 
     # Apply filters
+    $result = @($checks)
+
     if ($CloudProvider) {
-        $checks = $checks | Where-Object { $_.CloudProvider -eq $CloudProvider }
+        $result = $result | Where-Object { $_.CloudProvider -eq $CloudProvider }
     }
 
     if ($Service) {
-        $checks = $checks | Where-Object { $_.Service -eq $Service }
+        $result = $result | Where-Object { $_.Service -eq $Service }
     }
 
     if ($Severity) {
-        $checks = $checks | Where-Object { $_.Severity -eq $Severity }
+        $result = $result | Where-Object { $_.Severity -eq $Severity }
     }
 
     if ($CheckId) {
-        $checks = $checks | Where-Object { $_.Id -eq $CheckId }
+        $result = $result | Where-Object { $_.Id -eq $CheckId }
     }
 
-    $checks
+    $result
 }

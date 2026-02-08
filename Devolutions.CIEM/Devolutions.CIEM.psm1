@@ -33,6 +33,9 @@ $script:StorageService = @{}
 # Initialize PSU environment detection (populated on first access)
 $script:PSUEnvironment = $null
 
+# GitHub tree cache - reduces API calls from 67+ to 1 per ref (unauthenticated limit: 60/hr)
+$script:GitHubTreeCache = @{}
+
 # Get class, public, private, and check function definition files
 # Note: Errors during file enumeration indicate a broken module structure and should fail loudly
 $classesPath = Join-Path -Path $PSScriptRoot -ChildPath 'Classes'
@@ -58,7 +61,7 @@ if (Test-Path -Path $publicPath) {
 }
 
 if (Test-Path -Path $checksPath) {
-    $Checks = @(Get-ChildItem -Path "$checksPath\*\*.ps1" -ErrorAction Stop)
+    $Checks = @(Get-ChildItem -Path $checksPath -Filter '*.ps1' -Recurse -ErrorAction Stop)
 }
 
 # Dot source the files (classes first, then private, checks, public)

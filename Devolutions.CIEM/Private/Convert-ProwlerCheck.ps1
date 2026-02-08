@@ -342,7 +342,8 @@ function $FunctionName {
     }
 
     if (-not $OutputDirectory) {
-        $OutputDirectory = Join-Path -Path $script:ModuleRoot -ChildPath $script:Config.checksPath -AdditionalChildPath "$Provider/Checks"
+        $providerDisplayName = (Get-Culture).TextInfo.ToTitleCase($Provider)
+        $OutputDirectory = Join-Path -Path $script:ModuleRoot -ChildPath $script:Config.checksPath -AdditionalChildPath $providerDisplayName
     }
 
     $results = @{
@@ -373,9 +374,39 @@ function $FunctionName {
         Write-Verbose "JSON Metadata:"
         Write-Verbose $jsonOutput
 
-        $metadataOutputPath = Join-Path $OutputDirectory "$functionName.metadata.json"
-        $jsonOutput | Set-Content -Path $metadataOutputPath -Encoding UTF8
-        $results.MetadataPath = $metadataOutputPath
+        # Append to centralized ciem_checks.json
+        $ciemChecksPath = Join-Path $script:ModuleRoot 'ciem_checks.json'
+        $providerKey = $Provider.ToLower()
+
+        if (Test-Path $ciemChecksPath) {
+            $ciemData = Get-Content $ciemChecksPath -Raw | ConvertFrom-Json -AsHashtable
+        } else {
+            $ciemData = @{ azure = @(); aws = @() }
+        }
+
+        if (-not $ciemData.ContainsKey($providerKey)) {
+            $ciemData[$providerKey] = @()
+        }
+
+        # Check if this check already exists (by id) — update in place or append
+        $existingIndex = -1
+        for ($i = 0; $i -lt $ciemData[$providerKey].Count; $i++) {
+            if ($ciemData[$providerKey][$i].id -eq $checkMetadata.id) {
+                $existingIndex = $i
+                break
+            }
+        }
+
+        if ($existingIndex -ge 0) {
+            $ciemData[$providerKey][$existingIndex] = $checkMetadata
+            Write-Verbose "Updated existing check '$($checkMetadata.id)' in ciem_checks.json"
+        } else {
+            $ciemData[$providerKey] += $checkMetadata
+            Write-Verbose "Appended new check '$($checkMetadata.id)' to ciem_checks.json"
+        }
+
+        $ciemData | ConvertTo-Json -Depth 10 | Set-Content -Path $ciemChecksPath -Encoding UTF8
+        $results.MetadataPath = $ciemChecksPath
     }
 
     [PSCustomObject]$results

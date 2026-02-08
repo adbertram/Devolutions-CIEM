@@ -43,6 +43,22 @@ function Get-CIEMConfig {
                 Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -ErrorAction Stop
                 Write-Verbose "Initialized CIEM:Config in PSU cache with defaults"
             }
+            else {
+                # Backfill any missing top-level keys from defaults (handles config schema upgrades)
+                $defaults = Get-CIEMDefaultConfig
+                $needsUpdate = $false
+                foreach ($prop in $defaults.PSObject.Properties) {
+                    if (-not $config.PSObject.Properties[$prop.Name]) {
+                        $config | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+                        $needsUpdate = $true
+                        Write-Verbose "Backfilled missing config key: $($prop.Name)"
+                    }
+                }
+                if ($needsUpdate) {
+                    Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -ErrorAction Stop
+                    Write-Verbose "Updated CIEM:Config in PSU cache with backfilled keys"
+                }
+            }
         }
         catch {
             # PSU cache command exists but we're not connected (e.g., local dev)
