@@ -1011,6 +1011,2667 @@
           "Microsoft.Storage/storageAccounts/fileServices/read"
         ]
       }
+    },
+    {
+      "id": "aisearch_service_not_publicly_accessible",
+      "service": "Aisearch",
+      "title": "AI Search service has public network access disabled",
+      "description": "**Azure AI Search service** limits its data-plane endpoint by disabling **public network access**. This evaluation checks whether the service only permits connections via **private endpoints** or narrowly scoped, explicitly allowed sources.",
+      "risk": "Internet-reachable search endpoints impact CIA:\n- Confidentiality: unauthorized queries reveal indexed data/metadata\n- Integrity: stolen admin/query keys allow index changes or deletions\n- Availability: abuse and scanning drive throttling and outages",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AisearchServiceNotPubliclyAccessible.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "aks_cluster_rbac_enabled",
+      "service": "Aks",
+      "title": "AKS cluster has RBAC enabled",
+      "description": "**AKS clusters** with **Kubernetes RBAC** enforce authorization through roles and bindings mapped to identities and groups.\n\nThis evaluates whether the cluster has RBAC enabled to control access to namespaces and cluster-wide resources.",
+      "risk": "Without **Kubernetes RBAC**, authorization becomes overly broad, weakening **least privilege**. Compromised credentials could read secrets, alter workloads, or delete services, impacting **confidentiality**, **integrity**, and **availability**, and enabling lateral movement across the cluster.",
+      "severity": "high",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AksClusterRbacEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "aks_clusters_created_with_private_nodes",
+      "service": "Aks",
+      "title": "AKS cluster nodes do not have public IP addresses",
+      "description": "**AKS agent pools** use only private addressing, with node public IP assignment disabled (`enableNodePublicIP=false`). Clusters where any pool assigns a public IP to nodes are identified.",
+      "risk": "**Public node IPs** expose worker VMs to Internet scanning and exploit attempts against OS or kubelet services. Successful compromise can lead to stolen secrets and images (**confidentiality**), workload tampering (**integrity**), and node/resource exhaustion via DDoS or cryptomining (**availability**).",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AksClustersCreatedWithPrivateNodes.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "aks_clusters_public_access_disabled",
+      "service": "Aks",
+      "title": "AKS cluster has a private endpoint and node public access is disabled",
+      "description": "**AKS clusters** expose a **private control plane FQDN** and agent pools have `enable_node_public_ip=false`.\n\nThe evaluation focuses on the presence of a private FQDN and the absence of public IPs on nodes.",
+      "risk": "Exposed node IPs or a publicly reachable API increase attack surface, impacting **confidentiality** and **integrity**.\n- Internet scans reach kubelet, NodePort, or management agents\n- Exploits enable RCE and **lateral movement**\n- Metadata/secret theft leads to **credential compromise**\n\n**Availability** is at risk from DDoS on exposed endpoints.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AksClustersPublicAccessDisabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "aks_network_policy_enabled",
+      "service": "Aks",
+      "title": "AKS cluster has network policy enabled",
+      "description": "**AKS clusters** enforce **Kubernetes network policies** so that pod-to-pod traffic is governed by explicit ingress and egress rules. The finding evaluates whether a cluster has network policy enforcement enabled to support fine-grained, label-based segmentation between workloads.",
+      "risk": "Without network policy, pods can talk to any pod:\n- Easy lateral movement after a pod compromise\n- Unrestricted access to backend services and data\n- Covert exfiltration/C2 via East-West traffic\n\nThis harms **confidentiality** and **integrity** and amplifies the blast radius of runtime exploits.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AksNetworkPolicyEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "apim_threat_detection_llm_jacking",
+      "service": "Apim",
+      "title": "No potential LLM Jacking attacks detected across all Azure API Management instances",
+      "description": "**API Management** diagnostic logs in Log Analytics are analyzed for **LLM-related operations**. Requests are grouped by caller IP, the number of distinct monitored actions (e.g., `ChatCompletions_Create`, `ImageGenerations_Create`) within a configurable `minutes` window is measured, and that ratio is compared to a `threshold` to surface anomalous multi-action patterns.",
+      "risk": "Concentrated LLM activity from one IP indicates **automation or leaked credentials**.\n- **Availability/cost**: rapid token burn and quota exhaustion\n- **Confidentiality**: exposure of prompts/completions and model details\n- **Integrity**: abuse of deployment/model actions enabling unauthorized changes or mass content generation",
+      "severity": "critical",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-ApimThreatDetectionLlmJacking.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_client_certificates_on",
+      "service": "App",
+      "title": "Web app requires incoming client certificates",
+      "description": "**Azure App Service apps** enforce **mutual TLS** when `client certificate mode` is set to `Required`, meaning every inbound request must present a valid client certificate that the app can validate.",
+      "risk": "Without **mTLS**, clients aren't cryptographically authenticated at the transport layer. Adversaries can reach endpoints using spoofed sources or stolen tokens, leading to unauthorized data access (confidentiality), request tampering (integrity), and automated abuse that degrades service (availability).",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppClientCertificatesOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ensure_auth_is_set_up",
+      "service": "App",
+      "title": "App Service app has App Service Authentication enabled",
+      "description": "**Azure App Service** can enforce built-in **Authentication/Authorization** (Easy Auth) so requests are authenticated by a provider before reaching app code.\n\nThis evaluates whether platform auth is enabled for the app and an identity provider is configured.",
+      "risk": "Without platform **authentication**, apps may accept **anonymous requests**, enabling unauthorized access to APIs and data. Attackers can enumerate endpoints and bypass weak app checks, risking data exposure (C), unauthorized changes (I), and automated abuse impacting availability (A).",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppEnsureAuthIsSetUp.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ensure_http_is_redirected_to_https",
+      "service": "App",
+      "title": "App Service web app redirects HTTP to HTTPS",
+      "description": "**Azure App Service web apps** redirect `HTTP` traffic to `HTTPS` when the `HTTPS Only` setting is enabled. This evaluation identifies apps that do not force secure transport by checking whether plaintext requests are automatically redirected to encrypted endpoints.",
+      "risk": "Leaving **HTTP accessible** enables **man-in-the-middle** interception, credential and cookie theft, and response tampering. This undermines **confidentiality** and **integrity**, and can lead to session hijacking or downgrade attacks that bypass TLS.",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppEnsureHttpIsRedirectedToHttps.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ensure_java_version_is_latest",
+      "service": "App",
+      "title": "App Service web app uses the latest supported Java version or 17 by default",
+      "description": "**Azure App Service web apps** that run **Java** are assessed to ensure their configured runtime uses the **latest supported major version** (LTS) for the environment, across Linux and Windows.\n\n*Only apps with Java enabled are considered.*",
+      "risk": "Using an **outdated Java runtime** enables known exploits like **remote code execution**, unsafe **deserialization**, and **cryptographic flaws**, risking data theft and tampering (**confidentiality, integrity**) and outages or takeover (**availability**). Unsupported versions also delay critical security patches.",
+      "severity": "low",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppEnsureJavaVersionIsLatest.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ensure_php_version_is_latest",
+      "service": "App",
+      "title": "App Service web app uses the latest supported PHP version or 8.2 by default",
+      "description": "**Azure App Service web apps** running **PHP** are evaluated to ensure the runtime is configured to the **latest supported** release. The finding compares the app's PHP stack (from `linuxFxVersion` or `php_version`) with the newest available version.",
+      "risk": "Using **outdated PHP** enables exploitation of known flaws, including **remote code execution**, causing secret disclosure (confidentiality), unauthorized changes (integrity), and crashes or downtime (availability). Deprecated versions lack patches, widening exposure and instability.",
+      "severity": "low",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppEnsurePhpVersionIsLatest.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ensure_python_version_is_latest",
+      "service": "App",
+      "title": "App Service web app uses the latest supported Python version or 3.12 by default",
+      "description": "**Azure App Service web apps** using **Python** are assessed to confirm the runtime is the **latest supported version** (e.g., `3.12`). The evaluation reads the app's stack configuration to detect Python usage and compares the configured runtime against the defined latest baseline.",
+      "risk": "Outdated **Python runtimes** weaken security and reliability:\n- Compromise confidentiality via known interpreter/SSL flaws\n- Undermine integrity through RCE and package exploitation\n- Reduce availability when deprecated versions lose patches and break under load",
+      "severity": "low",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppEnsurePythonVersionIsLatest.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ensure_using_http20",
+      "service": "App",
+      "title": "App Service web app has HTTP/2.0 enabled",
+      "description": "**Azure App Service web apps** are evaluated for **HTTP/2 support** via the `http20_enabled` configuration, indicating whether the site serves traffic using the HTTP/2 protocol",
+      "risk": "Without **HTTP/2**, apps remain on **HTTP/1.1**, increasing connection overhead and head-of-line blocking, which can reduce **availability** under load. Inefficient use of TLS sessions raises **DoS susceptibility** and degrades user experience, impacting service reliability",
+      "severity": "low",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppEnsureUsingHttp20.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_ftp_deployment_disabled",
+      "service": "App",
+      "title": "App Service web app has FTP disabled or FTPS-only enforced",
+      "description": "**Azure App Service web apps** are evaluated for **FTP exposure** via the `ftpsState` setting. Values `FtpsOnly` or `Disabled` indicate FTP is not allowed; `AllAllowed` means both FTP and FTPS are accepted.",
+      "risk": "Allowing **FTP (unencrypted)** exposes credentials on public endpoints, enabling **credential theft** and **session hijacking**.\n\nCompromise grants write access to code and content, enabling **malicious deployments**, backdoors, and data leakage, degrading **integrity** and **confidentiality**-with greater blast radius if shared, user-scope publishing credentials are used.",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFtpDeploymentDisabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_access_keys_configured",
+      "service": "App",
+      "title": "Function app has function keys configured",
+      "description": "**Azure Function apps** are evaluated for configured **function access keys** on HTTP endpoints.\n\nThe finding distinguishes functions with at least one access key defined from those without any keys configured.",
+      "risk": "Missing **access keys** weakens authentication, enabling unsolicited calls to function endpoints. This risks:\n- loss of **confidentiality** via data exposure\n- compromised **integrity** by triggering unintended actions\n- reduced **availability** from abuse, throttling, and cost spikes",
+      "severity": "high",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionAccessKeysConfigured.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_application_insights_enabled",
+      "service": "App",
+      "title": "Function App has Application Insights configured",
+      "description": "**Azure Function apps** are configured to send telemetry to **Application Insights** when application settings include `APPLICATIONINSIGHTS_CONNECTION_STRING` or `APPINSIGHTS_INSTRUMENTATIONKEY`.",
+      "risk": "Without this telemetry, **visibility** into exceptions, dependencies, and performance is lost, reducing **availability** and delaying response. Gaps in traces mask anomalous traffic and failures, enabling prolonged outages and undermining **integrity** of processing (e.g., undetected retries or timeouts).",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionApplicationInsightsEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_ftps_deployment_disabled",
+      "service": "App",
+      "title": "Function app has FTP and FTPS deployments disabled",
+      "description": "**Azure Function apps** are evaluated for the `ftps_state` setting that controls **FTP/FTPS deployment endpoints**. Values `AllAllowed` or `FtpsOnly` indicate deployment over FTP/FTPS is enabled, while `Disabled` indicates both endpoints are turned off.",
+      "risk": "Enabled **FTP/FTPS deployment** undermines confidentiality and integrity. FTP exposes credentials in cleartext; FTPS still presents a public basic-auth endpoint susceptible to brute force and credential reuse. Compromise enables **unauthorized code pushes**, leading to RCE, data leakage, and service disruption.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionFtpsDeploymentDisabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_identity_is_configured",
+      "service": "App",
+      "title": "Function app has a system-assigned or user-assigned managed identity enabled",
+      "description": "**Azure Function Apps** are evaluated for an enabled **managed identity** (`SystemAssigned` or `UserAssigned`) configured on the app.\n\nThe finding indicates whether an identity is present to support token-based access to other Azure resources.",
+      "risk": "Without **managed identities**, apps rely on stored secrets/keys, risking:\n- Confidentiality loss from leaked credentials\n- Integrity tampering via unauthorized writes\n- Availability outages from secret expiry/rotation\n\nCompromised keys enable unauthorized access and lateral movement.",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionIdentityIsConfigured.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_identity_without_admin_privileges",
+      "service": "App",
+      "title": "Function app managed identity is not assigned Owner, Contributor, User Access Administrator, or Role Based Access Control Administrator roles",
+      "description": "**Azure Function apps** with managed identities are evaluated for assignments to broad **administrative roles**: **Owner**, **Contributor**, **User Access Administrator**, **RBAC Administrator**.\n\nThe finding highlights functions whose identity carries elevated permissions beyond normal runtime needs.",
+      "risk": "Admin rights on a function's identity expose the control plane.\n- Confidentiality: read secrets and data\n- Integrity: alter configs, grant roles, deploy changes\n- Availability: stop or delete resources\nA runtime compromise can enable **lateral movement** and **privilege escalation** across the environment.",
+      "severity": "high",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionIdentityWithoutAdminPrivileges.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Authorization/roleDefinitions/read"
+        ]
+      }
+    },
+    {
+      "id": "app_function_latest_runtime_version",
+      "service": "App",
+      "title": "Function app uses the latest supported runtime version (~4)",
+      "description": "**Azure Function apps** are assessed for the **runtime version** set via `FUNCTIONS_EXTENSION_VERSION`. The finding identifies apps not configured to use the current supported major version `~4`.",
+      "risk": "Outdated Functions runtimes erode CIA:\n- **Confidentiality**: known flaws enable unauthorized data access.\n- **Integrity**: RCE or binding bugs allow code tampering.\n- **Availability**: missing fixes cause crashes and scale faults.\n\nEnd-of-support versions (e.g., 2.x/3.x) lack security patches, increasing exploitability.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionLatestRuntimeVersion.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_not_publicly_accessible",
+      "service": "App",
+      "title": "Function app is not publicly accessible",
+      "description": "**Azure Function apps** are assessed for whether they are reachable from the public Internet. The evaluation considers the app's `publicNetworkAccess` state and the presence of access restrictions or private endpoints to limit inbound traffic.",
+      "risk": "Public exposure allows unauthorized invocation, risking data disclosure and tampering (**confidentiality** and **integrity**). Attackers can brute-force tokens or abuse misconfigurations for remote execution. Unrestricted calls also enable abuse and DoS, driving cost and harming **availability**.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionNotPubliclyAccessible.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_function_vnet_integration_enabled",
+      "service": "App",
+      "title": "Function app has Virtual Network integration enabled",
+      "description": "**Azure Function apps** configured with **Virtual Network integration** uses a chosen subnet so outbound traffic is routed via the VNet and can reach private or service-endpoint-secured resources.\n\nThe finding reflects whether a function app is associated with a subnet resource ID.",
+      "risk": "Without VNet integration, function apps send egress directly to the public Internet and cannot reach private endpoints.\n\nThis weakens confidentiality and integrity by bypassing NSG/UDR controls, enables data exfiltration from compromised code, and may force exposing backends publicly, increasing attack surface.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppFunctionVnetIntegrationEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_http_logs_enabled",
+      "service": "App",
+      "title": "App Service web app has HTTP logs enabled in diagnostic settings",
+      "description": "**Azure App Service web apps** diagnostic settings include **HTTP request logging** when the `AppServiceHTTPLogs` category (or the `allLogs` group) is enabled to capture web access events.",
+      "risk": "Without **HTTP access logs**, visibility into requests is lost, hindering **detection** of brute force, probing, and injection attempts. This weakens **forensics** and reduces **confidentiality** and **integrity** by masking data access paths and blocking reliable incident timelines.",
+      "severity": "low",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppHttpLogsEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Insights/diagnosticSettings/read"
+        ]
+      }
+    },
+    {
+      "id": "app_minimum_tls_version_12",
+      "service": "App",
+      "title": "App Service web app has minimum TLS version set to 1.2 or 1.3",
+      "description": "**Azure App Service web apps** are assessed for the configured minimum TLS version for HTTPS. The expected baseline is `1.2` or `1.3`; settings that permit lower versions indicate acceptance of legacy TLS during client negotiation.",
+      "risk": "Allowing `TLS 1.0/1.1` enables protocol downgrades and weak cipher negotiation, exposing HTTPS traffic to **MITM** interception, credential theft, and tampering. This undermines the **confidentiality** and **integrity** of sessions and data in transit, and can enable account takeover via stolen tokens.",
+      "severity": "medium",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppMinimumTlsVersion12.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "app_register_with_identity",
+      "service": "App",
+      "title": "App Service web app has a managed identity configured",
+      "description": "**Azure App Service web apps** are configured with a **managed identity** (`identity`: `SystemAssigned` or `UserAssigned`) for token-based access to Azure resources without embedded credentials",
+      "risk": "**Missing managed identity** drives reliance on stored secrets. Leaked credentials enable **unauthorized access** to SQL, Storage, or Key Vault, leading to **data exfiltration**, tampering, and lateral movement. Secret expiry or revocation can break connectivity, degrading **availability**.",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppRegisterWithIdentity.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "appinsights_ensure_is_configured",
+      "service": "Appinsights",
+      "title": "Subscription has at least one Application Insights resource configured",
+      "description": "**Azure subscription** contains at least one **Application Insights** resource collecting application telemetry (metrics, traces, logs) for monitored workloads.\n\nThe check determines whether telemetry collection exists at the subscription level, indicating that application monitoring is configured.",
+      "risk": "If **Application Insights** is missing, applications run with reduced **observability**, limiting detection of anomalies and attacks.\n\nThis undermines **integrity** and accountability (fewer traces), degrades **availability** by slowing troubleshooting, and increases exposure to undetected data exfiltration or injection at the app layer.",
+      "severity": "low",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-AppinsightsEnsureIsConfigured.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "containerregistry_admin_user_disabled",
+      "service": "ContainerRegistry",
+      "title": "Container Registry admin user is disabled",
+      "description": "**Azure Container Registry** admin account configuration, confirming the built-in **admin user** is disabled so access relies on Microsoft Entra-based **RBAC** identities and scoped roles.",
+      "risk": "Using a shared, always-valid **admin credential** grants full push/pull and lacks attribution. Compromise enables unauthorized image pulls (confidentiality), malicious pushes or tag changes (integrity), and deletions or lockout (availability), enabling supply-chain attacks and lateral movement.",
+      "severity": "high",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-ContainerregistryAdminUserDisabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "containerregistry_not_publicly_accessible",
+      "service": "ContainerRegistry",
+      "title": "Container Registry public network access is disabled",
+      "description": "**Azure Container Registry** configuration indicates whether the registry permits **unrestricted public access** based on the `Public network access` setting.",
+      "risk": "**Internet-exposed ACR** expands attack paths impacting **CIA**:\n- Confidentiality: unauthorized image pulls leak code/secrets\n- Integrity: compromised creds allow tampered image pushes (supply-chain)\n- Availability: pull storms or scans exhaust quotas, causing outages and cost spikes",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-ContainerregistryNotPubliclyAccessible.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "containerregistry_uses_private_link",
+      "service": "ContainerRegistry",
+      "title": "Container Registry uses a private endpoint (Private Link)",
+      "description": "**Azure Container Registry** access via **Private Endpoints** (Azure Private Link). Registries with `private endpoint connections` use private IPs; others rely on the public endpoint.",
+      "risk": "Publicly reachable registries expand attack surface for **credential stuffing**, token abuse, and scanning. A compromise enables unauthorized pull/push, causing image **data leakage** and **supply-chain tampering**. Public routing weakens network isolation, impacting the **confidentiality** and **integrity** of images and metadata.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-ContainerregistryUsesPrivateLink.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "cosmosdb_account_firewall_use_selected_networks",
+      "service": "CosmosDb",
+      "title": "Cosmos DB account firewall allows access only from selected networks",
+      "description": "**Azure Cosmos DB accounts** limit connectivity to **selected networks** using virtual network rules and/or IP allowlists rather than permitting access from all networks.\n\nThe evaluation determines whether the account's network firewall enforces this restriction.",
+      "risk": "Access from all networks enlarges the attack surface. If keys or tokens are exposed or privileges are misconfigured, attackers anywhere can read or modify data, harming **confidentiality** and **integrity**.\n\nWeak segmentation also enables SSRF/pivot paths from Azure services and can impact **availability** through abuse.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-CosmosdbAccountFirewallUseSelectedNetworks.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "cosmosdb_account_use_aad_and_rbac",
+      "service": "CosmosDb",
+      "title": "Cosmos DB account has local authentication disabled and uses Azure AD authentication with Azure RBAC",
+      "description": "**Azure Cosmos DB accounts** configured to use **Microsoft Entra ID** with **Azure RBAC** by disabling key-based credentials (`disableLocalAuth=true`). Clients authenticate with identities rather than account keys.",
+      "risk": "With local/key-based auth enabled, **long-lived account keys** can be leaked or shared, enabling unauthorized reads/writes and tampering. Access bypasses **MFA** and granular **RBAC**, hindering rotation/revocation and increasing persistence and lateral movement risks.",
+      "severity": "high",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-CosmosdbAccountUseAadAndRbac.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "cosmosdb_account_use_private_endpoints",
+      "service": "CosmosDb",
+      "title": "Cosmos DB account uses private endpoint connections",
+      "description": "**Azure Cosmos DB accounts** are assessed for **private endpoint connections** that keep data-plane traffic on private IPs within authorized virtual networks.",
+      "risk": "Without **private endpoints**, access may use public endpoints or broad IP rules, enabling:\n- interception and credential replay\n- unauthorized queries and data exfiltration\n- lateral movement via exposed paths\n\nThis degrades **confidentiality** and can impact **availability** under abusive traffic.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-CosmosdbAccountUsePrivateEndpoints.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "databricks_workspace_cmk_encryption_enabled",
+      "service": "Databricks",
+      "title": "Databricks workspace uses a customer-managed key (CMK) for encryption at rest",
+      "description": "**Azure Databricks workspaces** are evaluated for use of **customer-managed keys** (`CMK`) on at-rest encryption, based on the workspace's managed disk encryption configuration.",
+      "risk": "Without **CMK**, keys are provider-controlled, degrading **confidentiality** and incident response.\n- Slower revoke/rotate during breaches\n- Weaker **separation of duties** and audit trails\n- Larger blast radius if storage or control plane is compromised",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DatabricksWorkspaceCmkEncryptionEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "databricks_workspace_vnet_injection_enabled",
+      "service": "Databricks",
+      "title": "Databricks workspace is deployed in a customer-managed VNet (VNet Injection enabled)",
+      "description": "**Azure Databricks workspaces** using **VNet injection** are placed in a customer-managed VNet rather than a Databricks-managed network. This evaluates whether a workspace is linked to a customer VNet.",
+      "risk": "Using a Databricks-managed VNet limits control over routing, egress, and access boundaries, degrading **confidentiality** and **integrity**.\n- Unrestricted outbound paths enable **data exfiltration**\n- Harder to enforce **private endpoints** and NSG policies\n- Increased chance of **lateral movement** into compute nodes",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DatabricksWorkspaceVnetInjectionEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_additional_email_configured_with_a_security_contact",
+      "service": "Defender",
+      "title": "Security contact has additional email addresses configured",
+      "description": "**Microsoft Defender for Cloud** security contact settings include **additional email recipients** defined in the `emails` field to receive alert notifications.",
+      "risk": "Relying only on subscription owners for alerts creates a **single point of failure**. Missed or delayed notifications extend attacker dwell time, enabling data exfiltration (**confidentiality**), unauthorized changes (**integrity**), and service disruption (**availability**). Absence or turnover can silently suppress alerts.",
+      "severity": "low",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderAdditionalEmailConfiguredWithASecurityContact.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_assessments_vm_endpoint_protection_installed",
+      "service": "Defender",
+      "title": "All virtual machines in the subscription have endpoint protection installed",
+      "description": "**Azure virtual machines** are assessed for the presence of an **endpoint protection (antimalware)** solution and its reported health across the subscription",
+      "risk": "Absent or unhealthy **endpoint protection** lets malware execute on VMs, risking:\n- Data exfiltration (confidentiality)\n- Tampering and credential theft (integrity)\n- Ransomware, cryptomining, and outages (availability)\n\nIt also enables persistence and lateral movement to other cloud resources.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderAssessmentsVmEndpointProtectionInstalled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_attack_path_notifications_properly_configured",
+      "service": "Defender",
+      "title": "Security contact has attack path email notifications enabled at or above the configured minimum risk level",
+      "description": "**Microsoft Defender for Cloud** attack path email notifications are configured per subscription with a defined **minimal risk level**, and the setting is present and meets the required threshold.",
+      "risk": "Without alerts on **exploitable attack paths**, security teams lose visibility, enabling **lateral movement**, **privilege escalation**, and **data exfiltration** before containment, degrading confidentiality, integrity, and availability.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderAttackPathNotificationsProperlyConfigured.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_auto_provisioning_log_analytics_agent_vms_on",
+      "service": "Defender",
+      "title": "Defender auto-provisioning of Log Analytics agent for Azure VMs is enabled",
+      "description": "**Microsoft Defender for Cloud** auto-provisioning of the **Log Analytics agent** to Azure VMs is configured to `On` at the subscription level",
+      "risk": "Without automatic agent deployment, some VMs lack security telemetry, creating **blind spots** for vulnerabilities, missing patches, and threats.\n\nAttackers can persist or move laterally unnoticed, undermining **confidentiality** and **integrity**, while delayed detection hampers effective response.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderAutoProvisioningLogAnalyticsAgentVmsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_auto_provisioning_vulnerabilty_assessments_machines_on",
+      "service": "Defender",
+      "title": "All virtual machines in the subscription have a vulnerability assessment solution installed",
+      "description": "**Microsoft Defender for Cloud** evaluates whether **Azure VMs** and **Arc-enabled machines** have a **vulnerability assessment solution** deployed and reporting healthy coverage across the subscription.",
+      "risk": "Without continuous **vulnerability assessment**, unpatched flaws persist, enabling:\n- **Remote code execution** and privilege escalation\n- **Ransomware** disrupting availability\n- **Data exfiltration** via lateral movement\n\nConfidentiality, integrity, and availability are reduced across affected machines.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderAutoProvisioningVulnerabiltyAssessmentsMachinesOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_container_images_resolved_vulnerabilities",
+      "service": "Defender",
+      "title": "All Azure running container images in the subscription have no unresolved vulnerabilities",
+      "description": "**Running container images** are evaluated for unresolved **vulnerability findings** (`CVEs`) reported by Microsoft Defender for Cloud. The check reviews images currently in use across Kubernetes workloads and identifies where vulnerabilities remain unremediated.",
+      "risk": "Unremediated `CVEs` in active images enable:\n- **RCE**, container escape, and node takeover affecting **integrity/availability**\n- **Data exfiltration** and secret theft compromising **confidentiality**\nAdversaries can use public exploits to pivot across clusters and pipelines, tamper images, and disrupt services.",
+      "severity": "critical",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderContainerImagesResolvedVulnerabilities.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_container_images_scan_enabled",
+      "service": "Defender",
+      "title": "Subscription has container image vulnerability scanning enabled",
+      "description": "**Azure subscriptions** have **container image vulnerability assessment** enabled for **Azure Container Registry** via Microsoft Defender for Cloud (`ContainerRegistriesVulnerabilityAssessments`). Images in registries are evaluated for known package vulnerabilities in their packages and dependencies.",
+      "risk": "Without registry scanning, **known CVEs** in images can reach runtime, enabling **RCE**, privilege escalation, and lateral movement. This undermines data confidentiality and integrity and can reduce availability through cryptomining or service disruption.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderContainerImagesScanEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_app_services_is_on",
+      "service": "Defender",
+      "title": "Defender for App Services is set to On (Standard pricing tier)",
+      "description": "**Azure subscriptions** are evaluated for **Defender for App Service** coverage by inspecting the `AppServices` pricing configuration. The finding indicates whether the plan is set to `Standard`, which applies protection to App Service resources at the subscription scope.",
+      "risk": "Without this coverage, malicious traffic and runtime anomalies may go unseen, enabling:\n- Confidentiality loss via data exfiltration\n- Integrity compromise through web shells or code tampering\n- Availability impact from takeover and resource abuse",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForAppServicesIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_arm_is_on",
+      "service": "Defender",
+      "title": "Defender for Azure Resource Manager is set to On (Standard pricing tier)",
+      "description": "**Microsoft Defender for Cloud** plan for **Azure Resource Manager** is configured at the `Standard` tier for the subscription",
+      "risk": "Without this protection, malicious or misconfigured ARM deployments can go unnoticed. Adversaries could create high-privilege roles, disable logging, or deploy exfiltration paths and crypto workloads, degrading **integrity**, **confidentiality**, and **availability** of Azure resources.",
+      "severity": "high",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForArmIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_azure_sql_databases_is_on",
+      "service": "Defender",
+      "title": "Defender for Azure SQL databases is set to On (Standard pricing tier)",
+      "description": "Microsoft Defender for Cloud plan for **Azure SQL Database Servers** is evaluated at subscription scope, expecting the `pricing_tier` set to `Standard` for `SqlServers`. Non-standard tiers indicate the plan isn't enabled.",
+      "risk": "Without **Defender for SQL**, attacks like **SQL injection**, brute-force logins, and anomalous queries may go **undetected**, enabling data exfiltration and tampering. Limited telemetry delays **incident response**, risking loss of confidentiality and integrity and aiding lateral movement.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForAzureSqlDatabasesIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_containers_is_on",
+      "service": "Defender",
+      "title": "Defender for Containers is set to On (Standard pricing tier)",
+      "description": "**Azure subscriptions** are assessed to determine if the **Defender for Containers** plan is configured with pricing tier `Standard`.",
+      "risk": "Without **Defender for Containers**, images and runtimes lack continuous **threat detection** and **vulnerability assessment**. Adversaries can ship malicious images, run **cryptomining**, exfiltrate secrets, and **move laterally**, degrading **confidentiality** and **availability** of container workloads.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForContainersIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_cosmosdb_is_on",
+      "service": "Defender",
+      "title": "Defender for Cosmos DB is set to On (Standard pricing tier)",
+      "description": "**Microsoft Defender for Azure Cosmos DB** is enabled at the subscription using the `Standard` pricing tier for the `CosmosDbs` plan, covering all Cosmos DB accounts",
+      "risk": "Without this protection, Cosmos DB activity lacks advanced threat detection and telemetry. Attacks such as **SQL injection**, credential abuse, and **anomalous access patterns** may go unnoticed, enabling data exfiltration and unauthorized changes, degrading **confidentiality** and **integrity**.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForCosmosdbIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_databases_is_on",
+      "service": "Defender",
+      "title": "Defender for Databases is set to On (Standard pricing tier)",
+      "description": "**Azure subscription** is evaluated for **Defender for Databases** coverage: `Standard` pricing must be enabled for `SqlServers`, `SqlServerVirtualMachines`, `OpenSourceRelationalDatabases`, and `CosmosDbs`.",
+      "risk": "Without this coverage, database workloads lack **advanced threat detection**, **vulnerability assessment**, and **behavior analytics**.\n\nAttacks like credential brute force, SQL injection, privilege abuse, and data exfiltration can go **undetected**, threatening **confidentiality, integrity**, and **availability**.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForDatabasesIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_dns_is_on",
+      "service": "Defender",
+      "title": "Defender for DNS is set to On (Standard pricing tier)",
+      "description": "**Microsoft Defender for DNS** is configured at the `Standard` tier for the subscription's Defender pricing",
+      "risk": "Absent **Defender for DNS**, query telemetry isn't inspected, allowing **C2 callbacks**, **DNS tunneling**, and **malicious domains** to bypass detection. This increases risks to **confidentiality** (exfiltration), **integrity** (malware/DGA), and **availability** (poisoned or hijacked resolution).",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForDnsIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_keyvault_is_on",
+      "service": "Defender",
+      "title": "Defender for Key Vaults is set to On (Standard pricing tier)",
+      "description": "**Azure subscriptions** are evaluated for the **Defender for Key Vaults** plan configured at the `Standard` tier. It identifies where Key Vault protection uses this tier versus where the Defender pricing for `KeyVaults` is not set accordingly.",
+      "risk": "Without **Defender for Key Vaults**, anomalous access and mass secret retrievals can go undetected, enabling:\n- Secret exfiltration (confidentiality)\n- Key/secret tampering (integrity)\n- Destructive actions like purge/delete (availability)\n\nLack of signals delays response and facilitates lateral movement.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForKeyvaultIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.KeyVault/vaults/read"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_os_relational_databases_is_on",
+      "service": "Defender",
+      "title": "Defender for Open-Source Relational Databases is set to On (Standard pricing tier)",
+      "description": "**Microsoft Defender for Cloud** plan for **Open-Source Relational Databases** is evaluated for the `Standard` pricing tier at the subscription level.",
+      "risk": "Absent the `Standard` plan, open-source databases lack **threat detection** and **behavior analytics**, reducing **confidentiality** and **integrity**. SQL injection, brute-force logins, and data exfiltration may go unnoticed, delaying response and enabling **lateral movement**.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForOsRelationalDatabasesIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_server_is_on",
+      "service": "Defender",
+      "title": "Defender for Servers is set to On (Standard pricing tier)",
+      "description": "**Microsoft Defender for Servers** subscription plan (`VirtualMachines`) is configured to the `Standard` tier. The evaluation checks whether the Servers plan is enabled at this level for all server workloads in the subscription.",
+      "risk": "Without **Defender for Servers**, endpoints lack unified EDR, hardening, and threat analytics. This enables silent malware, credential theft, and lateral movement, driving data exfiltration (C), ransomware/tampering (I), and outages or cryptomining abuse (A).",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForServerIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_sql_servers_is_on",
+      "service": "Defender",
+      "title": "Defender for SQL servers on machines is set to On (Standard pricing tier)",
+      "description": "**Subscription pricing** for **Defender for SQL Server on Machines** is configured to the `Standard` plan, covering SQL Server instances running on virtual machines.",
+      "risk": "Without **Defender for SQL Server on Machines**, attacks on SQL Server VMs can go **undetected**-including SQL injection, brute-force logons, and privilege abuse.\n\nThis risks data exfiltration (C), schema or record tampering (I), and outages or ransomware impact (A), while reducing visibility and delaying response.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForSqlServersIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_defender_for_storage_is_on",
+      "service": "Defender",
+      "title": "Defender for Storage is set to On (Standard pricing tier)",
+      "description": "Azure subscription's **Defender for Storage** plan is set to `Standard` for Storage Accounts.",
+      "risk": "Without **Defender for Storage**, suspicious access to blobs, files, and queues may go undetected. Compromised keys or `SAS` tokens can enable data exfiltration (**confidentiality**), object tampering (**integrity**), and mass deletion or ransomware-like encryption (**availability**).",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureDefenderForStorageIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_iot_hub_defender_is_on",
+      "service": "Defender",
+      "title": "Defender for IoT Hub is set to On",
+      "description": "**Microsoft Defender for IoT security solution** exists in the subscription and reports status `Enabled` for monitored **IoT Hub** resources.",
+      "risk": "Without **Defender for IoT**, device activity lacks telemetry and alerting, degrading CIA:\n- Compromised devices join botnets and exfiltrate data\n- Abused device identities alter cloud twins and commands\n- Lateral movement from IoT networks to Azure workloads\nThis blind spot increases dwell time and blast radius.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureIotHubDefenderIsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_mcas_is_enabled",
+      "service": "Defender",
+      "title": "Defender for Cloud Apps is enabled",
+      "description": "**Subscription settings** contain the `MCAS` integration for **Microsoft Defender for Cloud Apps**, and the setting is `enabled`.",
+      "risk": "Missing integration leaves **Defender for Cloud** blind to SaaS context, weakening correlation of control-plane activity with app usage. Attackers can hide data exfiltration via cloud apps, abuse OAuth grants, or mask unauthorized ARM changes-impacting confidentiality and integrity and slowing incident response.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureMcasIsEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_notify_alerts_severity_is_high",
+      "service": "Defender",
+      "title": "Security contact has alert notifications enabled with minimum severity High or lower",
+      "description": "**Microsoft Defender for Cloud** email notifications use a minimum alert severity of `High` or more inclusive (`Medium`/`Low`). The evaluation inspects security contacts to confirm a threshold is defined and not `Critical`.",
+      "risk": "Setting the threshold to `Critical` or leaving it unset limits alerting, causing **delayed detection** of `High`/`Medium` threats. Attackers can persist, escalate privileges, and exfiltrate data, impacting **confidentiality**, **integrity**, and **availability** via ransomware or service disruption.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureNotifyAlertsSeverityIsHigh.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_notify_emails_to_owners",
+      "service": "Defender",
+      "title": "Security contact notifications include the Owner role",
+      "description": "**Microsoft Defender for Cloud** email notifications target subscription users in the `Owner` role through role-based recipients.",
+      "risk": "Without notifying **Owners**, critical alerts can be missed, delaying incident response. Attackers gain longer dwell time for data exfiltration, privilege abuse, and service disruption, undermining **confidentiality**, **integrity**, and **availability**.",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureNotifyEmailsToOwners.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Authorization/roleDefinitions/read"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_system_updates_are_applied",
+      "service": "Defender",
+      "title": "All virtual machines in the subscription have system updates applied",
+      "description": "**Azure VMs** are evaluated for:\n- Presence of a monitoring agent\n- Periodic checks for missing updates\n- Installation of the latest **security and critical OS updates** on Windows and Linux",
+      "risk": "Unpatched VMs are exposed to **known exploits** (RCE, privilege escalation), enabling **initial access** and **lateral movement**. This endangers **confidentiality** (data theft), **integrity** (tampering), and **availability** (ransomware, outages). Lapses in periodic assessment prolong exposure to critical vulnerabilities.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureSystemUpdatesAreApplied.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "defender_ensure_wdatp_is_enabled",
+      "service": "Defender",
+      "title": "Defender for Endpoint is enabled",
+      "description": "**Azure subscription** integrates **Microsoft Defender for Endpoint** with **Defender for Cloud** via `WDATP`. The setting's presence and enabled state at the subscription scope are evaluated.",
+      "risk": "Without this integration, servers lack **EDR telemetry**, automated onboarding, and unified alerts, shrinking visibility. Hands-on-keyboard intrusions, ransomware, and credential theft can persist unnoticed, enabling data exfiltration (**confidentiality**), unauthorized changes (**integrity**), and outages (**availability**).",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-DefenderEnsureWdatpIsEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "keyvault_access_only_through_private_endpoints",
+      "service": "KeyVault",
+      "title": "Ensure that public network access when using private endpoint is disabled.",
+      "description": "Checks if Key Vaults with private endpoints have public network access disabled.",
+      "risk": "Allowing public network access to Key Vault when using private endpoint can expose sensitive data to unauthorized access.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/key-vault/general/network-security",
+      "checkScript": "Test-KeyvaultAccessOnlyThroughPrivateEndpoints.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.KeyVault/vaults/read"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_create_policy_assignment",
+      "service": "Monitor",
+      "title": "Subscription has an Azure Monitor activity log alert for policy assignment creation",
+      "description": "**Azure Monitor Activity Log alert** configurations are assessed for an **activity log alert** on `Microsoft.Authorization/policyAssignments/write`, indicating monitoring of newly created **Azure Policy assignments**",
+      "risk": "Absent alerts on new policy assignments, unauthorized or accidental changes can silently weaken governance. Adversaries could assign permissive policies or replace deny rules, enabling misconfigurations, privilege expansion, and data exposure-degrading **integrity** and threatening **confidentiality** and **availability**.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertCreatePolicyAssignment.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_create_update_nsg",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log alert for Network Security Group create or update operations",
+      "description": "**Azure Monitor Activity Log alert** monitors **Network Security Group** changes via the `Microsoft.Network/networkSecurityGroups/write` operation to capture create/update events across the subscription",
+      "risk": "Lack of alerting on NSG changes allows **unauthorized network policy modifications** to go unnoticed. Adversaries or mistakes could open ports, reduce segmentation, and enable **lateral movement**, impacting data **confidentiality** and service **availability** through exposure or disruption of critical traffic",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertCreateUpdateNsg.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_create_update_public_ip_address_rule",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log Alert for Public IP address create or update operations",
+      "description": "**Azure Monitor activity log alert** for **Public IP addresses** tracks `Microsoft.Network/publicIPAddresses/write` events at the subscription level, covering any creation or update of public IP resources.",
+      "risk": "Without this alert, unauthorized or mistaken public IP changes can go unnoticed, exposing workloads to the Internet.\n- Confidentiality: unexpected ingress paths\n- Integrity: shadow endpoints for control\n- Availability: larger DDoS surface and outages",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertCreateUpdatePublicIpAddressRule.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_create_update_security_solution",
+      "service": "Monitor",
+      "title": "Subscription has Activity Log alert for Security Solution create or update",
+      "description": "**Azure Monitor activity log alert** is configured to capture **Security Solutions** create/update operations (`Microsoft.Security/securitySolutions/write`) at subscription scope.",
+      "risk": "Without this alert, **unauthorized or mistaken changes** to security tooling can go undetected. Attackers could disable defenses, alter integrations, or weaken policies, eroding the **integrity** of controls, creating blind spots that threaten **confidentiality**, and delaying incident response.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertCreateUpdateSecuritySolution.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_create_update_sqlserver_fr",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log alert for SQL Server firewall rule create or update events",
+      "description": "**Azure Monitor activity log alerts** are configured for **Azure SQL Server firewall rule changes**, targeting the `Microsoft.Sql/servers/firewallRules/write` operation.\n\nThis evaluates whether notifications or automated actions are set when firewall rules are created or updated.",
+      "risk": "Without alerting on firewall rule changes, unauthorized or accidental openings can remain unnoticed, exposing databases to untrusted networks.\n\nThis harms **confidentiality** (data exfiltration via widened IP ranges) and **integrity** (unauthorized queries), while increasing attacker dwell time.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertCreateUpdateSqlserverFr.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_delete_nsg",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log alert for Network Security Group delete operations",
+      "description": "**Azure Monitor activity log alerts** include the NSG deletion signal (`Microsoft.Network/networkSecurityGroups/delete` or `Microsoft.ClassicNetwork/networkSecurityGroups/delete`). The finding indicates whether a subscription has an alert rule configured to trigger when a Network Security Group is deleted.",
+      "risk": "Without alerting on **NSG deletions**, network segmentation can be removed unnoticed, exposing services to broad ingress/egress. Malicious actors or automation may delete NSGs to enable **lateral movement** and **data exfiltration**. Missing alerts delay response, impacting confidentiality and availability.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertDeleteNsg.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_delete_policy_assignment",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log alert for policy assignment deletion",
+      "description": "**Azure Monitor Activity log alerts** for policy assignment deletions using the `Microsoft.Authorization/policyAssignments/delete` operation at subscription scope",
+      "risk": "Without this alert, **policy assignment deletions** can go unnoticed, eroding configuration **integrity** and enabling governance drift. Malicious or accidental changes may remove guardrails, increasing exposure and threatening **confidentiality** of protected resources.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertDeletePolicyAssignment.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_delete_public_ip_address_rule",
+      "service": "Monitor",
+      "title": "Azure subscription has an Activity Log alert for public IP address deletion",
+      "description": "**Azure Monitor activity log alert** exists for the **Delete Public IP Address** operation (`Microsoft.Network/publicIPAddresses/delete`), capturing subscription-wide events when Public IP resources are removed.",
+      "risk": "Unmonitored deletion of Public IPs can abruptly sever ingress/egress, break DNS and allowlists, and take services offline (**availability**). Attackers or misconfigurations can delete IPs to cause **DoS** or evade controls, and delayed visibility hinders **incident response** and **forensics**.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertDeletePublicIpAddressRule.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_delete_security_solution",
+      "service": "Monitor",
+      "title": "Subscription has an Azure Monitor Activity Log alert for Microsoft.Security/securitySolutions delete operations",
+      "description": "**Azure activity log alerts** monitor deletions of **Security Solutions** by targeting the operation `Microsoft.Security/securitySolutions/delete` at subscription scope.\n\nIdentifies whether notifications are configured for security solution removal events.",
+      "risk": "Without this alert, **unauthorized or accidental deletions** of security tooling may go **unnoticed**, reducing the **availability** of protections and the **integrity** of monitoring. Adversaries can evade defenses, prolong dwell time, and enable **data exfiltration** under reduced visibility.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertDeleteSecuritySolution.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_delete_sqlserver_fr",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log Alert for SQL Server firewall rule deletions",
+      "description": "**Azure Monitor Activity log alerts** watch the admin operation `Microsoft.Sql/servers/firewallRules/delete`, indicating when an **Azure SQL firewall rule** is removed across a subscription.",
+      "risk": "Without alerting on firewall rule deletions, unexpected changes to SQL network allowlists can go unnoticed, causing **availability** loss for apps and masking **unauthorized tampering**. A compromised admin could remove rules to disrupt service, erode control **integrity**, and delay response.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertDeleteSqlserverFr.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_alert_service_health_exists",
+      "service": "Monitor",
+      "title": "Azure subscription has an enabled Activity Log alert for Service Health incidents",
+      "description": "**Azure Monitor Activity Log alert** is configured for **Service Health** notifications where `category` is `ServiceHealth` and `properties.incidentType` is `Incident`, with the rule enabled.",
+      "risk": "Without alerts for **Service Health incidents**, teams may miss Azure outages or degradations, harming **availability** and delaying failover. Unseen incidents can cause cascading errors, timeouts, deployment failures, and SLA breaches across dependent workloads.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorAlertServiceHealthExists.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "monitor_diagnostic_setting_with_appropriate_categories",
+      "service": "Monitor",
+      "title": "Subscription has a diagnostic setting capturing Administrative, Security, Alert, and Policy categories",
+      "description": "**Azure Monitor Diagnostic Settings** capture **control-plane events** at the subscription level. This evaluates whether at least one setting collects the categories: `Administrative`, `Security`, `Policy`, and `Alert`.",
+      "risk": "Without these categories, critical control-plane actions may go unrecorded. Attackers could change policies, roles, or alerts unnoticed, enabling privilege escalation and resource tampering. This erodes **integrity**, threatens **confidentiality**, and weakens **availability** and **incident response**.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorDiagnosticSettingWithAppropriateCategories.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Insights/diagnosticSettings/read"
+        ]
+      }
+    },
+    {
+      "id": "monitor_diagnostic_settings_exists",
+      "service": "Monitor",
+      "title": "Subscription has an Activity Log diagnostic setting",
+      "description": "**Azure Monitor Diagnostic Settings** are configured to export the **Activity Log** to an external destination (Log Analytics, Storage, Event Hub, or partner).",
+      "risk": "Without exporting the **Activity Log**, control-plane events lack **centralization and retention**.\n\nUndetected RBAC changes, policy updates, and resource deletions reduce **detectability**, hinder **forensics**, and weaken incident response and audit evidence.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorDiagnosticSettingsExists.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Insights/diagnosticSettings/read"
+        ]
+      }
+    },
+    {
+      "id": "monitor_storage_account_with_activity_logs_cmk_encrypted",
+      "service": "Monitor",
+      "title": "Storage account storing Activity Log data is encrypted with a customer-managed key",
+      "description": "**Azure Monitor Activity Logs** sent to a **Storage account** are evaluated to confirm encryption with **Customer-Managed Keys** (`CMK`) instead of **Microsoft-managed keys**.",
+      "risk": "Storing activity logs without **CMK** weakens confidentiality and control of audit data. You lose independent key ownership, limiting rapid rotation/revocation and separation of duties. If storage credentials are compromised, attackers can exfiltrate logs that map resources and changes, aiding targeted attacks and hindering effective incident response.",
+      "severity": "medium",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorStorageAccountWithActivityLogsCmkEncrypted.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Insights/diagnosticSettings/read",
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "monitor_storage_account_with_activity_logs_is_private",
+      "service": "Monitor",
+      "title": "Storage account storing activity logs does not allow public blob access",
+      "description": "**Azure Monitor Activity Logs** sent to a **Storage account** are evaluated for **Blob public access**. The finding identifies whether the account that stores the logs has `AllowBlobPublicAccess` turned on.",
+      "risk": "Exposed log data undermines **confidentiality** by revealing operations, resource IDs, IPs, and identities.\n\nAdversaries gain **reconnaissance** to map controls, craft targeted attacks, and time actions to avoid detection, enabling **lateral movement** and broader compromise.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MonitorStorageAccountWithActivityLogsIsPrivate.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Insights/diagnosticSettings/read",
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "mysql_flexible_server_audit_log_connection_activated",
+      "service": "Mysql",
+      "title": "MySQL flexible server has audit_log_events including CONNECTION",
+      "description": "**Azure Database for MySQL Flexible Server** audit configuration includes the `CONNECTION` event in `audit_log_events`.",
+      "risk": "Without **CONNECTION auditing**, login attempts are invisible, weakening detection of **brute-force**, **credential stuffing**, and anomalous access. This enables unnoticed account takeover and lateral movement, impacting **confidentiality** and **integrity**, and hinders **forensics** and timely response.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MysqlFlexibleServerAuditLogConnectionActivated.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "mysql_flexible_server_audit_log_enabled",
+      "service": "Mysql",
+      "title": "MySQL flexible server has audit_log_enabled set to ON",
+      "description": "**Azure Database for MySQL Flexible Server** with `audit_log_enabled` set to `ON` generates **audit logs** for connections, authentication, DDL/DML, and administrative actions.",
+      "risk": "Missing **audit logs** reduces **accountability** and obscures activity affecting **confidentiality** and **integrity**. Unauthorized logins, privilege abuse, or suspicious queries may go undetected, impeding **forensics**, slowing incident response, and enabling covert data exfiltration.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MysqlFlexibleServerAuditLogEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "mysql_flexible_server_minimum_tls_version_12",
+      "service": "Mysql",
+      "title": "MySQL flexible server enforces TLS 1.2 or higher",
+      "description": "**Azure Database for MySQL Flexible Server** uses the `tls_version` setting to permit only **modern TLS** for client connections, requiring `TLSv1.2+` and excluding `TLSv1.0` and `TLSv1.1`.",
+      "risk": "Allowing legacy TLS (`TLSv1.0`/`TLSv1.1`) weakens **confidentiality** and **integrity** of data in transit. Attackers can force downgrades and perform **man-in-the-middle** interception, exposing credentials and queries or altering results, leading to unauthorized access and data exfiltration.",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MysqlFlexibleServerMinimumTlsVersion12.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "mysql_flexible_server_ssl_connection_enabled",
+      "service": "Mysql",
+      "title": "MySQL Flexible Server enforces SSL connections",
+      "description": "**Azure Database for MySQL Flexible Server** uses the `require_secure_transport` parameter to enforce **encrypted connections**. This evaluation determines whether the server is configured to require **TLS/SSL** for all client sessions.",
+      "risk": "Without **TLS enforcement**, credentials and queries may traverse the network in cleartext, enabling **man-in-the-middle**, **credential theft**, tampering, and data exfiltration. This directly impacts **confidentiality** and **integrity** and can lead to compliance violations.",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-MysqlFlexibleServerSslConnectionEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_bastion_host_exists",
+      "service": "Network",
+      "title": "Azure subscription has at least one Bastion Host",
+      "description": "**Azure subscription** contains an **Azure Bastion host** for secure RDP/SSH brokering over TLS on `443/TCP` to virtual machines using private IPs. The assessment identifies whether such a bastion is available.",
+      "risk": "Absent **Bastion**, admins often assign public IPs or open `22/3389`, expanding attack surface.\n\nThis enables Internet brute force, credential stuffing, and RDP/SSH exploits, leading to unauthorized access, data exfiltration, and lateral movement. CIA impact: confidentiality/integrity loss and potential downtime from ransomware.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkBastionHostExists.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_flow_log_captured_sent",
+      "service": "Network",
+      "title": "Network Watcher has flow logs enabled and sent to a Log Analytics workspace",
+      "description": "**Azure Network Watcher** has **NSG flow logs** enabled and configured to forward traffic records to a centralized **Log Analytics workspace**",
+      "risk": "Missing or disabled flow logging blinds visibility into network behavior, hindering detection of:\n- **Lateral movement** and internal scanning\n- **C2 beacons** and exfiltration patterns\nThis degrades incident response and correlation, impacting **confidentiality** and **integrity**.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkFlowLogCapturedSent.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_flow_log_more_than_90_days",
+      "service": "Network",
+      "title": "Network Watcher has all flow logs enabled with retention set to 0 or at least 90 days",
+      "description": "**Azure Network Watcher** has **NSG flow logs** enabled and configured to retain for at least `90` days (or `0` for unlimited). The evaluation checks that flow logging is enabled and that the retention policy meets the required duration for each configured log.",
+      "risk": "Absent or short-retained **NSG flow logs** reduce visibility into IP flows, delaying detection of port scans, brute force, data exfiltration, and lateral movement.\n\nForensics and accountability degrade, threatening **confidentiality** and **integrity**.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkFlowLogMoreThan90Days.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_http_internet_access_restricted",
+      "service": "Network",
+      "title": "Network security group restricts inbound HTTP (port 80) access from the Internet",
+      "description": "**Azure NSG** are evaluated for inbound rules that allow public **HTTP** access on `TCP 80`, including cases where `80` is covered by a port range, from `0.0.0.0/0`, `Internet`, or `*`.",
+      "risk": "Exposing `TCP 80` to the Internet increases attack surface:\n- Web recon and exploits compromise **integrity** and **availability**\n- Cleartext HTTP can leak credentials, cookies, and data, harming **confidentiality**\n- Public endpoints enable bot abuse and footholds for lateral movement",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkHttpInternetAccessRestricted.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_public_ip_shodan",
+      "service": "Network",
+      "title": "Azure public IP address is not listed in Shodan",
+      "description": "**Azure Public IP addresses** are detected as **indexed by Shodan**, indicating Internet-visible services with open `ports` and service banner metadata.",
+      "risk": "Shodan-visible IPs are easy to discover and target, elevating risks to **confidentiality** and **integrity**. Adversaries can enumerate banners, probe open ports, brute-force access, and exploit known CVEs, enabling unauthorized entry, data exfiltration, and lateral movement.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkPublicIpShodan.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_rdp_internet_access_restricted",
+      "service": "Network",
+      "title": "Network security group does not allow inbound RDP (TCP 3389) from the Internet",
+      "description": "**Azure NSG inbound rules** are evaluated for **public RDP exposure**. The finding flags rules that `Allow` `TCP` traffic to `port 3389` from broad sources like `0.0.0.0/0`, `Internet`, or `*`, including ranges that cover `3389`.",
+      "risk": "Exposed **RDP** enables Internet-wide **brute force** and **credential stuffing**, risking unauthorized console access.\n\nCompromise can cause data theft (**confidentiality**), tampering or malware deployment (**integrity**), VM lockout or disruption (**availability**), and **lateral movement** within the VNet.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkRdpInternetAccessRestricted.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_ssh_internet_access_restricted",
+      "service": "Network",
+      "title": "Network security group does not allow inbound SSH (TCP port 22) from the Internet",
+      "description": "**Azure NSG** inbound rules that allow **SSH** on `TCP 22` from `0.0.0.0/0`, `Internet`, or `*` are identified, including rules where port ranges include `22` and protocol is `TCP` or `*`.\n\nIndicates NSGs exposing SSH to the Internet.",
+      "risk": "Public **SSH** access weakens **confidentiality** and **integrity**. Open `22` invites brute force and key theft, enabling remote shell control, persistence, and **lateral movement**. Attackers can pivot into VNets, exfiltrate data, deploy crypto-miners, and impact **availability**.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkSshInternetAccessRestricted.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_udp_internet_access_restricted",
+      "service": "Network",
+      "title": "Network security group does not allow inbound UDP from the Internet",
+      "description": "**Azure NSG rules** are assessed for **inbound UDP** exposure to the public Internet (e.g., `0.0.0.0/0`, `*`, `Internet`). The finding identifies allow rules that permit unsolicited **UDP** traffic from any external source to attached resources.",
+      "risk": "Publicly reachable **UDP** services enable **DDoS reflection/amplification**, exhausting bandwidth and compute and degrading **availability** for workloads and networks. Open services (DNS, NTP, SSDP, SNMP, CLDAP) can be abused with spoofed traffic, turning endpoints into amplifiers and disrupting adjacent resources.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkUdpInternetAccessRestricted.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "network_watcher_enabled",
+      "service": "Network",
+      "title": "Network Watcher is enabled for all locations in the subscription",
+      "description": "**Azure Network Watcher** presence across the subscription's regions. The assessment checks that a Network Watcher instance exists in every subscription location where resources may be deployed.",
+      "risk": "Absent **Network Watcher** in a region creates blind spots in **network telemetry and diagnostics**, hindering detection of anomalies. Attackers can exploit unnoticed NSG or routing issues for lateral movement or data exfiltration, degrading **confidentiality** and **availability** and slowing incident triage.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-NetworkWatcherEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "policy_ensure_asc_enforcement_enabled",
+      "service": "Policy",
+      "title": "Security Center built-in policy assignment has enforcement mode set to Default",
+      "description": "**Defender for Cloud default policy assignment** (`SecurityCenterBuiltIn`) uses enforcement mode `Default` rather than `DoNotEnforce`",
+      "risk": "With `DoNotEnforce`, policy effects like `deny` and `deployIfNotExists` aren't applied, letting insecure configs persist. This erodes **confidentiality** and **integrity** (exposed endpoints, weak encryption) and can affect **availability** via unpatched or misconfigured services, enabling compromise and lateral movement.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PolicyEnsureAscEnforcementEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_allow_access_services_disabled",
+      "service": "Postgresql",
+      "title": "PostgreSQL flexible server has 'Allow public access from any Azure service' disabled",
+      "description": "**Azure Database for PostgreSQL Flexible Server** firewall should not include the rule that allows connections from **any Azure service**, represented by `start_ip=0.0.0.0` and `end_ip=0.0.0.0`.",
+      "risk": "Allowing **all Azure services** erodes network isolation, permitting unsolicited connections from other subscriptions and tenants. This enables credential brute force and unauthorized access paths, risking data **confidentiality** and **integrity**, and increasing the chance of service disruption (**availability**).",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerAllowAccessServicesDisabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_connection_throttling_on",
+      "service": "Postgresql",
+      "title": "Flexible PostgreSQL server has connection_throttling enabled",
+      "description": "**Azure PostgreSQL flexible servers** where the `connection_throttling` parameter is set to `ON`",
+      "risk": "Without `connection_throttling`, bursts of new sessions can exhaust connection slots and CPU, degrading **availability** and causing timeouts.\n\nReduced telemetry delays detection of **DoS** or runaway clients, extending impact and recovery time.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerConnectionThrottlingOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_enforce_ssl_enabled",
+      "service": "Postgresql",
+      "title": "PostgreSQL Flexible Server enforces SSL connections",
+      "description": "**Azure Database for PostgreSQL flexible servers** are evaluated for **encrypted in-transit connections**, specifically whether `require_secure_transport` is set to `ON` to force TLS for all client sessions.",
+      "risk": "Without enforced **TLS**, clients may connect in plaintext or with weak settings, exposing credentials and data to **man-in-the-middle**, query tampering, and session hijacking. This undermines **confidentiality** and **integrity**, and can enable lateral movement if stolen creds are reused.",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerEnforceSslEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_entra_id_authentication_enabled",
+      "service": "Postgresql",
+      "title": "Microsoft Entra ID authentication is enabled for PostgreSQL Flexible Server",
+      "description": "**PostgreSQL Flexible Servers** must set `authConfig.activeDirectoryAuth` to `Enabled` and keep at least one **Microsoft Entra administrator** assigned so database sessions inherit centrally governed identities instead of unmanaged PostgreSQL accounts.",
+      "risk": "Without Entra ID authentication, stolen local passwords bypass **MFA** and conditional access, enabling persistent database logins. Missing administrators leaves the feature unusable, blocking security teams from rotating duties and allowing unauthorized access or **privilege escalation**.",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerEntraIdAuthenticationEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_log_checkpoints_on",
+      "service": "Postgresql",
+      "title": "PostgreSQL Flexible Server has checkpoint logging enabled",
+      "description": "**Azure PostgreSQL Flexible Server** has **checkpoint logging** enabled when `log_checkpoints=on`, recording each checkpoint in the server logs",
+      "risk": "Without **checkpoint logging**, visibility into write and recovery activity is reduced, hindering incident investigation and tamper detection. Unseen checkpoint storms or WAL pressure can degrade I/O and recovery, threatening **availability** and data **integrity**.",
+      "severity": "low",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerLogCheckpointsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_log_connections_on",
+      "service": "Postgresql",
+      "title": "PostgreSQL flexible server has log_connections enabled",
+      "description": "**Azure Database for PostgreSQL Flexible Server** evaluates the `log_connections` setting that controls logging of client connection attempts and authentication results.\n\nThe finding indicates whether this parameter is set to `ON`.",
+      "risk": "Without **connection logging**, visibility of access attempts is lost, making **brute force** and **credential stuffing** harder to detect. This weakens **confidentiality** and **integrity**, hinders incident investigations, and can mask **lateral movement** or unauthorized data access.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerLogConnectionsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_log_disconnections_on",
+      "service": "Postgresql",
+      "title": "PostgreSQL Flexible Server has disconnection logging enabled",
+      "description": "**Azure Database for PostgreSQL Flexible Server** uses the `log_disconnections` setting to record when client sessions end and how long they lasted.",
+      "risk": "Without **disconnection logs**, session timelines and user activity are opaque, weakening **auditability** and **forensics**.\n\nAbuse such as stolen credentials, short-lived access, or hijacked sessions can go unnoticed, enabling data exfiltration and privilege misuse, impacting **confidentiality** and **integrity**.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerLogDisconnectionsOn.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "postgresql_flexible_server_log_retention_days_greater_3",
+      "service": "Postgresql",
+      "title": "PostgreSQL flexible server log_retention_days is between 4 and 7 days",
+      "description": "Log retention on **Azure Database for PostgreSQL Flexible Server** is governed by `log_retention_days`. Configuration is assessed as set and within `4-7` days versus unset or outside this range.",
+      "risk": "**Insufficient or disabled log retention** limits the audit trail needed to detect brute-force, SQL injection, or insider misuse, impeding investigation. **Excessive retention** enlarges exposure if logs are accessed, risking sensitive query data leakage and policy violations. This reduces visibility and weakens confidentiality and integrity.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-PostgresqlFlexibleServerLogRetentionDaysGreater3.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_auditing_enabled",
+      "service": "SqlServer",
+      "title": "SQL Server has an auditing policy configured",
+      "description": "**Azure SQL Server** auditing is assessed at the server level to confirm audit logging is active. Configurations with any auditing policy state set to `Disabled` indicate auditing is not configured for the server and its databases.",
+      "risk": "Without **SQL auditing**, visibility into logins, privilege changes, and query activity is lost. Stealthy data exfiltration and tampering can go undetected, impacting **confidentiality** and **integrity**. Absent audit trails hinder **forensics**, slow incident response, and weaken compliance evidence.",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverAuditingEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_auditing_retention_90_days",
+      "service": "SqlServer",
+      "title": "SQL server has auditing enabled with retention greater than 90 days",
+      "description": "**Azure SQL Server auditing** settings are evaluated to ensure **auditing is enabled** and log retention is greater than `90` days. It considers the auditing policy state and the configured `retention_days` value.",
+      "risk": "Without adequate retention or with auditing disabled, **activity trails expire too soon**, limiting detection and investigation of **unauthorized access, data exfiltration, and privilege abuse**. This weakens **confidentiality** and **integrity** and slows incident response.",
+      "severity": "medium",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverAuditingRetention90Days.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_azuread_administrator_enabled",
+      "service": "SqlServer",
+      "title": "SQL Server has an Azure Active Directory administrator configured",
+      "description": "**Azure SQL Server** is configured with a **Microsoft Entra (Azure AD) administrator** at the server scope, indicated by `administrator_type` set to `ActiveDirectory`.",
+      "risk": "Without a **Microsoft Entra admin**, the server can't use Entra identities, pushing reliance on **SQL authentication**. This weakens confidentiality and integrity: no MFA/conditional access, harder offboarding and auditing, and compromised passwords can enable unauthorized data access and privilege escalation.",
+      "severity": "medium",
+      "categories": [
+        "identity"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverAzureadAdministratorEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_microsoft_defender_enabled",
+      "service": "SqlServer",
+      "title": "SQL Server has Microsoft Defender for SQL enabled",
+      "description": "**Azure SQL Server** instances are evaluated for the server-level **security alert policy** of **Microsoft Defender for SQL**, expecting the policy state to be `Enabled`.",
+      "risk": "Without **Defender for SQL**, anomalous logins, SQL injection patterns, and risky configurations may go undetected, enabling data exfiltration (**confidentiality**), unauthorized changes (**integrity**), and disruptive queries or ransomware (**availability**).",
+      "severity": "high",
+      "categories": [
+        "logging"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverMicrosoftDefenderEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_recommended_minimal_tls_version",
+      "service": "SqlServer",
+      "title": "SQL server enforces minimal TLS version 1.2 or 1.3",
+      "description": "**Azure SQL logical servers** are assessed for the configured **minimum TLS version** for client connections. The finding determines whether the minimal accepted version aligns with recommended modern values such as `1.2` or `1.3`.",
+      "risk": "Without a modern minimum, clients can negotiate **weak TLS** or be downgraded, enabling **MITM** and decryption. This jeopardizes **confidentiality** (credential/data exposure) and **integrity** (query tampering), and may disrupt **availability** via session resets during handshake interference.",
+      "severity": "medium",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverRecommendedMinimalTlsVersion.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_tde_encrypted_with_cmk",
+      "service": "SqlServer",
+      "title": "SQL server uses a customer-managed key for the TDE protector and all databases have TDE enabled",
+      "description": "**Azure SQL Server** uses **Transparent Data Encryption** with a **customer-managed key** in Azure Key Vault, and each database has TDE `Enabled`",
+      "risk": "Without **TDE with CMK**, data at rest may be unencrypted or controlled by service keys, weakening **confidentiality** and **key custody**. Attackers or insiders could read backups, snapshots, or stolen disks, and you cannot enforce **rotation**, **revocation**, or **separation of duties**, raising compliance and incident response risks.",
+      "severity": "critical",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverTdeEncryptedWithCmk.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.KeyVault/vaults/read"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_tde_encryption_enabled",
+      "service": "SqlServer",
+      "title": "SQL database has Transparent Data Encryption (TDE) enabled",
+      "description": "**Azure SQL user databases** have **Transparent Data Encryption** (`TDE`) enabled, ensuring encryption of database files, backups, and transaction logs at rest.\n\n*The `master` system database is excluded from evaluation.*",
+      "risk": "Without **TDE**, data at rest remains unencrypted:\n- Stolen backups, snapshots, or compromised storage enable offline data disclosure\n- Attackers with substrate access can bypass DB auth, harming **confidentiality** and enabling **exfiltration**",
+      "severity": "high",
+      "categories": [
+        "encryption"
+      ],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverTdeEncryptionEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_unrestricted_inbound_access",
+      "service": "SqlServer",
+      "title": "Azure SQL Server does not have firewall rules allowing 0.0.0.0-255.255.255.255",
+      "description": "**Azure SQL Server** server-level firewall rules are evaluated for an entry that allows the entire IPv4 space (`0.0.0.0` to `255.255.255.255`).\n\nThe finding identifies presence of this Internet-wide rule on the server firewall.",
+      "risk": "An Internet-wide rule permits unsolicited access from any host, enabling mass scanning, brute force, and exploitation of weak configurations.\n- Confidentiality: unauthorized data access/exfiltration\n- Integrity: malicious data/DDL changes\n- Availability: resource abuse or DoS via excessive connections",
+      "severity": "critical",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverUnrestrictedInboundAccess.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_va_emails_notifications_admins_enabled",
+      "service": "SqlServer",
+      "title": "SQL Server has Vulnerability Assessment enabled and email notifications to subscription admins configured",
+      "description": "**Azure SQL Server** Vulnerability Assessment configuration, specifically whether recurring scans are set to email results to subscription admins/owners via `Also send email notifications to admins and subscription owners`.",
+      "risk": "Without these notifications, findings may go unnoticed, delaying fixes. Prolonged exposure of misconfigurations and weak permissions threatens data **confidentiality** and **integrity**, can affect **availability**, and slows **incident response** and audit readiness.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverVaEmailsNotificationsAdminsEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_va_periodic_recurring_scans_enabled",
+      "service": "SqlServer",
+      "title": "SQL Server has Vulnerability Assessment periodic recurring scans enabled",
+      "description": "**Azure SQL servers** are evaluated for **Vulnerability Assessment** configuration and whether **periodic recurring scans** are scheduled (e.g., weekly) for the server and its databases.\n\nServers with Vulnerability Assessment missing or scans not scheduled are identified.",
+      "risk": "Without scheduled scans, new misconfigurations and vulnerable settings can persist unnoticed, weakening **confidentiality** and **integrity**. Attackers can exploit stale permissions, unsafe firewall rules, or unpatched features to read or alter data and pivot to other resources.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverVaPeriodicRecurringScansEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_va_scan_reports_configured",
+      "service": "SqlServer",
+      "title": "SQL server has Vulnerability Assessment enabled and scan report recipients configured",
+      "description": "**Azure SQL Server** vulnerability assessment uses **recurring scans** and emails results to designated recipients. This evaluates that VA is enabled and that `Send scan reports to` (or subscription admin notifications) is configured so scan reports are delivered.",
+      "risk": "If VA reports aren't sent to responsible owners, findings can be missed, delaying fixes. Attackers may exploit misconfigurations, excessive permissions, or outdated settings, leading to data exposure (C), unauthorized changes (I), and potential service disruption (A).",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverVaScanReportsConfigured.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "sqlserver_vulnerability_assessment_enabled",
+      "service": "SqlServer",
+      "title": "SQL server has vulnerability assessment enabled with storage container configured",
+      "description": "**Azure SQL Server** has **Vulnerability Assessment** configured with a defined location to persist assessment reports and scan results",
+      "risk": "Without **Vulnerability Assessment**, misconfigurations and excessive permissions can go unnoticed.\n\nAdversaries may exploit weak server or database settings to escalate privileges, exfiltrate data, or alter records, degrading confidentiality and integrity.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "",
+      "checkScript": "Test-SqlserverVulnerabilityAssessmentEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "vm_backup_enabled",
+      "service": "Vm",
+      "title": "Ensure Backups are enabled for Azure Virtual Machines",
+      "description": "Ensure that Microsoft Azure Backup service is in use for your Azure virtual machines (VMs) to protect against accidental deletion or corruption.",
+      "risk": "Without Azure Backup enabled, VMs are at risk of data loss due to accidental deletion, corruption, or other failures, and recovery options are limited.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://docs.microsoft.com/en-us/azure/backup/backup-overview",
+      "checkScript": "Test-VmBackupEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_desired_sku_size",
+      "service": "Vm",
+      "title": "Ensure that your virtual machine instances are using SKU sizes that are approved by your organization",
+      "description": "Ensure that your virtual machine instances are using SKU sizes that are approved by your organization. This check requires configuration of the desired VM SKU sizes in the Prowler configuration file.",
+      "risk": "Setting limits for the SKU size(s) of the virtual machine instances provisioned in your Microsoft Azure account can help you to manage better your cloud compute power, address internal compliance requirements and prevent unexpected charges on your Azure monthly bill. Without proper SKU size controls, organizations may face cost overruns and compliance violations.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/overview",
+      "checkScript": "Test-VmDesiredSkuSize.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_ensure_attached_disks_encrypted_with_cmk",
+      "service": "Vm",
+      "title": "Ensure that 'OS and Data' disks are encrypted with Customer Managed Key (CMK)",
+      "description": "Ensure that OS disks (boot volumes) and data disks (non-boot volumes) are encrypted with CMK (Customer Managed Keys). Customer Managed keys can be either ADE or Server Side Encryption (SSE).",
+      "risk": "Encrypting the IaaS VM's OS disk (boot volume) and Data disks (non-boot volume) ensures that the entire content is fully unrecoverable without a key, thus protecting the volume from unwanted reads. PMK (Platform Managed Keys) are enabled by default in Azure-managed disks and allow encryption at rest. CMK is recommended because it gives the customer the option to control which specific keys are used for the encryption and decryption of the disk. The customer can then change keys and increase security by disabling them instead of relying on the PMK key that remains unchanging. There is also the option to increase security further by using automatically rotating keys so that access to disk is ensured to be limited. Organizations should evaluate what their security requirements are, however, for the data stored on the disk. For high-risk data using CMK is a must, as it provides extra steps of security. If the data is low risk, PMK is enabled by default and provides sufficient data security.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption-overview",
+      "checkScript": "Test-VmEnsureAttachedDisksEncryptedWithCmk.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_ensure_unattached_disks_encrypted_with_cmk",
+      "service": "Vm",
+      "title": "Ensure that 'Unattached disks' are encrypted with 'Customer Managed Key' (CMK)",
+      "description": "Ensure that unattached disks in a subscription are encrypted with a Customer Managed Key (CMK).",
+      "risk": "Managed disks are encrypted by default with Platform-managed keys. Using Customer-managed keys may provide an additional level of security or meet an organization's regulatory requirements. Encrypting managed disks ensures that its entire content is fully unrecoverable without a key and thus protects the volume from unwarranted reads. Even if the disk is not attached to any of the VMs, there is always a risk where a compromised user account with administrative access to VM service can mount/attach these data disks, which may lead to sensitive information disclosure and tampering.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://docs.microsoft.com/en-us/azure/security/fundamentals/azure-disk-encryption-vms-vmss",
+      "checkScript": "Test-VmEnsureUnattachedDisksEncryptedWithCmk.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_ensure_using_approved_images",
+      "service": "Vm",
+      "title": "Ensure that Azure VMs are using an approved machine image.",
+      "description": "Ensure that all your Azure virtual machine instances are launched from approved machine images only.",
+      "risk": "An approved machine image is a custom virtual machine (VM) image that contains a pre-configured OS and a well-defined stack of server software approved by Azure, fully configured to run your application. Using approved (golden) machine images to launch new VM instances within your Azure cloud environment brings major benefits such as fast and stable application deployment and scaling, secure application stack upgrades, and versioning.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-machines/windows/create-vm-generalized-managed",
+      "checkScript": "Test-VmEnsureUsingApprovedImages.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_ensure_using_managed_disks",
+      "service": "Vm",
+      "title": "Ensure Virtual Machines are utilizing Managed Disks",
+      "description": "Migrate blob-based VHDs to Managed Disks on Virtual Machines to exploit the default features of this configuration. The features include: 1. Default Disk Encryption 2. Resilience, as Microsoft will managed the disk storage and move around if underlying hardware goes faulty 3. Reduction of costs over storage accounts",
+      "risk": "Managed disks are by default encrypted on the underlying hardware, so no additional encryption is required for basic protection. It is available if additional encryption is required. Managed disks are by design more resilient that storage accounts. For ARM-deployed Virtual Machines, Azure Adviser will at some point recommend moving VHDs to managed disks both from a security and cost management perspective.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-machines/unmanaged-disks-deprecation",
+      "checkScript": "Test-VmEnsureUsingManagedDisks.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "arm": [
+          "Microsoft.Storage/storageAccounts/read"
+        ]
+      }
+    },
+    {
+      "id": "vm_jit_access_enabled",
+      "service": "Vm",
+      "title": "Enable Just-In-Time Access for Virtual Machines",
+      "description": "Ensure that Microsoft Azure virtual machines are configured to use Just-in-Time (JIT) access.",
+      "risk": "Without JIT access, management ports such as 22 (SSH) and 3389 (RDP) may be exposed, increasing the risk of brute-force and DDoS attacks.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://docs.microsoft.com/en-us/azure/security-center/security-center-just-in-time?tabs=jit-config-asc%2Cjit-request-asc",
+      "checkScript": "Test-VmJitAccessEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_linux_enforce_ssh_authentication",
+      "service": "Vm",
+      "title": "Ensure SSH key authentication is enforced on Linux-based Virtual Machines",
+      "description": "Ensure that Azure Linux-based virtual machines are configured to use SSH keys by disabling password authentication.",
+      "risk": "Allowing password-based SSH authentication increases the risk of brute-force attacks and unauthorized access. Enforcing SSH key authentication ensures only users with the private key can access the VM.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://docs.microsoft.com/en-us/azure/virtual-machines/linux/create-ssh-keys-detailed",
+      "checkScript": "Test-VmLinuxEnforceSshAuthentication.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_scaleset_associated_with_load_balancer",
+      "service": "Vm",
+      "title": "VM Scale Set Is Associated With Load Balancer",
+      "description": "Ensure that your Azure virtual machine scale sets are using load balancers for traffic distribution.",
+      "risk": "Without load balancer integration, Azure virtual machine scale sets may experience reduced availability and potential service disruptions during traffic spikes or instance failures, leading to degraded user experience and potential business impact.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-network/network-overview",
+      "checkScript": "Test-VmScalesetAssociatedWithLoadBalancer.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_scaleset_not_empty",
+      "service": "Vm",
+      "title": "Check for Empty Virtual Machine Scale Sets",
+      "description": "Identify and remove empty virtual machine scale sets from your Azure cloud account.",
+      "risk": "Empty virtual machine scale sets may incur unnecessary costs and complicate cloud resource management, impacting cost optimization and compliance.",
+      "severity": "low",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/overview",
+      "checkScript": "Test-VmScalesetNotEmpty.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_sufficient_daily_backup_retention_period",
+      "service": "Vm",
+      "title": "Ensure there is a sufficient daily backup retention period configured for Azure virtual machines.",
+      "description": "Ensure there is a sufficient daily backup retention period configured for Azure virtual machines.",
+      "risk": "Having an optimal daily backup retention period for your Azure virtual machines will enforce your backup strategy to follow the best practices as specified in the compliance regulations promoted by your organization. Retaining VM backups for a longer period of time will allow you to handle more efficiently your data restoration process in the event of a failure.",
+      "severity": "medium",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://docs.microsoft.com/en-us/azure/backup/backup-azure-vms-introduction",
+      "checkScript": "Test-VmSufficientDailyBackupRetentionPeriod.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
+    },
+    {
+      "id": "vm_trusted_launch_enabled",
+      "service": "Vm",
+      "title": "Ensure Trusted Launch is enabled on Virtual Machines",
+      "description": "When Secure Boot and vTPM are enabled together, they provide a strong foundation for protecting your VM from boot attacks. For example, if an attacker attempts to replace the bootloader with a malicious version, Secure Boot will prevent the VM from booting. If the attacker is able to bypass Secure Boot and install a malicious bootloader, vTPM can be used to detect the intrusion and alert you.",
+      "risk": "Secure Boot and vTPM work together to protect your VM from a variety of boot attacks, including bootkits, rootkits, and firmware rootkits. Not enabling Trusted Launch in Azure VM can lead to increased vulnerability to rootkits and boot-level malware, reduced ability to detect and prevent unauthorized changes to the boot process, and a potential compromise of system integrity and data security.",
+      "severity": "high",
+      "categories": [],
+      "remediation": {
+        "text": "See Devolutions PAM for remediation guidance.",
+        "url": "https://devolutions.net/pam"
+      },
+      "relatedUrl": "https://learn.microsoft.com/en-us/azure/virtual-machines/trusted-launch-existing-vm?tabs=portal",
+      "checkScript": "Test-VmTrustedLaunchEnabled.ps1",
+      "dependsOn": [],
+      "permissions": {
+        "graph": [
+          "Directory.Read.All"
+        ]
+      }
     }
   ],
   "aws": [
