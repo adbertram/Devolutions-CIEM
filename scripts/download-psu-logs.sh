@@ -1,6 +1,6 @@
 #!/bin/bash
 # Download PSU logs and diagnostics from all sources to a local file
-# Usage: ./download-psu-logs.sh [output_file]
+# Usage: ./download-psu-logs.sh [--local] [output_file]
 #
 # Downloads from:
 #   - PSU database (LogEntry table) - App-level logs like [App-Devolutions CIEM]
@@ -17,7 +17,15 @@
 
 set -euo pipefail
 
+LOCAL_MODE=false
+if [[ "${1:-}" == "--local" ]]; then
+    LOCAL_MODE=true
+    shift
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/local-psu"
+LOCAL_PSU_URL="http://localhost:5001"
 ENV_FILE="$SCRIPT_DIR/../.env"
 
 # Load .env if it exists
@@ -38,6 +46,96 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 OUTPUT_FILE="${1:-${TEMP_DIR}/psu-logs-${TIMESTAMP}.log}"
 
 echo "Downloading PSU logs to: $OUTPUT_FILE" >&2
+
+if [ "$LOCAL_MODE" = true ]; then
+  # ============================================
+  # LOCAL MODE: Collect logs from local PSU instance
+  # ============================================
+  {
+    echo "=============================================="
+    echo "PSU Diagnostics Report (Local)"
+    echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "Source: $DATA_DIR"
+    echo "=============================================="
+    echo ""
+
+    # ============================================
+    # SECTION 1: PSU Database Logs (most useful for app debugging)
+    # ============================================
+    echo "=== PSU Database Logs (LogEntry table) ==="
+    echo ""
+    LOCAL_DB="$DATA_DIR/database.db"
+    if [ -f "$LOCAL_DB" ]; then
+      sqlite3 "$LOCAL_DB" "SELECT printf('[%s] [%s] [%s-%s] %s', TimeStamp, Level, Feature, Resource, Message) FROM LogEntry ORDER BY LogId DESC LIMIT 1000;" 2>/dev/null || echo "(database query failed)"
+    else
+      echo "(database not found: $LOCAL_DB)"
+    fi
+    echo ""
+
+    # ============================================
+    # SECTION 2: PSU REST API Logs
+    # ============================================
+    echo "=== PSU REST API Logs ==="
+    echo ""
+    API_TEMP_ZIP=$(mktemp).zip
+    API_TEMP_DIR=$(mktemp -d)
+
+    HTTP_CODE=$(curl -s -w "%{http_code}" "$LOCAL_PSU_URL/api/v1/log" -o "$API_TEMP_ZIP" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ]; then
+      unzip -q "$API_TEMP_ZIP" -d "$API_TEMP_DIR" 2>/dev/null || true
+      for log in "$API_TEMP_DIR"/*.txt; do
+        if [ -f "$log" ]; then
+          echo "--- $(basename "$log") ---"
+          cat "$log"
+          echo ""
+        fi
+      done
+    else
+      echo "(failed to fetch API logs from $LOCAL_PSU_URL - HTTP $HTTP_CODE)"
+    fi
+    rm -f "$API_TEMP_ZIP"
+    rm -rf "$API_TEMP_DIR"
+    echo ""
+
+    # ============================================
+    # SECTION 3: PSU Stdout Log
+    # ============================================
+    echo "=== PSU Stdout Log ==="
+    echo ""
+    STDOUT_LOG="$DATA_DIR/LogFiles/psu-stdout.log"
+    if [ -f "$STDOUT_LOG" ]; then
+      cat "$STDOUT_LOG"
+    else
+      echo "(not found: $STDOUT_LOG)"
+    fi
+    echo ""
+
+    # ============================================
+    # SECTION 4: Additional Log Files
+    # ============================================
+    echo "=== Additional Log Files ==="
+    echo ""
+    if [ -d "$DATA_DIR/LogFiles" ]; then
+      for logfile in "$DATA_DIR/LogFiles/"*; do
+        if [ -f "$logfile" ] && [ "$logfile" != "$STDOUT_LOG" ]; then
+          echo "--- $(basename "$logfile") ---"
+          cat "$logfile"
+          echo ""
+        fi
+      done
+    else
+      echo "(LogFiles directory not found: $DATA_DIR/LogFiles)"
+    fi
+
+    echo "=============================================="
+    echo "End of Diagnostics Report (Local)"
+    echo "=============================================="
+  } > "$OUTPUT_FILE"
+
+else
+  # ============================================
+  # AZURE MODE: Collect logs from Azure PSU instance
+  # ============================================
 
 # Check Azure CLI login
 if ! az account show &>/dev/null; then
@@ -266,6 +364,8 @@ get_kudu_credentials
   echo "=============================================="
 
 } > "$OUTPUT_FILE"
+
+fi  # end LOCAL_MODE / AZURE_MODE branch
 
 LINE_COUNT=$(wc -l < "$OUTPUT_FILE" | tr -d ' ')
 echo "Done. Downloaded $LINE_COUNT lines to: $OUTPUT_FILE" >&2

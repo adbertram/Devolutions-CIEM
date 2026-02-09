@@ -32,11 +32,26 @@ function Write-CIEMLog {
         [string]$Component = 'CIEM'
     )
 
-    # Log file path - use /home/LogFiles on Azure/Linux, module directory otherwise
+    # Log file path - find the PSU LogFiles directory
+    # Azure: /home/LogFiles
+    # Local PSU: walk up from module root to find LogFiles sibling of Repository
+    # Fallback: module directory
     $logDir = if ($IsLinux -and (Test-Path '/home/LogFiles')) {
         '/home/LogFiles'
     } else {
-        $script:ModuleRoot
+        # When imported into PSU, module lives under Repository/Modules/Name/Version/
+        # Walk up to find a parent that has a LogFiles directory
+        $dir = $script:ModuleRoot
+        $found = $null
+        for ($i = 0; $i -lt 5; $i++) {
+            $candidate = Join-Path (Split-Path $dir -Parent) 'LogFiles'
+            if (Test-Path $candidate) {
+                $found = $candidate
+                break
+            }
+            $dir = Split-Path $dir -Parent
+        }
+        if ($found) { $found } else { $script:ModuleRoot }
     }
     $logPath = Join-Path -Path $logDir -ChildPath 'ciem.log'
 
