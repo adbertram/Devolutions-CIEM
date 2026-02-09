@@ -23,8 +23,7 @@ function New-CIEMScanRun {
     [OutputType([CIEMScanRun])]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('Azure', 'AWS')]
-        [string]$Provider,
+        [CIEMCloudProvider]$Provider,
 
         [Parameter(Mandatory)]
         [string[]]$Services,

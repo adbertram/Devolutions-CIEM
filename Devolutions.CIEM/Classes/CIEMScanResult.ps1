@@ -40,7 +40,7 @@ class CIEMScanResult {
 class CIEMScanRun {
     [string]$Id
     [CIEMScanRunStatus]$Status
-    [string]$Provider
+    [CIEMCloudProvider]$Provider
     [string[]]$Services
     [datetime]$StartTime
     [nullable[datetime]]$EndTime
@@ -63,7 +63,7 @@ class CIEMScanRun {
     }
 
     # Constructor with parameters
-    CIEMScanRun([string]$Provider, [string[]]$Services, [bool]$IncludePassed) {
+    CIEMScanRun([CIEMCloudProvider]$Provider, [string[]]$Services, [bool]$IncludePassed) {
         $this.Id = [guid]::NewGuid().ToString()
         $this.StartTime = Get-Date
         $this.Status = [CIEMScanRunStatus]::Running
@@ -116,7 +116,7 @@ class CIEMScanRun {
         return @{
             Id            = $this.Id
             Status        = $this.Status.ToString()
-            Provider      = $this.Provider
+            Provider      = $this.Provider.ToString()
             Services      = $this.Services
             StartTime     = $this.StartTime.ToString('o')
             EndTime       = if ($this.EndTime) { $this.EndTime.ToString('o') } else { $null }
@@ -136,7 +136,7 @@ class CIEMScanRun {
         $run = [CIEMScanRun]::new()
         $run.Id = $Data.Id
         $run.Status = [CIEMScanRunStatus]$Data.Status
-        $run.Provider = $Data.Provider
+        $run.Provider = [CIEMCloudProvider]$Data.Provider
         $run.Services = $Data.Services
         $run.StartTime = [datetime]$Data.StartTime
         $run.EndTime = if ($Data.EndTime) { [datetime]$Data.EndTime } else { $null }

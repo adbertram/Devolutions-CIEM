@@ -42,6 +42,10 @@ function Get-CIEMDefaultConfig {
                 method = 'CurrentProfile'
                 profile = $null
                 region = $null
+                accessKey = [PSCustomObject]@{
+                    accessKeyId = $null
+                    secretAccessKey = $null
+                }
             }
             accountFilter = @()
         }

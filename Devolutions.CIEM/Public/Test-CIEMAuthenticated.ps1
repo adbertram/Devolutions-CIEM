@@ -31,7 +31,7 @@ function Test-CIEMAuthenticated {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter()]
-        [string[]]$Provider
+        [CIEMCloudProvider[]]$Provider
     )
 
     $providers = Get-CIEMProvider
@@ -90,6 +90,19 @@ function Test-CIEMAuthenticated {
                 }
                 catch {
                     Write-Verbose "Azure auth check failed: $($_.Exception.Message)"
+                    $authenticated = $false
+                }
+            }
+            'AWS' {
+                try {
+                    $awsContext = $script:AuthContext['AWS']
+                    if ($awsContext -and $awsContext.AccountId) {
+                        $authenticated = $true
+                        $account = $awsContext.Arn
+                    }
+                }
+                catch {
+                    Write-Verbose "AWS auth check failed: $($_.Exception.Message)"
                     $authenticated = $false
                 }
             }

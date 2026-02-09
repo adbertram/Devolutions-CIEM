@@ -43,8 +43,7 @@ function Connect-CIEM {
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
-        [ValidateSet('Azure', 'AWS')]
-        [string[]]$Provider,
+        [CIEMCloudProvider[]]$Provider,
 
         [Parameter()]
         [switch]$Force
@@ -107,14 +106,17 @@ function Connect-CIEM {
                     })
                 }
                 'AWS' {
-                    Write-CIEMLog -Message "AWS provider not yet supported" -Severity WARNING -Component 'Connect-CIEM'
-                    # AWS support coming soon
+                    Write-CIEMLog -Message "Calling Connect-CIEMAWS..." -Severity INFO -Component 'Connect-CIEM'
+                    $authContext = Connect-CIEMAWS
+                    $script:AuthContext['AWS'] = $authContext
+                    Write-CIEMLog -Message "AWS connection successful. AccountId: $($authContext.AccountId), Arn: $($authContext.Arn), Region: $($authContext.Region)" -Severity INFO -Component 'Connect-CIEM'
+
                     $results.Add([PSCustomObject]@{
                         Provider = 'AWS'
-                        Status   = 'NotSupported'
-                        Account  = $null
+                        Status   = 'Connected'
+                        Account  = $authContext.AccountId
                         TenantId = $null
-                        Message  = 'AWS provider support coming soon'
+                        Message  = "Connected as $($authContext.AccountType) ($($authContext.Arn))"
                     })
                 }
             }

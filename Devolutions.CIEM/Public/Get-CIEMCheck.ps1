@@ -46,8 +46,7 @@ function Get-CIEMCheck {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [ValidateSet('Azure', 'AWS')]
-        [string]$CloudProvider,
+        [CIEMCloudProvider]$CloudProvider,
 
         [Parameter()]
         [string]$Service,

@@ -36,7 +36,8 @@ function Get-CIEMProvider {
 
     foreach ($providerName in $providerNames) {
         $providerConfig = $script:Config.$providerName
-        $displayName = (Get-Culture).TextInfo.ToTitleCase($providerName)
+        $providerDisplayMap = @{ 'azure' = 'Azure'; 'aws' = 'AWS' }
+        $displayName = if ($providerDisplayMap.ContainsKey($providerName)) { $providerDisplayMap[$providerName] } else { (Get-Culture).TextInfo.ToTitleCase($providerName) }
 
         $checksPath = Join-Path -Path $script:ModuleRoot -ChildPath "Checks/$displayName"
         $checkCount = if (Test-Path $checksPath) { @(Get-ChildItem -Path "$checksPath/*.ps1").Count } else { 0 }

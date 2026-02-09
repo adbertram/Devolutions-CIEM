@@ -27,8 +27,7 @@ function Get-CIEMCheckService {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [ValidateSet('Azure', 'AWS')]
-        [string]$CloudProvider
+        [CIEMCloudProvider]$CloudProvider
     )
 
     $ErrorActionPreference = 'Stop'

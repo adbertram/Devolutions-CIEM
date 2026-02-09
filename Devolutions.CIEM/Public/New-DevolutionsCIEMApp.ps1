@@ -78,7 +78,7 @@ function New-DevolutionsCIEMApp {
                             Title = $_.Check.Title
                             Severity = ($_.Check.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                             Status = $_.Status
-                            Provider = 'Azure'
+                            Provider = if ($_.Check.CloudProvider) { $_.Check.CloudProvider.ToString() } else { 'Azure' }
                             Service = $_.Check.Service.ToString()
                             ResourceName = $_.ResourceName
                         }
@@ -204,6 +204,32 @@ function New-DevolutionsCIEMApp {
                 New-UDTypography -Text 'Run CIEM Scan' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
                 New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
+                # Provider Selector
+                $enabledProviders = @(Get-CIEMProvider | Where-Object Enabled)
+                if ($enabledProviders.Count -gt 1) {
+                    New-UDCard -Style @{ marginBottom = '20px' } -Content {
+                        New-UDSelect -Id 'scanProvider' -Label 'Cloud Provider' -Option {
+                            foreach ($ep in $enabledProviders) {
+                                New-UDSelectOption -Name $ep.Name -Value $ep.Name
+                            }
+                        } -DefaultValue $enabledProviders[0].Name -FullWidth -OnChange {
+                            $Session:SelectedProvider = $EventData
+                            Sync-UDElement -Id 'authStatusPanel'
+                            Sync-UDElement -Id 'serviceCheckboxes'
+                        }
+                    }
+                }
+                else {
+                    # Single provider - show as chip, set session
+                    $singleProvider = if ($enabledProviders.Count -eq 1) { $enabledProviders[0].Name } else { 'Azure' }
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '20px' } } -Content {
+                        New-UDChip -Label "Provider: $singleProvider" -Icon (New-UDIcon -Icon 'Cloud') -Style @{ backgroundColor = '#1976d2'; color = 'white' }
+                    }
+                    # Hidden element to hold provider value
+                    New-UDElement -Tag 'input' -Id 'scanProvider' -Attributes @{ type = 'hidden'; value = $singleProvider }
+                }
+                $Session:SelectedProvider = if ($enabledProviders.Count -ge 1) { $enabledProviders[0].Name } else { 'Azure' }
+
                 # Authentication Status Card
                 New-UDCard -Title 'Authentication Status' -Style @{ marginBottom = '20px' } -Content {
                     New-UDDynamic -Id 'authStatusPanel' -LoadingComponent {
@@ -214,43 +240,60 @@ function New-DevolutionsCIEMApp {
                     } -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         try {
-                            # Check current auth status using Test-CIEMAuthenticated (reads Az context)
-                            $authStatus = Test-CIEMAuthenticated -Provider Azure
+                            $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
+
+                            # Check current auth status using Test-CIEMAuthenticated
+                            $authStatus = Test-CIEMAuthenticated -Provider $selectedProvider
 
                             # Auto-connect if not authenticated but credentials are configured
                             if (-not $authStatus.Authenticated) {
                                 $config = Get-CIEMConfig
-                                $authMethod = $config.azure.authentication.method
                                 $hasCredentials = $false
 
-                                # Check if credentials are configured based on auth method
-                                switch ($authMethod) {
-                                    'ServicePrincipalSecret' {
-                                        $tenantId = $config.azure.authentication.tenantId
-                                        $clientId = $config.azure.authentication.servicePrincipal.clientId
-                                        $clientSecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
-                                        $hasCredentials = $tenantId -and $clientId -and $clientSecret
+                                switch ($selectedProvider) {
+                                    'Azure' {
+                                        $authMethod = $config.azure.authentication.method
+                                        switch ($authMethod) {
+                                            'ServicePrincipalSecret' {
+                                                $tenantId = $config.azure.authentication.tenantId
+                                                $clientId = $config.azure.authentication.servicePrincipal.clientId
+                                                $clientSecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
+                                                $hasCredentials = $tenantId -and $clientId -and $clientSecret
+                                            }
+                                            'ServicePrincipalCertificate' {
+                                                $tenantId = $config.azure.authentication.tenantId
+                                                $clientId = $config.azure.authentication.servicePrincipal.clientId
+                                                $thumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
+                                                $hasCredentials = $tenantId -and $clientId -and $thumbprint
+                                            }
+                                            'ManagedIdentity' {
+                                                $hasCredentials = $true
+                                            }
+                                        }
                                     }
-                                    'ServicePrincipalCertificate' {
-                                        $tenantId = $config.azure.authentication.tenantId
-                                        $clientId = $config.azure.authentication.servicePrincipal.clientId
-                                        $thumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
-                                        $hasCredentials = $tenantId -and $clientId -and $thumbprint
-                                    }
-                                    'ManagedIdentity' {
-                                        # Managed identity doesn't need explicit credentials
-                                        $hasCredentials = $true
+                                    'AWS' {
+                                        $authMethod = $config.aws.authentication.method
+                                        switch ($authMethod) {
+                                            'CurrentProfile' {
+                                                # CurrentProfile always has creds (uses AWS CLI config)
+                                                $hasCredentials = $true
+                                            }
+                                            'AccessKey' {
+                                                $accessKeyId = Get-CIEMSecret 'CIEM_AWS_AccessKeyId'
+                                                $secretAccessKey = Get-CIEMSecret 'CIEM_AWS_SecretAccessKey'
+                                                $hasCredentials = $accessKeyId -and $secretAccessKey
+                                            }
+                                        }
                                     }
                                 }
 
                                 if ($hasCredentials) {
-                                    Write-CIEMLog -Message "Auto-connecting on scan page load (method: $authMethod)" -Severity INFO -Component 'PSU-ScanPage'
+                                    Write-CIEMLog -Message "Auto-connecting on scan page load (provider: $selectedProvider)" -Severity INFO -Component 'PSU-ScanPage'
                                     try {
-                                        $connectResult = Connect-CIEM -Provider Azure
-                                        $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
-                                        if ($connectAzure.Status -eq 'Connected') {
-                                            # Re-check auth status after connect
-                                            $authStatus = Test-CIEMAuthenticated -Provider Azure
+                                        $connectResult = Connect-CIEM -Provider $selectedProvider
+                                        $connectProvider = $connectResult.Providers | Where-Object { $_.Provider -eq $selectedProvider }
+                                        if ($connectProvider.Status -eq 'Connected') {
+                                            $authStatus = Test-CIEMAuthenticated -Provider $selectedProvider
                                             Write-CIEMLog -Message "Auto-connect successful: $($authStatus.Account)" -Severity INFO -Component 'PSU-ScanPage'
                                         }
                                     }
@@ -267,9 +310,11 @@ function New-DevolutionsCIEMApp {
                                 New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                     New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
                                     New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text 'Connected to Azure' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#4caf50' }
+                                        New-UDTypography -Text "Connected to $selectedProvider" -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#4caf50' }
                                         New-UDTypography -Text "Account: $accountInfo" -Variant 'body2' -Style @{ color = '#666' }
-                                        New-UDTypography -Text "Tenant: $tenantInfo" -Variant 'caption' -Style @{ color = '#999' }
+                                        if ($tenantInfo) {
+                                            New-UDTypography -Text "Tenant: $tenantInfo" -Variant 'caption' -Style @{ color = '#999' }
+                                        }
                                     }
                                 }
                             }
@@ -298,27 +343,21 @@ function New-DevolutionsCIEMApp {
 
                 # Scan Configuration Card
                 New-UDCard -Title 'Scan Configuration' -Content {
-                    # Load available checks to show counts
-                    $allChecks = Get-CIEMCheck
-                    $entraCount = @($allChecks | Where-Object { $_.service -eq 'Entra' }).Count
-                    $iamCount = @($allChecks | Where-Object { $_.service -eq 'IAM' }).Count
-                    $kvCount = @($allChecks | Where-Object { $_.service -eq 'KeyVault' }).Count
-                    $storageCount = @($allChecks | Where-Object { $_.service -eq 'Storage' }).Count
-
                     New-UDTypography -Text 'Select Services to Scan' -Variant 'subtitle2' -Style @{ marginBottom = '8px'; marginTop = '8px' }
 
-                    New-UDGrid -Container -Spacing 2 -Content {
-                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
-                            New-UDCheckbox -Id 'scanEntra' -Label "Entra ID ($entraCount checks)" -Checked $true
-                        }
-                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
-                            New-UDCheckbox -Id 'scanIAM' -Label "IAM ($iamCount checks)" -Checked $true
-                        }
-                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
-                            New-UDCheckbox -Id 'scanKeyVault' -Label "KeyVault ($kvCount checks)" -Checked $true
-                        }
-                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
-                            New-UDCheckbox -Id 'scanStorage' -Label "Storage ($storageCount checks)" -Checked $true
+                    New-UDDynamic -Id 'serviceCheckboxes' -Content {
+                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                        $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
+                        $allChecks = Get-CIEMCheck -CloudProvider $selectedProvider
+                        $services = @(Get-CIEMCheckService -CloudProvider $selectedProvider)
+
+                        New-UDGrid -Container -Spacing 2 -Content {
+                            foreach ($svc in $services) {
+                                $svcCount = @($allChecks | Where-Object { $_.Service -eq $svc.Name }).Count
+                                New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
+                                    New-UDCheckbox -Id "scan_$($svc.Name)" -Label "$($svc.Name) ($svcCount checks)" -Checked $true
+                                }
+                            }
                         }
                     }
 
@@ -338,26 +377,32 @@ function New-DevolutionsCIEMApp {
                                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                 Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
 
-                                # Connect to Azure (handles all auth internally)
-                                Write-CIEMLog -Message "Connecting to Azure..." -Severity INFO -Component 'PSU-ScanPage'
-                                $connectResult = Connect-CIEM -Provider Azure -Force
-                                $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
+                                # Get selected provider
+                                $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
 
-                                if ($connectAzure.Status -ne 'Connected') {
-                                    Write-CIEMLog -Message "Connect failed: $($connectAzure.Message)" -Severity ERROR -Component 'PSU-ScanPage'
-                                    Show-UDToast -Message "Connection failed: $($connectAzure.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                # Connect to provider (handles all auth internally)
+                                Write-CIEMLog -Message "Connecting to $selectedProvider..." -Severity INFO -Component 'PSU-ScanPage'
+                                $connectResult = Connect-CIEM -Provider $selectedProvider -Force
+                                $connectProvider = $connectResult.Providers | Where-Object { $_.Provider -eq $selectedProvider }
+
+                                if ($connectProvider.Status -ne 'Connected') {
+                                    Write-CIEMLog -Message "Connect failed: $($connectProvider.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                                    Show-UDToast -Message "Connection failed: $($connectProvider.Message)" -Duration 8000 -BackgroundColor '#f44336'
                                     Sync-UDElement -Id 'authStatusPanel'
                                     return
                                 }
-                                Write-CIEMLog -Message "Connected: $($connectAzure.Account)" -Severity INFO -Component 'PSU-ScanPage'
+                                Write-CIEMLog -Message "Connected: $($connectProvider.Account)" -Severity INFO -Component 'PSU-ScanPage'
                                 Sync-UDElement -Id 'authStatusPanel'
 
-                                # Get selected services
+                                # Get selected services dynamically from checkbox IDs
+                                $providerServices = @(Get-CIEMCheckService -CloudProvider $selectedProvider | Select-Object -ExpandProperty Name)
                                 $selectedServices = @()
-                                if ((Get-UDElement -Id 'scanEntra').checked) { $selectedServices += 'Entra' }
-                                if ((Get-UDElement -Id 'scanIAM').checked) { $selectedServices += 'IAM' }
-                                if ((Get-UDElement -Id 'scanKeyVault').checked) { $selectedServices += 'KeyVault' }
-                                if ((Get-UDElement -Id 'scanStorage').checked) { $selectedServices += 'Storage' }
+                                foreach ($svcName in $providerServices) {
+                                    $cbId = "scan_$svcName"
+                                    try {
+                                        if ((Get-UDElement -Id $cbId).checked) { $selectedServices += $svcName }
+                                    } catch { }
+                                }
 
                                 if ($selectedServices.Count -eq 0) {
                                     Show-UDToast -Message 'Please select at least one service to scan.' -Duration 5000 -BackgroundColor '#ff9800'
@@ -389,7 +434,7 @@ function New-DevolutionsCIEMApp {
                                 # Run the actual scan
                                 Write-CIEMLog -Message "Calling Invoke-CIEMScan..." -Severity INFO -Component 'PSU-ScanPage'
                                 try {
-                                    $scanResults = Invoke-CIEMScan -Provider Azure -Service $selectedServices -IncludePassed:$includePassedChecks -Verbose 4>&1 | ForEach-Object {
+                                    $scanResults = Invoke-CIEMScan -Provider $selectedProvider -Service $selectedServices -IncludePassed:$includePassedChecks -Verbose 4>&1 | ForEach-Object {
                                         if ($_ -is [System.Management.Automation.VerboseRecord]) {
                                             Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-ScanPage'
                                         }
@@ -703,7 +748,7 @@ function New-DevolutionsCIEMApp {
                     New-UDElement -Tag 'div' -Content {
                         New-UDSelect -Id 'cloudProvider' -Label 'Cloud Provider' -Option {
                             New-UDSelectOption -Name 'Azure' -Value 'Azure'
-                            New-UDSelectOption -Name 'AWS (Coming Soon)' -Value 'AWS'
+                            New-UDSelectOption -Name 'AWS' -Value 'AWS'
                         } -DefaultValue $currentProvider -FullWidth -OnChange {
                             # Only sync authMethodContainer - it will sync authFieldsContainer after rendering
                             Sync-UDElement -Id 'authMethodContainer'
@@ -716,12 +761,17 @@ function New-DevolutionsCIEMApp {
                         if (-not $selectedProvider) { $selectedProvider = 'Azure' }
 
                         if ($selectedProvider -eq 'AWS') {
-                            # AWS is disabled - show coming soon message
-                            New-UDAlert -Severity 'info' -Text 'AWS support is coming soon. Please select Azure as your cloud provider.' -Style @{ marginBottom = '16px' }
-                            New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
-                                New-UDSelectOption -Name 'Current Profile (AWS CLI)' -Value 'CurrentProfile'
-                            } -DefaultValue 'CurrentProfile' -FullWidth -Disabled
-                            # Sync auth fields after AWS dropdown is rendered
+                            $awsAuthMethod = if ($CurrentConfig.aws.authentication.method) { $CurrentConfig.aws.authentication.method } else { 'CurrentProfile' }
+
+                            New-UDElement -Tag 'div' -Content {
+                                New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
+                                    New-UDSelectOption -Name 'Current Profile (AWS CLI)' -Value 'CurrentProfile'
+                                    New-UDSelectOption -Name 'Access Key' -Value 'AccessKey'
+                                } -DefaultValue $awsAuthMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
+                            } -Attributes @{ style = @{ marginBottom = '8px' } }
+
+                            New-UDTypography -Text 'Select the authentication method for your AWS environment.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '16px' }
+
                             Sync-UDElement -Id 'authFieldsContainer'
                         }
                         else {
@@ -838,8 +888,42 @@ function New-DevolutionsCIEMApp {
                             }
                         }
                         elseif ($selectedProvider -eq 'AWS') {
-                            # AWS fields (disabled for now)
-                            New-UDTypography -Text 'AWS authentication configuration will be available in a future release.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic' }
+                            $awsConfig = Get-CIEMConfig
+                            $awsStoredProfile = $awsConfig.aws.authentication.profile
+                            $awsStoredRegion = $awsConfig.aws.authentication.region
+                            $awsAccessKeyExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_AWS_AccessKeyId'))
+                            $awsSecretKeyExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_AWS_SecretAccessKey'))
+
+                            switch ($selectedMethod) {
+                                'CurrentProfile' {
+                                    New-UDAlert -Severity 'info' -Text 'Uses your existing AWS CLI configuration (~/.aws/credentials). Optionally specify a named profile and region.' -Dense -Style @{ marginBottom = '16px' }
+                                    New-UDGrid -Container -Spacing 2 -Content {
+                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                            New-UDTextbox -Id 'awsProfile' -Label 'AWS Profile (Optional)' -Value $awsStoredProfile -FullWidth -Placeholder 'default'
+                                        }
+                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                            New-UDTextbox -Id 'awsRegion' -Label 'AWS Region (Optional)' -Value $awsStoredRegion -FullWidth -Placeholder 'us-east-1'
+                                        }
+                                    }
+                                }
+                                'AccessKey' {
+                                    New-UDGrid -Container -Spacing 2 -Content {
+                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                            $akPlaceholder = if ($awsAccessKeyExists) { 'Access Key is stored. Leave empty to keep existing.' } else { 'AKIAIOSFODNN7EXAMPLE' }
+                                            $akValue = if ($awsAccessKeyExists) { '********' } else { '' }
+                                            New-UDTextbox -Id 'awsAccessKeyId' -Label 'Access Key ID' -Value $akValue -FullWidth -Placeholder $akPlaceholder
+                                        }
+                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                            $skPlaceholder = if ($awsSecretKeyExists) { 'Secret Key is stored. Leave empty to keep existing.' } else { 'Enter AWS secret access key' }
+                                            $skValue = if ($awsSecretKeyExists) { '********' } else { '' }
+                                            New-UDTextbox -Id 'awsSecretAccessKey' -Label 'Secret Access Key' -Type 'password' -Value $skValue -FullWidth -Placeholder $skPlaceholder
+                                        }
+                                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                            New-UDTextbox -Id 'awsRegion' -Label 'AWS Region (Optional)' -Value $awsStoredRegion -FullWidth -Placeholder 'us-east-1'
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -900,25 +984,28 @@ function New-DevolutionsCIEMApp {
                                     Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                     Write-CIEMLog -Message "Test Authentication button clicked" -Severity INFO -Component 'PSU-ConfigPage'
 
+                                    $testProvider = (Get-UDElement -Id 'cloudProvider').value
+                                    if (-not $testProvider) { $testProvider = 'Azure' }
+
                                     # Show progress
                                     Set-UDElement -Id 'testAuthProgress' -Content {
-                                        New-CIEMProgressContent -Text 'Connecting to Azure...'
+                                        New-CIEMProgressContent -Text "Connecting to $testProvider..."
                                     }
                                     Set-UDElement -Id 'testAuthBtn' -Properties @{ disabled = $true }
 
                                     # Connect handles all auth logic internally
-                                    $connectResult = Connect-CIEM -Provider Azure -Force
-                                    $connectAzure = $connectResult.Providers | Where-Object { $_.Provider -eq 'Azure' }
-                                    Write-CIEMLog -Message "Connect-CIEM result: Status=$($connectAzure.Status), Account=$($connectAzure.Account)" -Severity INFO -Component 'PSU-ConfigPage'
+                                    $connectResult = Connect-CIEM -Provider $testProvider -Force
+                                    $connectProvider = $connectResult.Providers | Where-Object { $_.Provider -eq $testProvider }
+                                    Write-CIEMLog -Message "Connect-CIEM result: Status=$($connectProvider.Status), Account=$($connectProvider.Account)" -Severity INFO -Component 'PSU-ConfigPage'
 
-                                    if ($connectAzure.Status -eq 'Connected') {
+                                    if ($connectProvider.Status -eq 'Connected') {
                                         Set-UDElement -Id 'testAuthProgress' -Content {
-                                            New-CIEMSuccessContent -Text 'Authentication Successful' -Details "Connected as $($connectAzure.Account)"
+                                            New-CIEMSuccessContent -Text 'Authentication Successful' -Details "Connected as $($connectProvider.Account)"
                                         }
                                     } else {
-                                        Write-CIEMLog -Message "Authentication FAILED: $($connectAzure.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                                        Write-CIEMLog -Message "Authentication FAILED: $($connectProvider.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
                                         Set-UDElement -Id 'testAuthProgress' -Content {
-                                            New-CIEMErrorContent -Text 'Authentication Failed' -Details $connectAzure.Message
+                                            New-CIEMErrorContent -Text 'Authentication Failed' -Details $connectProvider.Message
                                         }
                                     }
                                 } catch {
@@ -952,15 +1039,6 @@ function New-DevolutionsCIEMApp {
                                 $authMethod = (Get-UDElement -Id 'authMethod').value
                                 Write-CIEMLog -Message "Form values - Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
 
-                                # Validate AWS is not selected (coming soon)
-                                if ($provider -eq 'AWS') {
-                                    Write-CIEMLog -Message "AWS provider selected but not supported - rejecting" -Severity WARNING -Component 'PSU-ConfigPage'
-                                    Set-UDElement -Id 'saveConfigProgress' -Content {
-                                        New-CIEMErrorContent -Text 'Not Supported' -Details 'AWS support is coming soon. Please select Azure as your cloud provider.'
-                                    }
-                                    return
-                                }
-
                                 # Validate ManagedIdentity is only saved when supported
                                 $envInfo = Get-PSUInstalledEnvironment
                                 Write-CIEMLog -Message "Environment: $($envInfo.Environment), SupportsManagedIdentity: $($envInfo.SupportsManagedIdentity)" -Severity DEBUG -Component 'PSU-ConfigPage'
@@ -979,37 +1057,65 @@ function New-DevolutionsCIEMApp {
                                 # Non-sensitive settings go to PSU cache
                                 $configSettings = @{
                                     'cloudProvider' = $provider
-                                    'azure.authentication.method' = $authMethod
                                 }
-                                Write-CIEMLog -Message "Config settings to save: $($configSettings.Keys -join ', ')" -Severity DEBUG -Component 'PSU-ConfigPage'
+                                Write-CIEMLog -Message "Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
 
-                                # Collect credentials based on auth method
+                                # Collect credentials based on provider and auth method
                                 $credentials = @{}
-                                # TenantId goes to PSU cache (not secrets)
-                                $tenantIdElement = Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue
-                                if ($tenantIdElement -and $tenantIdElement.value) {
-                                    $configSettings['azure.authentication.tenantId'] = $tenantIdElement.value
-                                    Write-CIEMLog -Message "TenantId collected from form: $($tenantIdElement.value.Substring(0,8))... (saving to PSU cache)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                }
+                                $secretPrefix = ''
 
-                                switch ($authMethod) {
-                                    'ServicePrincipalSecret' {
-                                        $clientId = (Get-UDElement -Id 'azSpClientId').value
-                                        $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
-                                        Write-CIEMLog -Message "ServicePrincipalSecret - ClientId: $(if($clientId){'found'}else{'empty'}), ClientSecret: $(if($clientSecret -and $clientSecret -ne '********'){'new value'}elseif($clientSecret -eq '********'){'placeholder'}else{'empty'})" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                        # ClientId goes to PSU cache (not secrets)
-                                        if ($clientId) { $configSettings['azure.authentication.servicePrincipal.clientId'] = $clientId }
-                                        # Only ClientSecret goes to PSU secrets (it's the only sensitive value)
-                                        if ($clientSecret -and $clientSecret -ne '********') { $credentials['ClientSecret'] = $clientSecret }
+                                if ($provider -eq 'Azure') {
+                                    $configSettings['azure.authentication.method'] = $authMethod
+                                    $configSettings['azure.enabled'] = $true
+                                    $secretPrefix = 'CIEM_Azure_'
+
+                                    # TenantId goes to PSU cache (not secrets)
+                                    $tenantIdElement = Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue
+                                    if ($tenantIdElement -and $tenantIdElement.value) {
+                                        $configSettings['azure.authentication.tenantId'] = $tenantIdElement.value
+                                        Write-CIEMLog -Message "TenantId collected from form (saving to PSU cache)" -Severity DEBUG -Component 'PSU-ConfigPage'
                                     }
-                                    'ServicePrincipalCertificate' {
-                                        $clientId = (Get-UDElement -Id 'azCertClientId').value
-                                        $thumbprint = (Get-UDElement -Id 'azCertThumbprint').value
-                                        Write-CIEMLog -Message "ServicePrincipalCertificate - ClientId: $(if($clientId){'found'}else{'empty'}), Thumbprint: $(if($thumbprint){'found'}else{'empty'})" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                        if ($clientId) { $credentials['ClientId'] = $clientId }
-                                        if ($thumbprint) { $credentials['CertThumbprint'] = $thumbprint }
+
+                                    switch ($authMethod) {
+                                        'ServicePrincipalSecret' {
+                                            $clientId = (Get-UDElement -Id 'azSpClientId').value
+                                            $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
+                                            if ($clientId) { $configSettings['azure.authentication.servicePrincipal.clientId'] = $clientId }
+                                            if ($clientSecret -and $clientSecret -ne '********') { $credentials['ClientSecret'] = $clientSecret }
+                                        }
+                                        'ServicePrincipalCertificate' {
+                                            $clientId = (Get-UDElement -Id 'azCertClientId').value
+                                            $thumbprint = (Get-UDElement -Id 'azCertThumbprint').value
+                                            if ($clientId) { $credentials['ClientId'] = $clientId }
+                                            if ($thumbprint) { $credentials['CertThumbprint'] = $thumbprint }
+                                        }
                                     }
-                                    # ManagedIdentity requires no credentials - uses system-assigned identity
+                                }
+                                elseif ($provider -eq 'AWS') {
+                                    $configSettings['aws.authentication.method'] = $authMethod
+                                    $configSettings['aws.enabled'] = $true
+                                    $secretPrefix = 'CIEM_AWS_'
+
+                                    # Region goes to PSU cache
+                                    $regionElement = Get-UDElement -Id 'awsRegion' -ErrorAction SilentlyContinue
+                                    if ($regionElement -and $regionElement.value) {
+                                        $configSettings['aws.authentication.region'] = $regionElement.value
+                                    }
+
+                                    switch ($authMethod) {
+                                        'CurrentProfile' {
+                                            $profileElement = Get-UDElement -Id 'awsProfile' -ErrorAction SilentlyContinue
+                                            if ($profileElement -and $profileElement.value) {
+                                                $configSettings['aws.authentication.profile'] = $profileElement.value
+                                            }
+                                        }
+                                        'AccessKey' {
+                                            $accessKeyId = (Get-UDElement -Id 'awsAccessKeyId').value
+                                            $secretAccessKey = (Get-UDElement -Id 'awsSecretAccessKey').value
+                                            if ($accessKeyId -and $accessKeyId -ne '********') { $credentials['AccessKeyId'] = $accessKeyId }
+                                            if ($secretAccessKey -and $secretAccessKey -ne '********') { $credentials['SecretAccessKey'] = $secretAccessKey }
+                                        }
+                                    }
                                 }
                                 Write-CIEMLog -Message "Credentials collected: $($credentials.Keys -join ', ')" -Severity INFO -Component 'PSU-ConfigPage'
 
@@ -1018,7 +1124,7 @@ function New-DevolutionsCIEMApp {
                                     Write-CIEMLog -Message "Saving credentials to PSU secrets..." -Severity INFO -Component 'PSU-ConfigPage'
                                     $secretsCreated = @()
                                     foreach ($key in $credentials.Keys) {
-                                        $secretName = "CIEM_Azure_$key"
+                                        $secretName = "${secretPrefix}${key}"
                                         $secretValue = $credentials[$key]
                                         if (-not [string]::IsNullOrEmpty($secretValue)) {
                                             Write-CIEMLog -Message "Processing secret: $secretName" -Severity DEBUG -Component 'PSU-ConfigPage'
@@ -1070,19 +1176,18 @@ function New-DevolutionsCIEMApp {
 
                                 # Test authentication if settings changed
                                 Write-CIEMLog -Message "Auth changed: $authChanged, Provider: $provider" -Severity INFO -Component 'PSU-ConfigPage'
-                                if ($authChanged -and $provider -eq 'Azure') {
-                                    Write-CIEMLog -Message "Auth settings changed - initiating Connect-CIEM..." -Severity INFO -Component 'PSU-ConfigPage'
+                                if ($authChanged) {
+                                    Write-CIEMLog -Message "Auth settings changed - initiating Connect-CIEM for $provider..." -Severity INFO -Component 'PSU-ConfigPage'
                                     Set-UDElement -Id 'saveConfigProgress' -Content {
-                                        New-CIEMProgressContent -Text 'Testing authentication...'
+                                        New-CIEMProgressContent -Text "Testing $provider authentication..."
                                     }
                                     try {
-                                        # Config already updated by Save-CIEMConfig above
-                                        $result = Connect-CIEM -Provider Azure -Force
-                                        $azureResult = $result.Providers | Where-Object { $_.Provider -eq 'Azure' }
-                                        Write-CIEMLog -Message "Connect-CIEM result: Status=$($azureResult.Status), Account=$($azureResult.Account), Message=$($azureResult.Message)" -Severity INFO -Component 'PSU-ConfigPage'
-                                        if ($azureResult.Status -eq 'Connected') {
+                                        $result = Connect-CIEM -Provider $provider -Force
+                                        $providerResult = $result.Providers | Where-Object { $_.Provider -eq $provider }
+                                        Write-CIEMLog -Message "Connect-CIEM result: Status=$($providerResult.Status), Account=$($providerResult.Account), Message=$($providerResult.Message)" -Severity INFO -Component 'PSU-ConfigPage'
+                                        if ($providerResult.Status -eq 'Connected') {
                                             Set-UDElement -Id 'saveConfigProgress' -Content {
-                                                New-CIEMSuccessContent -Text 'Configuration Saved' -Details "Connected as $($azureResult.Account)"
+                                                New-CIEMSuccessContent -Text 'Configuration Saved' -Details "Connected as $($providerResult.Account)"
                                             }
                                             # Update session state with new values
                                             $Session:OriginalAuthValues = @{
@@ -1094,14 +1199,14 @@ function New-DevolutionsCIEMApp {
                                             }
                                             Write-CIEMLog -Message "Session:OriginalAuthValues updated" -Severity DEBUG -Component 'PSU-ConfigPage'
                                         } else {
-                                            Write-CIEMLog -Message "Authentication failed: $($azureResult.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                                            Write-CIEMLog -Message "Authentication failed: $($providerResult.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
                                             Set-UDElement -Id 'saveConfigProgress' -Content {
                                                 New-UDCard -Style @{ backgroundColor = '#fff3e0'; marginTop = '12px'; marginBottom = '12px' } -Content {
                                                     New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                                         New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
                                                         New-UDElement -Tag 'div' -Content {
                                                             New-UDTypography -Text 'Configuration Saved (Auth Failed)' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#e65100' }
-                                                            New-UDTypography -Text $azureResult.Message -Variant 'body2' -Style @{ color = '#666' }
+                                                            New-UDTypography -Text $providerResult.Message -Variant 'body2' -Style @{ color = '#666' }
                                                         }
                                                     }
                                                 }
@@ -1186,88 +1291,6 @@ function New-DevolutionsCIEMApp {
 
                     # Filter checkboxes row
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; alignItems = 'center'; gap = '24px'; marginBottom = '16px'; flexWrap = 'wrap' } } -Content {
-                        # Load Installed Checks button - queries local cache only (fast)
-                        New-UDButton -Id 'loadChecksBtn' -Text 'Load Installed Checks' -Variant 'outlined' -Icon (New-UDIcon -Icon 'Search') -ShowLoading -OnClick {
-                            try {
-                                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                Write-CIEMLog -Message "Load Installed Checks clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
-
-                                # Capture warnings from Get-CIEMCheck to diagnose class type issues
-                                $warnings = @()
-                                $allChecks = @(Get-CIEMCheck -WarningVariable warnings)
-                                if ($warnings.Count -gt 0) {
-                                    Write-CIEMLog -Message "Get-CIEMCheck warnings ($($warnings.Count)): $($warnings[0])" -Severity WARNING -Component 'PSU-CloudChecksPage'
-                                }
-                                Write-CIEMLog -Message "Get-CIEMCheck returned $($allChecks.Count) checks" -Severity INFO -Component 'PSU-CloudChecksPage'
-
-                                # Merge services from loaded checks with pre-packed catalog
-                                $Session:ServicesByProvider = @{}
-                                $catalogServices = Get-CIEMCheckService
-                                foreach ($entry in @(@{key='azure';display='Azure'}, @{key='aws';display='AWS'})) {
-                                    $fromCatalog = @($catalogServices | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Name })
-                                    $fromChecks = @($allChecks | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Service })
-                                    $Session:ServicesByProvider[$entry.key] = @(($fromCatalog + $fromChecks) | Sort-Object -Unique)
-                                }
-                                Sync-UDElement -Id 'serviceCheckboxesDynamic'
-
-                                if ($allChecks.Count -gt 0) {
-                                    Set-UDElement -Id 'checksTablePanel' -Content {
-                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px'; display = 'flex'; flexWrap = 'wrap'; gap = '8px'; alignItems = 'center' } } -Content {
-                                            New-UDChip -Label "Total: $($allChecks.Count)" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' }
-                                            $serviceGroups = $allChecks | Group-Object -Property Service
-                                            foreach ($group in ($serviceGroups | Sort-Object Name)) {
-                                                New-UDChip -Label "$($group.Name): $($group.Count)" -Variant 'outlined' -Color 'primary'
-                                            }
-                                        }
-
-                                        New-UDDataGrid -LoadRows {
-                                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                            $checks = @(Get-CIEMCheck)
-                                            $checksData = $checks | ForEach-Object {
-                                                @{
-                                                    id            = $_.Id
-                                                    checkId       = $_.Id
-                                                    title         = $_.Title
-                                                    cloudProvider = $_.CloudProvider.ToString()
-                                                    service       = $_.Service.ToString()
-                                                    severity      = ($_.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
-                                                    categories    = ($_.Categories -join ', ')
-                                                }
-                                            }
-                                            @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
-                                        } -Columns @(
-                                            New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
-                                            New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
-                                            New-UDDataGridColumn -Field 'cloudProvider' -HeaderName 'Provider' -Width 100
-                                            New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
-                                            New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
-                                                $sev = $EventData.severity.ToUpper()
-                                                $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
-                                                New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
-                                            }
-                                            New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
-                                        ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
-                                    }
-
-                                }
-                                else {
-                                    Set-UDElement -Id 'checksTablePanel' -Content {
-                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
-                                            New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                                                New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
-                                                New-UDTypography -Text 'No Checks Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                                New-UDTypography -Text 'Use "Sync Checks" above to download checks from the Prowler repository first.' -Variant 'body1' -Style @{ color = '#666' }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            catch {
-                                Write-CIEMLog -Message "Load checks failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
-                                Show-UDToast -Message "Failed to load checks: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                            }
-                        }
-
                         # Sync button - discovers services from GitHub and syncs for selected providers
                         New-UDButton -Id 'syncChecksBtn' -Text 'Sync Checks' -Variant 'contained' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -ShowLoading -OnClick {
                             try {
@@ -1376,13 +1399,9 @@ function New-DevolutionsCIEMApp {
 
                     # Services section
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px' } } -Content {
-                        New-UDStack -Direction 'row' -AlignItems 'center' -Spacing 1 -Content {
-                            New-UDIcon -Icon 'Filter' -Style @{ color = '#666'; marginRight = '4px' }
-                            New-UDTypography -Text 'Services' -Variant 'subtitle1' -Style @{ fontWeight = 'bold' }
-                        }
                         # Select All / Deselect All buttons
                         New-UDElement -Tag 'div' -Attributes @{
-                            style = @{ display = 'flex'; gap = '8px'; marginBottom = '8px'; marginTop = '8px' }
+                            style = @{ display = 'flex'; gap = '8px'; marginBottom = '8px' }
                         } -Content {
                                 New-UDButton -Text 'Select All' -Variant 'outlined' -Size 'small' -OnClick {
                                     foreach ($svc in $Session:CurrentServices) {
@@ -1445,7 +1464,78 @@ function New-DevolutionsCIEMApp {
                             New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
                                 New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
                                 New-UDTypography -Text 'Checks Not Loaded' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                New-UDTypography -Text 'Click "Load Installed Checks" above to view synced security checks.' -Variant 'body1' -Style @{ color = '#666' }
+                                New-UDTypography -Text 'Load installed checks to browse synced security checks.' -Variant 'body1' -Style @{ color = '#666'; marginBottom = '16px' }
+                                New-UDButton -Id 'loadChecksBtn' -Text 'Load Installed Checks' -Variant 'outlined' -Icon (New-UDIcon -Icon 'Search') -ShowLoading -OnClick {
+                                    try {
+                                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                        Write-CIEMLog -Message "Load Installed Checks clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
+
+                                        # Capture warnings from Get-CIEMCheck to diagnose class type issues
+                                        $warnings = @()
+                                        $allChecks = @(Get-CIEMCheck -WarningVariable warnings)
+                                        if ($warnings.Count -gt 0) {
+                                            Write-CIEMLog -Message "Get-CIEMCheck warnings ($($warnings.Count)): $($warnings[0])" -Severity WARNING -Component 'PSU-CloudChecksPage'
+                                        }
+                                        Write-CIEMLog -Message "Get-CIEMCheck returned $($allChecks.Count) checks" -Severity INFO -Component 'PSU-CloudChecksPage'
+
+                                        # Merge services from loaded checks with pre-packed catalog
+                                        $Session:ServicesByProvider = @{}
+                                        $catalogServices = Get-CIEMCheckService
+                                        foreach ($entry in @(@{key='azure';display='Azure'}, @{key='aws';display='AWS'})) {
+                                            $fromCatalog = @($catalogServices | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Name })
+                                            $fromChecks = @($allChecks | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Service })
+                                            $Session:ServicesByProvider[$entry.key] = @(($fromCatalog + $fromChecks) | Sort-Object -Unique)
+                                        }
+                                        Sync-UDElement -Id 'serviceCheckboxesDynamic'
+
+                                        if ($allChecks.Count -gt 0) {
+                                            Set-UDElement -Id 'checksTablePanel' -Content {
+                                                New-UDDataGrid -LoadRows {
+                                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                                    $checks = @(Get-CIEMCheck)
+                                                    $checksData = $checks | ForEach-Object {
+                                                        @{
+                                                            id            = $_.Id
+                                                            checkId       = $_.Id
+                                                            title         = $_.Title
+                                                            cloudProvider = $_.CloudProvider.ToString()
+                                                            service       = $_.Service.ToString()
+                                                            severity      = ($_.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                                            categories    = ($_.Categories -join ', ')
+                                                        }
+                                                    }
+                                                    @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
+                                                } -Columns @(
+                                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
+                                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
+                                                    New-UDDataGridColumn -Field 'cloudProvider' -HeaderName 'Provider' -Width 100
+                                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
+                                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
+                                                        $sev = $EventData.severity.ToUpper()
+                                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                                    }
+                                                    New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
+                                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
+                                            }
+                                        }
+                                        else {
+                                            Set-UDElement -Id 'checksTablePanel' -Content {
+                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
+                                                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
+                                                        New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
+                                                        New-UDTypography -Text 'No Checks Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
+                                                        New-UDTypography -Text 'Use "Sync Checks" above to download checks from the Prowler repository first.' -Variant 'body1' -Style @{ color = '#666' }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch {
+                                        Write-CIEMLog -Message "Load checks failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
+                                        Show-UDToast -Message "Failed to load checks: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                    }
+                                }
                             }
                         }
                     }
@@ -1458,18 +1548,27 @@ function New-DevolutionsCIEMApp {
             param($Navigation)
 
             New-UDPage -Name 'About' -Url '/ciem/about' -Content {
+                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+
                 New-UDTypography -Text 'About Devolutions CIEM' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
 
                 New-UDCard -Title 'Cloud Infrastructure Entitlement Management' -Content {
                     New-UDTypography -Text 'Devolutions CIEM is a security scanning solution that helps identify identity and access management issues across your cloud infrastructure.' -Variant 'body1' -Style @{ marginBottom = '20px' }
 
+                    # Dynamic provider/check info
+                    $providers = @(Get-CIEMProvider)
+                    $featureItems = @()
+                    foreach ($p in $providers) {
+                        $featureItems += "$($p.CheckCount) $($p.Name) security checks"
+                    }
+
                     New-UDTypography -Text 'Key Features:' -Variant 'h6' -Style @{ marginTop = '20px' }
                     New-UDList -Content {
-                        New-UDListItem -Label '46 Azure identity-focused security checks'
-                        New-UDListItem -Label 'Entra ID (Azure AD) security validation'
-                        New-UDListItem -Label 'IAM/RBAC permissions analysis'
-                        New-UDListItem -Label 'KeyVault access and configuration checks'
-                        New-UDListItem -Label 'Storage account security validation'
+                        foreach ($item in $featureItems) {
+                            New-UDListItem -Label $item
+                        }
+                        New-UDListItem -Label 'Multi-provider support (Azure + AWS)'
+                        New-UDListItem -Label 'Identity and entitlement focused checks'
                         New-UDListItem -Label 'Integration with Devolutions PAM for remediation'
                     }
 

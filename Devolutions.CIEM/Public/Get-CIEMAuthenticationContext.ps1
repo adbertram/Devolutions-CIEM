@@ -9,7 +9,7 @@ function Get-CIEMAuthenticationContext {
         before running scans.
 
     .PARAMETER Provider
-        The cloud provider to get authentication context for. Currently only 'Azure' is supported.
+        The cloud provider to get authentication context for (Azure or AWS).
 
     .OUTPUTS
         [PSCustomObject] Object containing:
@@ -36,14 +36,14 @@ function Get-CIEMAuthenticationContext {
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('Azure')]
-        [string]$Provider
+        [CIEMCloudProvider]$Provider
     )
 
     $ErrorActionPreference = 'Stop'
 
     switch ($Provider) {
         'Azure' { Get-AzureAuthenticationContext }
+        'AWS' { Get-AWSAuthenticationContext }
     }
 }
 
@@ -124,6 +124,42 @@ function Get-AzureAuthenticationContext {
             SubscriptionCount  = $subscriptions.Count
             SubscriptionFilter = $subscriptionFilter
             Subscriptions      = @($subscriptionDetails)
+        }
+    }
+}
+
+function Get-AWSAuthenticationContext {
+    <#
+    .SYNOPSIS
+        Internal function to get AWS authentication context.
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param()
+
+    $configuredMethod = $script:Config.aws.authentication.method
+    $awsContext = $script:AuthContext['AWS']
+
+    if (-not $awsContext) {
+        [PSCustomObject]@{
+            Provider         = 'AWS'
+            ConfiguredMethod = $configuredMethod
+            IsAuthenticated  = $false
+            AccountId        = $null
+            AccountType      = $null
+            Arn              = $null
+            Region           = $script:Config.aws.authentication.region
+        }
+    }
+    else {
+        [PSCustomObject]@{
+            Provider         = 'AWS'
+            ConfiguredMethod = $configuredMethod
+            IsAuthenticated  = $true
+            AccountId        = $awsContext.AccountId
+            AccountType      = $awsContext.AccountType
+            Arn              = $awsContext.Arn
+            Region           = $awsContext.Region
         }
     }
 }

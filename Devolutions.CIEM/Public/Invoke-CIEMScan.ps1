@@ -1,16 +1,17 @@
 function Invoke-CIEMScan {
     <#
     .SYNOPSIS
-        Executes CIEM security checks against Azure resources.
+        Executes CIEM security checks against cloud resources.
 
     .DESCRIPTION
-        Main entry point for running CIEM security scans. Authenticates to Azure,
-        initializes service data, and executes selected checks in parallel.
+        Main entry point for running CIEM security scans. Authenticates to the
+        specified cloud provider, initializes service data, and executes selected
+        checks in parallel.
 
         Returns an array of finding objects with pass/fail/manual/skipped status.
 
     .PARAMETER Provider
-        Cloud provider to scan. Currently only 'Azure' is supported.
+        Cloud provider to scan. Supports 'Azure' and 'AWS'.
 
     .PARAMETER CheckId
         Optional array of check IDs to run. If not specified, runs all checks.
@@ -54,14 +55,12 @@ function Invoke-CIEMScan {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter()]
-        [ValidateSet('Azure')]
-        [string]$Provider = 'Azure',
+        [CIEMCloudProvider]$Provider = 'Azure',
 
         [Parameter()]
         [string[]]$CheckId,
 
         [Parameter()]
-        [ValidateSet('Entra', 'IAM', 'KeyVault', 'Storage')]
         [string[]]$Service,
 
         [Parameter()]
@@ -76,8 +75,17 @@ function Invoke-CIEMScan {
 
     # Note: ThrottleLimit reserved for future parallel implementation
 
-    # Determine services for ScanRun (use Service param if provided, otherwise all)
-    $scanServices = if ($Service) { $Service } else { @('Entra', 'IAM', 'KeyVault', 'Storage') }
+    # Determine services for ScanRun (use Service param if provided, otherwise all for this provider)
+    $providerServices = @(Get-CIEMCheckService -CloudProvider $Provider | Select-Object -ExpandProperty Name)
+    $scanServices = if ($Service) { $Service } else { $providerServices }
+
+    # Validate that requested services exist for this provider
+    if ($Service) {
+        $invalidServices = $Service | Where-Object { $_ -notin $providerServices }
+        if ($invalidServices) {
+            throw "Invalid service(s) for provider $Provider`: $($invalidServices -join ', '). Valid services: $($providerServices -join ', ')"
+        }
+    }
 
     # Create and persist ScanRun at start
     $scanRun = New-CIEMScanRun -Provider $Provider -Services $scanServices -IncludePassed $IncludePassed.IsPresent
@@ -105,21 +113,29 @@ function Invoke-CIEMScan {
         Write-Verbose "Tenant: $($authContext.TenantId)"
         Write-Verbose "Subscriptions: $($subscriptionIds.Count)"
 
-        # Step 2: Initialize services
-        Write-Verbose "Initializing Entra service..."
-        Initialize-EntraService
+        # Step 2: Initialize services (provider-specific)
+        switch ($Provider) {
+            'Azure' {
+                Write-Verbose "Initializing Entra service..."
+                Initialize-EntraService
 
-        Write-Verbose "Initializing IAM service..."
-        Initialize-IAMService -SubscriptionIds $subscriptionIds
+                Write-Verbose "Initializing IAM service..."
+                Initialize-IAMService -SubscriptionIds $subscriptionIds
 
-        Write-Verbose "Initializing KeyVault service..."
-        Initialize-KeyVaultService -SubscriptionIds $subscriptionIds
+                Write-Verbose "Initializing KeyVault service..."
+                Initialize-KeyVaultService -SubscriptionIds $subscriptionIds
 
-        Write-Verbose "Initializing Storage service..."
-        Initialize-StorageService -SubscriptionIds $subscriptionIds
+                Write-Verbose "Initializing Storage service..."
+                Initialize-StorageService -SubscriptionIds $subscriptionIds
+            }
+            'AWS' {
+                # AWS checks are stubs (MANUAL status) - no service initialization needed
+                Write-Verbose "AWS provider: skipping service initialization (all checks return MANUAL)"
+            }
+        }
 
         # Step 3: Load check metadata via Get-CIEMCheck (handles filtering)
-        $getCheckParams = @{}
+        $getCheckParams = @{ CloudProvider = $Provider.ToString() }
         if ($CheckId -and $CheckId.Count -eq 1) { $getCheckParams.CheckId = $CheckId[0] }
         if ($Service -and $Service.Count -eq 1) { $getCheckParams.Service = $Service[0] }
         $checks = Get-CIEMCheck @getCheckParams
@@ -135,7 +151,7 @@ function Invoke-CIEMScan {
         Write-Verbose "Checks to execute: $(@($checks).Count)"
 
         # Step 5: Load check scripts
-        $checkScriptsPath = Join-Path -Path $PSScriptRoot -ChildPath '../Checks/Azure'
+        $checkScriptsPath = Join-Path -Path $PSScriptRoot -ChildPath "../Checks/$Provider"
         $checkScripts = Get-ChildItem -Path "$checkScriptsPath/*.ps1"
 
         if (-not $checkScripts -or $checkScripts.Count -eq 0) {
