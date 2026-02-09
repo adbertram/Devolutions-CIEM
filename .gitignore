@@ -172,3 +172,6 @@ prowler/.github/skills
 prowler/.gemini/skills
 .env
 _temp/
+
+# Local PSU instance
+local-psu/

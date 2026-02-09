@@ -20,10 +20,10 @@ function Connect-PSU {
         parameters directly. Sets up the module-level connection for subsequent commands.
 
     .PARAMETER Url
-        The PSU server URL. If not specified, reads from PSU_URL in .env file.
+        The PSU server URL. If not specified, reads from AZURE_PSU_URL or LOCAL_PSU_URL in .env file.
 
     .PARAMETER Token
-        The PSU app token. If not specified, reads from PSU_TOKEN in .env file.
+        The PSU app token. If not specified, reads from AZURE_PSU_TOKEN or LOCAL_PSU_TOKEN in .env file.
 
     .PARAMETER EnvFilePath
         Path to the .env file. Defaults to .env in the current directory or repository root.
@@ -45,6 +45,10 @@ function Connect-PSU {
     .EXAMPLE
         Connect-PSU -ResourceGroup "my-rg" -WebAppName "my-psu"
         # Connect to Azure-hosted PSU with filesystem access
+
+    .EXAMPLE
+        Connect-PSU -Local
+        # Connect to local PSU instance (uses LOCAL_PSU_URL and LOCAL_PSU_TOKEN from .env)
     #>
     [CmdletBinding()]
     param(
@@ -61,7 +65,10 @@ function Connect-PSU {
         [string]$ResourceGroup,
 
         [Parameter()]
-        [string]$WebAppName
+        [string]$WebAppName,
+
+        [Parameter()]
+        [switch]$Local
     )
 
     # Find .env file if not specified
@@ -81,6 +88,7 @@ function Connect-PSU {
     }
 
     # Read from .env file if we have one and parameters weren't provided
+    $envVars = @{}
     if ($EnvFilePath -and (Test-Path $EnvFilePath)) {
         Write-Verbose "Reading configuration from: $EnvFilePath"
         $envContent = Get-Content $EnvFilePath -ErrorAction Stop
@@ -93,13 +101,20 @@ function Connect-PSU {
             if ($line -match '^([^=]+)=(.*)$') {
                 $key = $matches[1].Trim()
                 $value = $matches[2].Trim()
+                $envVars[$key] = $value
 
                 switch ($key) {
-                    'PSU_URL' {
-                        if (-not $Url) { $Url = $value }
+                    'AZURE_PSU_URL' {
+                        if (-not $Url -and -not $Local) { $Url = $value }
                     }
-                    'PSU_TOKEN' {
-                        if (-not $Token) { $Token = $value }
+                    'AZURE_PSU_TOKEN' {
+                        if (-not $Token -and -not $Local) { $Token = $value }
+                    }
+                    'LOCAL_PSU_URL' {
+                        if (-not $Url -and $Local) { $Url = $value }
+                    }
+                    'LOCAL_PSU_TOKEN' {
+                        if (-not $Token -and $Local) { $Token = $value }
                     }
                 }
             }
@@ -107,12 +122,12 @@ function Connect-PSU {
     }
 
     # Validate required parameters
+    $target = if ($Local) { 'LOCAL' } else { 'AZURE' }
     if (-not $Url) {
-        throw "PSU URL is required. Provide -Url parameter or set PSU_URL in .env file."
+        throw "PSU URL is required. Provide -Url parameter or set ${target}_PSU_URL in .env file."
     }
-
     if (-not $Token) {
-        throw "PSU Token is required. Provide -Token parameter or set PSU_TOKEN in .env file."
+        throw "PSU Token is required. Provide -Token parameter or set ${target}_PSU_TOKEN in .env file."
     }
 
     # Normalize URL (remove trailing slash)
@@ -121,8 +136,10 @@ function Connect-PSU {
     # Test connection by calling the module endpoint
     Write-Verbose "Testing connection to $Url"
     $headers = @{
-        'Authorization' = "Bearer $Token"
-        'Accept'        = 'application/json'
+        'Accept' = 'application/json'
+    }
+    if ($Token) {
+        $headers['Authorization'] = "Bearer $Token"
     }
 
     try {
@@ -133,6 +150,9 @@ function Connect-PSU {
     catch {
         $statusCode = $_.Exception.Response.StatusCode.value__
         if ($statusCode -eq 401) {
+            if ($Local) {
+                throw "Authentication failed. Local PSU may not be running in development mode, or may require a token."
+            }
             throw "Authentication failed. Check your PSU token."
         }
         throw "Failed to connect to PSU at $Url. Error: $_"
@@ -994,9 +1014,21 @@ function Publish-PSUModule {
         Publish-PSUModule -ModulePath ./Devolutions.CIEM -BumpVersion Minor
         # Bumps minor version and publishes
 
+    .PARAMETER LocalOnly
+        Skip PowerShell Gallery publishing entirely and import the module
+        directly to a local PSU instance. This:
+        - Skips version bump (no PSGallery versioning needed)
+        - Skips publishing to PowerShell Gallery
+        - Connects to local PSU using Connect-PSU -Local
+        - Imports the module to local PSU using Install-PSUModule
+
     .EXAMPLE
         Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf
         # Shows what would be published without actually publishing
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./Devolutions.CIEM -LocalOnly
+        # Imports the module directly to a local PSU instance (no PSGallery)
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
@@ -1016,7 +1048,10 @@ function Publish-PSUModule {
         [switch]$SkipValidation,
 
         [Parameter()]
-        [string]$EnvFilePath
+        [string]$EnvFilePath,
+
+        [Parameter()]
+        [switch]$LocalOnly
     )
 
     $ErrorActionPreference = 'Stop'
@@ -1030,6 +1065,103 @@ function Publish-PSUModule {
 
     if (-not (Test-Path $manifestPath)) {
         throw "Module manifest not found: $manifestPath"
+    }
+
+    # ========================================================================
+    # LocalOnly Mode: Skip PSGallery entirely, import to local PSU
+    # ========================================================================
+    if ($LocalOnly) {
+        Write-Host '========================================' -ForegroundColor Cyan
+        Write-Host "Importing $moduleName to Local PSU" -ForegroundColor Cyan
+        Write-Host '========================================' -ForegroundColor Cyan
+        Write-Host "Module: $ModulePath"
+        Write-Host ''
+
+        # Step 1: Connect to local PSU
+        Write-Host 'Step 1: Connecting to local PSU...' -ForegroundColor Yellow
+        try {
+            $null = Connect-PSU -Local -ErrorAction Stop
+            Write-Host '  [OK] Connected to local PSU' -ForegroundColor Green
+        }
+        catch {
+            throw "Failed to connect to local PSU: $_"
+        }
+
+        # Step 2: Copy local module files to local PSU
+        Write-Host ''
+        Write-Host 'Step 2: Installing module to local PSU...' -ForegroundColor Yellow
+
+        if ($PSCmdlet.ShouldProcess($moduleName, "Install to local PSU")) {
+            $manifest = Import-PowerShellDataFile -Path $manifestPath
+            $moduleVersion = $manifest.ModuleVersion
+            $projectRoot = Split-Path $ModulePath -Parent
+            $localPsuModulesDir = Join-Path $projectRoot 'local-psu' 'Repository' 'Modules'
+            $targetModuleDir = Join-Path $localPsuModulesDir $moduleName
+
+            if (-not (Test-Path $localPsuModulesDir)) {
+                throw "Local PSU modules directory not found: $localPsuModulesDir"
+            }
+
+            # Remove all existing versions of this module
+            if (Test-Path $targetModuleDir) {
+                Write-Verbose "Removing existing module at: $targetModuleDir"
+                Remove-Item -Path $targetModuleDir -Recurse -Force
+            }
+
+            # Copy local files to versioned directory
+            $targetVersionDir = Join-Path $targetModuleDir $moduleVersion
+            Write-Verbose "Copying module to: $targetVersionDir"
+            Copy-Item -Path $ModulePath -Destination $targetVersionDir -Recurse -Force
+
+            Write-Host "  [OK] Module installed: $moduleName v$moduleVersion" -ForegroundColor Green
+
+            # Step 3: Restart app if defined by this module
+            $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
+            if (Test-Path $dashboardsPath) {
+                $dashboardContent = Get-Content $dashboardsPath -Raw
+                if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
+                    $appName = $matches[1]
+                    Write-Host ''
+                    Write-Host 'Step 3: Restarting app...' -ForegroundColor Yellow
+                    try {
+                        Restart-PSUApp -Name $appName
+                        Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
+                    }
+                    catch {
+                        Write-Host "  [WARN] Could not restart app '$appName': $_" -ForegroundColor Yellow
+                    }
+                }
+            }
+
+            Write-Host ''
+            Write-Host '========================================' -ForegroundColor Cyan
+            Write-Host 'Local Import Successful!' -ForegroundColor Green
+            Write-Host '========================================' -ForegroundColor Cyan
+
+            return [PSCustomObject]@{
+                ModuleName = $moduleName
+                Version    = $moduleVersion
+                GalleryUrl = $null
+                UpdatedPSU = $true
+                Status     = 'LocalImport'
+            }
+        }
+        else {
+            Write-Host ''
+            $manifest = Import-PowerShellDataFile -Path $manifestPath
+            Write-Host '[DRY RUN] Would import to local PSU:' -ForegroundColor Yellow
+            Write-Host "  Module: $moduleName"
+            Write-Host "  Version: $($manifest.ModuleVersion)"
+            Write-Host "  Path: $ModulePath"
+
+            return [PSCustomObject]@{
+                ModuleName = $moduleName
+                Version    = $manifest.ModuleVersion
+                GalleryUrl = $null
+                UpdatedPSU = $false
+                Status     = 'DryRun'
+            }
+        }
     }
 
     Write-Host '========================================' -ForegroundColor Cyan
@@ -1255,7 +1387,7 @@ NuGet API key required. Options:
             }
             catch {
                 Write-Host "  [WARN] Could not auto-connect to PSU: $_" -ForegroundColor Yellow
-                Write-Host '  Ensure PSU_URL and PSU_TOKEN are set in .env file' -ForegroundColor Gray
+                Write-Host '  Ensure AZURE_PSU_URL and AZURE_PSU_TOKEN are set in .env file' -ForegroundColor Gray
             }
         }
 
