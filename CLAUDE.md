@@ -70,9 +70,12 @@ Import-Module ./scripts/PSUniversal.psm1
 # WRONG - Never do this
 ./scripts/azure_psu_file_manager.sh upload Devolutions.CIEM/ Repository/Modules/
 
-# CORRECT - Use Publish-PSUModule (auto-connects to PSU and imports the module)
+# CORRECT - Publish to PSGallery and import to production PSU
 Publish-PSUModule -ModulePath ./Devolutions.CIEM -WhatIf  # Dry run first
 Publish-PSUModule -ModulePath ./Devolutions.CIEM          # Publish and auto-import to PSU
+
+# LOCAL DEV - Import to local PSU only (skips PSGallery publish)
+Publish-PSUModule -ModulePath ./Devolutions.CIEM -LocalOnly
 ```
 
 **What Publish-PSUModule does:**
@@ -81,8 +84,10 @@ Publish-PSUModule -ModulePath ./Devolutions.CIEM          # Publish and auto-imp
 3. Auto-bumps version (Patch by default, use `-BumpVersion Minor|Major`)
 4. Publishes to PowerShell Gallery
 5. Verifies publication
-6. Auto-connects to PSU (reads PSU_URL/PSU_TOKEN from .env)
+6. Auto-connects to PSU (reads PROD_PSU_URL/PSU_TOKEN from .env)
 7. Imports the new version to PSU
+
+**With `-LocalOnly`:** Skips steps 2-5, connects to local PSU via `Connect-PSU -Local`, and imports the module directly.
 
 **Why:** The PSU Gallery is the distribution mechanism. Direct uploads bypass version control, break the upgrade path for users, and don't follow the intended distribution model.
 
@@ -90,11 +95,42 @@ Publish-PSUModule -ModulePath ./Devolutions.CIEM          # Publish and auto-imp
 
 ---
 
-## PowerShell Universal (PSU) Server
+## PowerShell Universal (PSU) Servers
 
-A PSU v5 server is deployed in Azure for this project.
+### Local PSU Instance (Development)
 
-### Access Details
+| Property | Value |
+|----------|-------|
+| **URL** | http://localhost:5001 |
+| **PSU Version** | 2026.1.0 |
+| **Binary** | `~/.local/share/powershell-universal/Universal.Server` (native macOS ARM64) |
+| **Data** | `local-psu/` (gitignored) |
+| **Database** | `local-psu/database.db` (SQLite) |
+
+```bash
+# Start/stop local PSU
+./scripts/setup-local-psu.sh start          # Start and wait for ready
+./scripts/setup-local-psu.sh start --no-wait  # Start without waiting
+./scripts/setup-local-psu.sh stop            # Stop
+./scripts/setup-local-psu.sh status          # Check health
+./scripts/setup-local-psu.sh logs -f         # Follow logs
+./scripts/setup-local-psu.sh reset           # Wipe all data and start fresh
+
+# Connect from PowerShell
+Connect-PSU -Local                           # Uses LOCAL_PSU_URL from .env
+```
+
+### .env Configuration
+
+```
+PROD_PSU_URL=https://devolutions-ciem-psu.azurewebsites.net
+LOCAL_PSU_URL=http://localhost:5001
+PSU_TOKEN=<production-token>  # Local PSU runs in dev mode (no auth needed)
+```
+
+`Connect-PSU` reads `PROD_PSU_URL` by default. Use `-Local` to connect to `LOCAL_PSU_URL`.
+
+### Azure PSU Instance (Production)
 
 | Property | Value |
 |----------|-------|
@@ -176,18 +212,19 @@ az group delete --name devolutions-ciem-rg --yes
 
 ### PSU File Manager
 
-Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem via Kudu API:
+Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem. Supports `--local` for local PSU.
 
 ```bash
-# List directories
+# Azure (default)
 ./scripts/azure_psu_file_manager.sh list                    # Root (maps to /home)
 ./scripts/azure_psu_file_manager.sh list Repository/Modules # PSU modules
-
-# Read files
 ./scripts/azure_psu_file_manager.sh read Repository/.universal/apps.ps1
-
-# Execute shell commands (runs in Kudu container, not PSU container)
 ./scripts/azure_psu_file_manager.sh exec "ls -la"
+
+# Local PSU
+./scripts/azure_psu_file_manager.sh --local list
+./scripts/azure_psu_file_manager.sh --local list Repository/Modules
+./scripts/azure_psu_file_manager.sh --local read Repository/.universal/dashboards.ps1
 ```
 
 **Key PSU paths:**
@@ -201,19 +238,19 @@ Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem via 
 
 ### PSU Log Script
 
-Use `scripts/download-psu-logs.sh` to download logs from all PSU sources:
+Use `scripts/download-psu-logs.sh` to download logs. Supports `--local` for local PSU.
 
 ```bash
-# Download all logs to timestamped file
+# Azure (default)
 ./scripts/download-psu-logs.sh
-
-# Download to specific file
 ./scripts/download-psu-logs.sh my-logs.log
+
+# Local PSU
+./scripts/download-psu-logs.sh --local
 
 # Then search locally with grep
 grep -i "CIEM" psu-logs-*.log
 grep -i "error" psu-logs-*.log
-grep -i "authentication" psu-logs-*.log
 ```
 
 **Log sources downloaded:**
@@ -227,30 +264,22 @@ grep -i "authentication" psu-logs-*.log
 
 ### PSU Troubleshooting Script
 
-Use `scripts/invoke_command_in_azure_webapp.sh` for troubleshooting the PSU web app:
+Use `scripts/invoke_command_in_azure_webapp.sh` for troubleshooting. Supports `--local` for local PSU.
 
 ```bash
-# Run shell commands (via Kudu - shares /home filesystem with app)
+# Azure (default)
 ./scripts/invoke_command_in_azure_webapp.sh run "ls -la /home/Repository"
-./scripts/invoke_command_in_azure_webapp.sh run "cat /home/LogFiles/*.log | tail -50"
-
-# Use presets for common troubleshooting tasks
-./scripts/invoke_command_in_azure_webapp.sh preset files      # List PSU config files
-./scripts/invoke_command_in_azure_webapp.sh preset apps       # Show apps.ps1 config
-./scripts/invoke_command_in_azure_webapp.sh preset modules    # List installed modules
-./scripts/invoke_command_in_azure_webapp.sh preset logs       # Show recent logs
-./scripts/invoke_command_in_azure_webapp.sh preset health     # Check PSU health endpoint
-./scripts/invoke_command_in_azure_webapp.sh preset version    # Get PSU version via API
-
-# Query PSU REST API (requires PSU_APP_TOKEN)
-export PSU_APP_TOKEN="your-token-here"
+./scripts/invoke_command_in_azure_webapp.sh preset health
+./scripts/invoke_command_in_azure_webapp.sh preset modules
 ./scripts/invoke_command_in_azure_webapp.sh api "/api/v1/dashboard"
 
-# Interactive SSH (if enabled in container)
-./scripts/invoke_command_in_azure_webapp.sh ssh
+# Local PSU
+./scripts/invoke_command_in_azure_webapp.sh --local preset health
+./scripts/invoke_command_in_azure_webapp.sh --local preset modules
+./scripts/invoke_command_in_azure_webapp.sh --local run "ls -la Repository"
 ```
 
-**Architecture note:** Commands run in the Kudu sidecar container, which shares the `/home` filesystem with the PSU app container. File operations work, but runtime state queries (loaded modules, running jobs) require the PSU REST API.
+**Architecture note:** Azure commands run in the Kudu sidecar container. Local commands run against the `local-psu/` directory.
 
 ### Documentation
 
