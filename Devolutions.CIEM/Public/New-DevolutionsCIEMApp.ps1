@@ -1212,13 +1212,11 @@ function New-DevolutionsCIEMApp {
 
                                 if ($allChecks.Count -gt 0) {
                                     Set-UDElement -Id 'checksTablePanel' -Content {
-                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
-                                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                                New-UDChip -Label "Total: $($allChecks.Count)" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' }
-                                                $serviceGroups = $allChecks | Group-Object -Property Service
-                                                foreach ($group in ($serviceGroups | Sort-Object Name)) {
-                                                    New-UDChip -Label "$($group.Name): $($group.Count)" -Variant 'outlined' -Color 'primary'
-                                                }
+                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px'; display = 'flex'; flexWrap = 'wrap'; gap = '8px'; alignItems = 'center' } } -Content {
+                                            New-UDChip -Label "Total: $($allChecks.Count)" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' }
+                                            $serviceGroups = $allChecks | Group-Object -Property Service
+                                            foreach ($group in ($serviceGroups | Sort-Object Name)) {
+                                                New-UDChip -Label "$($group.Name): $($group.Count)" -Variant 'outlined' -Color 'primary'
                                             }
                                         }
 
@@ -1376,13 +1374,16 @@ function New-DevolutionsCIEMApp {
                         }
                     }
 
-                    # Services expansion panel
-                    New-UDExpansionPanelGroup -Children {
-                        New-UDExpansionPanel -Title 'Services' -Icon (New-UDIcon -Icon 'Filter') -Children {
-                            # Select All / Deselect All buttons
-                            New-UDElement -Tag 'div' -Attributes @{
-                                style = @{ display = 'flex'; gap = '8px'; marginBottom = '8px' }
-                            } -Content {
+                    # Services section
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px' } } -Content {
+                        New-UDStack -Direction 'row' -AlignItems 'center' -Spacing 1 -Content {
+                            New-UDIcon -Icon 'Filter' -Style @{ color = '#666'; marginRight = '4px' }
+                            New-UDTypography -Text 'Services' -Variant 'subtitle1' -Style @{ fontWeight = 'bold' }
+                        }
+                        # Select All / Deselect All buttons
+                        New-UDElement -Tag 'div' -Attributes @{
+                            style = @{ display = 'flex'; gap = '8px'; marginBottom = '8px'; marginTop = '8px' }
+                        } -Content {
                                 New-UDButton -Text 'Select All' -Variant 'outlined' -Size 'small' -OnClick {
                                     foreach ($svc in $Session:CurrentServices) {
                                         Set-UDElement -Id "chkSvc_$svc" -Properties @{ checked = $true }
@@ -1410,24 +1411,26 @@ function New-DevolutionsCIEMApp {
                                 $allServices = $allServices | Sort-Object -Unique
                                 $Session:CurrentServices = $allServices
 
-                                # Show count + scrollable checkbox list
-                                New-UDTypography -Text "$($allServices.Count) services" -Variant 'caption'
-                                New-UDElement -Tag 'div' -Attributes @{
-                                    style = @{
-                                        maxHeight = '250px'; overflowY = 'auto'; padding = '4px 8px'
-                                        border = '1px solid #e0e0e0'; borderRadius = '4px'; backgroundColor = '#fafafa'
-                                    }
-                                } -Content {
-                                    New-UDElement -Tag 'div' -Attributes @{
-                                        style = @{ display = 'grid'; gridTemplateColumns = '1fr 1fr'; gap = '0px' }
-                                    } -Content {
-                                        foreach ($svc in $allServices) {
-                                            New-UDCheckBox -Id "chkSvc_$svc" -Label $svc -Checked $true -Size 'small'
+                                # Show count + collapsible provider groups
+                                New-UDTypography -Text "$($allServices.Count) services" -Variant 'caption' -Style @{ marginBottom = '4px' }
+                                $providerLabels = @{ azure = 'Azure'; aws = 'AWS' }
+                                New-UDExpansionPanelGroup -Children {
+                                    foreach ($p in $selectedProviders | Sort-Object) {
+                                        $providerServices = @($Session:ServicesByProvider[$p] | Sort-Object)
+                                        if ($providerServices.Count -eq 0) { continue }
+
+                                        New-UDExpansionPanel -Title "$($providerLabels[$p]) ($($providerServices.Count) services)" -Children {
+                                            New-UDElement -Tag 'div' -Attributes @{
+                                                style = @{ display = 'grid'; gridTemplateColumns = 'repeat(auto-fill, minmax(180px, 1fr))'; gap = '0px' }
+                                            } -Content {
+                                                foreach ($svc in $providerServices) {
+                                                    New-UDCheckBox -Id "chkSvc_$svc" -Label $svc -Checked $true -Size 'small'
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
                     }
 
                     New-UDElement -Tag 'div' -Id 'syncProgressArea' -Content {

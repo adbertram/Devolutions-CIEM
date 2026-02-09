@@ -54,17 +54,18 @@ function Test-CIEMAuthenticated {
                         $tenantId = $context.Tenant.Id
 
                         # Test actual API connectivity
+                        # Only consider authenticated if CIEM-managed tokens exist
+                        # A pre-existing Az context (e.g. from terminal) is not sufficient;
+                        # authentication must be configured via the CIEM Configuration page
                         $tokens = Get-CIEMToken
                         if ($tokens.GraphToken -and $tokens.ARMToken) {
-                            # Have both tokens - consider authenticated
                             $authenticated = $true
                         }
                         elseif ($tokens.GraphToken -or $tokens.ARMToken) {
-                            # Have at least one token - try API calls to verify
+                            # Have partial tokens - verify both APIs actually work
                             $graphApiBase = $script:Config.azure.endpoints.graphApi
                             $armApiBase = $script:Config.azure.endpoints.armApi
 
-                            # Test Graph API
                             $graphOk = $false
                             try {
                                 $graphResponse = Invoke-AzureApi -Uri "$graphApiBase/organization" -Api Graph -ResourceName 'Organization' -ErrorAction Stop
@@ -74,7 +75,6 @@ function Test-CIEMAuthenticated {
                                 Write-Verbose "Graph API test failed: $($_.Exception.Message)"
                             }
 
-                            # Test ARM API
                             $armOk = $false
                             try {
                                 $armResponse = Invoke-AzureApi -Uri "$armApiBase/subscriptions?api-version=2020-01-01" -Api ARM -ResourceName 'Subscriptions' -ErrorAction Stop
@@ -85,10 +85,6 @@ function Test-CIEMAuthenticated {
                             }
 
                             $authenticated = $graphOk -and $armOk
-                        }
-                        else {
-                            # No tokens but have context - may work via Az module
-                            $authenticated = $true
                         }
                     }
                 }
