@@ -1,0 +1,61 @@
+---
+name: publish-psu-module
+description: Publishes the Devolutions.CIEM module to a PSU instance (local or Azure). Use when deploying, publishing, or importing module changes to PSU.
+argument-hint: "[local|azure]"
+allowed-tools: Bash, AskUserQuestion
+---
+
+<objective>
+Imports the PSUniversal.psm1 management module and calls Publish-PSUModule to deploy the Devolutions.CIEM module to a PSU instance. Supports both local development and Azure production targets.
+</objective>
+
+<quick_start>
+Parse $ARGUMENTS to determine target:
+- `local` → Local PSU at http://localhost:5001 (skips PSGallery)
+- `azure` → Azure PSU (publishes to PSGallery first, then imports)
+
+If no argument provided, ask which target using AskUserQuestion.
+
+Then run the appropriate PowerShell command.
+</quick_start>
+
+<workflow>
+<step name="parse-target">
+Determine target from $ARGUMENTS:
+- "local" or "dev" → local
+- "azure" or "prod" or "production" → azure
+- Empty or unclear → prompt user with AskUserQuestion
+</step>
+
+<step name="prompt-if-needed" condition="no valid target">
+Use AskUserQuestion with options:
+- **Local** - Import to local PSU (http://localhost:5001), skips PSGallery publish
+- **Azure** - Publish to PSGallery and import to Azure PSU (production)
+</step>
+
+<step name="publish-local" condition="target is local">
+```bash
+pwsh -NoProfile -Command "Import-Module ./scripts/PSUniversal.psm1; Publish-PSUModule -ModulePath ./Devolutions.CIEM -LocalOnly"
+```
+
+This skips PSGallery and imports directly to local PSU.
+</step>
+
+<step name="publish-azure" condition="target is azure">
+```bash
+pwsh -NoProfile -Command "Import-Module ./scripts/PSUniversal.psm1; Publish-PSUModule -ModulePath ./Devolutions.CIEM"
+```
+
+This publishes to PSGallery (auto-bumps version), verifies, then imports to Azure PSU.
+</step>
+</workflow>
+
+<success_criteria>
+- PowerShell command completes without error
+- Module version and status reported to user
+- For azure: PSGallery URL provided
+</success_criteria>
+
+<validated>
+Validated by validate-skill on 2026-02-09 15:48
+</validated>
