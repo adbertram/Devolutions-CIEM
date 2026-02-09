@@ -73,48 +73,4 @@ class CIEMCheck {
     [CIEMCheckPermissions]$Permissions
 
     CIEMCheck() {}
-
-    static [CIEMCheck] FromJsonObject([PSCustomObject]$JsonObj, [CIEMCloudProvider]$Provider) {
-        $check = [CIEMCheck]::new()
-        $check.Id = $JsonObj.id
-        $check.CloudProvider = $Provider
-        $check.Service = $JsonObj.service
-        $check.Title = $JsonObj.title
-        $check.Description = $JsonObj.description
-        $check.Risk = $JsonObj.risk
-        $check.Severity = [CIEMCheckSeverity]$JsonObj.severity
-        $check.RelatedUrl = $JsonObj.relatedUrl
-        $check.CheckScript = $JsonObj.checkScript
-        $check.DependsOn = @($JsonObj.dependsOn | Where-Object { $_ })
-
-        # Parse categories
-        $check.Categories = @($JsonObj.categories | Where-Object { $_ } | ForEach-Object {
-            [CIEMCheckCategory]$_
-        })
-
-        # Parse remediation
-        $rem = [CIEMCheckRemediation]::new()
-        if ($JsonObj.remediation) {
-            $rem.Text = $JsonObj.remediation.text
-            $rem.Url = $JsonObj.remediation.url
-        }
-        $check.Remediation = $rem
-
-        # Parse permissions
-        $perms = [CIEMCheckPermissions]::new()
-        if ($JsonObj.permissions) {
-            if ($JsonObj.permissions.PSObject.Properties['graph'] -and $JsonObj.permissions.graph) {
-                $perms.Graph = @($JsonObj.permissions.graph)
-            }
-            if ($JsonObj.permissions.PSObject.Properties['arm'] -and $JsonObj.permissions.arm) {
-                $perms.ARM = @($JsonObj.permissions.arm)
-            }
-            if ($JsonObj.permissions.PSObject.Properties['keyvaultDataPlane'] -and $JsonObj.permissions.keyvaultDataPlane) {
-                $perms.KeyVaultDataPlane = @($JsonObj.permissions.keyvaultDataPlane)
-            }
-        }
-        $check.Permissions = $perms
-
-        return $check
-    }
 }

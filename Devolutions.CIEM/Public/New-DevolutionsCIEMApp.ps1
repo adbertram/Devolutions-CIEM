@@ -1167,8 +1167,15 @@ function New-DevolutionsCIEMApp {
             New-UDPage -Name 'Cloud Checks' -Url '/ciem/checks' -Content {
                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
 
-                # Service lists populated on-demand via Load Installed Checks button (avoids blocking page load)
+                # Initialize service lists from pre-packed checks so the filter is usable before syncing
                 $Session:ServicesByProvider = @{}
+                foreach ($svc in (Get-CIEMCheckService)) {
+                    $key = $svc.CloudProvider.ToString().ToLower()
+                    if (-not $Session:ServicesByProvider.ContainsKey($key)) {
+                        $Session:ServicesByProvider[$key] = @()
+                    }
+                    $Session:ServicesByProvider[$key] += $svc.Name
+                }
 
                 New-UDTypography -Text 'Cloud Checks' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
                 New-UDTypography -Text 'Browse all available CIEM security checks and sync new checks from upstream Prowler' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
@@ -1185,15 +1192,21 @@ function New-DevolutionsCIEMApp {
                                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                 Write-CIEMLog -Message "Load Installed Checks clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
 
-                                $allChecks = @(Get-CIEMCheck)
+                                # Capture warnings from Get-CIEMCheck to diagnose class type issues
+                                $warnings = @()
+                                $allChecks = @(Get-CIEMCheck -WarningVariable warnings)
+                                if ($warnings.Count -gt 0) {
+                                    Write-CIEMLog -Message "Get-CIEMCheck warnings ($($warnings.Count)): $($warnings[0])" -Severity WARNING -Component 'PSU-CloudChecksPage'
+                                }
+                                Write-CIEMLog -Message "Get-CIEMCheck returned $($allChecks.Count) checks" -Severity INFO -Component 'PSU-CloudChecksPage'
 
-                                # Populate service checkboxes from cached checks
+                                # Merge services from loaded checks with pre-packed catalog
                                 $Session:ServicesByProvider = @{}
-                                foreach ($provider in @('azure', 'aws')) {
-                                    $services = @($allChecks | Where-Object { $_.CloudProvider -eq $provider } | ForEach-Object { $_.Service } | Sort-Object -Unique)
-                                    if ($services.Count -gt 0) {
-                                        $Session:ServicesByProvider[$provider] = $services
-                                    }
+                                $catalogServices = Get-CIEMCheckService
+                                foreach ($entry in @(@{key='azure';display='Azure'}, @{key='aws';display='AWS'})) {
+                                    $fromCatalog = @($catalogServices | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Name })
+                                    $fromChecks = @($allChecks | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Service })
+                                    $Session:ServicesByProvider[$entry.key] = @(($fromCatalog + $fromChecks) | Sort-Object -Unique)
                                 }
                                 Sync-UDElement -Id 'serviceCheckboxesDynamic'
 
