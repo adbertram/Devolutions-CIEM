@@ -15,6 +15,13 @@ Test, publish, and debug the Devolutions CIEM PowerShell Universal (PSU) app. Ma
 </quick_start>
 
 <essential_principles>
+**LOGS FIRST:** When troubleshooting ANY issue, ALWAYS start by downloading and inspecting PSU logs:
+```bash
+./scripts/download-psu-logs.sh
+grep -i "CIEM\|error\|exception" psu-logs-*.log
+```
+This reveals the actual server-side error before you waste time guessing.
+
 **DEBUG BEFORE PUBLISH:** Always test code fixes via `Invoke-PSUCommand` on the PSU instance BEFORE publishing a new module version. Publishing is slow - validate fixes work first.
 
 ALWAYS restart the PSU app after publishing a new module version.

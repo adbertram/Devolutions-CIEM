@@ -50,6 +50,7 @@ After gathering inputs:
      - Comment-based help
      - Error handling patterns
      - Pester test structure (if tests exist)
+     - Class type leakage (see Class Type Isolation rule below)
 
      [If remediation requested]: Fix any issues found.
      [If review only]: Report issues without making changes.
@@ -61,6 +62,31 @@ After gathering inputs:
 3. **Report results**
    Present the agent's findings to the user.
 </workflow>
+
+<class_type_isolation>
+## Class Type Isolation Rule
+
+PowerShell classes defined inside a module are scoped to that module. Callers
+(including PSU endpoint runspaces) cannot reference them via `[TypeName]` syntax
+because the type literal is resolved at parse time, before `Import-Module` runs.
+
+**Rule:** Public functions MUST NOT require module-defined class types as
+parameters. Accept simple types (strings, hashtables, bools) in the public API
+and construct typed objects internally within the function (which runs in module
+scope where the classes are available).
+
+**Applies to:**
+- `[Parameter()] [SomeModuleClass]$Param` in public function signatures
+- Requiring callers to do `[SomeModuleClass]::new()` before calling a function
+- Returning typed objects that callers must pass back as parameters
+
+**Acceptable:**
+- Returning typed objects for read-only consumption (e.g. `Get-*` functions)
+- Using class types in Private/internal functions (module scope)
+- Using class types between functions within the module
+
+**Flag as:** Severity HIGH — causes runtime "Unable to find type" errors in PSU.
+</class_type_isolation>
 
 <success_criteria>
 This skill is complete when:
