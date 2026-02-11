@@ -5,51 +5,83 @@ function Save-CIEMAuthenticationContext {
 
     .DESCRIPTION
         Single entry point for persisting provider authentication settings.
-        Accepts a typed CIEMAuthenticationContext object. Non-secret values
-        (method, tenant ID, client ID, profile, region) are saved to PSU cache
-        via Set-CIEMConfig. Secret values (client secret, access keys) are
-        saved to PSU secrets via Set-CIEMSecret.
+        Accepts simple string/bool parameters — typed context objects are created
+        internally (avoids PS class scoping issues in PSU endpoint runspaces).
+        Non-secret values are saved to PSU cache via Set-CIEMConfig. Secret
+        values are saved to PSU secrets via Set-CIEMSecret.
 
-    .PARAMETER Context
-        A CIEMAuthenticationContext subclass instance containing the provider
-        credentials to save.
+    .PARAMETER Provider
+        Cloud provider: 'Azure' or 'AWS'.
+
+    .PARAMETER Method
+        Authentication method (e.g. 'ServicePrincipalSecret', 'AccessKey').
+
+    .PARAMETER TenantId
+        Azure tenant ID.
+
+    .PARAMETER ClientId
+        Azure service principal client ID.
+
+    .PARAMETER ManagedIdentityClientId
+        Azure managed identity client ID (null = system-assigned).
+
+    .PARAMETER Region
+        AWS region.
+
+    .PARAMETER Profile
+        AWS CLI profile name.
 
     .PARAMETER ClientSecret
-        Azure SP client secret. Passed separately because secrets are never
-        stored on the context object. Stored as PSU secret.
+        Azure SP client secret. Stored as PSU secret.
 
     .PARAMETER CertThumbprint
-        Azure certificate thumbprint. Passed separately because secrets are
-        never stored on the context object. Stored as PSU secret.
+        Azure certificate thumbprint. Stored as PSU secret.
 
     .PARAMETER AccessKeyId
-        AWS access key ID. Passed separately because secrets are never stored
-        on the context object. Stored as PSU secret.
+        AWS access key ID. Stored as PSU secret.
 
     .PARAMETER SecretAccessKey
-        AWS secret access key. Passed separately because secrets are never
-        stored on the context object. Stored as PSU secret.
+        AWS secret access key. Stored as PSU secret.
 
     .OUTPUTS
         None.
 
     .EXAMPLE
-        $ctx = [CIEMAzureSPAuthenticationContext]::new()
-        $ctx.TenantId = '...'
-        $ctx.ClientId = '...'
-        Save-CIEMAuthenticationContext -Context $ctx -ClientSecret '...'
+        Save-CIEMAuthenticationContext -Provider Azure -Method ServicePrincipalSecret `
+            -TenantId '...' -ClientId '...' -ClientSecret '...'
 
     .EXAMPLE
-        $ctx = [CIEMAWSAccessKeyAuthenticationContext]::new()
-        $ctx.Region = 'us-east-1'
-        Save-CIEMAuthenticationContext -Context $ctx -AccessKeyId '...' -SecretAccessKey '...'
+        Save-CIEMAuthenticationContext -Provider AWS -Method AccessKey `
+            -Region 'us-east-1' -AccessKeyId '...' -SecretAccessKey '...'
     #>
     [CmdletBinding()]
     param(
+        # Simple params replace typed -Context object (avoids PS class scoping in PSU runspaces)
         [Parameter(Mandatory)]
-        [CIEMAuthenticationContext]$Context,
+        [ValidateSet('Azure', 'AWS')]
+        [string]$Provider,
 
-        # Secrets are passed as separate params — never stored on the context object
+        [Parameter(Mandatory)]
+        [string]$Method,
+
+        # Azure-specific non-secret params
+        [Parameter()]
+        [string]$TenantId,
+
+        [Parameter()]
+        [string]$ClientId,
+
+        [Parameter()]
+        [string]$ManagedIdentityClientId,
+
+        # AWS-specific non-secret params
+        [Parameter()]
+        [string]$Region,
+
+        [Parameter()]
+        [string]$Profile,
+
+        # Secrets — stored in PSU secret store, never in config
         [Parameter()]
         [string]$ClientSecret,
 
@@ -65,62 +97,59 @@ function Save-CIEMAuthenticationContext {
 
     $ErrorActionPreference = 'Stop'
 
-    $provider = $Context.Provider
-    $method   = $Context.Method
-
-    Write-CIEMLog -Message "Save-CIEMAuthenticationContext called for $provider ($method)" -Severity INFO -Component 'Save-CIEMAuthContext'
+    Write-CIEMLog -Message "Save-CIEMAuthenticationContext called for $Provider ($Method)" -Severity INFO -Component 'Save-CIEMAuthContext'
 
     # Build non-secret config settings (saved to PSU cache via Set-CIEMConfig)
     $configSettings = @{}
 
-    switch ($provider) {
+    switch ($Provider) {
         'Azure' {
-            $configSettings['azure.enabled'] = $Context.Enabled
-            $configSettings['azure.authentication.method'] = $method
+            $configSettings['azure.enabled'] = $true
+            $configSettings['azure.authentication.method'] = $Method
 
-            # TenantId is on all Azure context subclasses
-            if ($Context -is [CIEMAzureAuthenticationContext]) {
-                $configSettings['azure.authentication.tenantId'] = $Context.TenantId
+            # TenantId is common to all Azure auth methods
+            if ($TenantId) {
+                $configSettings['azure.authentication.tenantId'] = $TenantId
             }
 
-            switch ($method) {
+            switch ($Method) {
                 'ServicePrincipalSecret' {
-                    $configSettings['azure.authentication.servicePrincipal.clientId'] = $Context.ClientId
-                    # Secret → PSU secret store
+                    $configSettings['azure.authentication.servicePrincipal.clientId'] = $ClientId
+                    # Secret -> PSU secret store
                     if ($ClientSecret) {
                         Set-CIEMSecret 'CIEM_Azure_ClientSecret' $ClientSecret
                         Write-CIEMLog -Message "Saved CIEM_Azure_ClientSecret to PSU secrets" -Severity DEBUG -Component 'Save-CIEMAuthContext'
                     }
                 }
                 'ServicePrincipalCertificate' {
-                    $configSettings['azure.authentication.servicePrincipal.clientId'] = $Context.ClientId
-                    # Secret → PSU secret store
+                    $configSettings['azure.authentication.servicePrincipal.clientId'] = $ClientId
+                    # Secret -> PSU secret store
                     if ($CertThumbprint) {
                         Set-CIEMSecret 'CIEM_Azure_CertThumbprint' $CertThumbprint
                         Write-CIEMLog -Message "Saved CIEM_Azure_CertThumbprint to PSU secrets" -Severity DEBUG -Component 'Save-CIEMAuthContext'
                     }
                 }
                 'ManagedIdentity' {
-                    $configSettings['azure.authentication.managedIdentity.clientId'] = $Context.ManagedIdentityClientId
+                    $configSettings['azure.authentication.managedIdentity.clientId'] = $ManagedIdentityClientId
                 }
                 # DeviceCode / Interactive need no additional credentials
             }
         }
         'AWS' {
-            $configSettings['aws.enabled'] = $Context.Enabled
-            $configSettings['aws.authentication.method'] = $method
+            $configSettings['aws.enabled'] = $true
+            $configSettings['aws.authentication.method'] = $Method
 
-            # Region is on all AWS context subclasses
-            if ($Context -is [CIEMAWSAuthenticationContext]) {
-                $configSettings['aws.authentication.region'] = $Context.Region
+            # Region is common to all AWS auth methods
+            if ($Region) {
+                $configSettings['aws.authentication.region'] = $Region
             }
 
-            switch ($method) {
+            switch ($Method) {
                 'CurrentProfile' {
-                    $configSettings['aws.authentication.profile'] = $Context.Profile
+                    $configSettings['aws.authentication.profile'] = $Profile
                 }
                 'AccessKey' {
-                    # Secrets → PSU secret store
+                    # Secrets -> PSU secret store
                     if ($AccessKeyId) {
                         Set-CIEMSecret 'CIEM_AWS_AccessKeyId' $AccessKeyId
                         Write-CIEMLog -Message "Saved CIEM_AWS_AccessKeyId to PSU secrets" -Severity DEBUG -Component 'Save-CIEMAuthContext'
@@ -140,5 +169,5 @@ function Save-CIEMAuthenticationContext {
         Write-CIEMLog -Message "Config settings saved: $($configSettings.Keys -join ', ')" -Severity INFO -Component 'Save-CIEMAuthContext'
     }
 
-    Write-CIEMLog -Message "Save-CIEMAuthenticationContext completed for $provider" -Severity INFO -Component 'Save-CIEMAuthContext'
+    Write-CIEMLog -Message "Save-CIEMAuthenticationContext completed for $Provider" -Severity INFO -Component 'Save-CIEMAuthContext'
 }

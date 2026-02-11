@@ -336,10 +336,13 @@ function New-DevolutionsCIEMApp {
                                     $scanRuns = @(Get-CIEMScanRun)
                                     $scanRun = $scanRuns[0]  # Most recent
 
-                                    # Process scan results
+                                    # Process scan results (extract all status counts at top level for uniform access)
                                     $allResults = @($scanResults)
                                     $failedCount = $scanRun.FailedResults
                                     $passedCount = $scanRun.PassedResults
+                                    $manualCount = $scanRun.ManualResults
+                                    $skippedCount = $scanRun.SkippedResults
+                                    $totalCount = $scanRun.TotalResults
                                     $durationStr = $scanRun.Duration
 
                                     Write-CIEMLog -Message "Scan complete. Results: $($allResults.Count), Duration: $durationStr" -Severity INFO -Component 'PSU-ScanPage'
@@ -358,16 +361,23 @@ function New-DevolutionsCIEMApp {
                                                 New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
                                                 New-UDElement -Tag 'div' -Content {
                                                     New-UDTypography -Text 'Scan Complete!' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#2e7d32' }
-                                                    $totalEvaluated = $failedCount + $passedCount
-                                                    $skippedCount = $scanRun.SkippedResults
-                                                    New-UDTypography -Text "Duration: $durationStr | Evaluated: $totalEvaluated | Failed: $failedCount | Passed: $passedCount | Skipped: $skippedCount" -Variant 'body2' -Style @{ color = '#666' }
+                                                    # Show all status counts uniformly (provider-agnostic; vars set in parent scope)
+                                                    $summaryParts = @("Duration: $durationStr", "Total: $totalCount", "Failed: $failedCount", "Passed: $passedCount")
+                                                    if ($manualCount -gt 0) { $summaryParts += "Manual: $manualCount" }
+                                                    if ($skippedCount -gt 0) { $summaryParts += "Skipped: $skippedCount" }
+                                                    New-UDTypography -Text ($summaryParts -join ' | ') -Variant 'body2' -Style @{ color = '#666' }
                                                     New-UDTypography -Text 'Expand the scan in the history below to view detailed results.' -Variant 'caption' -Style @{ color = '#666'; marginTop = '4px' }
                                                 }
                                             }
                                         }
                                     }
 
-                                    Show-UDToast -Message "Scan complete! Found $failedCount failed checks." -Duration 5000 -BackgroundColor '#4caf50'
+                                    # Toast with meaningful summary regardless of provider (includes all statuses)
+                                    $toastParts = @("Scan complete!")
+                                    if ($failedCount -gt 0) { $toastParts += "$failedCount failed" }
+                                    if ($passedCount -gt 0) { $toastParts += "$passedCount passed" }
+                                    if ($manualCount -gt 0) { $toastParts += "$manualCount manual review" }
+                                    Show-UDToast -Message ($toastParts -join ' | ') -Duration 5000 -BackgroundColor '#4caf50'
 
                                     # Refresh scan history
                                     Sync-UDElement -Id 'scanHistoryPanel'
@@ -418,6 +428,7 @@ function New-DevolutionsCIEMApp {
                                             status   = [string]$_.Status
                                             failed   = $_.FailedResults
                                             passed   = $_.PassedResults
+                                            manual   = $_.ManualResults  # show all statuses uniformly
                                             skipped  = $_.SkippedResults
                                             duration = $_.Duration
                                         }
@@ -440,6 +451,10 @@ function New-DevolutionsCIEMApp {
                                     New-UDDataGridColumn -Field 'passed' -HeaderName 'Passed' -Width 90 -Render {
                                         New-UDChip -Label $EventData.passed -Size 'small' -Style @{ backgroundColor = '#4caf50'; color = 'white' }
                                     }
+                                    New-UDDataGridColumn -Field 'manual' -HeaderName 'Manual' -Width 90 -Render {
+                                        $color = if ($EventData.manual -gt 0) { '#1565c0' } else { '#9e9e9e' }
+                                        New-UDChip -Label $EventData.manual -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
                                     New-UDDataGridColumn -Field 'skipped' -HeaderName 'Skipped' -Width 90 -Render {
                                         $color = if ($EventData.skipped -gt 0) { '#ff9800' } else { '#9e9e9e' }
                                         New-UDChip -Label $EventData.skipped -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
@@ -461,6 +476,7 @@ function New-DevolutionsCIEMApp {
                                                 Duration  = $_.Duration
                                                 Failed    = $_.FailedResults
                                                 Passed    = $_.PassedResults
+                                                Manual    = $_.ManualResults  # include all statuses in export
                                                 Skipped   = $_.SkippedResults
                                             }
                                         }
@@ -479,6 +495,7 @@ function New-DevolutionsCIEMApp {
                                                 duration     = $_.Duration
                                                 failedCount  = $_.FailedResults
                                                 passedCount  = $_.PassedResults
+                                                manualCount  = $_.ManualResults  # include all statuses in export
                                                 skippedCount = $_.SkippedResults
                                                 scan_results = @($_.ScanResults | ForEach-Object {
                                                     [ordered]@{
@@ -531,16 +548,18 @@ function New-DevolutionsCIEMApp {
                                             }
 
                                             New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '16px'; backgroundColor = '#fafafa' } } -Content {
-                                                # Summary chips
+                                                # Summary chips (provider-agnostic — show all statuses uniformly)
                                                 $failedCount = @($enrichedResults | Where-Object { $_.status -eq 'FAIL' }).Count
                                                 $passedCount = @($enrichedResults | Where-Object { $_.status -eq 'PASS' }).Count
+                                                $manualCount = @($enrichedResults | Where-Object { $_.status -eq 'MANUAL' }).Count
                                                 $skippedCount = @($enrichedResults | Where-Object { $_.status -eq 'SKIPPED' }).Count
                                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
                                                     New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                                         New-UDTypography -Text 'Scan Results' -Variant 'h6'
                                                         New-UDChip -Label "Failed: $failedCount" -Size 'small' -Style @{ backgroundColor = '#ffebee'; color = '#c62828' }
                                                         New-UDChip -Label "Passed: $passedCount" -Size 'small' -Style @{ backgroundColor = '#e8f5e9'; color = '#2e7d32' }
-                                                        New-UDChip -Label "Skipped: $skippedCount" -Size 'small' -Style @{ backgroundColor = '#fff3e0'; color = '#e65100' }
+                                                        if ($manualCount -gt 0) { New-UDChip -Label "Manual: $manualCount" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' } }
+                                                        if ($skippedCount -gt 0) { New-UDChip -Label "Skipped: $skippedCount" -Size 'small' -Style @{ backgroundColor = '#fff3e0'; color = '#e65100' } }
                                                     }
                                                 }
 
@@ -952,70 +971,58 @@ function New-DevolutionsCIEMApp {
                                 # Active provider is a config concern, not an auth context concern
                                 Set-CIEMConfig -Settings @{ 'cloudProvider' = $provider }
 
-                                # Build typed context object and collect secrets separately
-                                $authCtx = $null
-                                $secretParams = @{}
+                                # Build simple save params — no typed objects needed (avoids PS class scoping in PSU runspaces)
+                                $saveParams = @{
+                                    Provider = $provider
+                                    Method   = $authMethod
+                                }
 
                                 if ($provider -eq 'Azure') {
                                     $tenantId = (Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue).value
+                                    $saveParams['TenantId'] = $tenantId
 
                                     switch ($authMethod) {
                                         'ServicePrincipalSecret' {
-                                            $authCtx = [CIEMAzureSPAuthenticationContext]::new()
-                                            $authCtx.ClientId = (Get-UDElement -Id 'azSpClientId').value
+                                            $saveParams['ClientId'] = (Get-UDElement -Id 'azSpClientId').value
                                             $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
                                             if ($clientSecret -and $clientSecret -ne '********') {
-                                                $secretParams['ClientSecret'] = $clientSecret
+                                                $saveParams['ClientSecret'] = $clientSecret
                                             }
                                         }
                                         'ServicePrincipalCertificate' {
-                                            $authCtx = [CIEMAzureSPCertificateAuthenticationContext]::new()
-                                            $authCtx.ClientId = (Get-UDElement -Id 'azCertClientId').value
+                                            $saveParams['ClientId'] = (Get-UDElement -Id 'azCertClientId').value
                                             $thumbprint = (Get-UDElement -Id 'azCertThumbprint').value
                                             if ($thumbprint) {
-                                                $secretParams['CertThumbprint'] = $thumbprint
+                                                $saveParams['CertThumbprint'] = $thumbprint
                                             }
                                         }
-                                        'ManagedIdentity' {
-                                            $authCtx = [CIEMAzureManagedIdentityAuthenticationContext]::new()
-                                        }
-                                        'DeviceCode' {
-                                            $authCtx = [CIEMAzureDeviceCodeAuthenticationContext]::new()
-                                        }
-                                        'Interactive' {
-                                            $authCtx = [CIEMAzureInteractiveAuthenticationContext]::new()
-                                        }
+                                        # ManagedIdentity, DeviceCode, Interactive — no extra params needed
                                     }
-                                    $authCtx.Enabled  = $true
-                                    $authCtx.TenantId = $tenantId
                                 }
                                 elseif ($provider -eq 'AWS') {
                                     $region = (Get-UDElement -Id 'awsRegion' -ErrorAction SilentlyContinue).value
+                                    $saveParams['Region'] = $region
 
                                     switch ($authMethod) {
                                         'CurrentProfile' {
-                                            $authCtx = [CIEMAWSCurrentProfileAuthenticationContext]::new()
-                                            $authCtx.Profile = (Get-UDElement -Id 'awsProfile' -ErrorAction SilentlyContinue).value
+                                            $saveParams['Profile'] = (Get-UDElement -Id 'awsProfile' -ErrorAction SilentlyContinue).value
                                         }
                                         'AccessKey' {
-                                            $authCtx = [CIEMAWSAccessKeyAuthenticationContext]::new()
                                             $accessKeyId = (Get-UDElement -Id 'awsAccessKeyId').value
                                             $secretAccessKey = (Get-UDElement -Id 'awsSecretAccessKey').value
                                             if ($accessKeyId -and $accessKeyId -ne '********') {
-                                                $secretParams['AccessKeyId'] = $accessKeyId
+                                                $saveParams['AccessKeyId'] = $accessKeyId
                                             }
                                             if ($secretAccessKey -and $secretAccessKey -ne '********') {
-                                                $secretParams['SecretAccessKey'] = $secretAccessKey
+                                                $saveParams['SecretAccessKey'] = $secretAccessKey
                                             }
                                         }
                                     }
-                                    $authCtx.Enabled = $true
-                                    $authCtx.Region  = $region
                                 }
 
                                 # Single save path for config + secrets
-                                Write-CIEMLog -Message "Calling Save-CIEMAuthenticationContext ($($authCtx.GetType().Name))..." -Severity INFO -Component 'PSU-ConfigPage'
-                                Save-CIEMAuthenticationContext -Context $authCtx @secretParams
+                                Write-CIEMLog -Message "Calling Save-CIEMAuthenticationContext ($provider/$authMethod)..." -Severity INFO -Component 'PSU-ConfigPage'
+                                Save-CIEMAuthenticationContext @saveParams
                                 Write-CIEMLog -Message "Save-CIEMAuthenticationContext completed" -Severity INFO -Component 'PSU-ConfigPage'
 
                                 # Detect if authentication settings changed
@@ -1028,12 +1035,12 @@ function New-DevolutionsCIEMApp {
                                         $authChanged = $true
                                         Write-CIEMLog -Message "Auth changed: provider or method differs" -Severity DEBUG -Component 'PSU-ConfigPage'
                                     }
-                                    # Check for changes in credential-related properties
+                                    # Check for changes in credential-related properties (use saveParams, not typed objects)
                                     else {
-                                        if ($authCtx.TenantId -and $authCtx.TenantId -ne $originalAuth.TenantId) { $authChanged = $true }
-                                        if ($authCtx.ClientId -and $authCtx.ClientId -ne $originalAuth.ClientId) { $authChanged = $true }
-                                        if ($secretParams.ContainsKey('ClientSecret')) { $authChanged = $true }  # any new secret = changed
-                                        if ($secretParams.ContainsKey('CertThumbprint') -and $secretParams['CertThumbprint'] -ne $originalAuth.CertThumbprint) { $authChanged = $true }
+                                        if ($saveParams.TenantId -and $saveParams.TenantId -ne $originalAuth.TenantId) { $authChanged = $true }
+                                        if ($saveParams.ClientId -and $saveParams.ClientId -ne $originalAuth.ClientId) { $authChanged = $true }
+                                        if ($saveParams.ContainsKey('ClientSecret')) { $authChanged = $true }  # any new secret = changed
+                                        if ($saveParams.ContainsKey('CertThumbprint') -and $saveParams['CertThumbprint'] -ne $originalAuth.CertThumbprint) { $authChanged = $true }
                                         if ($authChanged) { Write-CIEMLog -Message "Auth changed: credentials differ" -Severity DEBUG -Component 'PSU-ConfigPage' }
                                     }
                                 } else {
@@ -1057,13 +1064,13 @@ function New-DevolutionsCIEMApp {
                                             Set-UDElement -Id 'saveConfigProgress' -Content {
                                                 New-CIEMSuccessContent -Text 'Configuration Saved' -Details "Connected as $($providerResult.Account)"
                                             }
-                                            # Track saved values to detect future changes
+                                            # Track saved values to detect future changes (use $saveParams, not removed $authCtx/$secretParams)
                                             $Session:OriginalAuthValues = @{
                                                 Provider       = $provider
                                                 Method         = $authMethod
-                                                TenantId       = $authCtx.TenantId
-                                                ClientId       = $authCtx.ClientId
-                                                CertThumbprint = $secretParams['CertThumbprint']
+                                                TenantId       = $saveParams['TenantId']
+                                                ClientId       = $saveParams['ClientId']
+                                                CertThumbprint = $saveParams['CertThumbprint']
                                             }
                                             Write-CIEMLog -Message "Session:OriginalAuthValues updated" -Severity DEBUG -Component 'PSU-ConfigPage'
                                         } else {

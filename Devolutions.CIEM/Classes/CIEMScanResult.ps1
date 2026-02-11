@@ -83,14 +83,15 @@ class CIEMScanRun {
         return "{0:N0}s" -f $span.TotalSeconds
     }
 
-    # Calculate counts from ScanResults
+    # Calculate counts from ScanResults (provider-agnostic — counts all statuses uniformly)
     [void] UpdateCounts() {
         if ($this.ScanResults) {
             $this.FailedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'FAIL' }).Count
             $this.PassedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'PASS' }).Count
             $this.SkippedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'SKIPPED' }).Count
             $this.ManualResults = @($this.ScanResults | Where-Object { $_.Status -eq 'MANUAL' }).Count
-            $this.TotalResults = $this.FailedResults + $this.PassedResults
+            # TotalResults = all results, not just FAIL+PASS (ensures every provider has meaningful totals)
+            $this.TotalResults = $this.FailedResults + $this.PassedResults + $this.SkippedResults + $this.ManualResults
         }
     }
 

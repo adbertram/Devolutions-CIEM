@@ -107,10 +107,13 @@ function Invoke-CIEMScan {
         }
 
         $authContext = $script:AuthContext[$Provider.ToString()]
+        # SubscriptionIds/TenantId are Azure-specific; guard with property check to avoid errors on AWS
         $subscriptionIds = @(if ($authContext.PSObject.Properties['SubscriptionIds']) { $authContext.SubscriptionIds } else { @() })
 
         Write-Verbose "Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
-        Write-Verbose "Tenant: $($authContext.TenantId)"
+        if ($authContext.PSObject.Properties['TenantId']) {
+            Write-Verbose "Tenant: $($authContext.TenantId)"
+        }
         Write-Verbose "Subscriptions: $($subscriptionIds.Count)"
 
         # Step 2: Initialize services (provider-specific)
@@ -204,8 +207,10 @@ function Invoke-CIEMScan {
                     foreach ($finding in (& $functionName -Check $check)) {
                         $checkFindingCount++
                         $findingCount++
-                        if ($statusCounts.ContainsKey($finding.Status)) {
-                            $statusCounts[$finding.Status]++
+                        # Cast enum to string for hashtable key lookup (.ContainsKey doesn't coerce enums)
+                        $statusKey = [string]$finding.Status
+                        if ($statusCounts.ContainsKey($statusKey)) {
+                            $statusCounts[$statusKey]++
                         }
                         [void]$allFindings.Add($finding)
                         $finding
