@@ -83,7 +83,7 @@
       "dependsOn": [],
       "permissions": {
         "graph": [
-          "Directory.Read.All"
+          "Policy.Read.All"
         ]
       }
     },

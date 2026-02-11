@@ -418,6 +418,7 @@ function New-DevolutionsCIEMApp {
                                             status   = [string]$_.Status
                                             failed   = $_.FailedResults
                                             passed   = $_.PassedResults
+                                            skipped  = $_.SkippedResults
                                             duration = $_.Duration
                                         }
                                     }
@@ -439,6 +440,10 @@ function New-DevolutionsCIEMApp {
                                     New-UDDataGridColumn -Field 'passed' -HeaderName 'Passed' -Width 90 -Render {
                                         New-UDChip -Label $EventData.passed -Size 'small' -Style @{ backgroundColor = '#4caf50'; color = 'white' }
                                     }
+                                    New-UDDataGridColumn -Field 'skipped' -HeaderName 'Skipped' -Width 90 -Render {
+                                        $color = if ($EventData.skipped -gt 0) { '#ff9800' } else { '#9e9e9e' }
+                                        New-UDChip -Label $EventData.skipped -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
                                     New-UDDataGridColumn -Field 'duration' -HeaderName 'Duration' -Width 100
                                 ) -AutoHeight $true -Pagination -PageSize 10 -ExportOptions @('CSV', 'JSON') -OnExport {
                                     Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
@@ -456,6 +461,7 @@ function New-DevolutionsCIEMApp {
                                                 Duration  = $_.Duration
                                                 Failed    = $_.FailedResults
                                                 Passed    = $_.PassedResults
+                                                Skipped   = $_.SkippedResults
                                             }
                                         }
                                         $exportContent = $csvData | ConvertTo-Csv -NoTypeInformation | Out-String
@@ -473,6 +479,7 @@ function New-DevolutionsCIEMApp {
                                                 duration     = $_.Duration
                                                 failedCount  = $_.FailedResults
                                                 passedCount  = $_.PassedResults
+                                                skippedCount = $_.SkippedResults
                                                 scan_results = @($_.ScanResults | ForEach-Object {
                                                     [ordered]@{
                                                         checkId        = $_.Check.Id
@@ -527,11 +534,13 @@ function New-DevolutionsCIEMApp {
                                                 # Summary chips
                                                 $failedCount = @($enrichedResults | Where-Object { $_.status -eq 'FAIL' }).Count
                                                 $passedCount = @($enrichedResults | Where-Object { $_.status -eq 'PASS' }).Count
+                                                $skippedCount = @($enrichedResults | Where-Object { $_.status -eq 'SKIPPED' }).Count
                                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
                                                     New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                                         New-UDTypography -Text 'Scan Results' -Variant 'h6'
                                                         New-UDChip -Label "Failed: $failedCount" -Size 'small' -Style @{ backgroundColor = '#ffebee'; color = '#c62828' }
                                                         New-UDChip -Label "Passed: $passedCount" -Size 'small' -Style @{ backgroundColor = '#e8f5e9'; color = '#2e7d32' }
+                                                        New-UDChip -Label "Skipped: $skippedCount" -Size 'small' -Style @{ backgroundColor = '#fff3e0'; color = '#e65100' }
                                                     }
                                                 }
 
@@ -686,11 +695,6 @@ function New-DevolutionsCIEMApp {
                             # Sync auth fields after Azure dropdown is rendered (important for provider switch from AWS to Azure)
                             Sync-UDElement -Id 'authFieldsContainer'
                         }
-                    }
-
-                    # Warning when on-prem and ManagedIdentity might be selected
-                    if (-not $envInfo.SupportsManagedIdentity) {
-                        New-UDAlert -Severity 'info' -Text 'Managed Identity is only available in Azure App Service deployments.' -Dense -Style @{ marginBottom = '8px' }
                     }
 
                     # Dynamic fields based on selected authentication method

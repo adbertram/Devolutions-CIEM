@@ -39,10 +39,15 @@ function Test-KeyVaultItemExpiration {
     $itemTypeLower = $ItemType.ToLower()
     $itemTypeSingular = $itemTypeLower.TrimEnd('s')
 
+    # Track totals to emit a descriptive result when no vaults match the filter
+    $totalVaults = 0
+    $matchedVaults = 0
+
     foreach ($subscriptionId in $script:KeyVaultService.Keys) {
         $kvData = $script:KeyVaultService[$subscriptionId]
 
         foreach ($vault in $kvData.KeyVaults) {
+            $totalVaults++
             $vaultName = $vault.name
             $location = $vault.location
             $resourceId = $vault.id
@@ -57,6 +62,8 @@ function Test-KeyVaultItemExpiration {
             # Skip vaults that don't match the RBAC requirement
             if ($RequireRbac -and -not $isRbacEnabled) { continue }
             if (-not $RequireRbac -and $isRbacEnabled) { continue }
+
+            $matchedVaults++
 
             # Get items for this vault
             $items = $kvData.$ItemType[$vaultName]
@@ -106,6 +113,18 @@ function Test-KeyVaultItemExpiration {
             if (-not $hasItemWithoutExpiration) {
                 [CIEMScanResult]::Create($Check, 'PASS', "Keyvault $vaultName has all the $itemTypeLower with expiration date set.", $resourceId, $vaultName, $location)
             }
+        }
+    }
+
+    # Emit a descriptive SKIPPED when no vaults matched the RBAC filter (not applicable, not a pass)
+    $oppositeLabel = if ($RequireRbac) { 'non-RBAC' } else { 'RBAC' }
+    if ($matchedVaults -eq 0) {
+        if ($totalVaults -eq 0) {
+            [CIEMScanResult]::Create($Check, 'SKIPPED', "No Key Vaults found in any accessible subscription. This check is not applicable.", 'N/A', 'N/A')
+        }
+        else {
+            # All vaults use the opposite authorization model
+            [CIEMScanResult]::Create($Check, 'SKIPPED', "No $rbacLabel Key Vaults found - all $totalVaults vault(s) use $oppositeLabel authorization. This check is not applicable.", 'N/A', 'N/A')
         }
     }
 }
