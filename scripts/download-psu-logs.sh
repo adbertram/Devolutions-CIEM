@@ -1,14 +1,16 @@
 #!/bin/bash
 # Download PSU logs and diagnostics from all sources to a local file
-# Usage: ./download-psu-logs.sh [--local] [output_file]
+# Usage: ./download-psu-logs.sh --local|--azure [output_file]
 #
 # Downloads from:
-#   - PSU database (LogEntry table) - App-level logs like [App-Devolutions CIEM]
-#   - Azure Docker logs - Container stdout
-#   - PSU REST API logs - Infrastructure logs
-#   - Azure Instance Status - Container health, VNETFailure, etc.
-#   - Azure Resource Health - Availability status
-#   - App configuration - Settings and container config
+#   --local: Local PSU instance (localhost:5001, local-psu/ directory)
+#   --azure: Azure PSU instance (requires Azure CLI login)
+#     - PSU database (LogEntry table) - App-level logs like [App-Devolutions CIEM]
+#     - Azure Docker logs - Container stdout
+#     - PSU REST API logs - Infrastructure logs
+#     - Azure Instance Status - Container health, VNETFailure, etc.
+#     - Azure Resource Health - Availability status
+#     - App configuration - Settings and container config
 #
 # After downloading, search the file locally with grep:
 #   grep -i "CIEM" _temp/psu-logs.log
@@ -17,10 +19,18 @@
 
 set -euo pipefail
 
-LOCAL_MODE=false
 if [[ "${1:-}" == "--local" ]]; then
     LOCAL_MODE=true
     shift
+elif [[ "${1:-}" == "--azure" ]]; then
+    LOCAL_MODE=false
+    shift
+else
+    echo "Usage: $(basename "$0") --local|--azure [output_file]" >&2
+    echo "" >&2
+    echo "  --local   Download logs from local PSU (localhost:5001)" >&2
+    echo "  --azure   Download logs from Azure PSU instance" >&2
+    exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
