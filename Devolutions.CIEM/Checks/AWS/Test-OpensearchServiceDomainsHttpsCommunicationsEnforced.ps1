@@ -13,7 +13,7 @@ function Test-OpensearchServiceDomainsHttpsCommunicationsEnforced {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

@@ -13,7 +13,7 @@ function Test-KmsCmkNotDeletedUnintentionally {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

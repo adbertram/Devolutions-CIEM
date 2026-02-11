@@ -15,7 +15,7 @@ function Test-SqlserverUnrestrictedInboundAccess {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

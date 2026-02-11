@@ -15,7 +15,7 @@ function Test-Ec2SecuritygroupAllowIngressFromInternetToTcpPortMongodb2701727018
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

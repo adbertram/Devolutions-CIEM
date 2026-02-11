@@ -43,16 +43,15 @@ function Get-CIEMScanRun {
     if ($Id) {
         # Return specific scan run
         $metadataKey = "CIEM:ScanRuns:$Id"
-        $data = Get-PSUCache -Key $metadataKey -ErrorAction Ignore
+        $data = Get-PSUCache -Key $metadataKey -Integrated -ErrorAction Ignore
 
         if ($data) {
-            $scanRun = [CIEMScanRun]::FromHashtable($data)
             if ($IncludeResults) {
                 $resultsKey = "CIEM:ScanResults:$Id"
-                $results = Get-PSUCache -Key $resultsKey -ErrorAction Ignore
-                $scanRun.ScanResults = @($results)
+                $results = Get-PSUCache -Key $resultsKey -Integrated -ErrorAction Ignore
+                $data | Add-Member -NotePropertyName ScanResults -NotePropertyValue @($results) -Force
             }
-            return $scanRun
+            return $data
         }
         else {
             Write-Verbose "ScanRun not found: $Id"
@@ -61,17 +60,16 @@ function Get-CIEMScanRun {
     }
     else {
         # Return all scan runs from history
-        $historyData = Get-PSUCache -Key 'CIEM:ScanRunHistory' -ErrorAction Ignore
+        $historyData = Get-PSUCache -Key 'CIEM:ScanRunHistory' -Integrated -ErrorAction Ignore
 
-        if ($historyData -and $historyData.Count -gt 0) {
-            $scanRuns = foreach ($item in $historyData) {
-                $run = [CIEMScanRun]::FromHashtable($item)
+        if ($historyData -and @($historyData).Count -gt 0) {
+            $scanRuns = foreach ($item in @($historyData)) {
                 if ($IncludeResults) {
-                    $resultsKey = "CIEM:ScanResults:$($run.Id)"
-                    $results = Get-PSUCache -Key $resultsKey -ErrorAction Ignore
-                    $run.ScanResults = @($results)
+                    $resultsKey = "CIEM:ScanResults:$($item.Id)"
+                    $results = Get-PSUCache -Key $resultsKey -Integrated -ErrorAction Ignore
+                    $item | Add-Member -NotePropertyName ScanResults -NotePropertyValue @($results) -Force
                 }
-                $run
+                $item
             }
             return $scanRuns
         }

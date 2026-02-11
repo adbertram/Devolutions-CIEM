@@ -15,7 +15,7 @@ function Test-CloudtrailLogsS3BucketAccessLoggingEnabled {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

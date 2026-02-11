@@ -13,7 +13,7 @@ function Test-Ec2InstanceAccountImdsv2Enabled {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

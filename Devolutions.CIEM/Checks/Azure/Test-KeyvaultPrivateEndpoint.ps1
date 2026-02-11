@@ -18,7 +18,7 @@ function Test-KeyvaultPrivateEndpoint {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

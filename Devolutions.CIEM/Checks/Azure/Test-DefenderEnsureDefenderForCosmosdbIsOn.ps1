@@ -13,7 +13,7 @@ function Test-DefenderEnsureDefenderForCosmosdbIsOn {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

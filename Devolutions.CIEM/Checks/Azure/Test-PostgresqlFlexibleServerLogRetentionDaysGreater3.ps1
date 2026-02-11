@@ -13,7 +13,7 @@ function Test-PostgresqlFlexibleServerLogRetentionDaysGreater3 {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

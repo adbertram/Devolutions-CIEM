@@ -13,7 +13,7 @@ function Test-AksClustersCreatedWithPrivateNodes {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

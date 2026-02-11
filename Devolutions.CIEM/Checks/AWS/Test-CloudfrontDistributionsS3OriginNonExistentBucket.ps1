@@ -15,7 +15,7 @@ function Test-CloudfrontDistributionsS3OriginNonExistentBucket {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

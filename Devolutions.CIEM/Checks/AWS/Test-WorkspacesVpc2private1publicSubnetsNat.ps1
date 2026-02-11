@@ -13,7 +13,7 @@ function Test-WorkspacesVpc2private1publicSubnetsNat {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

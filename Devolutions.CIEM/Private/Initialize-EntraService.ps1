@@ -45,7 +45,18 @@ function Initialize-EntraService {
     # Load paginated resources
     Write-CIEMLog -Severity DEBUG -Message "Loading users..."
     $usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType"
-    $script:EntraService.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
+    try {
+        $script:EntraService.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
+    }
+    catch {
+        if ($_.Exception.Message -match 'Access denied|missing permissions|403|Forbidden') {
+            Write-CIEMLog -Severity WARNING -Message "Users data unavailable - missing permissions. User-related checks will be skipped."
+            $script:EntraService.Users = $null
+        }
+        else {
+            throw
+        }
+    }
 
     # Load user MFA status - requires Azure AD Premium P1/P2 license
     # Handle gracefully if tenant doesn't have the required license
@@ -55,8 +66,8 @@ function Initialize-EntraService {
         $script:EntraService.UserMFAStatus = @(Get-AllGraphPage -Uri $mfaUri -ResourceName "UserMFAStatus")
     }
     catch {
-        # Check for common licensing errors
-        if ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license|403') {
+        # Check for common licensing/permission errors
+        if ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license|Access denied|missing permissions|403|Forbidden') {
             Write-CIEMLog -Severity WARNING -Message "MFA status data unavailable - Azure AD Premium license required. MFA-related checks will be skipped."
             $script:EntraService.UserMFAStatus = $null
             $script:EntraService.MFAStatusUnavailable = $true
@@ -88,12 +99,16 @@ function Initialize-EntraService {
             $script:EntraService[$endpoint.Key] = Invoke-AzureApi @params
         }
         catch {
-            if ($endpoint.Value.RequiresPremium -and ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license|403')) {
+            if ($_.Exception.Message -match 'Access denied|missing permissions|403|Forbidden') {
+                $reason = if ($endpoint.Value.RequiresPremium) { 'Azure AD Premium license required' } else { 'missing permissions' }
+                Write-CIEMLog -Severity WARNING -Message "$($endpoint.Key) data unavailable - $reason. Related checks will be skipped."
+                $script:EntraService[$endpoint.Key] = $null
+            }
+            elseif ($endpoint.Value.RequiresPremium -and ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license')) {
                 Write-CIEMLog -Severity WARNING -Message "$($endpoint.Key) data unavailable - Azure AD Premium license required."
                 $script:EntraService[$endpoint.Key] = $null
             }
             else {
-                # Re-throw non-premium errors
                 throw
             }
         }

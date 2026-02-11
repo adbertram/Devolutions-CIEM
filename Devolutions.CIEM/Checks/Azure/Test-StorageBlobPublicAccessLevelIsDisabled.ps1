@@ -17,7 +17,7 @@ function Test-StorageBlobPublicAccessLevelIsDisabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     # Prowler simply checks the account-level allowBlobPublicAccess property

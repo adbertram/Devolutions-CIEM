@@ -13,7 +13,7 @@ function Test-Apigatewayv2ApiAuthorizersEnabled {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

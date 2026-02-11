@@ -13,7 +13,7 @@ function Test-Wafv2WebaclRuleLoggingEnabled {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

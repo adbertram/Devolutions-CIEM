@@ -18,7 +18,7 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $params = @{

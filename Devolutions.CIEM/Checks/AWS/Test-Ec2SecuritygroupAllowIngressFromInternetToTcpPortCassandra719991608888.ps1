@@ -15,7 +15,7 @@ function Test-Ec2SecuritygroupAllowIngressFromInternetToTcpPortCassandra71999160
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

@@ -32,7 +32,7 @@ function Reset-CIEMConfig {
 
         if ($psuCacheAvailable) {
             try {
-                Set-PSUCache -Key 'CIEM:Config' -Value $defaults -Persist -ErrorAction Stop
+                Set-PSUCache -Key 'CIEM:Config' -Value $defaults -Persist -Integrated -ErrorAction Stop
                 $psuCacheConnected = $true
                 Write-Verbose "Configuration reset to defaults in PSU cache"
             }

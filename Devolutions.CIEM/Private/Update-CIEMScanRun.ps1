@@ -29,7 +29,7 @@ function Update-CIEMScanRun {
     [OutputType([CIEMScanRun])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [CIEMScanRun]$ScanRun,
+        $ScanRun,
 
         [Parameter()]
         [ValidateSet('Completed', 'Failed')]

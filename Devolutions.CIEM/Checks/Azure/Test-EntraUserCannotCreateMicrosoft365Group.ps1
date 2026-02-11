@@ -20,7 +20,7 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

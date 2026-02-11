@@ -28,13 +28,6 @@ class CIEMCheckRemediation {
         $this.Text = $Text
         $this.Url = $Url
     }
-
-    [hashtable] ToHashtable() {
-        return @{
-            Text = $this.Text
-            Url  = $this.Url
-        }
-    }
 }
 
 class CIEMCheckPermissions {
@@ -48,15 +41,6 @@ class CIEMCheckPermissions {
         $this.ARM = @()
         $this.KeyVaultDataPlane = @()
         $this.IAM = @()
-    }
-
-    [hashtable] ToHashtable() {
-        $ht = @{}
-        if ($this.Graph.Count -gt 0) { $ht.Graph = $this.Graph }
-        if ($this.ARM.Count -gt 0) { $ht.ARM = $this.ARM }
-        if ($this.KeyVaultDataPlane.Count -gt 0) { $ht.KeyVaultDataPlane = $this.KeyVaultDataPlane }
-        if ($this.IAM.Count -gt 0) { $ht.IAM = $this.IAM }
-        return $ht
     }
 }
 
@@ -76,4 +60,88 @@ class CIEMCheck {
     [CIEMCheckPermissions]$Permissions
 
     CIEMCheck() {}
+}
+
+# --- Authentication context classes (depend on CIEMCloudProvider enum above) ---
+
+# Base class for all authentication contexts
+class CIEMAuthenticationContext {
+    [CIEMCloudProvider]$Provider
+    [bool]$Enabled
+    [string]$Method
+}
+
+# --- Azure contexts ---
+
+class CIEMAzureAuthenticationContext : CIEMAuthenticationContext {
+    [string]$TenantId
+
+    CIEMAzureAuthenticationContext() {
+        $this.Provider = [CIEMCloudProvider]::Azure
+    }
+}
+
+class CIEMAzureSPAuthenticationContext : CIEMAzureAuthenticationContext {
+    [string]$ClientId
+    [bool]$HasClientSecret  # true when secret exists in PSU secret store
+
+    CIEMAzureSPAuthenticationContext() {
+        $this.Method = 'ServicePrincipalSecret'
+    }
+}
+
+class CIEMAzureSPCertificateAuthenticationContext : CIEMAzureAuthenticationContext {
+    [string]$ClientId
+    [bool]$HasCertThumbprint  # true when thumbprint exists in PSU secret store
+
+    CIEMAzureSPCertificateAuthenticationContext() {
+        $this.Method = 'ServicePrincipalCertificate'
+    }
+}
+
+class CIEMAzureManagedIdentityAuthenticationContext : CIEMAzureAuthenticationContext {
+    [string]$ManagedIdentityClientId  # null = system-assigned
+
+    CIEMAzureManagedIdentityAuthenticationContext() {
+        $this.Method = 'ManagedIdentity'
+    }
+}
+
+class CIEMAzureDeviceCodeAuthenticationContext : CIEMAzureAuthenticationContext {
+    CIEMAzureDeviceCodeAuthenticationContext() {
+        $this.Method = 'DeviceCode'
+    }
+}
+
+class CIEMAzureInteractiveAuthenticationContext : CIEMAzureAuthenticationContext {
+    CIEMAzureInteractiveAuthenticationContext() {
+        $this.Method = 'Interactive'
+    }
+}
+
+# --- AWS contexts ---
+
+class CIEMAWSAuthenticationContext : CIEMAuthenticationContext {
+    [string]$Region
+
+    CIEMAWSAuthenticationContext() {
+        $this.Provider = [CIEMCloudProvider]::AWS
+    }
+}
+
+class CIEMAWSCurrentProfileAuthenticationContext : CIEMAWSAuthenticationContext {
+    [string]$Profile
+
+    CIEMAWSCurrentProfileAuthenticationContext() {
+        $this.Method = 'CurrentProfile'
+    }
+}
+
+class CIEMAWSAccessKeyAuthenticationContext : CIEMAWSAuthenticationContext {
+    [bool]$HasAccessKeyId      # true when key exists in PSU secret store
+    [bool]$HasSecretAccessKey  # true when key exists in PSU secret store
+
+    CIEMAWSAccessKeyAuthenticationContext() {
+        $this.Method = 'AccessKey'
+    }
 }

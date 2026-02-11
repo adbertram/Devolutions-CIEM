@@ -15,7 +15,7 @@ function Test-Ec2TransitgatewayAutoAcceptVpcAttachments {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

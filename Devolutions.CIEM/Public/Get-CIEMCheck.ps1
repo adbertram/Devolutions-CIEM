@@ -99,7 +99,21 @@ function Get-CIEMCheck {
                 RelatedUrl    = $jsonObj.relatedUrl
                 CheckScript   = $jsonObj.checkScript
                 DependsOn     = @($jsonObj.dependsOn | Where-Object { $_ })
-                Permissions   = $jsonObj.permissions
+                Permissions   = & {
+                    $raw = $jsonObj.permissions
+                    $p = @{ Graph = @(); ARM = @(); KeyVaultDataPlane = @(); IAM = @() }
+                    if ($null -ne $raw) {
+                        foreach ($prop in $raw.PSObject.Properties) {
+                            switch ($prop.Name.ToLower()) {
+                                'graph'             { $p.Graph = @($prop.Value) }
+                                'arm'               { $p.ARM = @($prop.Value) }
+                                'keyvaultdataplane' { $p.KeyVaultDataPlane = @($prop.Value) }
+                                'iam'               { $p.IAM = @($prop.Value) }
+                            }
+                        }
+                    }
+                    [PSCustomObject]$p
+                }
             })
         }
     }
@@ -107,8 +121,8 @@ function Get-CIEMCheck {
     # Apply filters
     $result = @($checks)
 
-    if ($CloudProvider) {
-        $result = $result | Where-Object { $_.CloudProvider -eq $CloudProvider }
+    if ($PSBoundParameters.ContainsKey('CloudProvider')) {
+        $result = $result | Where-Object { $_.CloudProvider -eq $CloudProvider.ToString() }
     }
 
     if ($Service) {

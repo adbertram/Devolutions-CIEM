@@ -33,7 +33,7 @@ function Test-StorageAccountProperty {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check,
+        $Check,
 
         [Parameter(Mandatory)]
         [string]$PropertyPath,

@@ -37,7 +37,7 @@ function Connect-CIEM {
 
     .NOTES
         This function must be called before running Invoke-CIEMScan or any other
-        scan functions. Use Test-CIEMAuthenticated to check connection status.
+        scan functions. Use Test-CIEMAuthenticationContext to check connection status.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -75,14 +75,17 @@ function Connect-CIEM {
         Write-Verbose "Connecting to provider: $p"
 
         # Skip if already connected and not forcing
-        if (-not $Force.IsPresent -and $script:AuthContext[$p]) {
-            Write-CIEMLog -Message "$p is already connected (AccountId: $($script:AuthContext[$p].AccountId)). Skipping." -Severity INFO -Component 'Connect-CIEM'
+        # Cast enum to string for hashtable key lookup (enum keys != string keys)
+        $providerKey = $p.ToString()
+
+        if (-not $Force.IsPresent -and $script:AuthContext[$providerKey]) {
+            Write-CIEMLog -Message "$p is already connected (AccountId: $($script:AuthContext[$providerKey].AccountId)). Skipping." -Severity INFO -Component 'Connect-CIEM'
             Write-Verbose "$p is already connected. Use -Force to re-authenticate."
             $results.Add([PSCustomObject]@{
                 Provider = $p
                 Status   = 'AlreadyConnected'
-                Account  = $script:AuthContext[$p].AccountId
-                TenantId = $script:AuthContext[$p].TenantId
+                Account  = $script:AuthContext[$providerKey].AccountId
+                TenantId = $script:AuthContext[$providerKey].TenantId
                 Message  = 'Already authenticated. Use -Force to re-authenticate.'
             })
             continue
@@ -122,7 +125,7 @@ function Connect-CIEM {
             }
         }
         catch {
-            $script:AuthContext[$p] = $null
+            $script:AuthContext[$providerKey] = $null
             Write-CIEMLog -Message "Failed to connect to $p : $($_.Exception.Message)" -Severity ERROR -Component 'Connect-CIEM'
             Write-CIEMLog -Message "Stack trace: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'Connect-CIEM'
             $results.Add([PSCustomObject]@{

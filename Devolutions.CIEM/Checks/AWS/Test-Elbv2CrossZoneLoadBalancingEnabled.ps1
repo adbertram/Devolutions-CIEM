@@ -13,7 +13,7 @@ function Test-Elbv2CrossZoneLoadBalancingEnabled {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

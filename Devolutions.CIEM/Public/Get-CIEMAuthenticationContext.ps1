@@ -1,165 +1,148 @@
 function Get-CIEMAuthenticationContext {
     <#
     .SYNOPSIS
-        Returns the current authentication context for CIEM providers.
+        Returns the configured authentication context for cloud providers.
 
     .DESCRIPTION
-        Shows the configured authentication method and current authentication state
-        for the specified cloud provider. Useful for verifying authentication setup
-        before running scans.
+        Reads authentication configuration from PSU cache and checks for the
+        presence of secrets in PSU secret storage. Returns a typed context
+        object for each requested provider, with the concrete type determined
+        by the configured authentication method.
+
+        By default returns contexts for all providers. Use -Provider to filter
+        to a specific provider.
 
     .PARAMETER Provider
-        The cloud provider to get authentication context for (Azure or AWS).
+        Optional. Return context for specific provider(s) only.
 
     .OUTPUTS
-        [PSCustomObject] Object containing:
-        - Provider: The cloud provider name
-        - ConfiguredMethod: Authentication method from CIEM config
-        - IsAuthenticated: Whether a valid context exists
-        - AccountId: The authenticated account identifier
-        - AccountType: Type of account (User, ServicePrincipal, ManagedIdentity)
-        - TenantId: The tenant/directory ID
-        - TenantDomain: The tenant primary domain (if available)
-        - SubscriptionCount: Number of accessible subscriptions
-        - SubscriptionFilter: Configured subscription filter (if any)
-        - Subscriptions: Array of subscription details
+        [CIEMAuthenticationContext] One typed subclass instance per provider.
+
+    .EXAMPLE
+        Get-CIEMAuthenticationContext
+        # Returns contexts for all providers
 
     .EXAMPLE
         Get-CIEMAuthenticationContext -Provider Azure
-        # Returns Azure authentication context
+        # Returns Azure context (e.g. CIEMAzureSPAuthenticationContext)
 
     .EXAMPLE
-        Get-CIEMAuthenticationContext -Provider Azure | Select-Object AccountId, AccountType, TenantId
-        # Returns specific authentication details
+        $ctx = Get-CIEMAuthenticationContext -Provider Azure
+        $ctx.GetType().Name  # CIEMAzureSPAuthenticationContext
+        $ctx.TenantId        # tenant ID from config
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
-        [Parameter(Mandatory)]
-        [CIEMCloudProvider]$Provider
+        [Parameter()]
+        [ValidateSet('Azure', 'AWS')]
+        [string[]]$Provider
     )
 
     $ErrorActionPreference = 'Stop'
 
-    switch ($Provider) {
-        'Azure' { Get-AzureAuthenticationContext }
-        'AWS' { Get-AWSAuthenticationContext }
+    # Ensure config is loaded
+    if (-not $script:Config) {
+        $script:Config = Get-CIEMConfig
+    }
+
+    # Determine which providers to return
+    $targetProviders = if ($Provider) { @($Provider) } else { @('Azure', 'AWS') }
+
+    foreach ($p in $targetProviders) {
+        switch ($p) {
+            'Azure' { Get-AzureAuthenticationContextFromConfig }
+            'AWS'   { Get-AWSAuthenticationContextFromConfig }
+        }
     }
 }
 
-function Get-AzureAuthenticationContext {
+function Get-AzureAuthenticationContextFromConfig {
     <#
     .SYNOPSIS
-        Internal function to get Azure authentication context.
+        Internal helper — builds a typed Azure auth context from config + secrets.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param()
 
-    # Get configured authentication method
-    $configuredMethod = $script:Config.azure.authentication.method
-    $subscriptionFilter = $script:Config.azure.subscriptionFilter
+    $authConfig = $script:Config.azure.authentication
 
-    # Check for existing Az PowerShell context
-    $context = Get-AzContext -ErrorAction SilentlyContinue
-
-    if (-not $context) {
-        [PSCustomObject]@{
-            Provider           = 'Azure'
-            ConfiguredMethod   = $configuredMethod
-            IsAuthenticated    = $false
-            AccountId          = $null
-            AccountType        = $null
-            TenantId           = $null
-            TenantDomain       = $null
-            SubscriptionCount  = 0
-            SubscriptionFilter = $subscriptionFilter
-            Subscriptions      = @()
+    # Instantiate the correct subclass based on configured method
+    $ctx = switch ($authConfig.method) {
+        'ServicePrincipalSecret' {
+            $c = [CIEMAzureSPAuthenticationContext]::new()
+            $c.ClientId        = $authConfig.servicePrincipal.clientId
+            $c.HasClientSecret = [bool](Get-CIEMSecret 'CIEM_Azure_ClientSecret')
+            $c
+        }
+        'ServicePrincipalCertificate' {
+            $c = [CIEMAzureSPCertificateAuthenticationContext]::new()
+            $c.ClientId          = $authConfig.servicePrincipal.clientId
+            $c.HasCertThumbprint = [bool](Get-CIEMSecret 'CIEM_Azure_CertThumbprint')
+            $c
+        }
+        'ManagedIdentity' {
+            $c = [CIEMAzureManagedIdentityAuthenticationContext]::new()
+            $c.ManagedIdentityClientId = $authConfig.managedIdentity.clientId
+            $c
+        }
+        'DeviceCode' {
+            [CIEMAzureDeviceCodeAuthenticationContext]::new()
+        }
+        'Interactive' {
+            [CIEMAzureInteractiveAuthenticationContext]::new()
+        }
+        default {
+            # Fallback for unknown method — return base Azure context
+            $c = [CIEMAzureAuthenticationContext]::new()
+            $c.Method = $authConfig.method
+            $c
         }
     }
-    else {
-        # Determine account type
-        $accountType = switch ($context.Account.Type) {
-            'User' { 'User' }
-            'ServicePrincipal' { 'ServicePrincipal' }
-            'ManagedService' { 'ManagedIdentity' }
-            default { $context.Account.Type }
-        }
 
-        # Get accessible subscriptions
-        $subscriptions = @(Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue)
+    # Common Azure properties
+    $ctx.Enabled  = [bool]$script:Config.azure.enabled
+    $ctx.TenantId = $authConfig.tenantId
 
-        # Apply subscription filter if configured
-        if ($subscriptionFilter -and $subscriptionFilter.Count -gt 0) {
-            $subscriptions = @($subscriptions | Where-Object { $subscriptionFilter -contains $_.Id })
-        }
-
-        # Build subscription details
-        $subscriptionDetails = $subscriptions | ForEach-Object {
-            [PSCustomObject]@{
-                Id    = $_.Id
-                Name  = $_.Name
-                State = $_.State
-            }
-        }
-
-        # Try to get tenant domain
-        $tenantDomain = $null
-        if ($context.Tenant.Id) {
-            $tenant = Get-AzTenant -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
-            if ($tenant -and $tenant.Domains) {
-                $tenantDomain = ($tenant.Domains | Where-Object { $_ -notmatch '\.onmicrosoft\.com$' } | Select-Object -First 1) ??
-                               ($tenant.Domains | Select-Object -First 1)
-            }
-        }
-
-        [PSCustomObject]@{
-            Provider           = 'Azure'
-            ConfiguredMethod   = $configuredMethod
-            IsAuthenticated    = $true
-            AccountId          = $context.Account.Id
-            AccountType        = $accountType
-            TenantId           = $context.Tenant.Id
-            TenantDomain       = $tenantDomain
-            SubscriptionCount  = $subscriptions.Count
-            SubscriptionFilter = $subscriptionFilter
-            Subscriptions      = @($subscriptionDetails)
-        }
-    }
+    $ctx
 }
 
-function Get-AWSAuthenticationContext {
+function Get-AWSAuthenticationContextFromConfig {
     <#
     .SYNOPSIS
-        Internal function to get AWS authentication context.
+        Internal helper — builds a typed AWS auth context from config + secrets.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param()
 
-    $configuredMethod = $script:Config.aws.authentication.method
-    $awsContext = $script:AuthContext['AWS']
+    $authConfig = $script:Config.aws.authentication
 
-    if (-not $awsContext) {
-        [PSCustomObject]@{
-            Provider         = 'AWS'
-            ConfiguredMethod = $configuredMethod
-            IsAuthenticated  = $false
-            AccountId        = $null
-            AccountType      = $null
-            Arn              = $null
-            Region           = $script:Config.aws.authentication.region
+    # Instantiate the correct subclass based on configured method
+    $ctx = switch ($authConfig.method) {
+        'CurrentProfile' {
+            $c = [CIEMAWSCurrentProfileAuthenticationContext]::new()
+            $c.Profile = $authConfig.profile
+            $c
+        }
+        'AccessKey' {
+            $c = [CIEMAWSAccessKeyAuthenticationContext]::new()
+            $c.HasAccessKeyId     = [bool](Get-CIEMSecret 'CIEM_AWS_AccessKeyId')
+            $c.HasSecretAccessKey = [bool](Get-CIEMSecret 'CIEM_AWS_SecretAccessKey')
+            $c
+        }
+        default {
+            # Fallback for unknown method — return base AWS context
+            $c = [CIEMAWSAuthenticationContext]::new()
+            $c.Method = $authConfig.method
+            $c
         }
     }
-    else {
-        [PSCustomObject]@{
-            Provider         = 'AWS'
-            ConfiguredMethod = $configuredMethod
-            IsAuthenticated  = $true
-            AccountId        = $awsContext.AccountId
-            AccountType      = $awsContext.AccountType
-            Arn              = $awsContext.Arn
-            Region           = $awsContext.Region
-        }
-    }
+
+    # Common AWS properties
+    $ctx.Enabled = [bool]$script:Config.aws.enabled
+    $ctx.Region  = $authConfig.region
+
+    $ctx
 }

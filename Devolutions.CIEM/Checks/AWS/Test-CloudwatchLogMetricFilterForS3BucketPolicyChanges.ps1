@@ -13,7 +13,7 @@ function Test-CloudwatchLogMetricFilterForS3BucketPolicyChanges {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

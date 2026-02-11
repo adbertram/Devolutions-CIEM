@@ -13,7 +13,7 @@ function Test-GlueDevelopmentEndpointsS3EncryptionEnabled {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

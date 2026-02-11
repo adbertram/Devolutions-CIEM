@@ -18,7 +18,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

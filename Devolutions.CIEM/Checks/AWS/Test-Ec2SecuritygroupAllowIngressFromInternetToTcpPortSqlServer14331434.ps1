@@ -13,7 +13,7 @@ function Test-Ec2SecuritygroupAllowIngressFromInternetToTcpPortSqlServer14331434
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

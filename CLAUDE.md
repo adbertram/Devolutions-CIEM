@@ -236,6 +236,27 @@ Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem. Sup
 
 **Note:** The `exec` command runs in the Kudu sidecar container (Debian), not the PSU container. Use `list` and `read` commands to inspect PSU files.
 
+### Azure Web App Logs
+
+Use the `azlogs` CLI tool (installed globally) to download and analyze Azure Web App logs (platform, container, application, Kudu). The original `scripts/azure_webapp_log_downloader/` was ported to this CLI.
+
+```bash
+# Download a full log package from Azure
+azlogs packages download --app devolutions-ciem-psu --resource-group devolutions-ciem-rg
+
+# List downloaded packages
+azlogs packages list
+
+# Parse and merge logs into searchable JSONL
+azlogs packages parse <package-name>
+
+# Search parsed entries
+azlogs entries list <package-name> --filter "level=ERROR"
+
+# Generate HTML report
+azlogs report generate <package-name>
+```
+
 ### PSU Log Script
 
 Use `scripts/download-psu-logs.sh` to download logs. Supports `--local` for local PSU.

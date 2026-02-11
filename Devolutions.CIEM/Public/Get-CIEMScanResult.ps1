@@ -33,7 +33,7 @@ function Get-CIEMScanResult {
     }
 
     $resultsKey = "CIEM:ScanResults:$ScanRunId"
-    $results = Get-PSUCache -Key $resultsKey -ErrorAction Ignore
+    $results = Get-PSUCache -Key $resultsKey -Integrated -ErrorAction Ignore
 
     if (-not $results) {
         Write-Verbose "No results found for ScanRunId: $ScanRunId"

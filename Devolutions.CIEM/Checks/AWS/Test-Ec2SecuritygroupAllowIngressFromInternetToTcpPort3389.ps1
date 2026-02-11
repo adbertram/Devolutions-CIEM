@@ -13,7 +13,7 @@ function Test-Ec2SecuritygroupAllowIngressFromInternetToTcpPort3389 {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

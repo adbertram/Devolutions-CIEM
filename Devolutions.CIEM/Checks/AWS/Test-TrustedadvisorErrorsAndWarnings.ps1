@@ -13,7 +13,7 @@ function Test-TrustedadvisorErrorsAndWarnings {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

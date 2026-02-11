@@ -13,7 +13,7 @@ function Test-Ec2SecuritygroupDefaultRestrictTraffic {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

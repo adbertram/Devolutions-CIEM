@@ -13,7 +13,7 @@ function Test-Ec2EbsVolumeProtectedByBackupPlan {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

@@ -15,7 +15,7 @@ function Test-Ec2SecuritygroupAllowWideOpenPublicIpv4 {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

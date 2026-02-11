@@ -17,7 +17,7 @@ function Test-StorageSecureTransferRequiredIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $params = @{

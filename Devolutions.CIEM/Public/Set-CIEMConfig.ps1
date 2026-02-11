@@ -67,7 +67,7 @@ function Set-CIEMConfig {
         $config = $null
         if ($psuCacheAvailable) {
             try {
-                $config = Get-PSUCache -Key 'CIEM:Config' -ErrorAction Stop
+                $config = Get-PSUCache -Key 'CIEM:Config' -Integrated -ErrorAction Stop
                 $psuCacheConnected = $true
             }
             catch {
@@ -93,7 +93,7 @@ function Set-CIEMConfig {
             # Write to PSU cache if available and connected
             if ($psuCacheConnected) {
                 try {
-                    Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -ErrorAction Stop
+                    Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -Integrated -ErrorAction Stop
                     Write-Verbose "Configuration saved to PSU cache"
                 }
                 catch {

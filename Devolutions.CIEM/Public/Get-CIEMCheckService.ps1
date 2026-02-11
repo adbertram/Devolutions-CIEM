@@ -51,7 +51,7 @@ function Get-CIEMCheckService {
             continue
         }
 
-        if ($CloudProvider -and $providerDisplay -ne $CloudProvider) {
+        if ($PSBoundParameters.ContainsKey('CloudProvider') -and $providerDisplay -ne $CloudProvider.ToString()) {
             continue
         }
 

@@ -33,7 +33,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

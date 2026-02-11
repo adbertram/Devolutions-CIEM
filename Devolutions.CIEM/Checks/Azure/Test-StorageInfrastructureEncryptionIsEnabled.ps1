@@ -17,7 +17,7 @@ function Test-StorageInfrastructureEncryptionIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $params = @{

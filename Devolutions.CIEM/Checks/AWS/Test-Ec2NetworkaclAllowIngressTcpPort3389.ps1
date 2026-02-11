@@ -15,7 +15,7 @@ function Test-Ec2NetworkaclAllowIngressTcpPort3389 {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

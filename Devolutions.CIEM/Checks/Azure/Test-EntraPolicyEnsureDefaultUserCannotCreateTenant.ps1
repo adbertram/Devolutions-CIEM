@@ -18,7 +18,7 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $params = @{

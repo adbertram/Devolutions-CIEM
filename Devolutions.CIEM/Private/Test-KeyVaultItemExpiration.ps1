@@ -23,7 +23,7 @@ function Test-KeyVaultItemExpiration {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check,
+        $Check,
 
         [Parameter(Mandatory)]
         [ValidateSet('Keys', 'Secrets')]

@@ -12,7 +12,7 @@ enum CIEMScanRunStatus {
 }
 
 class CIEMScanResult {
-    [CIEMCheck]$Check
+    [object]$Check  # PSCustomObject from Get-CIEMCheck (not [CIEMCheck] - PSU runspace compat)
     [CIEMScanStatus]$Status
     [string]$StatusExtended
     [string]$ResourceId
@@ -21,7 +21,7 @@ class CIEMScanResult {
 
     CIEMScanResult() {}
 
-    static [CIEMScanResult] Create([CIEMCheck]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName, [string]$Location) {
+    static [CIEMScanResult] Create([object]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName, [string]$Location) {
         $result = [CIEMScanResult]::new()
         $result.Check = $Check
         $result.Status = [CIEMScanStatus]$Status
@@ -32,7 +32,7 @@ class CIEMScanResult {
         return $result
     }
 
-    static [CIEMScanResult] Create([CIEMCheck]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName) {
+    static [CIEMScanResult] Create([object]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName) {
         return [CIEMScanResult]::Create($Check, $Status, $StatusExtended, $ResourceId, $ResourceName, 'Global')
     }
 }
@@ -86,11 +86,11 @@ class CIEMScanRun {
     # Calculate counts from ScanResults
     [void] UpdateCounts() {
         if ($this.ScanResults) {
-            $this.TotalResults = $this.ScanResults.Count
             $this.FailedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'FAIL' }).Count
             $this.PassedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'PASS' }).Count
             $this.SkippedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'SKIPPED' }).Count
             $this.ManualResults = @($this.ScanResults | Where-Object { $_.Status -eq 'MANUAL' }).Count
+            $this.TotalResults = $this.FailedResults + $this.PassedResults
         }
     }
 
@@ -111,43 +111,4 @@ class CIEMScanRun {
         $this.UpdateCounts()
     }
 
-    # Convert to hashtable for cache storage (excludes ScanResults)
-    [hashtable] ToHashtable() {
-        return @{
-            Id            = $this.Id
-            Status        = $this.Status.ToString()
-            Provider      = $this.Provider.ToString()
-            Services      = $this.Services
-            StartTime     = $this.StartTime.ToString('o')
-            EndTime       = if ($this.EndTime) { $this.EndTime.ToString('o') } else { $null }
-            Duration      = $this.Duration
-            IncludePassed = $this.IncludePassed
-            TotalResults  = $this.TotalResults
-            FailedResults = $this.FailedResults
-            PassedResults = $this.PassedResults
-            SkippedResults = $this.SkippedResults
-            ManualResults = $this.ManualResults
-            ErrorMessage  = $this.ErrorMessage
-        }
-    }
-
-    # Create from hashtable (cache retrieval)
-    static [CIEMScanRun] FromHashtable([hashtable]$Data) {
-        $run = [CIEMScanRun]::new()
-        $run.Id = $Data.Id
-        $run.Status = [CIEMScanRunStatus]$Data.Status
-        $run.Provider = [CIEMCloudProvider]$Data.Provider
-        $run.Services = $Data.Services
-        $run.StartTime = [datetime]$Data.StartTime
-        $run.EndTime = if ($Data.EndTime) { [datetime]$Data.EndTime } else { $null }
-        $run.Duration = $Data.Duration
-        $run.IncludePassed = $Data.IncludePassed
-        $run.TotalResults = $Data.TotalResults
-        $run.FailedResults = $Data.FailedResults
-        $run.PassedResults = $Data.PassedResults
-        $run.SkippedResults = $Data.SkippedResults
-        $run.ManualResults = $Data.ManualResults
-        $run.ErrorMessage = $Data.ErrorMessage
-        return $run
-    }
 }

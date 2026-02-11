@@ -32,7 +32,7 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

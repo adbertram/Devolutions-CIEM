@@ -15,7 +15,7 @@ function Test-Ec2SecuritygroupAllowIngressFromInternetToTcpPortOracle15212483 {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

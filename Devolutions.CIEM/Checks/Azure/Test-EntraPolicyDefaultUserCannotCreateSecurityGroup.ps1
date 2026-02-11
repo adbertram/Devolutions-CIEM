@@ -18,7 +18,7 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $params = @{

@@ -12,7 +12,7 @@
 RootModule = 'Devolutions.CIEM.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.3.28'
+ModuleVersion = '0.3.29'
 
 # Supported PSEditions
 CompatiblePSEditions = 'Core'
@@ -158,7 +158,8 @@ FileList = '.universal\dashboards.ps1', 'ciem_checks.json',
                'Public/New-CIEMUIContent.ps1',
                'Public/Write-CIEMLog.ps1', 'Public/New-DevolutionsCIEMApp.ps1', 
                'Public/Connect-CIEM.ps1', 
-               'Public/Get-CIEMAuthenticationContext.ps1', 
+               'Public/Get-CIEMAuthenticationContext.ps1',
+               'Public/Save-CIEMAuthenticationContext.ps1', 
                'Public/Get-CIEMCheck.ps1', 'Public/Get-CIEMCheckService.ps1',
                'Public/Get-CIEMProvider.ps1', 
                'Public/Get-CIEMRequiredPermission.ps1', 
@@ -167,7 +168,7 @@ FileList = '.universal\dashboards.ps1', 'ciem_checks.json',
                'Public/New-PSUAzureServicePrincipal.ps1', 
                'Public/Get-ProwlerCheck.ps1', 'Public/Invoke-CIEMScan.ps1',
                'Public/Reset-CIEMConfig.ps1', 'Public/Sync-ProwlerCheck.ps1',
-               'Public/Test-CIEMAuthenticated.ps1',
+               'Public/Test-CIEMAuthenticationContext.ps1',
                'Public/Get-CIEMScanRun.ps1',
                'Public/Get-CIEMScanResult.ps1'
 

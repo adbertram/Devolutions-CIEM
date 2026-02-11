@@ -13,7 +13,7 @@ function Test-Ec2EbsVolumeSnapshotsExists {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

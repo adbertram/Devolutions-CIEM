@@ -29,7 +29,7 @@ function Save-CIEMScanRun {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [CIEMScanRun]$ScanRun
+        $ScanRun
     )
 
     process {
@@ -39,29 +39,57 @@ function Save-CIEMScanRun {
             return
         }
 
-        # 1. Store ScanRun metadata
+        # 1. Store ScanRun metadata as PSCustomObject (class instances lose data in PSU cache)
         $metadataKey = "CIEM:ScanRuns:$($ScanRun.Id)"
-        Set-PSUCache -Key $metadataKey -Value $ScanRun.ToHashtable() -Persist
+        $serializableRun = [PSCustomObject]@{
+            Id             = $ScanRun.Id
+            Status         = [string]$ScanRun.Status
+            Provider       = [string]$ScanRun.Provider
+            Services       = @($ScanRun.Services)
+            StartTime      = $ScanRun.StartTime
+            EndTime        = $ScanRun.EndTime
+            Duration       = $ScanRun.Duration
+            IncludePassed  = $ScanRun.IncludePassed
+            TotalResults   = $ScanRun.TotalResults
+            FailedResults  = $ScanRun.FailedResults
+            PassedResults  = $ScanRun.PassedResults
+            SkippedResults = $ScanRun.SkippedResults
+            ManualResults  = $ScanRun.ManualResults
+            ErrorMessage   = $ScanRun.ErrorMessage
+        }
+        Set-PSUCache -Key $metadataKey -Value $serializableRun -Persist -Integrated
 
         # 2. Store ScanResults separately (if present)
+        #    Convert CIEMScanResult class instances to PSCustomObjects so PSU cache
+        #    serializes their properties (class instances only get .ToString() → "CIEMScanResult")
         if ($ScanRun.ScanResults -and $ScanRun.ScanResults.Count -gt 0) {
             $resultsKey = "CIEM:ScanResults:$($ScanRun.Id)"
-            Set-PSUCache -Key $resultsKey -Value @($ScanRun.ScanResults) -Persist
+            $serializableResults = @($ScanRun.ScanResults | ForEach-Object {
+                [PSCustomObject]@{
+                    Check          = $_.Check  # Already a PSCustomObject from Get-CIEMCheck
+                    Status         = [string]$_.Status
+                    StatusExtended = $_.StatusExtended
+                    ResourceId     = $_.ResourceId
+                    ResourceName   = $_.ResourceName
+                    Location       = $_.Location
+                }
+            })
+            Set-PSUCache -Key $resultsKey -Value $serializableResults -Persist -Integrated
         }
 
         # 3. Update scan history (prepend, keep last 10)
         $historyKey = 'CIEM:ScanRunHistory'
-        $existingHistory = Get-PSUCache -Key $historyKey -ErrorAction Ignore
+        $existingHistory = Get-PSUCache -Key $historyKey -Integrated -ErrorAction Ignore
         if (-not $existingHistory) { $existingHistory = @() }
 
         # Remove this scan if it already exists in history (for updates)
         $existingHistory = @($existingHistory | Where-Object { $_.Id -ne $ScanRun.Id })
-        # Prepend current scan and keep last 10
-        $existingHistory = @($ScanRun.ToHashtable()) + @($existingHistory) | Select-Object -First 10
-        Set-PSUCache -Key $historyKey -Value $existingHistory -Persist
+        # Prepend current scan (as serializable PSCustomObject) and keep last 10
+        $existingHistory = @($serializableRun) + @($existingHistory) | Select-Object -First 10
+        Set-PSUCache -Key $historyKey -Value $existingHistory -Persist -Integrated
 
         # 4. Update current scan ID
-        Set-PSUCache -Key 'CIEM:CurrentScanRun' -Value $ScanRun.Id -Persist
+        Set-PSUCache -Key 'CIEM:CurrentScanRun' -Value $ScanRun.Id -Persist -Integrated
 
         Write-Verbose "Persisted ScanRun: $($ScanRun.Id) (Status: $($ScanRun.Status))"
     }

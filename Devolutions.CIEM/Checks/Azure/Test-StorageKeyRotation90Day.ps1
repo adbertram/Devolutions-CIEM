@@ -17,7 +17,7 @@ function Test-StorageKeyRotation90Day {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     # Prowler checks the key_expiration_period_in_days policy setting

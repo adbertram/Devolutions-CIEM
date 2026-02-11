@@ -13,7 +13,7 @@ function Test-AutoscalingGroupUsingEc2LaunchTemplate {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

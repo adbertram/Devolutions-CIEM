@@ -15,7 +15,7 @@ function Test-CognitoUserPoolPasswordPolicyMinimumLength14 {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

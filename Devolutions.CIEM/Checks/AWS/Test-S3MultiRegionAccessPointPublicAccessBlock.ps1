@@ -15,7 +15,7 @@ function Test-S3MultiRegionAccessPointPublicAccessBlock {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

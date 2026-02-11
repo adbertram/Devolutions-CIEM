@@ -13,7 +13,7 @@ function Test-CloudwatchLogMetricFilterUnauthorizedApiCalls {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

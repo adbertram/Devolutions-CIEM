@@ -13,7 +13,7 @@ function Test-DefenderEnsureDefenderForAppServicesIsOn {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     $ErrorActionPreference = 'Stop'

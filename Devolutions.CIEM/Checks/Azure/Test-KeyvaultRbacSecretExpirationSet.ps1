@@ -18,7 +18,7 @@ function Test-KeyvaultRbacSecretExpirationSet {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check
+        $Check
     )
 
     Test-KeyVaultItemExpiration -Check $Check -ItemType 'Secrets' -RequireRbac $true
