@@ -93,7 +93,8 @@ function Get-CIEMRequiredPermission {
         $kvPermissions = @($kvPermissions | Select-Object -Unique | Sort-Object)
 
         # Determine required Azure RBAC roles based on permissions
-        $azureRoles = @()
+        # Subscription Reader is always required for subscription discovery (Get-AzSubscription)
+        $azureRoles = @('Reader')
 
         # ARM permissions: Reader role covers all */read actions
         if ($armPermissions.Count -gt 0) {
@@ -149,8 +150,9 @@ function Get-CIEMRequiredPermission {
 
         if ($azureRoles.Count -gt 0) {
             $summaryParts += ""
-            $summaryParts += "Required Azure RBAC Roles:"
-            foreach ($role in $azureRoles) {
+            $summaryParts += "Required Azure RBAC Roles (assign at subscription scope):"
+            $summaryParts += "  - Reader (required for subscription discovery)"
+            foreach ($role in @($azureRoles | Where-Object { $_ -ne 'Reader' })) {
                 $summaryParts += "  - $role"
             }
         }

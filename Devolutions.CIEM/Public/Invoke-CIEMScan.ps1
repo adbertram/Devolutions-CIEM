@@ -106,8 +106,8 @@ function Invoke-CIEMScan {
             throw "Failed to connect to ${Provider}: $($providerResult.Message)"
         }
 
-        $authContext = $script:AuthContext[$Provider]
-        $subscriptionIds = $authContext.SubscriptionIds
+        $authContext = $script:AuthContext[$Provider.ToString()]
+        $subscriptionIds = @(if ($authContext.PSObject.Properties['SubscriptionIds']) { $authContext.SubscriptionIds } else { @() })
 
         Write-Verbose "Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
         Write-Verbose "Tenant: $($authContext.TenantId)"
@@ -200,7 +200,9 @@ function Invoke-CIEMScan {
 
                 try {
                     # Execute check and stream each finding to the pipeline
+                    $checkFindingCount = 0
                     foreach ($finding in (& $functionName -Check $check)) {
+                        $checkFindingCount++
                         $findingCount++
                         if ($statusCounts.ContainsKey($finding.Status)) {
                             $statusCounts[$finding.Status]++
@@ -208,9 +210,21 @@ function Invoke-CIEMScan {
                         [void]$allFindings.Add($finding)
                         $finding
                     }
+
+                    # If a check produced zero findings, emit SKIPPED (e.g., no subscriptions available)
+                    if ($checkFindingCount -eq 0) {
+                        Write-Verbose "Check $($check.Id) produced no findings - marking as SKIPPED"
+                        $statusCounts['SKIPPED']++
+                        $findingCount++
+                        $finding = [CIEMScanResult]::Create($check, 'SKIPPED', 'Check produced no results - required data may be unavailable (e.g., no accessible subscriptions)', 'N/A', 'N/A')
+                        [void]$allFindings.Add($finding)
+                        $finding
+                    }
                 }
                 catch {
-                    if ($script:Config.scan.continueOnError) {
+                    # Default to continue on individual check failures
+                    $continueOnError = if ($null -ne $script:Config -and $null -ne $script:Config.scan) { $script:Config.scan.continueOnError } else { $true }
+                    if ($continueOnError) {
                         Write-Warning "Check $($check.Id) failed: $($_.Exception.Message)"
                         $statusCounts['SKIPPED']++
                         $findingCount++

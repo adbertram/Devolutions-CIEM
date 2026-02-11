@@ -76,10 +76,10 @@ function New-DevolutionsCIEMApp {
                             Id = $_.Check.Id
                             CheckId = $_.Check.Id
                             Title = $_.Check.Title
-                            Severity = ($_.Check.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                            Severity = ([string]$_.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                             Status = $_.Status
-                            Provider = if ($_.Check.CloudProvider) { $_.Check.CloudProvider.ToString() } else { 'Azure' }
-                            Service = $_.Check.Service.ToString()
+                            Provider = if ($_.Check.CloudProvider) { [string]$_.Check.CloudProvider } else { 'Azure' }
+                            Service = [string]$_.Check.Service
                             ResourceName = $_.ResourceName
                         }
                     }
@@ -92,7 +92,7 @@ function New-DevolutionsCIEMApp {
                     $LowCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'LOW' }).Count
 
                     # Show scan timestamp
-                    $timestampStr = if ($scanTimestamp) { $scanTimestamp.ToString('yyyy-MM-dd HH:mm:ss') } else { 'Unknown' }
+                    $timestampStr = if ($scanTimestamp) { ([datetime]$scanTimestamp).ToString('yyyy-MM-dd HH:mm:ss') } else { 'Unknown' }
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '20px' } } -Content {
                         New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                             New-UDChip -Label "Last Scan: $timestampStr" -Icon (New-UDIcon -Icon 'Clock') -Size 'small' -Style @{ backgroundColor = '#e3f2fd' }
@@ -214,7 +214,6 @@ function New-DevolutionsCIEMApp {
                             }
                         } -DefaultValue $enabledProviders[0].Name -FullWidth -OnChange {
                             $Session:SelectedProvider = $EventData
-                            Sync-UDElement -Id 'authStatusPanel'
                             Sync-UDElement -Id 'serviceCheckboxes'
                         }
                     }
@@ -230,132 +229,24 @@ function New-DevolutionsCIEMApp {
                 }
                 $Session:SelectedProvider = if ($enabledProviders.Count -ge 1) { $enabledProviders[0].Name } else { 'Azure' }
 
-                # Authentication Status Card
-                New-UDCard -Title 'Authentication Status' -Style @{ marginBottom = '20px' } -Content {
-                    New-UDDynamic -Id 'authStatusPanel' -LoadingComponent {
-                        New-UDElement -Tag 'div' -Content {
-                            New-UDProgress -Circular
-                            New-UDTypography -Text 'Checking authentication status...' -Variant 'body2' -Style @{ marginTop = '10px'; color = '#666' }
-                        } -Attributes @{ style = @{ display = 'flex'; flexDirection = 'column'; alignItems = 'center'; padding = '30px' } }
-                    } -Content {
-                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                        try {
-                            $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-
-                            # Check current auth status using Test-CIEMAuthenticated
-                            $authStatus = Test-CIEMAuthenticated -Provider $selectedProvider
-
-                            # Auto-connect if not authenticated but credentials are configured
-                            if (-not $authStatus.Authenticated) {
-                                $config = Get-CIEMConfig
-                                $hasCredentials = $false
-
-                                switch ($selectedProvider) {
-                                    'Azure' {
-                                        $authMethod = $config.azure.authentication.method
-                                        switch ($authMethod) {
-                                            'ServicePrincipalSecret' {
-                                                $tenantId = $config.azure.authentication.tenantId
-                                                $clientId = $config.azure.authentication.servicePrincipal.clientId
-                                                $clientSecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
-                                                $hasCredentials = $tenantId -and $clientId -and $clientSecret
-                                            }
-                                            'ServicePrincipalCertificate' {
-                                                $tenantId = $config.azure.authentication.tenantId
-                                                $clientId = $config.azure.authentication.servicePrincipal.clientId
-                                                $thumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
-                                                $hasCredentials = $tenantId -and $clientId -and $thumbprint
-                                            }
-                                            'ManagedIdentity' {
-                                                $hasCredentials = $true
-                                            }
-                                        }
-                                    }
-                                    'AWS' {
-                                        $authMethod = $config.aws.authentication.method
-                                        switch ($authMethod) {
-                                            'CurrentProfile' {
-                                                # CurrentProfile always has creds (uses AWS CLI config)
-                                                $hasCredentials = $true
-                                            }
-                                            'AccessKey' {
-                                                $accessKeyId = Get-CIEMSecret 'CIEM_AWS_AccessKeyId'
-                                                $secretAccessKey = Get-CIEMSecret 'CIEM_AWS_SecretAccessKey'
-                                                $hasCredentials = $accessKeyId -and $secretAccessKey
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if ($hasCredentials) {
-                                    Write-CIEMLog -Message "Auto-connecting on scan page load (provider: $selectedProvider)" -Severity INFO -Component 'PSU-ScanPage'
-                                    try {
-                                        $connectResult = Connect-CIEM -Provider $selectedProvider
-                                        $connectProvider = $connectResult.Providers | Where-Object { $_.Provider -eq $selectedProvider }
-                                        if ($connectProvider.Status -eq 'Connected') {
-                                            $authStatus = Test-CIEMAuthenticated -Provider $selectedProvider
-                                            Write-CIEMLog -Message "Auto-connect successful: $($authStatus.Account)" -Severity INFO -Component 'PSU-ScanPage'
-                                        }
-                                    }
-                                    catch {
-                                        Write-CIEMLog -Message "Auto-connect failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
-                                    }
-                                }
-                            }
-
-                            if ($authStatus.Authenticated) {
-                                $accountInfo = $authStatus.Account
-                                $tenantInfo = $authStatus.TenantId
-
-                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                    New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text "Connected to $selectedProvider" -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#4caf50' }
-                                        New-UDTypography -Text "Account: $accountInfo" -Variant 'body2' -Style @{ color = '#666' }
-                                        if ($tenantInfo) {
-                                            New-UDTypography -Text "Tenant: $tenantInfo" -Variant 'caption' -Style @{ color = '#999' }
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                    New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text 'Not Connected' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#ff9800' }
-                                        New-UDTypography -Text 'Configure authentication on the Configuration page, then refresh.' -Variant 'body2' -Style @{ color = '#666' }
-                                    }
-                                }
-                            }
-                        }
-                        catch {
-                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                New-UDIcon -Icon 'TimesCircle' -Size 'lg' -Style @{ color = '#f44336' }
-                                New-UDTypography -Text "Error checking auth: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#f44336' }
-                            }
-                        }
-                    }
-
-                    New-UDButton -Id 'refreshStatusBtn' -Text 'Refresh Status' -Variant 'text' -Size 'small' -ShowLoading -OnClick {
-                        Sync-UDElement -Id 'authStatusPanel'
-                    } -Style @{ marginTop = '8px' }
-                }
-
                 # Scan Configuration Card
                 New-UDCard -Title 'Scan Configuration' -Content {
-                    New-UDTypography -Text 'Select Services to Scan' -Variant 'subtitle2' -Style @{ marginBottom = '8px'; marginTop = '8px' }
-
+                    # Collapsible services panel - keeps scan config compact
                     New-UDDynamic -Id 'serviceCheckboxes' -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
                         $allChecks = Get-CIEMCheck -CloudProvider $selectedProvider
                         $services = @(Get-CIEMCheckService -CloudProvider $selectedProvider)
 
-                        New-UDGrid -Container -Spacing 2 -Content {
-                            foreach ($svc in $services) {
-                                $svcCount = @($allChecks | Where-Object { $_.Service -eq $svc.Name }).Count
-                                New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
-                                    New-UDCheckbox -Id "scan_$($svc.Name)" -Label "$($svc.Name) ($svcCount checks)" -Checked $true
+                        New-UDExpansionPanelGroup -Children {
+                            New-UDExpansionPanel -Title "Services to Scan ($($services.Count) services)" -Active -Children {
+                                New-UDGrid -Container -Spacing 2 -Content {
+                                    foreach ($svc in $services) {
+                                        $svcCount = @($allChecks | Where-Object { $_.Service -eq $svc.Name }).Count
+                                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
+                                            New-UDCheckbox -Id "scan_$($svc.Name)" -Label "$($svc.Name) ($svcCount checks)" -Checked $true
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -388,11 +279,9 @@ function New-DevolutionsCIEMApp {
                                 if ($connectProvider.Status -ne 'Connected') {
                                     Write-CIEMLog -Message "Connect failed: $($connectProvider.Message)" -Severity ERROR -Component 'PSU-ScanPage'
                                     Show-UDToast -Message "Connection failed: $($connectProvider.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                                    Sync-UDElement -Id 'authStatusPanel'
                                     return
                                 }
                                 Write-CIEMLog -Message "Connected: $($connectProvider.Account)" -Severity INFO -Component 'PSU-ScanPage'
-                                Sync-UDElement -Id 'authStatusPanel'
 
                                 # Get selected services dynamically from checkbox IDs
                                 $providerServices = @(Get-CIEMCheckService -CloudProvider $selectedProvider | Select-Object -ExpandProperty Name)
@@ -469,7 +358,9 @@ function New-DevolutionsCIEMApp {
                                                 New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
                                                 New-UDElement -Tag 'div' -Content {
                                                     New-UDTypography -Text 'Scan Complete!' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#2e7d32' }
-                                                    New-UDTypography -Text "Duration: $durationStr | Total: $($allResults.Count) | Failed: $failedCount | Passed: $passedCount" -Variant 'body2' -Style @{ color = '#666' }
+                                                    $totalEvaluated = $failedCount + $passedCount
+                                                    $skippedCount = $scanRun.SkippedResults
+                                                    New-UDTypography -Text "Duration: $durationStr | Evaluated: $totalEvaluated | Failed: $failedCount | Passed: $passedCount | Skipped: $skippedCount" -Variant 'body2' -Style @{ color = '#666' }
                                                     New-UDTypography -Text 'Expand the scan in the history below to view detailed results.' -Variant 'caption' -Style @{ color = '#666'; marginTop = '4px' }
                                                 }
                                             }
@@ -521,10 +412,10 @@ function New-DevolutionsCIEMApp {
                                     $historyData = $runs | ForEach-Object {
                                         @{
                                             id       = $_.Id
-                                            date     = $_.StartTime.ToString('yyyy-MM-dd HH:mm')
-                                            provider = $_.Provider
+                                            date     = ([datetime]$_.StartTime).ToString('yyyy-MM-dd HH:mm')
+                                            provider = [string]$_.Provider
                                             services = ($_.Services -join ', ')
-                                            status   = $_.Status.ToString()
+                                            status   = [string]$_.Status
                                             failed   = $_.FailedResults
                                             passed   = $_.PassedResults
                                             duration = $_.Duration
@@ -559,9 +450,9 @@ function New-DevolutionsCIEMApp {
                                                 Id        = $_.Id
                                                 Provider  = $_.Provider
                                                 Services  = ($_.Services -join ', ')
-                                                Status    = $_.Status.ToString()
-                                                StartTime = $_.StartTime.ToString('yyyy-MM-dd HH:mm:ss')
-                                                EndTime   = if ($_.EndTime) { $_.EndTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+                                                Status    = [string]$_.Status
+                                                StartTime = ([datetime]$_.StartTime).ToString('yyyy-MM-dd HH:mm:ss')
+                                                EndTime   = if ($_.EndTime) { ([datetime]$_.EndTime).ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
                                                 Duration  = $_.Duration
                                                 Failed    = $_.FailedResults
                                                 Passed    = $_.PassedResults
@@ -576,9 +467,9 @@ function New-DevolutionsCIEMApp {
                                                 id           = $_.Id
                                                 provider     = $_.Provider
                                                 services     = $_.Services
-                                                status       = $_.Status.ToString()
-                                                startTime    = $_.StartTime.ToString('o')
-                                                endTime      = if ($_.EndTime) { $_.EndTime.ToString('o') } else { $null }
+                                                status       = [string]$_.Status
+                                                startTime    = ([datetime]$_.StartTime).ToString('o')
+                                                endTime      = if ($_.EndTime) { ([datetime]$_.EndTime).ToString('o') } else { $null }
                                                 duration     = $_.Duration
                                                 failedCount  = $_.FailedResults
                                                 passedCount  = $_.PassedResults
@@ -586,7 +477,7 @@ function New-DevolutionsCIEMApp {
                                                     [ordered]@{
                                                         checkId        = $_.Check.Id
                                                         status         = $_.Status
-                                                        severity       = $_.Check.Severity.ToString()
+                                                        severity       = [string]$_.Check.Severity
                                                         resourceId     = $_.ResourceId
                                                         resourceName   = $_.ResourceName
                                                         location       = $_.Location
@@ -614,9 +505,9 @@ function New-DevolutionsCIEMApp {
                                                     id = $result.Check.Id + '_' + ($result.ResourceId -replace '[^\w]', '_')
                                                     checkId = $result.Check.Id
                                                     title = $result.Check.Title
-                                                    severity = ($result.Check.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                                    severity = ([string]$result.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                                                     status = $result.Status
-                                                    service = $result.Check.Service.ToString()
+                                                    service = [string]$result.Check.Service
                                                     resourceId = $result.ResourceId
                                                     resourceName = $result.ResourceName
                                                     location = $result.Location
@@ -662,6 +553,7 @@ function New-DevolutionsCIEMApp {
                                                         if (-not $color) { $color = '#666' }
                                                         New-UDChip -Label $EventData.status -Style @{ backgroundColor = $color; color = 'white' }
                                                     }
+                                                    New-UDDataGridColumn -Field 'statusExtended' -HeaderName 'Status Description' -Flex 1
                                                     New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
                                                     New-UDDataGridColumn -Field 'resourceName' -HeaderName 'Resource' -Width 180
                                                 ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
@@ -1050,105 +942,77 @@ function New-DevolutionsCIEMApp {
                                     return
                                 }
 
-                                # Check if running in PSU context (Secret: drive available)
-                                $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-                                Write-CIEMLog -Message "PSU context detected: $inPSUContext" -Severity INFO -Component 'PSU-ConfigPage'
-
-                                # Non-sensitive settings go to PSU cache
-                                $configSettings = @{
-                                    'cloudProvider' = $provider
-                                }
+                                # Collect form values into typed auth context + secret params
                                 Write-CIEMLog -Message "Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
 
-                                # Collect credentials based on provider and auth method
-                                $credentials = @{}
-                                $secretPrefix = ''
+                                # Active provider is a config concern, not an auth context concern
+                                Set-CIEMConfig -Settings @{ 'cloudProvider' = $provider }
+
+                                # Build typed context object and collect secrets separately
+                                $authCtx = $null
+                                $secretParams = @{}
 
                                 if ($provider -eq 'Azure') {
-                                    $configSettings['azure.authentication.method'] = $authMethod
-                                    $configSettings['azure.enabled'] = $true
-                                    $secretPrefix = 'CIEM_Azure_'
-
-                                    # TenantId goes to PSU cache (not secrets)
-                                    $tenantIdElement = Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue
-                                    if ($tenantIdElement -and $tenantIdElement.value) {
-                                        $configSettings['azure.authentication.tenantId'] = $tenantIdElement.value
-                                        Write-CIEMLog -Message "TenantId collected from form (saving to PSU cache)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                    }
+                                    $tenantId = (Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue).value
 
                                     switch ($authMethod) {
                                         'ServicePrincipalSecret' {
-                                            $clientId = (Get-UDElement -Id 'azSpClientId').value
+                                            $authCtx = [CIEMAzureSPAuthenticationContext]::new()
+                                            $authCtx.ClientId = (Get-UDElement -Id 'azSpClientId').value
                                             $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
-                                            if ($clientId) { $configSettings['azure.authentication.servicePrincipal.clientId'] = $clientId }
-                                            if ($clientSecret -and $clientSecret -ne '********') { $credentials['ClientSecret'] = $clientSecret }
+                                            if ($clientSecret -and $clientSecret -ne '********') {
+                                                $secretParams['ClientSecret'] = $clientSecret
+                                            }
                                         }
                                         'ServicePrincipalCertificate' {
-                                            $clientId = (Get-UDElement -Id 'azCertClientId').value
+                                            $authCtx = [CIEMAzureSPCertificateAuthenticationContext]::new()
+                                            $authCtx.ClientId = (Get-UDElement -Id 'azCertClientId').value
                                             $thumbprint = (Get-UDElement -Id 'azCertThumbprint').value
-                                            if ($clientId) { $credentials['ClientId'] = $clientId }
-                                            if ($thumbprint) { $credentials['CertThumbprint'] = $thumbprint }
+                                            if ($thumbprint) {
+                                                $secretParams['CertThumbprint'] = $thumbprint
+                                            }
+                                        }
+                                        'ManagedIdentity' {
+                                            $authCtx = [CIEMAzureManagedIdentityAuthenticationContext]::new()
+                                        }
+                                        'DeviceCode' {
+                                            $authCtx = [CIEMAzureDeviceCodeAuthenticationContext]::new()
+                                        }
+                                        'Interactive' {
+                                            $authCtx = [CIEMAzureInteractiveAuthenticationContext]::new()
                                         }
                                     }
+                                    $authCtx.Enabled  = $true
+                                    $authCtx.TenantId = $tenantId
                                 }
                                 elseif ($provider -eq 'AWS') {
-                                    $configSettings['aws.authentication.method'] = $authMethod
-                                    $configSettings['aws.enabled'] = $true
-                                    $secretPrefix = 'CIEM_AWS_'
-
-                                    # Region goes to PSU cache
-                                    $regionElement = Get-UDElement -Id 'awsRegion' -ErrorAction SilentlyContinue
-                                    if ($regionElement -and $regionElement.value) {
-                                        $configSettings['aws.authentication.region'] = $regionElement.value
-                                    }
+                                    $region = (Get-UDElement -Id 'awsRegion' -ErrorAction SilentlyContinue).value
 
                                     switch ($authMethod) {
                                         'CurrentProfile' {
-                                            $profileElement = Get-UDElement -Id 'awsProfile' -ErrorAction SilentlyContinue
-                                            if ($profileElement -and $profileElement.value) {
-                                                $configSettings['aws.authentication.profile'] = $profileElement.value
-                                            }
+                                            $authCtx = [CIEMAWSCurrentProfileAuthenticationContext]::new()
+                                            $authCtx.Profile = (Get-UDElement -Id 'awsProfile' -ErrorAction SilentlyContinue).value
                                         }
                                         'AccessKey' {
+                                            $authCtx = [CIEMAWSAccessKeyAuthenticationContext]::new()
                                             $accessKeyId = (Get-UDElement -Id 'awsAccessKeyId').value
                                             $secretAccessKey = (Get-UDElement -Id 'awsSecretAccessKey').value
-                                            if ($accessKeyId -and $accessKeyId -ne '********') { $credentials['AccessKeyId'] = $accessKeyId }
-                                            if ($secretAccessKey -and $secretAccessKey -ne '********') { $credentials['SecretAccessKey'] = $secretAccessKey }
-                                        }
-                                    }
-                                }
-                                Write-CIEMLog -Message "Credentials collected: $($credentials.Keys -join ', ')" -Severity INFO -Component 'PSU-ConfigPage'
-
-                                # Save credentials to PSU secrets (if in PSU context)
-                                if ($inPSUContext -and $credentials.Count -gt 0) {
-                                    Write-CIEMLog -Message "Saving credentials to PSU secrets..." -Severity INFO -Component 'PSU-ConfigPage'
-                                    $secretsCreated = @()
-                                    foreach ($key in $credentials.Keys) {
-                                        $secretName = "${secretPrefix}${key}"
-                                        $secretValue = $credentials[$key]
-                                        if (-not [string]::IsNullOrEmpty($secretValue)) {
-                                            Write-CIEMLog -Message "Processing secret: $secretName" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                            # Check if secret exists
-                                            $existingVar = Get-PSUVariable -Name $secretName -ErrorAction SilentlyContinue
-                                            if ($existingVar) {
-                                                Write-CIEMLog -Message "Updating existing secret: $secretName" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                                Set-PSUVariable -Variable $existingVar -Value $secretValue
-                                            } else {
-                                                Write-CIEMLog -Message "Creating new secret: $secretName (Vault: Database)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                                New-PSUVariable -Name $secretName -Value $secretValue -Vault 'Database'
+                                            if ($accessKeyId -and $accessKeyId -ne '********') {
+                                                $secretParams['AccessKeyId'] = $accessKeyId
                                             }
-                                            $secretsCreated += $secretName
+                                            if ($secretAccessKey -and $secretAccessKey -ne '********') {
+                                                $secretParams['SecretAccessKey'] = $secretAccessKey
+                                            }
                                         }
                                     }
-                                    Write-CIEMLog -Message "Secrets saved: $($secretsCreated -join ', ')" -Severity INFO -Component 'PSU-ConfigPage'
-                                } elseif (-not $inPSUContext -and $credentials.Count -gt 0) {
-                                    Write-CIEMLog -Message "Not in PSU context - credentials not saved" -Severity WARNING -Component 'PSU-ConfigPage'
+                                    $authCtx.Enabled = $true
+                                    $authCtx.Region  = $region
                                 }
 
-                                # Save non-sensitive config to PSU cache and update in-memory config
-                                Write-CIEMLog -Message "Calling Set-CIEMConfig..." -Severity INFO -Component 'PSU-ConfigPage'
-                                Set-CIEMConfig -Settings $configSettings
-                                Write-CIEMLog -Message "Set-CIEMConfig completed" -Severity INFO -Component 'PSU-ConfigPage'
+                                # Single save path for config + secrets
+                                Write-CIEMLog -Message "Calling Save-CIEMAuthenticationContext ($($authCtx.GetType().Name))..." -Severity INFO -Component 'PSU-ConfigPage'
+                                Save-CIEMAuthenticationContext -Context $authCtx @secretParams
+                                Write-CIEMLog -Message "Save-CIEMAuthenticationContext completed" -Severity INFO -Component 'PSU-ConfigPage'
 
                                 # Detect if authentication settings changed
                                 $authChanged = $false
@@ -1160,17 +1024,17 @@ function New-DevolutionsCIEMApp {
                                         $authChanged = $true
                                         Write-CIEMLog -Message "Auth changed: provider or method differs" -Severity DEBUG -Component 'PSU-ConfigPage'
                                     }
-                                    # Check for changes in credentials
-                                    elseif ($credentials.Count -gt 0) {
-                                        if ($credentials['TenantId'] -and $credentials['TenantId'] -ne $originalAuth.TenantId) { $authChanged = $true }
-                                        if ($credentials['ClientId'] -and $credentials['ClientId'] -ne $originalAuth.ClientId) { $authChanged = $true }
-                                        if ($credentials['ClientSecret'] -and $credentials['ClientSecret'] -ne '********') { $authChanged = $true }
-                                        if ($credentials['CertThumbprint'] -and $credentials['CertThumbprint'] -ne $originalAuth.CertThumbprint) { $authChanged = $true }
+                                    # Check for changes in credential-related properties
+                                    else {
+                                        if ($authCtx.TenantId -and $authCtx.TenantId -ne $originalAuth.TenantId) { $authChanged = $true }
+                                        if ($authCtx.ClientId -and $authCtx.ClientId -ne $originalAuth.ClientId) { $authChanged = $true }
+                                        if ($secretParams.ContainsKey('ClientSecret')) { $authChanged = $true }  # any new secret = changed
+                                        if ($secretParams.ContainsKey('CertThumbprint') -and $secretParams['CertThumbprint'] -ne $originalAuth.CertThumbprint) { $authChanged = $true }
                                         if ($authChanged) { Write-CIEMLog -Message "Auth changed: credentials differ" -Severity DEBUG -Component 'PSU-ConfigPage' }
                                     }
                                 } else {
-                                    # No original values stored (first save), consider it a change if credentials provided
-                                    $authChanged = $credentials.Count -gt 0
+                                    # No original values stored (first save), always try to connect
+                                    $authChanged = $true
                                     Write-CIEMLog -Message "No original auth values stored, authChanged=$authChanged" -Severity DEBUG -Component 'PSU-ConfigPage'
                                 }
 
@@ -1189,13 +1053,13 @@ function New-DevolutionsCIEMApp {
                                             Set-UDElement -Id 'saveConfigProgress' -Content {
                                                 New-CIEMSuccessContent -Text 'Configuration Saved' -Details "Connected as $($providerResult.Account)"
                                             }
-                                            # Update session state with new values
+                                            # Track saved values to detect future changes
                                             $Session:OriginalAuthValues = @{
-                                                Provider = $provider
-                                                Method = $authMethod
-                                                TenantId = $credentials['TenantId']
-                                                ClientId = $credentials['ClientId']
-                                                CertThumbprint = $credentials['CertThumbprint']
+                                                Provider       = $provider
+                                                Method         = $authMethod
+                                                TenantId       = $authCtx.TenantId
+                                                ClientId       = $authCtx.ClientId
+                                                CertThumbprint = $secretParams['CertThumbprint']
                                             }
                                             Write-CIEMLog -Message "Session:OriginalAuthValues updated" -Severity DEBUG -Component 'PSU-ConfigPage'
                                         } else {
@@ -1275,7 +1139,7 @@ function New-DevolutionsCIEMApp {
                 # Initialize service lists from pre-packed checks so the filter is usable before syncing
                 $Session:ServicesByProvider = @{}
                 foreach ($svc in (Get-CIEMCheckService)) {
-                    $key = $svc.CloudProvider.ToString().ToLower()
+                    $key = ([string]$svc.CloudProvider).ToLower()
                     if (-not $Session:ServicesByProvider.ContainsKey($key)) {
                         $Session:ServicesByProvider[$key] = @()
                     }
@@ -1498,9 +1362,9 @@ function New-DevolutionsCIEMApp {
                                                             id            = $_.Id
                                                             checkId       = $_.Id
                                                             title         = $_.Title
-                                                            cloudProvider = $_.CloudProvider.ToString()
-                                                            service       = $_.Service.ToString()
-                                                            severity      = ($_.Severity.ToString() -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                                            cloudProvider = [string]$_.CloudProvider
+                                                            service       = [string]$_.Service
+                                                            severity      = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                                                             categories    = ($_.Categories -join ', ')
                                                         }
                                                     }
