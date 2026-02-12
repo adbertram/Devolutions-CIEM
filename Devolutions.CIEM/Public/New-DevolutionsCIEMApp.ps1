@@ -1147,270 +1147,73 @@ function New-DevolutionsCIEMApp {
             New-UDPage -Name 'Cloud Checks' -Url '/ciem/checks' -Content {
                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
 
-                # Initialize service lists from pre-packed checks so the filter is usable before syncing
-                $Session:ServicesByProvider = @{}
-                foreach ($svc in (Get-CIEMCheckService)) {
-                    $key = ([string]$svc.Provider).ToLower()
-                    if (-not $Session:ServicesByProvider.ContainsKey($key)) {
-                        $Session:ServicesByProvider[$key] = @()
-                    }
-                    $Session:ServicesByProvider[$key] += $svc.Name
-                }
-
                 New-UDTypography -Text 'Cloud Checks' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
-                New-UDTypography -Text 'Browse all available CIEM security checks and sync new checks from upstream Prowler' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
-
-                # Sync Checks Card
-                New-UDCard -Title 'Sync Checks from Prowler' -Style @{ marginBottom = '20px' } -Content {
-                    New-UDTypography -Text 'Download new security checks from the upstream Prowler GitHub repository. Existing checks are skipped.' -Variant 'body2' -Style @{ color = '#666'; marginBottom = '16px' }
-
-                    # Filter checkboxes row
-                    New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; alignItems = 'center'; gap = '24px'; marginBottom = '16px'; flexWrap = 'wrap' } } -Content {
-                        # Sync button - discovers services from GitHub and syncs for selected providers
-                        New-UDButton -Id 'syncChecksBtn' -Text 'Sync Checks' -Variant 'contained' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -ShowLoading -OnClick {
-                            try {
-                                Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                Write-CIEMLog -Message "Sync Checks button clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
-
-                                # Read provider checkbox states
-                                $selectedProviders = @()
-                                if ((Get-UDElement -Id 'chkAzure').checked) { $selectedProviders += 'azure' }
-                                if ((Get-UDElement -Id 'chkAWS').checked) { $selectedProviders += 'aws' }
-
-                                if ($selectedProviders.Count -eq 0) {
-                                    Show-UDToast -Message 'Select at least one provider.' -Duration 4000 -BackgroundColor '#ff9800'
-                                    return
-                                }
-
-                                # Read service checkbox states if any are loaded
-                                $selectedServices = @()
-                                if ($Session:CurrentServices -and $Session:CurrentServices.Count -gt 0) {
-                                    foreach ($svc in $Session:CurrentServices) {
-                                        try {
-                                            if ((Get-UDElement -Id "chkSvc_$svc").checked) {
-                                                $selectedServices += $svc
-                                            }
-                                        } catch {}
-                                    }
-                                }
-
-                                # Show progress
-                                Set-UDElement -Id 'syncProgressArea' -Content {
-                                    New-CIEMProgressContent -Text "Discovering and syncing checks for: $($selectedProviders -join ', ')..."
-                                }
-                                Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $true }
-
-                                # Single archive download replaces nested provider/service loops
-                                $syncParams = @{ Verbose = $true; ErrorAction = 'Stop' }
-                                $syncParams.Provider = $selectedProviders
-                                if ($selectedServices.Count -gt 0) { $syncParams.Service = $selectedServices }
-
-                                $syncResult = Sync-ProwlerCheck @syncParams 4>&1 | ForEach-Object {
-                                    if ($_ -is [System.Management.Automation.VerboseRecord]) {
-                                        Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-CloudChecksPage'
-                                    }
-                                    else { $_ }
-                                }
-
-                                $successCount = @($syncResult.Success).Count
-                                $skippedCount = @($syncResult.Skipped).Count
-                                $failedCount = @($syncResult.Failed).Count
-
-                                Write-CIEMLog -Message "Sync complete. Downloaded=$successCount, Skipped=$skippedCount, Failed=$failedCount" -Severity INFO -Component 'PSU-CloudChecksPage'
-
-                                if ($successCount -gt 0) {
-                                    $detailParts = @("Downloaded: $successCount")
-                                    if ($skippedCount -gt 0) { $detailParts += "Already existed: $skippedCount" }
-                                    if ($failedCount -gt 0) { $detailParts += "Failed: $failedCount" }
-                                    $detailText = $detailParts -join ' | '
-
-                                    Set-UDElement -Id 'syncProgressArea' -Content {
-                                        New-CIEMSuccessContent -Text 'Sync Complete' -Details $detailText
-                                    }
-
-                                    Show-UDToast -Message "Synced $successCount new check(s) from Prowler." -Duration 5000 -BackgroundColor '#4caf50'
-                                    # Auto-refresh the data table
-                                    Invoke-UDJavaScript "document.getElementById('loadChecksBtn').click();"
-                                }
-                                elseif ($failedCount -gt 0) {
-                                    Set-UDElement -Id 'syncProgressArea' -Content {
-                                        New-CIEMErrorContent -Text 'Sync Failed' -Details "$failedCount check(s) failed to download. Skipped: $skippedCount"
-                                    }
-                                }
-                                elseif ($skippedCount -gt 0) {
-                                    Set-UDElement -Id 'syncProgressArea' -Content {
-                                        New-CIEMSuccessContent -Text 'Already Up to Date' -Details "All $skippedCount upstream check(s) already exist locally."
-                                    }
-                                }
-                                else {
-                                    Set-UDElement -Id 'syncProgressArea' -Content {
-                                        New-CIEMInfoContent -Text 'No Checks Found' -Details "No upstream checks found for the selected providers."
-                                    }
-                                }
-                            }
-                            catch {
-                                Write-CIEMLog -Message "Sync failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
-                                Set-UDElement -Id 'syncProgressArea' -Content {
-                                    New-CIEMErrorContent -Text 'Sync Failed' -Details $_.Exception.Message
-                                }
-                                Show-UDToast -Message "Sync failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                            }
-                            finally {
-                                Set-UDElement -Id 'syncChecksBtn' -Properties @{ disabled = $false }
-                            }
-                        }
-
-                        # Provider checkboxes
-                        New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; alignItems = 'center'; gap = '4px' } } -Content {
-                            New-UDTypography -Text 'Providers:' -Variant 'body2' -Style @{ fontWeight = 'bold'; marginRight = '4px' }
-                            New-UDCheckBox -Id 'chkAzure' -Label 'Azure' -Checked $true -OnChange {
-                                Sync-UDElement -Id 'serviceCheckboxesDynamic'
-                            }
-                            New-UDCheckBox -Id 'chkAWS' -Label 'AWS' -Checked $true -OnChange {
-                                Sync-UDElement -Id 'serviceCheckboxesDynamic'
-                            }
-                        }
-                    }
-
-                    # Services section
-                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px' } } -Content {
-                        # Select All / Deselect All buttons
-                        New-UDElement -Tag 'div' -Attributes @{
-                            style = @{ display = 'flex'; gap = '8px'; marginBottom = '8px' }
-                        } -Content {
-                                New-UDButton -Text 'Select All' -Variant 'outlined' -Size 'small' -OnClick {
-                                    foreach ($svc in $Session:CurrentServices) {
-                                        Set-UDElement -Id "chkSvc_$svc" -Properties @{ checked = $true }
-                                    }
-                                }
-                                New-UDButton -Text 'Deselect All' -Variant 'outlined' -Size 'small' -OnClick {
-                                    foreach ($svc in $Session:CurrentServices) {
-                                        Set-UDElement -Id "chkSvc_$svc" -Properties @{ checked = $false }
-                                    }
-                                }
-                            }
-
-                            # Dynamic region: re-renders when provider checkboxes change
-                            New-UDDynamic -Id 'serviceCheckboxesDynamic' -Content {
-                                # Read selected providers
-                                $selectedProviders = @()
-                                try { if ((Get-UDElement -Id 'chkAzure').checked) { $selectedProviders += 'azure' } } catch {}
-                                try { if ((Get-UDElement -Id 'chkAWS').checked) { $selectedProviders += 'aws' } } catch {}
-
-                                # Build union of services from all selected providers
-                                $allServices = @()
-                                foreach ($p in $selectedProviders) {
-                                    $allServices += $Session:ServicesByProvider[$p]
-                                }
-                                $allServices = $allServices | Sort-Object -Unique
-                                $Session:CurrentServices = $allServices
-
-                                # Show count + collapsible provider groups
-                                New-UDTypography -Text "$($allServices.Count) services" -Variant 'caption' -Style @{ marginBottom = '4px' }
-                                $providerLabels = @{ azure = 'Azure'; aws = 'AWS' }
-                                New-UDExpansionPanelGroup -Children {
-                                    foreach ($p in $selectedProviders | Sort-Object) {
-                                        $providerServices = @($Session:ServicesByProvider[$p] | Sort-Object)
-                                        if ($providerServices.Count -eq 0) { continue }
-
-                                        New-UDExpansionPanel -Title "$($providerLabels[$p]) ($($providerServices.Count) services)" -Children {
-                                            New-UDElement -Tag 'div' -Attributes @{
-                                                style = @{ display = 'grid'; gridTemplateColumns = 'repeat(auto-fill, minmax(180px, 1fr))'; gap = '0px' }
-                                            } -Content {
-                                                foreach ($svc in $providerServices) {
-                                                    New-UDCheckBox -Id "chkSvc_$svc" -Label $svc -Checked $true -Size 'small'
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                    }
-
-                    New-UDElement -Tag 'div' -Id 'syncProgressArea' -Content {
-                        # Initially empty - populated during sync via Set-UDElement
-                    }
-                }
+                New-UDTypography -Text 'Browse all available CIEM security checks' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
                 # Checks Data Table Card
-                New-UDCard -Title 'Available Security Checks' -Content {
-                    New-UDElement -Tag 'div' -Id 'checksTablePanel' -Content {
-                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
-                            New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                                New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
-                                New-UDTypography -Text 'Checks Not Loaded' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                New-UDTypography -Text 'Load installed checks to browse synced security checks.' -Variant 'body1' -Style @{ color = '#666'; marginBottom = '16px' }
-                                New-UDButton -Id 'loadChecksBtn' -Text 'Load Installed Checks' -Variant 'outlined' -Icon (New-UDIcon -Icon 'Search') -ShowLoading -OnClick {
-                                    try {
-                                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                        Write-CIEMLog -Message "Load Installed Checks clicked" -Severity INFO -Component 'PSU-CloudChecksPage'
+                New-UDCard -Content {
+                    New-UDDynamic -Content {
+                        try {
+                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                            Write-CIEMLog -Message "Auto-loading installed checks" -Severity INFO -Component 'PSU-CloudChecksPage'
 
-                                        # Capture warnings from Get-CIEMCheck to diagnose class type issues
-                                        $warnings = @()
-                                        $allChecks = @(Get-CIEMCheck -WarningVariable warnings)
-                                        if ($warnings.Count -gt 0) {
-                                            Write-CIEMLog -Message "Get-CIEMCheck warnings ($($warnings.Count)): $($warnings[0])" -Severity WARNING -Component 'PSU-CloudChecksPage'
-                                        }
-                                        Write-CIEMLog -Message "Get-CIEMCheck returned $($allChecks.Count) checks" -Severity INFO -Component 'PSU-CloudChecksPage'
+                            $warnings = @()
+                            $allChecks = @(Get-CIEMCheck -WarningVariable warnings)
+                            if ($warnings.Count -gt 0) {
+                                Write-CIEMLog -Message "Get-CIEMCheck warnings ($($warnings.Count)): $($warnings[0])" -Severity WARNING -Component 'PSU-CloudChecksPage'
+                            }
+                            Write-CIEMLog -Message "Get-CIEMCheck returned $($allChecks.Count) checks" -Severity INFO -Component 'PSU-CloudChecksPage'
 
-                                        # Merge services from loaded checks with pre-packed catalog
-                                        $Session:ServicesByProvider = @{}
-                                        $catalogServices = Get-CIEMCheckService
-                                        foreach ($entry in @(@{key='azure';display='Azure'}, @{key='aws';display='AWS'})) {
-                                            $fromCatalog = @($catalogServices | Where-Object { $_.Provider -eq $entry.display } | ForEach-Object { $_.Name })
-                                            $fromChecks = @($allChecks | Where-Object { $_.Provider -eq $entry.display } | ForEach-Object { $_.Service })
-                                            $Session:ServicesByProvider[$entry.key] = @(($fromCatalog + $fromChecks) | Sort-Object -Unique)
-                                        }
-                                        Sync-UDElement -Id 'serviceCheckboxesDynamic'
-
-                                        if ($allChecks.Count -gt 0) {
-                                            Set-UDElement -Id 'checksTablePanel' -Content {
-                                                New-UDDataGrid -LoadRows {
-                                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                                    $checks = @(Get-CIEMCheck)
-                                                    $checksData = $checks | ForEach-Object {
-                                                        @{
-                                                            id            = $_.Id
-                                                            checkId       = $_.Id
-                                                            title         = $_.Title
-                                                            provider      = [string]$_.Provider
-                                                            service       = [string]$_.Service
-                                                            severity      = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
-                                                            categories    = ($_.Categories -join ', ')
-                                                        }
-                                                    }
-                                                    @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
-                                                } -Columns @(
-                                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
-                                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
-                                                    New-UDDataGridColumn -Field 'cloudProvider' -HeaderName 'Provider' -Width 100
-                                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
-                                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
-                                                        $sev = $EventData.severity.ToUpper()
-                                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
-                                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
-                                                    }
-                                                    New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
-                                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
-                                            }
-                                        }
-                                        else {
-                                            Set-UDElement -Id 'checksTablePanel' -Content {
-                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
-                                                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                                                        New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
-                                                        New-UDTypography -Text 'No Checks Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                                        New-UDTypography -Text 'Use "Sync Checks" above to download checks from the Prowler repository first.' -Variant 'body1' -Style @{ color = '#666' }
-                                                    }
-                                                }
-                                            }
+                            if ($allChecks.Count -gt 0) {
+                                New-UDDataGrid -LoadRows {
+                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                    $checks = @(Get-CIEMCheck)
+                                    $checksData = $checks | ForEach-Object {
+                                        @{
+                                            id            = $_.Id
+                                            checkId       = $_.Id
+                                            title         = $_.Title
+                                            provider      = [string]$_.Provider
+                                            service       = [string]$_.Service
+                                            severity      = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                            categories    = ($_.Categories -join ', ')
                                         }
                                     }
-                                    catch {
-                                        Write-CIEMLog -Message "Load checks failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
-                                        Show-UDToast -Message "Failed to load checks: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                    @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
+                                } -Columns @(
+                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
+                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
+                                    New-UDDataGridColumn -Field 'cloudProvider' -HeaderName 'Provider' -Width 100
+                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
+                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
+                                        $sev = $EventData.severity.ToUpper()
+                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
+                                    New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
+                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
+                            }
+                            else {
+                                New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
+                                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
+                                        New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
+                                        New-UDTypography -Text 'No Checks Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
+                                        New-UDTypography -Text 'No security checks are currently installed. Use Sync-ProwlerCheck to download checks from the Prowler repository.' -Variant 'body1' -Style @{ color = '#666' }
                                     }
                                 }
+                            }
+                        }
+                        catch {
+                            Write-CIEMLog -Message "Load checks failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
+                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
+                                New-UDTypography -Text "Failed to load checks: $($_.Exception.Message)" -Variant 'body1' -Style @{ color = '#f44336' }
+                            }
+                        }
+                    } -LoadingComponent {
+                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
+                            New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
+                                New-UDProgress -Circular
+                                New-UDTypography -Text 'Loading security checks...' -Variant 'body1' -Style @{ color = '#666'; marginTop = '16px' }
                             }
                         }
                     }

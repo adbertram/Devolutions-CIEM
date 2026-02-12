@@ -222,7 +222,7 @@ function $FunctionName {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        `$Check
     )
 
     `$ErrorActionPreference = 'Stop'
