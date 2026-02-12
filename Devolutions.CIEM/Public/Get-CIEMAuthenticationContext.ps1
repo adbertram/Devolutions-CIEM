@@ -35,56 +35,67 @@ function Get-CIEMAuthenticationContext {
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
-        [ValidateSet('Azure', 'AWS')]
         [string[]]$Provider
     )
 
     $ErrorActionPreference = 'Stop'
 
-    # Ensure config is loaded
-    if (-not $script:Config) {
-        $script:Config = Get-CIEMConfig
+    # Determine which providers to return
+    $allProviders = Get-CIEMProvider
+    $targetProviders = if ($Provider) {
+        @($allProviders | Where-Object { $Provider -contains $_.Name })
+    }
+    else {
+        @($allProviders)
     }
 
-    # Determine which providers to return
-    $targetProviders = if ($Provider) { @($Provider) } else { @('Azure', 'AWS') }
-
     foreach ($p in $targetProviders) {
-        switch ($p) {
-            'Azure' { Get-AzureAuthenticationContextFromConfig }
-            'AWS'   { Get-AWSAuthenticationContextFromConfig }
+        switch ($p.Name) {
+            'Azure' { Get-AzureAuthenticationContextFromProvider -ProviderObj $p }
+            'AWS'   { Get-AWSAuthenticationContextFromProvider -ProviderObj $p }
+            default {
+                # Unknown provider — return base context from provider object
+                $ctx = [CIEMAuthenticationContext]::new()
+                $ctx.Provider = $p.Name
+                $ctx.Enabled = $p.Enabled
+                $ctx.Method = $p.Authentication.Method
+                $ctx
+            }
         }
     }
 }
 
-function Get-AzureAuthenticationContextFromConfig {
+function Get-AzureAuthenticationContextFromProvider {
     <#
     .SYNOPSIS
-        Internal helper — builds a typed Azure auth context from config + secrets.
+        Internal helper — builds a typed Azure auth context from provider object + secrets.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
-    param()
+    param(
+        [Parameter(Mandatory)]
+        [PSCustomObject]$ProviderObj
+    )
 
-    $authConfig = $script:Config.azure.authentication
+    $authConfig = $ProviderObj.Authentication
 
     # Instantiate the correct subclass based on configured method
-    $ctx = switch ($authConfig.method) {
+    $ctx = switch ($authConfig.Method) {
         'ServicePrincipalSecret' {
             $c = [CIEMAzureSPAuthenticationContext]::new()
-            $c.ClientId        = $authConfig.servicePrincipal.clientId
+            $c.ClientId        = $authConfig.ClientId
             $c.HasClientSecret = [bool](Get-CIEMSecret 'CIEM_Azure_ClientSecret')
             $c
         }
         'ServicePrincipalCertificate' {
             $c = [CIEMAzureSPCertificateAuthenticationContext]::new()
-            $c.ClientId          = $authConfig.servicePrincipal.clientId
+            $c.ClientId          = $authConfig.ClientId
             $c.HasCertThumbprint = [bool](Get-CIEMSecret 'CIEM_Azure_CertThumbprint')
             $c
         }
         'ManagedIdentity' {
             $c = [CIEMAzureManagedIdentityAuthenticationContext]::new()
-            $c.ManagedIdentityClientId = $authConfig.managedIdentity.clientId
+            $c.ManagedIdentityClientId = $authConfig.ManagedIdentityClientId
             $c
         }
         'DeviceCode' {
@@ -96,34 +107,37 @@ function Get-AzureAuthenticationContextFromConfig {
         default {
             # Fallback for unknown method — return base Azure context
             $c = [CIEMAzureAuthenticationContext]::new()
-            $c.Method = $authConfig.method
+            $c.Method = $authConfig.Method
             $c
         }
     }
 
     # Common Azure properties
-    $ctx.Enabled  = [bool]$script:Config.azure.enabled
-    $ctx.TenantId = $authConfig.tenantId
+    $ctx.Enabled  = [bool]$ProviderObj.Enabled
+    $ctx.TenantId = $authConfig.TenantId
 
     $ctx
 }
 
-function Get-AWSAuthenticationContextFromConfig {
+function Get-AWSAuthenticationContextFromProvider {
     <#
     .SYNOPSIS
-        Internal helper — builds a typed AWS auth context from config + secrets.
+        Internal helper — builds a typed AWS auth context from provider object + secrets.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
-    param()
+    param(
+        [Parameter(Mandatory)]
+        [PSCustomObject]$ProviderObj
+    )
 
-    $authConfig = $script:Config.aws.authentication
+    $authConfig = $ProviderObj.Authentication
 
     # Instantiate the correct subclass based on configured method
-    $ctx = switch ($authConfig.method) {
+    $ctx = switch ($authConfig.Method) {
         'CurrentProfile' {
             $c = [CIEMAWSCurrentProfileAuthenticationContext]::new()
-            $c.Profile = $authConfig.profile
+            $c.Profile = $authConfig.Profile
             $c
         }
         'AccessKey' {
@@ -135,14 +149,14 @@ function Get-AWSAuthenticationContextFromConfig {
         default {
             # Fallback for unknown method — return base AWS context
             $c = [CIEMAWSAuthenticationContext]::new()
-            $c.Method = $authConfig.method
+            $c.Method = $authConfig.Method
             $c
         }
     }
 
     # Common AWS properties
-    $ctx.Enabled = [bool]$script:Config.aws.enabled
-    $ctx.Region  = $authConfig.region
+    $ctx.Enabled = [bool]$ProviderObj.Enabled
+    $ctx.Region  = $authConfig.Region
 
     $ctx
 }

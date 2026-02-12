@@ -43,7 +43,7 @@ function Connect-CIEM {
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
-        [CIEMCloudProvider[]]$Provider,
+        [string[]]$Provider,
 
         [Parameter()]
         [switch]$Force
@@ -61,8 +61,10 @@ function Connect-CIEM {
 
     # Determine which providers to connect
     if (-not $Provider) {
-        $Provider = @($script:Config.cloudProvider)
-        Write-CIEMLog -Message "No provider specified, using config default: $($script:Config.cloudProvider)" -Severity DEBUG -Component 'Connect-CIEM'
+        $defaultProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
+        if (-not $defaultProvider) { $defaultProvider = 'Azure' }
+        $Provider = @($defaultProvider)
+        Write-CIEMLog -Message "No provider specified, using default: $defaultProvider" -Severity DEBUG -Component 'Connect-CIEM'
     }
 
     Write-CIEMLog -Message "Providers to connect: $($Provider -join ', ')" -Severity INFO -Component 'Connect-CIEM'
@@ -182,14 +184,13 @@ function Connect-CIEMAzure {
     Write-CIEMLog -Message "Clearing existing Az context..." -Severity DEBUG -Component 'Connect-CIEMAzure'
     Clear-AzContext -Force -ErrorAction SilentlyContinue | Out-Null
 
-    # Note: $script:Config should be updated by Save-CIEMConfig before calling Connect-CIEM
-    if (-not $script:Config) {
-        Write-CIEMLog -Message "Config not loaded, calling Get-CIEMConfig..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-        $script:Config = Get-CIEMConfig
+    $azureProvider = Get-CIEMProvider -Name 'Azure'
+    if (-not $azureProvider) {
+        throw "Azure provider not configured. Use New-CIEMProvider -Name 'Azure' to create it."
     }
 
-    $authConfig = $script:Config.azure.authentication
-    $authMethod = $authConfig.method
+    $authConfig = $azureProvider.Authentication
+    $authMethod = $authConfig.Method
 
     Write-CIEMLog -Message "Authentication method from config: $authMethod" -Severity INFO -Component 'Connect-CIEMAzure'
     Write-Verbose "Azure authentication method: $authMethod"
@@ -205,10 +206,10 @@ function Connect-CIEMAzure {
         'ServicePrincipalSecret' {
             Write-CIEMLog -Message "Processing ServicePrincipalSecret authentication via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
 
-            # TenantId and ClientId come from PSU cache
-            $tenantId = $authConfig.tenantId
-            $clientId = $authConfig.servicePrincipal.clientId
-            Write-CIEMLog -Message "PSU cache - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            # TenantId and ClientId come from provider object
+            $tenantId = $authConfig.TenantId
+            $clientId = $authConfig.ClientId
+            Write-CIEMLog -Message "Provider config - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             # ClientSecret comes from PSU secret
             Write-CIEMLog -Message "Checking PSU secret for ClientSecret..." -Severity DEBUG -Component 'Connect-CIEMAzure'
@@ -280,10 +281,10 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         'ServicePrincipalCertificate' {
             Write-CIEMLog -Message "Processing ServicePrincipalCertificate authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
 
-            # TenantId and ClientId come from PSU cache
-            $tenantId = $authConfig.tenantId
-            $clientId = $authConfig.servicePrincipal.clientId
-            Write-CIEMLog -Message "PSU cache - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            # TenantId and ClientId come from provider object
+            $tenantId = $authConfig.TenantId
+            $clientId = $authConfig.ClientId
+            Write-CIEMLog -Message "Provider config - TenantId: $(if($tenantId){'found'}else{'null'}), ClientId: $(if($clientId){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             # Thumbprint comes from PSU secret
             Write-CIEMLog -Message "Checking PSU secret for CertThumbprint..." -Severity DEBUG -Component 'Connect-CIEMAzure'
@@ -327,8 +328,8 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
 
             # Check for user-assigned managed identity config (optional)
             $miClientId = $null
-            if ($authConfig.PSObject.Properties['managedIdentity'] -and $authConfig.managedIdentity.clientId) {
-                $miClientId = $authConfig.managedIdentity.clientId
+            if ($authConfig.PSObject.Properties['ManagedIdentityClientId'] -and $authConfig.ManagedIdentityClientId) {
+                $miClientId = $authConfig.ManagedIdentityClientId
                 Write-CIEMLog -Message "Using user-assigned managed identity: $miClientId" -Severity INFO -Component 'Connect-CIEMAzure'
             }
             else {
@@ -397,9 +398,9 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         'DeviceCode' {
             Write-CIEMLog -Message "Processing DeviceCode authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
             $connectParams = @{ UseDeviceAuthentication = $true }
-            if ($authConfig.tenantId) {
-                $connectParams.TenantId = $authConfig.tenantId
-                Write-CIEMLog -Message "Using tenant: $($authConfig.tenantId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            if ($authConfig.TenantId) {
+                $connectParams.TenantId = $authConfig.TenantId
+                Write-CIEMLog -Message "Using tenant: $($authConfig.TenantId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
             }
             Write-CIEMLog -Message "Calling Connect-AzAccount with device code..." -Severity INFO -Component 'Connect-CIEMAzure'
             Write-Verbose "Connecting with device code authentication"
@@ -415,9 +416,9 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         'Interactive' {
             Write-CIEMLog -Message "Processing Interactive authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
             $connectParams = @{}
-            if ($authConfig.tenantId) {
-                $connectParams.TenantId = $authConfig.tenantId
-                Write-CIEMLog -Message "Using tenant: $($authConfig.tenantId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            if ($authConfig.TenantId) {
+                $connectParams.TenantId = $authConfig.TenantId
+                Write-CIEMLog -Message "Using tenant: $($authConfig.TenantId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
             }
             Write-CIEMLog -Message "Calling Connect-AzAccount interactively..." -Severity INFO -Component 'Connect-CIEMAzure'
             Write-Verbose "Connecting with interactive authentication"
@@ -476,7 +477,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
     Write-CIEMLog -Message "Found $($subscriptions.Count) subscriptions" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
     # Filter to configured subscriptions if specified
-    $subscriptionFilter = @($script:Config.azure.subscriptionFilter)
+    $subscriptionFilter = @($azureProvider.ResourceFilter)
     if ($subscriptionFilter -and $subscriptionFilter.Count -gt 0) {
         Write-CIEMLog -Message "Applying subscription filter: $($subscriptionFilter -join ', ')" -Severity DEBUG -Component 'Connect-CIEMAzure'
         $subscriptions = $subscriptions | Where-Object { $subscriptionFilter -contains $_.Id }

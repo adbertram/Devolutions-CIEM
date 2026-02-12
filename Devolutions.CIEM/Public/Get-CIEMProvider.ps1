@@ -4,21 +4,25 @@ function Get-CIEMProvider {
         Lists available CIEM cloud providers.
 
     .DESCRIPTION
-        Returns information about cloud providers based on known providers
-        (azure, aws) with configuration from the CIEM config. Each provider
-        object includes computed properties and all config properties.
+        Returns provider objects from the CIEM:Providers PSU cache. Each provider
+        includes Name, Enabled, IsDefault, Authentication, Endpoints, ResourceFilter,
+        and a computed CheckCount property.
+
+        On first run (empty cache), returns built-in Azure and AWS defaults.
+
+    .PARAMETER Name
+        Optional. Return a single provider by name (case-insensitive).
 
     .OUTPUTS
-        [PSCustomObject[]] Array of provider objects with:
-        - Name: Provider name (title case)
-        - Enabled: Whether the provider is enabled in config (defaults to false)
-        - IsDefault: Whether this is the default provider
-        - CheckCount: Number of checks for this provider
-        - Plus all properties from the provider's config section
+        [PSCustomObject[]] Array of provider objects.
 
     .EXAMPLE
         Get-CIEMProvider
-        # Returns all known providers
+        # Returns all providers
+
+    .EXAMPLE
+        Get-CIEMProvider -Name Azure
+        # Returns the Azure provider
 
     .EXAMPLE
         Get-CIEMProvider | Where-Object Enabled
@@ -26,37 +30,71 @@ function Get-CIEMProvider {
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject[]])]
-    param()
+    param(
+        [Parameter()]
+        [string]$Name
+    )
 
     $ErrorActionPreference = 'Stop'
 
-    # Get provider names from config - any top-level key with an 'enabled' property is a provider
-    $nonProviderKeys = @('cloudProvider', 'scan', 'output', 'pam', 'checksPath', 'prowler')
-    $providerNames = $script:Config.PSObject.Properties.Name | Where-Object { $_ -notin $nonProviderKeys }
-
-    foreach ($providerName in $providerNames) {
-        $providerConfig = $script:Config.$providerName
-        $providerDisplayMap = @{ 'azure' = 'Azure'; 'aws' = 'AWS' }
-        $displayName = if ($providerDisplayMap.ContainsKey($providerName)) { $providerDisplayMap[$providerName] } else { (Get-Culture).TextInfo.ToTitleCase($providerName) }
-
-        $checksPath = Join-Path -Path $script:ModuleRoot -ChildPath "Checks/$displayName"
-        $checkCount = if (Test-Path $checksPath) { @(Get-ChildItem -Path "$checksPath/*.ps1").Count } else { 0 }
-
-        # Start with computed properties (Enabled defaults to false if not in config)
-        $obj = [ordered]@{
-            Name       = $displayName
-            Enabled    = $false
-            IsDefault  = ($script:Config.cloudProvider -eq $displayName)
-            CheckCount = $checkCount
-        }
-
-        # Add all properties from config (this will override Enabled if it exists)
-        if ($providerConfig) {
-            foreach ($prop in $providerConfig.PSObject.Properties) {
-                $obj[$prop.Name] = $prop.Value
-            }
-        }
-
-        [PSCustomObject]$obj
+    # Try to read from PSU cache
+    $providers = $null
+    try {
+        $providers = @(Get-PSUCache -Key 'CIEM:Providers' -ErrorAction SilentlyContinue)
     }
+    catch {
+        # Not in PSU context or cache unavailable
+    }
+
+    # Fall back to built-in defaults if cache is empty
+    if (-not $providers -or $providers.Count -eq 0 -or ($providers.Count -eq 1 -and $null -eq $providers[0])) {
+        $providers = @(
+            [PSCustomObject]@{
+                Name           = 'Azure'
+                Enabled        = $true
+                IsDefault      = $true
+                Authentication = [PSCustomObject]@{
+                    Provider = 'Azure'
+                    Enabled  = $true
+                    Method   = 'ServicePrincipalSecret'
+                    TenantId = $null
+                    ClientId = $null
+                    ManagedIdentityClientId = $null
+                }
+                Endpoints      = [PSCustomObject]@{
+                    graphApi = 'https://graph.microsoft.com/v1.0'
+                    armApi   = 'https://management.azure.com'
+                }
+                ResourceFilter = @()
+            }
+            [PSCustomObject]@{
+                Name           = 'AWS'
+                Enabled        = $false
+                IsDefault      = $false
+                Authentication = [PSCustomObject]@{
+                    Provider = 'AWS'
+                    Enabled  = $false
+                    Method   = 'CurrentProfile'
+                    Profile  = $null
+                    Region   = $null
+                }
+                Endpoints      = [PSCustomObject]@{}
+                ResourceFilter = @()
+            }
+        )
+    }
+
+    # Add computed CheckCount to each provider
+    foreach ($p in $providers) {
+        $checksPath = Join-Path -Path $script:ModuleRoot -ChildPath "Checks/$($p.Name)"
+        $checkCount = if (Test-Path $checksPath) { @(Get-ChildItem -Path "$checksPath/*.ps1").Count } else { 0 }
+        $p | Add-Member -NotePropertyName 'CheckCount' -NotePropertyValue $checkCount -Force
+    }
+
+    # Filter by name if specified
+    if ($Name) {
+        $providers = @($providers | Where-Object { $_.Name -eq $Name })
+    }
+
+    $providers
 }

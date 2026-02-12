@@ -23,7 +23,7 @@ function New-CIEMScanRun {
     [OutputType([CIEMScanRun])]
     param(
         [Parameter(Mandatory)]
-        [CIEMCloudProvider]$Provider,
+        [string]$Provider,
 
         [Parameter(Mandatory)]
         [string[]]$Services,

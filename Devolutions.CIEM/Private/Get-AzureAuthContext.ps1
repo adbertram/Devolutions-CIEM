@@ -39,26 +39,30 @@ function Get-AzureAuthContext {
 
     $ErrorActionPreference = 'Stop'
 
-    # Check authentication method from config
-    $authMethod = $script:Config.azure.authentication.method
+    # Check authentication method from provider
+    $azureProvider = Get-CIEMProvider -Name 'Azure'
+    $authMethod = $azureProvider.Authentication.Method
 
     # Get existing Azure context
     $context = Get-AzContext -ErrorAction SilentlyContinue
 
     switch ($authMethod) {
         'ServicePrincipalSecret' {
-            $authConfig = $script:Config.azure.authentication
-            $spConfig = $authConfig.servicePrincipal
-            if (-not $spConfig.clientId -or -not $spConfig.clientSecret -or -not $authConfig.tenantId) {
-                throw "Authentication method is 'ServicePrincipalSecret' but tenantId, clientId, or clientSecret not set in CIEM config"
+            $authConfig = $azureProvider.Authentication
+            if (-not $authConfig.ClientId -or -not $authConfig.TenantId) {
+                throw "Authentication method is 'ServicePrincipalSecret' but tenantId or clientId not set in provider config"
+            }
+            $clientSecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
+            if (-not $clientSecret) {
+                throw "Authentication method is 'ServicePrincipalSecret' but clientSecret not found in PSU secrets"
             }
 
-            $secureSecret = ConvertTo-SecureString $spConfig.clientSecret -AsPlainText -Force
-            $credential = New-Object System.Management.Automation.PSCredential($spConfig.clientId, $secureSecret)
+            $secureSecret = ConvertTo-SecureString $clientSecret -AsPlainText -Force
+            $credential = New-Object System.Management.Automation.PSCredential($authConfig.ClientId, $secureSecret)
 
-            Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $authConfig.tenantId -ErrorAction Stop | Out-Null
+            Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $authConfig.TenantId -ErrorAction Stop | Out-Null
             $context = Get-AzContext -ErrorAction Stop
-            Write-Verbose "Authenticated as service principal: $($spConfig.clientId)"
+            Write-Verbose "Authenticated as service principal: $($authConfig.ClientId)"
         }
         'ManagedIdentity' {
             Connect-AzAccount -Identity -ErrorAction Stop | Out-Null
@@ -93,7 +97,7 @@ function Get-AzureAuthContext {
     $subscriptions = Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction SilentlyContinue
 
     # Filter to configured subscriptions if specified
-    $subscriptionFilter = $script:Config.azure.subscriptionFilter
+    $subscriptionFilter = $azureProvider.ResourceFilter
     if ($subscriptionFilter -and $subscriptionFilter.Count -gt 0) {
         $subscriptions = $subscriptions | Where-Object { $subscriptionFilter -contains $_.Id }
     }
@@ -114,7 +118,7 @@ function Get-AzureAuthContext {
 
     # Test API access
     Write-Verbose "Testing Graph API access..."
-    $graphApiBase = $script:Config.azure.endpoints.graphApi
+    $graphApiBase = $azureProvider.Endpoints.graphApi
     try {
         $graphTest = Invoke-AzureApi -Uri "$graphApiBase/organization" -Api Graph -ResourceName 'Organization' -ErrorAction Stop
         if (-not $graphTest) {
@@ -126,7 +130,7 @@ function Get-AzureAuthContext {
     }
 
     Write-Verbose "Testing ARM API access..."
-    $armApiBase = $script:Config.azure.endpoints.armApi
+    $armApiBase = $azureProvider.Endpoints.armApi
     try {
         $armTest = Invoke-AzureApi -Uri "$armApiBase/subscriptions?api-version=2020-01-01" -Api ARM -ResourceName 'Subscriptions' -ErrorAction Stop
         if (-not $armTest) {

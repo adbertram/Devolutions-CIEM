@@ -31,7 +31,7 @@ function Test-CIEMAuthenticationContext {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter()]
-        [CIEMCloudProvider[]]$Provider
+        [string[]]$Provider
     )
 
     $providers = Get-CIEMProvider
@@ -63,8 +63,9 @@ function Test-CIEMAuthenticationContext {
                         }
                         elseif ($tokens.GraphToken -or $tokens.ARMToken) {
                             # Have partial tokens - verify both APIs actually work
-                            $graphApiBase = $script:Config.azure.endpoints.graphApi
-                            $armApiBase = $script:Config.azure.endpoints.armApi
+                            $azureProvider = Get-CIEMProvider -Name 'Azure'
+                            $graphApiBase = $azureProvider.Endpoints.graphApi
+                            $armApiBase = $azureProvider.Endpoints.armApi
 
                             $graphOk = $false
                             try {

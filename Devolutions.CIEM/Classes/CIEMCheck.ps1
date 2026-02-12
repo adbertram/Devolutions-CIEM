@@ -1,8 +1,3 @@
-enum CIEMCloudProvider {
-    Azure
-    AWS
-}
-
 enum CIEMCheckSeverity {
     low
     medium
@@ -46,7 +41,7 @@ class CIEMCheckPermissions {
 
 class CIEMCheck {
     [string]$Id
-    [CIEMCloudProvider]$CloudProvider
+    [string]$Provider
     [string]$Service
     [string]$Title
     [string]$Description
@@ -62,11 +57,11 @@ class CIEMCheck {
     CIEMCheck() {}
 }
 
-# --- Authentication context classes (depend on CIEMCloudProvider enum above) ---
+# --- Authentication context classes ---
 
 # Base class for all authentication contexts
 class CIEMAuthenticationContext {
-    [CIEMCloudProvider]$Provider
+    [string]$Provider
     [bool]$Enabled
     [string]$Method
 }
@@ -77,7 +72,7 @@ class CIEMAzureAuthenticationContext : CIEMAuthenticationContext {
     [string]$TenantId
 
     CIEMAzureAuthenticationContext() {
-        $this.Provider = [CIEMCloudProvider]::Azure
+        $this.Provider = 'Azure'
     }
 }
 
@@ -125,7 +120,7 @@ class CIEMAWSAuthenticationContext : CIEMAuthenticationContext {
     [string]$Region
 
     CIEMAWSAuthenticationContext() {
-        $this.Provider = [CIEMCloudProvider]::AWS
+        $this.Provider = 'AWS'
     }
 }
 

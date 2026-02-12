@@ -78,7 +78,7 @@ function New-DevolutionsCIEMApp {
                             Title = $_.Check.Title
                             Severity = ([string]$_.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                             Status = $_.Status
-                            Provider = if ($_.Check.CloudProvider) { [string]$_.Check.CloudProvider } else { 'Azure' }
+                            Provider = if ($_.Check.Provider) { [string]$_.Check.Provider } else { 'Azure' }
                             Service = [string]$_.Check.Service
                             ResourceName = $_.ResourceName
                         }
@@ -235,8 +235,8 @@ function New-DevolutionsCIEMApp {
                     New-UDDynamic -Id 'serviceCheckboxes' -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-                        $allChecks = Get-CIEMCheck -CloudProvider $selectedProvider
-                        $services = @(Get-CIEMCheckService -CloudProvider $selectedProvider)
+                        $allChecks = Get-CIEMCheck -Provider $selectedProvider
+                        $services = @(Get-CIEMCheckService -Provider $selectedProvider)
 
                         New-UDExpansionPanelGroup -Children {
                             New-UDExpansionPanel -Title "Services to Scan ($($services.Count) services)" -Active -Children {
@@ -284,7 +284,7 @@ function New-DevolutionsCIEMApp {
                                 Write-CIEMLog -Message "Connected: $($connectProvider.Account)" -Severity INFO -Component 'PSU-ScanPage'
 
                                 # Get selected services dynamically from checkbox IDs
-                                $providerServices = @(Get-CIEMCheckService -CloudProvider $selectedProvider | Select-Object -ExpandProperty Name)
+                                $providerServices = @(Get-CIEMCheckService -Provider $selectedProvider | Select-Object -ExpandProperty Name)
                                 $selectedServices = @()
                                 foreach ($svcName in $providerServices) {
                                     $cbId = "scan_$svcName"
@@ -1150,7 +1150,7 @@ function New-DevolutionsCIEMApp {
                 # Initialize service lists from pre-packed checks so the filter is usable before syncing
                 $Session:ServicesByProvider = @{}
                 foreach ($svc in (Get-CIEMCheckService)) {
-                    $key = ([string]$svc.CloudProvider).ToLower()
+                    $key = ([string]$svc.Provider).ToLower()
                     if (-not $Session:ServicesByProvider.ContainsKey($key)) {
                         $Session:ServicesByProvider[$key] = @()
                     }
@@ -1357,8 +1357,8 @@ function New-DevolutionsCIEMApp {
                                         $Session:ServicesByProvider = @{}
                                         $catalogServices = Get-CIEMCheckService
                                         foreach ($entry in @(@{key='azure';display='Azure'}, @{key='aws';display='AWS'})) {
-                                            $fromCatalog = @($catalogServices | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Name })
-                                            $fromChecks = @($allChecks | Where-Object { $_.CloudProvider -eq $entry.display } | ForEach-Object { $_.Service })
+                                            $fromCatalog = @($catalogServices | Where-Object { $_.Provider -eq $entry.display } | ForEach-Object { $_.Name })
+                                            $fromChecks = @($allChecks | Where-Object { $_.Provider -eq $entry.display } | ForEach-Object { $_.Service })
                                             $Session:ServicesByProvider[$entry.key] = @(($fromCatalog + $fromChecks) | Sort-Object -Unique)
                                         }
                                         Sync-UDElement -Id 'serviceCheckboxesDynamic'
@@ -1373,7 +1373,7 @@ function New-DevolutionsCIEMApp {
                                                             id            = $_.Id
                                                             checkId       = $_.Id
                                                             title         = $_.Title
-                                                            cloudProvider = [string]$_.CloudProvider
+                                                            provider      = [string]$_.Provider
                                                             service       = [string]$_.Service
                                                             severity      = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
                                                             categories    = ($_.Categories -join ', ')

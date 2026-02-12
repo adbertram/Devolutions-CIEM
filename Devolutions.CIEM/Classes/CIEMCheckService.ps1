@@ -1,12 +1,12 @@
 class CIEMCheckService {
     [string]$Name
-    [CIEMCloudProvider]$CloudProvider
+    [string]$Provider
 
     CIEMCheckService() {}
 
-    CIEMCheckService([string]$Name, [CIEMCloudProvider]$CloudProvider) {
+    CIEMCheckService([string]$Name, [string]$Provider) {
         $this.Name = $Name
-        $this.CloudProvider = $CloudProvider
+        $this.Provider = $Provider
     }
 
     [string] ToString() {

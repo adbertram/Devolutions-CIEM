@@ -88,3 +88,9 @@ foreach ($file in $Public) {
 # Initialize configuration from PSU cache (or defaults if not in PSU)
 # This must happen after functions are dot-sourced so Get-CIEMConfig is available
 $script:Config = Get-CIEMConfig
+
+# Migrate old config-based provider storage to CIEM:Providers cache (one-time)
+Import-CIEMProviderMigration
+
+# Register dynamic tab-completion for -Provider and -Name parameters
+Register-CIEMArgumentCompleters

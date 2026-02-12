@@ -18,8 +18,13 @@ function Connect-CIEMAWS {
 
     Write-CIEMLog -Message "Connect-CIEMAWS started" -Severity INFO -Component 'Connect-CIEMAWS'
 
-    $authConfig = $script:Config.aws.authentication
-    $authMethod = $authConfig.method
+    $awsProvider = Get-CIEMProvider -Name 'AWS'
+    if (-not $awsProvider) {
+        throw "AWS provider not configured. Use New-CIEMProvider -Name 'AWS' to create it."
+    }
+
+    $authConfig = $awsProvider.Authentication
+    $authMethod = $authConfig.Method
 
     Write-CIEMLog -Message "Authentication method from config: $authMethod" -Severity INFO -Component 'Connect-CIEMAWS'
 
@@ -30,13 +35,13 @@ function Connect-CIEMAWS {
             # Build aws sts get-caller-identity command
             $awsArgs = @('sts', 'get-caller-identity', '--output', 'json')
 
-            if ($authConfig.profile) {
-                $awsArgs += @('--profile', $authConfig.profile)
-                Write-CIEMLog -Message "Using profile: $($authConfig.profile)" -Severity DEBUG -Component 'Connect-CIEMAWS'
+            if ($authConfig.Profile) {
+                $awsArgs += @('--profile', $authConfig.Profile)
+                Write-CIEMLog -Message "Using profile: $($authConfig.Profile)" -Severity DEBUG -Component 'Connect-CIEMAWS'
             }
-            if ($authConfig.region) {
-                $awsArgs += @('--region', $authConfig.region)
-                Write-CIEMLog -Message "Using region: $($authConfig.region)" -Severity DEBUG -Component 'Connect-CIEMAWS'
+            if ($authConfig.Region) {
+                $awsArgs += @('--region', $authConfig.Region)
+                Write-CIEMLog -Message "Using region: $($authConfig.Region)" -Severity DEBUG -Component 'Connect-CIEMAWS'
             }
 
             Write-CIEMLog -Message "Calling aws sts get-caller-identity..." -Severity INFO -Component 'Connect-CIEMAWS'
@@ -48,7 +53,7 @@ function Connect-CIEMAWS {
             $identity = $result | ConvertFrom-Json
             Write-CIEMLog -Message "Authenticated as: $($identity.Arn)" -Severity INFO -Component 'Connect-CIEMAWS'
 
-            $region = if ($authConfig.region) { $authConfig.region } else {
+            $region = if ($authConfig.Region) { $authConfig.Region } else {
                 # Try to get default region from AWS CLI
                 $defaultRegion = & aws configure get region 2>$null
                 if ($defaultRegion) { $defaultRegion.Trim() } else { 'us-east-1' }
@@ -59,7 +64,7 @@ function Connect-CIEMAWS {
                 Arn         = $identity.Arn
                 UserId      = $identity.UserId
                 Region      = $region
-                Profile     = $authConfig.profile
+                Profile     = $authConfig.Profile
                 AccountType = if ($identity.Arn -match ':assumed-role/') { 'AssumedRole' }
                               elseif ($identity.Arn -match ':user/') { 'IAMUser' }
                               elseif ($identity.Arn -match ':root') { 'Root' }
@@ -88,7 +93,7 @@ Credential sources:
             $env:AWS_ACCESS_KEY_ID = $accessKeyId
             $env:AWS_SECRET_ACCESS_KEY = $secretAccessKey
 
-            $region = if ($authConfig.region) { $authConfig.region } else { 'us-east-1' }
+            $region = if ($authConfig.Region) { $authConfig.Region } else { 'us-east-1' }
             $env:AWS_DEFAULT_REGION = $region
 
             Write-CIEMLog -Message "Calling aws sts get-caller-identity with access key..." -Severity INFO -Component 'Connect-CIEMAWS'

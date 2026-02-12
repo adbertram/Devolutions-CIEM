@@ -36,7 +36,7 @@ function Initialize-StorageService {
         # Nothing to process - function ends naturally
     }
     else {
-        $armApiBase = $script:Config.azure.endpoints.armApi
+        $armApiBase = (Get-CIEMProvider -Name 'Azure').Endpoints.armApi
 
         foreach ($subscriptionId in $SubscriptionIds) {
             Write-CIEMLog -Severity DEBUG -Message "Loading Storage resources for subscription: $subscriptionId"

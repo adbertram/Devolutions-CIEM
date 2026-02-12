@@ -10,24 +10,24 @@ function Get-CIEMCheckService {
 
         Returns PSCustomObjects to ensure compatibility with PSU runspaces.
 
-    .PARAMETER CloudProvider
+    .PARAMETER Provider
         Filter services by cloud provider (Azure, AWS).
 
     .OUTPUTS
-        [PSCustomObject[]] Array of objects with Name and CloudProvider properties.
+        [PSCustomObject[]] Array of objects with Name and Provider properties.
 
     .EXAMPLE
         Get-CIEMCheckService
         # Returns all services across all providers
 
     .EXAMPLE
-        Get-CIEMCheckService -CloudProvider Azure
+        Get-CIEMCheckService -Provider Azure
         # Returns Azure services only
     #>
     [CmdletBinding()]
     param(
         [Parameter()]
-        [CIEMCloudProvider]$CloudProvider
+        [string]$Provider
     )
 
     $ErrorActionPreference = 'Stop'
@@ -51,7 +51,7 @@ function Get-CIEMCheckService {
             continue
         }
 
-        if ($PSBoundParameters.ContainsKey('CloudProvider') -and $providerDisplay -ne $CloudProvider.ToString()) {
+        if ($PSBoundParameters.ContainsKey('Provider') -and $providerDisplay -ne $Provider) {
             continue
         }
 
@@ -62,11 +62,11 @@ function Get-CIEMCheckService {
                 $seen[$key] = $true
                 $null = $services.Add([PSCustomObject]@{
                     Name          = $jsonObj.service
-                    CloudProvider = $providerDisplay
+                    Provider = $providerDisplay
                 })
             }
         }
     }
 
-    @($services | Sort-Object -Property CloudProvider, Name)
+    @($services | Sort-Object -Property Provider, Name)
 }

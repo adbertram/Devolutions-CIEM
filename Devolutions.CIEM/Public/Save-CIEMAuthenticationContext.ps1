@@ -7,11 +7,11 @@ function Save-CIEMAuthenticationContext {
         Single entry point for persisting provider authentication settings.
         Accepts simple string/bool parameters — typed context objects are created
         internally (avoids PS class scoping issues in PSU endpoint runspaces).
-        Non-secret values are saved to PSU cache via Set-CIEMConfig. Secret
-        values are saved to PSU secrets via Set-CIEMSecret.
+        Non-secret values are saved to the provider object via Update-CIEMProvider.
+        Secret values are saved to PSU secrets via Set-CIEMSecret.
 
     .PARAMETER Provider
-        Cloud provider: 'Azure' or 'AWS'.
+        Cloud provider name (e.g. 'Azure', 'AWS').
 
     .PARAMETER Method
         Authentication method (e.g. 'ServicePrincipalSecret', 'AccessKey').
@@ -58,7 +58,6 @@ function Save-CIEMAuthenticationContext {
     param(
         # Simple params replace typed -Context object (avoids PS class scoping in PSU runspaces)
         [Parameter(Mandatory)]
-        [ValidateSet('Azure', 'AWS')]
         [string]$Provider,
 
         [Parameter(Mandatory)]
@@ -81,7 +80,7 @@ function Save-CIEMAuthenticationContext {
         [Parameter()]
         [string]$Profile,
 
-        # Secrets — stored in PSU secret store, never in config
+        # Secrets — stored in PSU secret store, never in provider object
         [Parameter()]
         [string]$ClientSecret,
 
@@ -99,57 +98,54 @@ function Save-CIEMAuthenticationContext {
 
     Write-CIEMLog -Message "Save-CIEMAuthenticationContext called for $Provider ($Method)" -Severity INFO -Component 'Save-CIEMAuthContext'
 
-    # Build non-secret config settings (saved to PSU cache via Set-CIEMConfig)
-    $configSettings = @{}
+    # Build the new Authentication PSCustomObject based on provider type
+    $newAuth = $null
 
     switch ($Provider) {
         'Azure' {
-            $configSettings['azure.enabled'] = $true
-            $configSettings['azure.authentication.method'] = $Method
-
-            # TenantId is common to all Azure auth methods
-            if ($TenantId) {
-                $configSettings['azure.authentication.tenantId'] = $TenantId
+            $newAuth = [PSCustomObject]@{
+                Provider = 'Azure'
+                Enabled  = $true
+                Method   = $Method
+                TenantId = $TenantId
+                ClientId = $null
+                ManagedIdentityClientId = $null
             }
 
             switch ($Method) {
                 'ServicePrincipalSecret' {
-                    $configSettings['azure.authentication.servicePrincipal.clientId'] = $ClientId
-                    # Secret -> PSU secret store
+                    $newAuth.ClientId = $ClientId
                     if ($ClientSecret) {
                         Set-CIEMSecret 'CIEM_Azure_ClientSecret' $ClientSecret
                         Write-CIEMLog -Message "Saved CIEM_Azure_ClientSecret to PSU secrets" -Severity DEBUG -Component 'Save-CIEMAuthContext'
                     }
                 }
                 'ServicePrincipalCertificate' {
-                    $configSettings['azure.authentication.servicePrincipal.clientId'] = $ClientId
-                    # Secret -> PSU secret store
+                    $newAuth.ClientId = $ClientId
                     if ($CertThumbprint) {
                         Set-CIEMSecret 'CIEM_Azure_CertThumbprint' $CertThumbprint
                         Write-CIEMLog -Message "Saved CIEM_Azure_CertThumbprint to PSU secrets" -Severity DEBUG -Component 'Save-CIEMAuthContext'
                     }
                 }
                 'ManagedIdentity' {
-                    $configSettings['azure.authentication.managedIdentity.clientId'] = $ManagedIdentityClientId
+                    $newAuth.ManagedIdentityClientId = $ManagedIdentityClientId
                 }
-                # DeviceCode / Interactive need no additional credentials
             }
         }
         'AWS' {
-            $configSettings['aws.enabled'] = $true
-            $configSettings['aws.authentication.method'] = $Method
-
-            # Region is common to all AWS auth methods
-            if ($Region) {
-                $configSettings['aws.authentication.region'] = $Region
+            $newAuth = [PSCustomObject]@{
+                Provider = 'AWS'
+                Enabled  = $true
+                Method   = $Method
+                Profile  = $null
+                Region   = $Region
             }
 
             switch ($Method) {
                 'CurrentProfile' {
-                    $configSettings['aws.authentication.profile'] = $Profile
+                    $newAuth.Profile = $Profile
                 }
                 'AccessKey' {
-                    # Secrets -> PSU secret store
                     if ($AccessKeyId) {
                         Set-CIEMSecret 'CIEM_AWS_AccessKeyId' $AccessKeyId
                         Write-CIEMLog -Message "Saved CIEM_AWS_AccessKeyId to PSU secrets" -Severity DEBUG -Component 'Save-CIEMAuthContext'
@@ -161,13 +157,28 @@ function Save-CIEMAuthenticationContext {
                 }
             }
         }
+        default {
+            $newAuth = [PSCustomObject]@{
+                Provider = $Provider
+                Enabled  = $true
+                Method   = $Method
+            }
+        }
     }
 
-    # Persist non-secret config to PSU cache
-    if ($configSettings.Count -gt 0) {
-        Set-CIEMConfig -Settings $configSettings
-        Write-CIEMLog -Message "Config settings saved: $($configSettings.Keys -join ', ')" -Severity INFO -Component 'Save-CIEMAuthContext'
+    # Ensure provider exists, then update authentication and enable it
+    $existing = Get-CIEMProvider -Name $Provider
+    if (-not $existing) {
+        Write-CIEMLog -Message "Provider '$Provider' not found, creating it" -Severity INFO -Component 'Save-CIEMAuthContext'
+        New-CIEMProvider -Name $Provider | Out-Null
     }
+
+    # Build a dummy auth context object for Update-CIEMProvider
+    # We pass the PSCustomObject directly since Update-CIEMProvider handles both
+    Update-CIEMProvider -Name $Provider -Enabled $true -Authentication $newAuth | Out-Null
+
+    # Refresh module-level config
+    $script:Config = Get-CIEMConfig
 
     Write-CIEMLog -Message "Save-CIEMAuthenticationContext completed for $Provider" -Severity INFO -Component 'Save-CIEMAuthContext'
 }

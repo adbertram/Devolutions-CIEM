@@ -55,7 +55,7 @@ function Invoke-CIEMScan {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter()]
-        [CIEMCloudProvider]$Provider = 'Azure',
+        [string]$Provider = 'Azure',
 
         [Parameter()]
         [string[]]$CheckId,
@@ -76,7 +76,7 @@ function Invoke-CIEMScan {
     # Note: ThrottleLimit reserved for future parallel implementation
 
     # Determine services for ScanRun (use Service param if provided, otherwise all for this provider)
-    $providerServices = @(Get-CIEMCheckService -CloudProvider $Provider | Select-Object -ExpandProperty Name)
+    $providerServices = @(Get-CIEMCheckService -Provider $Provider | Select-Object -ExpandProperty Name)
     $scanServices = if ($Service) { $Service } else { $providerServices }
 
     # Validate that requested services exist for this provider
@@ -138,7 +138,7 @@ function Invoke-CIEMScan {
         }
 
         # Step 3: Load check metadata via Get-CIEMCheck (handles filtering)
-        $getCheckParams = @{ CloudProvider = $Provider.ToString() }
+        $getCheckParams = @{ Provider = $Provider }
         if ($CheckId -and $CheckId.Count -eq 1) { $getCheckParams.CheckId = $CheckId[0] }
         if ($Service -and $Service.Count -eq 1) { $getCheckParams.Service = $Service[0] }
         $checks = Get-CIEMCheck @getCheckParams

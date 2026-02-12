@@ -27,7 +27,7 @@ function Initialize-EntraService {
 
     $ErrorActionPreference = 'Stop'
 
-    $graphApiBase = $script:Config.azure.endpoints.graphApi
+    $graphApiBase = (Get-CIEMProvider -Name 'Azure').Endpoints.graphApi
 
     # Initialize service hashtable
     $script:EntraService = @{

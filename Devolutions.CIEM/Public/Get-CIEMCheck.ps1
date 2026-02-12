@@ -10,7 +10,7 @@ function Get-CIEMCheck {
         Returns PSCustomObjects (not class instances) to ensure compatibility
         with PSU runspaces where PowerShell class types may not be available.
 
-    .PARAMETER CloudProvider
+    .PARAMETER Provider
         Filter checks by cloud provider (Azure, AWS).
 
     .PARAMETER Service
@@ -24,7 +24,7 @@ function Get-CIEMCheck {
 
     .OUTPUTS
         [PSCustomObject[]] Array of check objects with properties:
-        Id, CloudProvider, Service, Title, Description, Risk, Severity,
+        Id, Provider, Service, Title, Description, Risk, Severity,
         Categories, Remediation, RelatedUrl, CheckScript, DependsOn, Permissions.
 
     .EXAMPLE
@@ -32,7 +32,7 @@ function Get-CIEMCheck {
         # Returns all checks across all providers
 
     .EXAMPLE
-        Get-CIEMCheck -CloudProvider AWS
+        Get-CIEMCheck -Provider AWS
         # Returns all AWS checks
 
     .EXAMPLE
@@ -46,7 +46,7 @@ function Get-CIEMCheck {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [CIEMCloudProvider]$CloudProvider,
+        [string]$Provider,
 
         [Parameter()]
         [string]$Service,
@@ -85,7 +85,7 @@ function Get-CIEMCheck {
 
             $null = $checks.Add([PSCustomObject]@{
                 Id            = $jsonObj.id
-                CloudProvider = $providerDisplay
+                Provider      = $providerDisplay
                 Service       = $jsonObj.service
                 Title         = $jsonObj.title
                 Description   = $jsonObj.description
@@ -121,8 +121,8 @@ function Get-CIEMCheck {
     # Apply filters
     $result = @($checks)
 
-    if ($PSBoundParameters.ContainsKey('CloudProvider')) {
-        $result = $result | Where-Object { $_.CloudProvider -eq $CloudProvider.ToString() }
+    if ($PSBoundParameters.ContainsKey('Provider')) {
+        $result = $result | Where-Object { $_.Provider -eq $Provider }
     }
 
     if ($Service) {
