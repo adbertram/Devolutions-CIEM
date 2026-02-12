@@ -5,8 +5,8 @@ function Sync-ProwlerCheck {
 
     .DESCRIPTION
         Uses the GitHub Trees API (single cached request) to discover all checks in the
-        Prowler repository, then downloads only new checks via raw.githubusercontent.com.
-        Each new check requires 2 HTTP requests (metadata.json + .py file).
+        Prowler repository, then uses git sparse checkout to bulk-download only new checks.
+        This replaces per-file HTTP downloads with ~2 git round-trips regardless of check count.
 
         For incremental syncs with 0 new checks, this costs a single cached API call.
 
@@ -127,42 +127,43 @@ function Sync-ProwlerCheck {
         }
     }
 
-    # 5. Download and convert new checks
-    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "ciem-sync-$([guid]::NewGuid().ToString('N').Substring(0,8))"
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    # 5. Sparse checkout new checks (bulk download via git)
+    $sparsePaths = @()
+    foreach ($p in $providersToSync) {
+        if ($Service) {
+            foreach ($s in $Service) {
+                $sparsePaths += "prowler/providers/$p/services/$s"
+            }
+        } else {
+            $sparsePaths += "prowler/providers/$p"
+        }
+    }
 
+    $cloneDir = $null
     try {
+        $cloneDir = Save-GitHubRepoSparseCheckout -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
+            -Paths $sparsePaths -ErrorAction Stop
+
+        Write-Verbose "Sparse checkout complete. Processing $($newEntryList.Count) new checks..."
+
         foreach ($entry in $newEntryList) {
             $null = $entry.Path -match '^prowler/providers/([^/]+)/services/([^/]+)/([^/]+)/'
             $providerName = $Matches[1]
             $serviceName = $Matches[2]
             $checkName = $Matches[3]
 
-            Write-Verbose "  Syncing: $checkName ($providerName/$serviceName)"
+            Write-Verbose "  Converting: $checkName ($providerName/$serviceName)"
 
-            # Create temp directory structure that Convert-ProwlerCheck expects
-            $tempCheckDir = Join-Path $tempDir "providers/$providerName/services/$serviceName/$checkName"
+            $checkDir = Join-Path $cloneDir "prowler/providers/$providerName/services/$serviceName/$checkName"
 
             try {
-                # Download metadata.json (required)
-                $metadataRepoPath = "prowler/providers/$providerName/services/$serviceName/$checkName/$checkName.metadata.json"
-                $metadataDest = Join-Path $tempCheckDir "$checkName.metadata.json"
+                if (-not (Test-Path $checkDir)) {
+                    Write-Verbose "    Check directory not found in sparse checkout: $checkDir"
+                    $failed.Add($checkName)
+                    continue
+                }
 
-                Save-GitHubRepoFile -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
-                    -Path $metadataRepoPath -Destination $metadataDest -ErrorAction Stop
-
-                # Download .py file (optional, used for permission inference)
-                $pyRepoPath = "prowler/providers/$providerName/services/$serviceName/$checkName/$checkName.py"
-                $pyDest = Join-Path $tempCheckDir "$checkName.py"
-
-                Save-GitHubRepoFile -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
-                    -Path $pyRepoPath -Destination $pyDest
-
-                # Convert to PowerShell
-                Write-Verbose "    Converting: $checkName"
-                Convert-ProwlerCheck -CheckPath $tempCheckDir | Out-Null
-                Write-Verbose "    Done"
-
+                Convert-ProwlerCheck -CheckPath $checkDir | Out-Null
                 $success.Add($checkName)
             }
             catch {
@@ -171,7 +172,7 @@ function Sync-ProwlerCheck {
             }
         }
 
-        Write-Verbose "Summary: Downloaded=$($success.Count), Skipped=$($skipped.Count), Failed=$($failed.Count)"
+        Write-Verbose "Summary: Converted=$($success.Count), Skipped=$($skipped.Count), Failed=$($failed.Count)"
 
         [PSCustomObject]@{
             Success = @($success)
@@ -180,10 +181,9 @@ function Sync-ProwlerCheck {
         }
     }
     finally {
-        # Clean up temp directory
-        if (Test-Path $tempDir) {
-            Write-Verbose "Cleaning up temp directory..."
-            Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        if ($cloneDir -and (Test-Path $cloneDir)) {
+            Write-Verbose "Cleaning up sparse checkout..."
+            Remove-Item $cloneDir -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 }

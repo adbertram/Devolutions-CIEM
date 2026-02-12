@@ -37,6 +37,7 @@ function Register-CIEMArgumentCompleters {
 
     # Register for -Provider parameter on relevant functions
     $providerParamFunctions = @(
+        'Compare-ProwlerCheck'
         'Connect-CIEM'
         'Invoke-CIEMScan'
         'Get-CIEMCheck'
