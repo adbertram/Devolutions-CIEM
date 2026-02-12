@@ -22,7 +22,49 @@ function Test-EntraGlobalAdminCountWithinLimit {
 
     $ErrorActionPreference = 'Stop'
 
-    # TODO: Implement check logic based on Prowler check: entra_global_admin_in_less_than_five_users
+    if (-not $script:EntraService.DirectoryRoles) {
+        [CIEMScanResult]::Create(
+            $Check,
+            'SKIPPED',
+            'Unable to retrieve directory roles - missing permissions',
+            'N/A',
+            'Global Administrator'
+        )
+        return
+    }
 
-    [CIEMScanResult]::Create($Check, 'MANUAL', 'This check requires manual implementation. See Prowler check entra_global_admin_in_less_than_five_users for reference.', 'N/A', 'Global Administrator Role')
+    $globalAdminRole = $script:EntraService.DirectoryRoles | Where-Object { $_.displayName -eq 'Global Administrator' } | Select-Object -First 1
+
+    if (-not $globalAdminRole) {
+        [CIEMScanResult]::Create(
+            $Check,
+            'SKIPPED',
+            'Global Administrator role not found in directory roles',
+            'N/A',
+            'Global Administrator'
+        )
+        return
+    }
+
+    $memberLookup = $script:EntraService.DirectoryRoleMembers[$globalAdminRole.id]
+    $numGlobalAdmins = if ($null -eq $memberLookup) { 0 } else { @($memberLookup).Count }
+
+    if ($numGlobalAdmins -lt 5) {
+        [CIEMScanResult]::Create(
+            $Check,
+            'PASS',
+            "There are $numGlobalAdmins global administrators.",
+            $globalAdminRole.id,
+            'Global Administrator'
+        )
+    }
+    else {
+        [CIEMScanResult]::Create(
+            $Check,
+            'FAIL',
+            "There are $numGlobalAdmins global administrators. It should be less than five.",
+            $globalAdminRole.id,
+            'Global Administrator'
+        )
+    }
 }
