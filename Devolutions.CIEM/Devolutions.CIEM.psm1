@@ -19,16 +19,10 @@ foreach ($moduleName in @('Az.Accounts', 'Az.Resources', 'Az.Websites', 'Microso
 # (see bottom of file where Get-CIEMConfig is called)
 $script:Config = $null
 
-# Initialize script-scoped service variables (populated during scan)
-$script:EntraService = @{}
-$script:IAMService = @{}
-$script:KeyVaultService = @{}
-
 # Initialize authentication context (populated by Connect-CIEM)
 $script:AuthContext = @{}
 $script:ARMAccessToken = $null
 $script:GraphAccessToken = $null
-$script:StorageService = @{}
 
 # Initialize PSU environment detection (populated on first access)
 $script:PSUEnvironment = $null

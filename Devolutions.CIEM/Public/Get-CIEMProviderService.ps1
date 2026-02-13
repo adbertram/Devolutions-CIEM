@@ -1,4 +1,4 @@
-function Get-CIEMCheckService {
+function Get-CIEMProviderService {
     <#
     .SYNOPSIS
         Lists unique services from the pre-packed CIEM checks catalog.
@@ -17,11 +17,11 @@ function Get-CIEMCheckService {
         [PSCustomObject[]] Array of objects with Name and Provider properties.
 
     .EXAMPLE
-        Get-CIEMCheckService
+        Get-CIEMProviderService
         # Returns all services across all providers
 
     .EXAMPLE
-        Get-CIEMCheckService -Provider Azure
+        Get-CIEMProviderService -Provider Azure
         # Returns Azure services only
     #>
     [CmdletBinding()]

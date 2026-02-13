@@ -1,10 +1,10 @@
-class CIEMCheckService {
+class CIEMProviderService {
     [string]$Name
     [string]$Provider
 
-    CIEMCheckService() {}
+    CIEMProviderService() {}
 
-    CIEMCheckService([string]$Name, [string]$Provider) {
+    CIEMProviderService([string]$Name, [string]$Provider) {
         $this.Name = $Name
         $this.Provider = $Provider
     }
