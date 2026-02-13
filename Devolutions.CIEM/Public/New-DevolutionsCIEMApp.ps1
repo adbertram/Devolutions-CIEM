@@ -236,7 +236,7 @@ function New-DevolutionsCIEMApp {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
                         $allChecks = Get-CIEMCheck -Provider $selectedProvider
-                        $services = @(Get-CIEMCheckService -Provider $selectedProvider)
+                        $services = @(Get-CIEMProviderService -Provider $selectedProvider)
 
                         New-UDExpansionPanelGroup -Children {
                             New-UDExpansionPanel -Title "Services to Scan ($($services.Count) services)" -Active -Children {
@@ -284,7 +284,7 @@ function New-DevolutionsCIEMApp {
                                 Write-CIEMLog -Message "Connected: $($connectProvider.Account)" -Severity INFO -Component 'PSU-ScanPage'
 
                                 # Get selected services dynamically from checkbox IDs
-                                $providerServices = @(Get-CIEMCheckService -Provider $selectedProvider | Select-Object -ExpandProperty Name)
+                                $providerServices = @(Get-CIEMProviderService -Provider $selectedProvider | Select-Object -ExpandProperty Name)
                                 $selectedServices = @()
                                 foreach ($svcName in $providerServices) {
                                     $cbId = "scan_$svcName"

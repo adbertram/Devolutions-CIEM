@@ -292,7 +292,7 @@
       },
       "relatedUrl": "",
       "checkScript": "Test-EntraUserWithVmAccessHasMfa.ps1",
-      "dependsOn": [],
+      "dependsOn": ["IAM"],
       "permissions": {
         "graph": [
           "UserAuthenticationMethod.Read.All",

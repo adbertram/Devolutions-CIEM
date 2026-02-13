@@ -76,7 +76,7 @@ function Invoke-CIEMScan {
     # Note: ThrottleLimit reserved for future parallel implementation
 
     # Determine services for ScanRun (use Service param if provided, otherwise all for this provider)
-    $providerServices = @(Get-CIEMCheckService -Provider $Provider | Select-Object -ExpandProperty Name)
+    $providerServices = @(Get-CIEMProviderService -Provider $Provider | Select-Object -ExpandProperty Name)
     $scanServices = if ($Service) { $Service } else { $providerServices }
 
     # Validate that requested services exist for this provider
@@ -116,20 +116,24 @@ function Invoke-CIEMScan {
         }
         Write-Verbose "Subscriptions: $($subscriptionIds.Count)"
 
-        # Step 2: Initialize services (provider-specific)
+        # Step 2: Initialize services via CIEMServiceCache orchestrator
+        $servicesToInit = if ($Service) { $Service } else { $providerServices }
+        $providerObj = Get-CIEMProvider -Name $Provider
+        $serviceCacheLookup = @{}
+
         switch ($Provider) {
             'Azure' {
-                Write-Verbose "Initializing Entra service..."
-                Initialize-EntraService
-
-                Write-Verbose "Initializing IAM service..."
-                Initialize-IAMService -SubscriptionIds $subscriptionIds
-
-                Write-Verbose "Initializing KeyVault service..."
-                Initialize-KeyVaultService -SubscriptionIds $subscriptionIds
-
-                Write-Verbose "Initializing Storage service..."
-                Initialize-StorageService -SubscriptionIds $subscriptionIds
+                Initialize-CIEMServiceCache -Provider $providerObj -Name $servicesToInit -SubscriptionIds $subscriptionIds | ForEach-Object {
+                    $serviceCacheLookup[$_.ServiceName] = $_
+                    if ($_.Success) {
+                        Write-Verbose "Initialized $($_.ServiceName) in $([math]::Round($_.Duration.TotalSeconds, 2))s"
+                    } else {
+                        Write-Warning "Failed to initialize $($_.ServiceName): $($_.Errors -join '; ')"
+                    }
+                    foreach ($w in $_.Warnings) {
+                        Write-Warning "[$($_.ServiceName)] $w"
+                    }
+                }
             }
             'AWS' {
                 # AWS checks are stubs (MANUAL status) - no service initialization needed
@@ -202,9 +206,18 @@ function Invoke-CIEMScan {
                 Write-Verbose "Running check: $($check.Id)"
 
                 try {
+                    # Build service cache array for this check
+                    $checkService = $check.Service.ToString()
+                    $neededServices = @($checkService)
+                    if ($check.DependsOn) { $neededServices += $check.DependsOn }
+
+                    $checkCaches = @($neededServices | ForEach-Object {
+                        if ($serviceCacheLookup.ContainsKey($_)) { $serviceCacheLookup[$_] }
+                    } | Where-Object { $_ })
+
                     # Execute check and stream each finding to the pipeline
                     $checkFindingCount = 0
-                    foreach ($finding in (& $functionName -Check $check)) {
+                    foreach ($finding in (& $functionName -Check $check -ServiceCache $checkCaches)) {
                         $checkFindingCount++
                         $findingCount++
                         # Cast enum to string for hashtable key lookup (.ContainsKey doesn't coerce enums)
