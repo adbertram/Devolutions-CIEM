@@ -175,3 +175,4 @@ _temp/
 
 # Local PSU instance
 local-psu/
+.playwright-cli/

@@ -215,6 +215,20 @@ function Invoke-CIEMScan {
                         if ($serviceCacheLookup.ContainsKey($_)) { $serviceCacheLookup[$_] }
                     } | Where-Object { $_ })
 
+                    # Auto-skip if any required service failed to initialize
+                    # (empty CacheData + StrictMode causes dot-notation property access to throw)
+                    $failedServices = @($checkCaches | Where-Object { -not $_.Success })
+                    if ($failedServices) {
+                        $failedNames = $failedServices.ServiceName -join ', '
+                        Write-Verbose "Skipping check $($check.Id) - service(s) failed to initialize: $failedNames"
+                        $statusCounts['SKIPPED']++
+                        $findingCount++
+                        $finding = [CIEMScanResult]::Create($check, 'SKIPPED', "Required service(s) unavailable: $failedNames", 'N/A', 'N/A')
+                        [void]$allFindings.Add($finding)
+                        $finding
+                        continue
+                    }
+
                     # Execute check and stream each finding to the pipeline
                     $checkFindingCount = 0
                     foreach ($finding in (& $functionName -Check $check -ServiceCache $checkCaches)) {

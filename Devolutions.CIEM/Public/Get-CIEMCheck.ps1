@@ -25,7 +25,7 @@ function Get-CIEMCheck {
     .OUTPUTS
         [PSCustomObject[]] Array of check objects with properties:
         Id, Provider, Service, Title, Description, Risk, Severity,
-        Categories, Remediation, RelatedUrl, CheckScript, DependsOn, Permissions.
+        Remediation, RelatedUrl, CheckScript, DependsOn, Permissions.
 
     .EXAMPLE
         Get-CIEMCheck
@@ -91,7 +91,6 @@ function Get-CIEMCheck {
                 Description   = $jsonObj.description
                 Risk          = $jsonObj.risk
                 Severity      = [string]$jsonObj.severity
-                Categories    = @($jsonObj.categories | Where-Object { $_ })
                 Remediation   = [PSCustomObject]@{
                     Text = $jsonObj.remediation.text
                     Url  = $jsonObj.remediation.url

@@ -214,7 +214,8 @@ function New-DevolutionsCIEMApp {
                             }
                         } -DefaultValue $enabledProviders[0].Name -FullWidth -OnChange {
                             $Session:SelectedProvider = $EventData
-                            Sync-UDElement -Id 'serviceCheckboxes'
+                            $Session:SelectedCheckIds = $null
+                            Sync-UDElement -Id 'checkSelectionGrid'
                         }
                     }
                 }
@@ -231,25 +232,64 @@ function New-DevolutionsCIEMApp {
 
                 # Scan Configuration Card
                 New-UDCard -Title 'Scan Configuration' -Content {
-                    # Collapsible services panel - keeps scan config compact
-                    New-UDDynamic -Id 'serviceCheckboxes' -Content {
+                    # Check selection data grid with checkboxes
+                    New-UDDynamic -Id 'checkSelectionGrid' -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-                        $allChecks = Get-CIEMCheck -Provider $selectedProvider
-                        $services = @(Get-CIEMProviderService -Provider $selectedProvider)
+                        $allChecks = @(Get-CIEMCheck -Provider $selectedProvider)
 
-                        New-UDExpansionPanelGroup -Children {
-                            New-UDExpansionPanel -Title "Services to Scan ($($services.Count) services)" -Active -Children {
-                                New-UDGrid -Container -Spacing 2 -Content {
-                                    foreach ($svc in $services) {
-                                        $svcCount = @($allChecks | Where-Object { $_.Service -eq $svc.Name }).Count
-                                        New-UDGrid -Item -ExtraSmallSize 6 -SmallSize 3 -Content {
-                                            New-UDCheckbox -Id "scan_$($svc.Name)" -Label "$($svc.Name) ($svcCount checks)" -Checked $true
-                                        }
+                        # Initialize selected checks (default: all) on first load
+                        if ($null -eq $Session:SelectedCheckIds) {
+                            $Session:SelectedCheckIds = @($allChecks | Select-Object -ExpandProperty Id)
+                        }
+
+                        # Selection summary
+                        New-UDDynamic -Id 'selectionSummary' -Content {
+                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                            $provider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
+                            $checks = @(Get-CIEMCheck -Provider $provider)
+                            $selectedCount = @($Session:SelectedCheckIds).Count
+                            $totalCount = $checks.Count
+                            New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '8px' } } -Content {
+                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                    New-UDTypography -Text "$selectedCount / $totalCount checks selected" -Variant 'body2' -Style @{ color = '#666' }
+                                    $selectedChecks = @($checks | Where-Object { $Session:SelectedCheckIds -contains $_.Id })
+                                    $sevGroups = $selectedChecks | Group-Object Severity
+                                    foreach ($sg in ($sevGroups | Sort-Object { switch ($_.Name) { 'CRITICAL' { 0 } 'HIGH' { 1 } 'MEDIUM' { 2 } 'LOW' { 3 } default { 4 } } })) {
+                                        $sevColor = Get-SeverityColor -Severity $sg.Name
+                                        New-UDChip -Label "$($sg.Name[0]):$($sg.Count)" -Size 'small' -Style @{ backgroundColor = $sevColor; color = 'white'; height = '22px'; fontSize = '11px' }
                                     }
                                 }
                             }
                         }
+
+                        New-UDDataGrid -Id 'checkSelector' -LoadRows {
+                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                            $provider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
+                            $checks = @(Get-CIEMCheck -Provider $provider)
+                            $checksData = $checks | ForEach-Object {
+                                @{
+                                    id       = $_.Id
+                                    checkId  = $_.Id
+                                    title    = $_.Title
+                                    service  = [string]$_.Service
+                                    severity = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                }
+                            }
+                            @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
+                        } -Columns @(
+                            New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
+                                $sev = $EventData.severity.ToUpper()
+                                $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                            }
+                            New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 130
+                            New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
+                            New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
+                        ) -CheckboxSelection -DisableRowSelectionOnClick -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -OnSelectionChange {
+                            $Session:SelectedCheckIds = @($EventData)
+                            Sync-UDElement -Id 'selectionSummary'
+                        } -Density 'compact'
                     }
 
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px'; marginBottom = '16px' } } -Content {
@@ -283,23 +323,20 @@ function New-DevolutionsCIEMApp {
                                 }
                                 Write-CIEMLog -Message "Connected: $($connectProvider.Account)" -Severity INFO -Component 'PSU-ScanPage'
 
-                                # Get selected services dynamically from checkbox IDs
-                                $providerServices = @(Get-CIEMProviderService -Provider $selectedProvider | Select-Object -ExpandProperty Name)
-                                $selectedServices = @()
-                                foreach ($svcName in $providerServices) {
-                                    $cbId = "scan_$svcName"
-                                    try {
-                                        if ((Get-UDElement -Id $cbId).checked) { $selectedServices += $svcName }
-                                    } catch { }
-                                }
+                                # Read selected check IDs from session state
+                                $allChecks = @(Get-CIEMCheck -Provider $selectedProvider)
+                                $selectedCheckIds = @($Session:SelectedCheckIds)
 
-                                if ($selectedServices.Count -eq 0) {
-                                    Show-UDToast -Message 'Please select at least one service to scan.' -Duration 5000 -BackgroundColor '#ff9800'
+                                if ($selectedCheckIds.Count -eq 0) {
+                                    Show-UDToast -Message 'Please select at least one check.' -Duration 5000 -BackgroundColor '#ff9800'
                                     return
                                 }
 
                                 $includePassedChecks = (Get-UDElement -Id 'includePassedChecks').checked
-                                Write-CIEMLog -Message "Scan config: Services=$($selectedServices -join ','), IncludePassed=$includePassedChecks" -Severity INFO -Component 'PSU-ScanPage'
+
+                                # Derive selected services for progress message
+                                $selectedServices = @($allChecks | Where-Object { $selectedCheckIds -contains $_.Id } | Select-Object -ExpandProperty Service -Unique)
+                                Write-CIEMLog -Message "Scan config: Checks=$($selectedCheckIds.Count)/$($allChecks.Count), Services=$($selectedServices -join ','), IncludePassed=$includePassedChecks" -Severity INFO -Component 'PSU-ScanPage'
 
                                 # Show progress area
                                 Set-UDElement -Id 'scanProgressArea' -Content {
@@ -317,13 +354,17 @@ function New-DevolutionsCIEMApp {
                                 $scanStart = Get-Date
 
                                 # Update status
-                                Set-UDElement -Id 'scanStatusText' -Properties @{ children = "Scanning $($selectedServices.Count) services..." }
-                                Show-UDToast -Message "Starting CIEM scan for: $($selectedServices -join ', ')" -Duration 3000
+                                Set-UDElement -Id 'scanStatusText' -Properties @{ children = "Scanning $($selectedCheckIds.Count) checks across $($selectedServices.Count) services..." }
+                                Show-UDToast -Message "Starting CIEM scan: $($selectedCheckIds.Count) checks across $($selectedServices -join ', ')" -Duration 3000
 
-                                # Run the actual scan
+                                # Run the actual scan — use -CheckId when subset selected, omit when all selected
                                 Write-CIEMLog -Message "Calling Invoke-CIEMScan..." -Severity INFO -Component 'PSU-ScanPage'
                                 try {
-                                    $scanResults = Invoke-CIEMScan -Provider $selectedProvider -Service $selectedServices -IncludePassed:$includePassedChecks -Verbose 4>&1 | ForEach-Object {
+                                    $scanParams = @{ Provider = $selectedProvider; Service = $selectedServices; IncludePassed = $includePassedChecks }
+                                    if ($selectedCheckIds.Count -lt $allChecks.Count) {
+                                        $scanParams['CheckId'] = $selectedCheckIds
+                                    }
+                                    $scanResults = Invoke-CIEMScan @scanParams -Verbose 4>&1 | ForEach-Object {
                                         if ($_ -is [System.Management.Automation.VerboseRecord]) {
                                             Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-ScanPage'
                                         }
@@ -1176,21 +1217,19 @@ function New-DevolutionsCIEMApp {
                                             provider      = [string]$_.Provider
                                             service       = [string]$_.Service
                                             severity      = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
-                                            categories    = ($_.Categories -join ', ')
                                         }
                                     }
                                     @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
                                 } -Columns @(
                                     New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
                                     New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
-                                    New-UDDataGridColumn -Field 'cloudProvider' -HeaderName 'Provider' -Width 100
+                                    New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 100
                                     New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
                                     New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
                                         $sev = $EventData.severity.ToUpper()
                                         $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
                                         New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                                     }
-                                    New-UDDataGridColumn -Field 'categories' -HeaderName 'Categories' -Width 180
                                 ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
                             }
                             else {

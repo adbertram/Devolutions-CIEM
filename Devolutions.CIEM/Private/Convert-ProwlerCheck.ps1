@@ -244,21 +244,6 @@ function $FunctionName {
             [hashtable]$Perms
         )
 
-        $categories = @()
-        foreach ($cat in $Metadata.Categories) {
-            $mappedCat = switch -Regex ($cat) {
-                'identity|access|iam' { 'identity' }
-                'encrypt' { 'encryption' }
-                'network' { 'network' }
-                'log|audit|monitor' { 'logging' }
-                'compliance' { 'compliance' }
-                default { $null }
-            }
-            if ($mappedCat -and $categories -notcontains $mappedCat) {
-                $categories += $mappedCat
-            }
-        }
-
         [ordered]@{
             id           = $Metadata.CheckID
             service      = $ServiceDisplayName
@@ -266,7 +251,6 @@ function $FunctionName {
             description  = $Metadata.Description
             risk         = $Metadata.Risk
             severity     = $Metadata.Severity.ToLower()
-            categories   = $categories
             remediation  = [ordered]@{
                 text = 'See Devolutions PAM for remediation guidance.'
                 url  = 'https://devolutions.net/pam'

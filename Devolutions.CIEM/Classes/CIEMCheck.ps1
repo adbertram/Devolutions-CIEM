@@ -5,14 +5,6 @@ enum CIEMCheckSeverity {
     critical
 }
 
-enum CIEMCheckCategory {
-    encryption
-    identity
-    network
-    logging
-    compliance
-}
-
 class CIEMCheckRemediation {
     [string]$Text
     [string]$Url
@@ -47,7 +39,6 @@ class CIEMCheck {
     [string]$Description
     [string]$Risk
     [CIEMCheckSeverity]$Severity
-    [CIEMCheckCategory[]]$Categories
     [CIEMCheckRemediation]$Remediation
     [string]$RelatedUrl
     [string]$CheckScript
