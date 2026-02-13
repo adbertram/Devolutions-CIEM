@@ -79,33 +79,26 @@ If local docs don't help:
 WebSearch: "PowerShell Universal v5 [error message or topic]"
 ```
 
-## Step 9: Test fix via Invoke-PSUCommand BEFORE publishing (MANDATORY)
+## Step 9: Test fix via Invoke-TestCommand.ps1 BEFORE publishing (MANDATORY)
 
-**Publishing is slow.** Always validate your fix works on the PSU server BEFORE publishing.
+**Publishing is slow.** Always validate your fix works BEFORE publishing.
 
-```powershell
-# Import the management module
-Import-Module ./scripts/PSUniversal.psm1
+```bash
+# Test locally first (imports module, no PSU needed)
+./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Get-CIEMProvider -Name Azure } -Destination local
 
-# Test your fix directly on PSU (runs in PSU's PowerShell environment)
-Invoke-PSUCommand -ScriptBlock {
-    # Example: Test Get-CIEMSecret fix
-    $item = Get-Item "Secret:CIEM_Azure_TenantId" -ErrorAction SilentlyContinue
-    if ($item) { $item.Value } else { "Secret not found (no error)" }
-}
-
-# Example: Check module version on PSU
-Invoke-PSUCommand -ScriptBlock {
+# Test on local PSU app (runs inside PSU's PowerShell environment)
+./scripts/Invoke-TestCommand.ps1 -ScriptBlock {
     (Get-Module Devolutions.CIEM -ListAvailable).Version.ToString()
-}
+} -Destination local_psu_app
 
-# Example: Test a function that was failing
-Invoke-PSUCommand -ScriptBlock {
+# Test on Azure PSU app
+./scripts/Invoke-TestCommand.ps1 -ScriptBlock {
     Get-CIEMSecret 'CIEM_Azure_TenantId'
-}
+} -Destination azure_psu_app
 ```
 
-**Only after confirming the fix works via Invoke-PSUCommand, proceed to publish:**
+**Only after confirming the fix works, proceed to publish:**
 
 ```powershell
 Publish-PSUModule -ModulePath ./Devolutions.CIEM

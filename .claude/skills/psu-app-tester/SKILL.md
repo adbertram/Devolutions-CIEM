@@ -22,7 +22,14 @@ grep -i "CIEM\|error\|exception" psu-logs-*.log
 ```
 This reveals the actual server-side error before you waste time guessing.
 
-**DEBUG BEFORE PUBLISH:** Always test code fixes via `Invoke-PSUCommand` on the PSU instance BEFORE publishing a new module version. Publishing is slow - validate fixes work first.
+**DEBUG BEFORE PUBLISH:** Always test code fixes via `Invoke-TestCommand.ps1` BEFORE publishing a new module version. Publishing is slow - validate fixes work first.
+
+**Invoke-TestCommand.ps1** runs commands in three destinations:
+```bash
+./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Get-CIEMProvider } -Destination local
+./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Get-Module Devolutions.CIEM } -Destination local_psu_app
+./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Get-Module Devolutions.CIEM } -Destination azure_psu_app
+```
 
 ALWAYS restart the PSU app after publishing a new module version.
 
@@ -41,6 +48,7 @@ When docs don't have the answer, use WebSearch for PSU v5 documentation.
 Module: `./Devolutions.CIEM/Devolutions.CIEM.psm1` (contains New-DevolutionsCIEMApp)
 Manifest: `./Devolutions.CIEM/Devolutions.CIEM.psd1`
 Management: `./scripts/PSUniversal.psm1` (Publish-PSUModule, Connect-PSU, Restart-PSUApp)
+Test Harness: `./scripts/Invoke-TestCommand.ps1` (unified command runner for local/PSU)
 PSU Docs: `./prowler/docs/psu-docs/`
 Azure URL: https://devolutions-ciem-psu.azurewebsites.net/ciem/ciem/
 </project_structure>

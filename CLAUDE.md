@@ -95,6 +95,31 @@ Publish-PSUModule -ModulePath ./Devolutions.CIEM -LocalOnly
 
 ---
 
+## Testing Commands
+
+Use `scripts/Invoke-TestCommand.ps1` to run PowerShell commands against the module. It handles module import, PSU connection, and credential loading automatically.
+
+```bash
+# Run locally (imports module in-process, no PSU needed)
+pwsh -NoProfile -Command "./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Get-CIEMProvider } -Destination local"
+
+# Run inside local PSU app (requires local PSU running)
+pwsh -NoProfile -Command "./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Get-Module Devolutions.CIEM } -Destination local_psu_app"
+
+# Run inside Azure PSU app
+pwsh -NoProfile -Command "./scripts/Invoke-TestCommand.ps1 -ScriptBlock { Invoke-CIEMScan -Service Entra } -Destination azure_psu_app"
+```
+
+| Destination | What it does | When to use |
+|-------------|-------------|-------------|
+| `local` | `Import-Module ./Devolutions.CIEM` then runs scriptblock | Testing module logic without PSU |
+| `local_psu_app` | `Connect-PSU -Local` then `Invoke-PSUCommand` | Testing in local PSU context (secrets, cache, app environment) |
+| `azure_psu_app` | `Connect-PSU` then `Invoke-PSUCommand` | Testing against production PSU |
+
+**Always test before publishing.** Use `local` for fast iteration, `local_psu_app` or `azure_psu_app` to validate in the PSU environment.
+
+---
+
 ## PowerShell Universal (PSU) Servers
 
 ### Local PSU Instance (Development)
@@ -152,7 +177,7 @@ PSU_TOKEN=<production-token>  # Local PSU runs in dev mode (no auth needed)
 **Before restarting, consider alternatives:**
 - Use `Restart-PSUApp -Name 'Devolutions CIEM'` to restart just the CIEM app (much faster)
 - Use `Sync-PSUConfiguration` to reload configuration without full restart
-- Test code changes via `Invoke-PSUCommand` before publishing
+- Test code changes via `Invoke-TestCommand.ps1` before publishing
 
 **If you must restart:** Monitor progress with:
 ```bash
