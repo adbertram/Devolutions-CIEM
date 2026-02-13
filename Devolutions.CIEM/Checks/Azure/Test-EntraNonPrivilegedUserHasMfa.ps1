@@ -18,13 +18,18 @@ function Test-EntraNonPrivilegedUserHasMfa {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+
     # Check if required data is available
-    if (-not $script:EntraService.Users) {
+    if (-not $svc.Users) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -33,7 +38,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
             'Users'
         )
     }
-    elseif (-not $script:EntraService.UserMFAStatus) {
+    elseif (-not $svc.UserMFAStatus) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -45,9 +50,9 @@ function Test-EntraNonPrivilegedUserHasMfa {
     else {
         # Build a set of privileged user IDs (users in any directory role)
         $privilegedUserIds = @{}
-        if ($script:EntraService.DirectoryRoleMembers) {
-            foreach ($roleId in $script:EntraService.DirectoryRoleMembers.Keys) {
-                $members = $script:EntraService.DirectoryRoleMembers[$roleId]
+        if ($svc.DirectoryRoleMembers) {
+            foreach ($roleId in $svc.DirectoryRoleMembers.Keys) {
+                $members = $svc.DirectoryRoleMembers[$roleId]
                 if ($members) {
                     foreach ($member in $members) {
                         if ($member.id) {
@@ -60,12 +65,12 @@ function Test-EntraNonPrivilegedUserHasMfa {
 
         # Build MFA status lookup
         $mfaStatusLookup = @{}
-        foreach ($mfaStatus in $script:EntraService.UserMFAStatus) {
+        foreach ($mfaStatus in $svc.UserMFAStatus) {
             $mfaStatusLookup[$mfaStatus.id] = $mfaStatus
         }
 
         # Check non-privileged users for MFA
-        $nonPrivilegedUsers = $script:EntraService.Users | Where-Object {
+        $nonPrivilegedUsers = $svc.Users | Where-Object {
             -not $privilegedUserIds.ContainsKey($_.id) -and $_.accountEnabled -eq $true -and $_.userType -eq 'Member'
         }
 

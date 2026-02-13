@@ -41,7 +41,8 @@ function Register-CIEMArgumentCompleters {
         'Connect-CIEM'
         'Invoke-CIEMScan'
         'Get-CIEMCheck'
-        'Get-CIEMCheckService'
+        'Get-CIEMProviderService'
+        'Initialize-CIEMServiceCache'
         'Test-CIEMAuthenticationContext'
         'Get-CIEMAuthenticationContext'
         'Save-CIEMAuthenticationContext'
@@ -61,4 +62,17 @@ function Register-CIEMArgumentCompleters {
     foreach ($funcName in $nameParamFunctions) {
         Register-ArgumentCompleter -CommandName $funcName -ParameterName 'Name' -ScriptBlock $providerCompleter
     }
+
+    # Register -Name completer for Initialize-CIEMServiceCache (returns service names for a provider)
+    $serviceNameCompleter = {
+        param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+        $provider = $fakeBoundParameters['Provider']
+        if (-not $provider) { $provider = 'Azure' }
+        try { $services = @(Get-CIEMProviderService -Provider $provider) }
+        catch { $services = @() }
+        $services | Where-Object { $_.Name -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_.Name, $_.Name, 'ParameterValue', $_.Name)
+        }
+    }
+    Register-ArgumentCompleter -CommandName 'Initialize-CIEMServiceCache' -ParameterName 'Name' -ScriptBlock $serviceNameCompleter
 }

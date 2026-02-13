@@ -17,7 +17,10 @@ function Test-StorageSecureTransferRequiredIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -26,6 +29,7 @@ function Test-StorageSecureTransferRequiredIsEnabled {
         ExpectedValue = $true
         PassMessage   = "Storage account '{0}' requires secure transfer (HTTPS only)."
         FailMessage   = "Storage account '{0}' does not require secure transfer. Enable 'Secure transfer required' to enforce HTTPS connections."
+        ServiceCache  = $ServiceCache
     }
     Test-StorageAccountProperty @params
 }

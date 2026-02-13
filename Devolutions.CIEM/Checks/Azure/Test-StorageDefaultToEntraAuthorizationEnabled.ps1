@@ -17,7 +17,10 @@ function Test-StorageDefaultToEntraAuthorizationEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -26,6 +29,7 @@ function Test-StorageDefaultToEntraAuthorizationEnabled {
         ExpectedValue = $true
         PassMessage   = "Storage account '{0}' defaults to Microsoft Entra ID authorization."
         FailMessage   = "Storage account '{0}' does not default to Microsoft Entra ID authorization. Enable 'Default to Microsoft Entra authorization in the Azure portal' to enforce identity-based access."
+        ServiceCache  = $ServiceCache
     }
     Test-StorageAccountProperty @params
 }

@@ -17,15 +17,20 @@ function Test-StorageKeyRotation90Day {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     # Prowler checks the key_expiration_period_in_days policy setting
     $ErrorActionPreference = 'Stop'
+
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Storage' }).CacheData
     $rotationThresholdDays = 90
 
-    foreach ($subscriptionId in $script:StorageService.Keys) {
-        $storageData = $script:StorageService[$subscriptionId]
+    foreach ($subscriptionId in $svc.Keys) {
+        $storageData = $svc[$subscriptionId]
 
         foreach ($account in $storageData.StorageAccounts) {
             $accountName = $account.name

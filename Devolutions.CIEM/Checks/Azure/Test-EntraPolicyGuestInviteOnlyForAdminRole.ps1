@@ -24,13 +24,18 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+
     # Check if Authorization Policy data is available
-    if (-not $script:EntraService.AuthorizationPolicy) {
+    if (-not $svc.AuthorizationPolicy) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -41,11 +46,11 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
     }
     else {
         # Authorization policy can be returned as an array, get the first item
-        $authPolicy = if ($script:EntraService.AuthorizationPolicy -is [array]) {
-            $script:EntraService.AuthorizationPolicy | Select-Object -First 1
+        $authPolicy = if ($svc.AuthorizationPolicy -is [array]) {
+            $svc.AuthorizationPolicy | Select-Object -First 1
         }
         else {
-            $script:EntraService.AuthorizationPolicy
+            $svc.AuthorizationPolicy
         }
 
         # Check the allowInvitesFrom setting

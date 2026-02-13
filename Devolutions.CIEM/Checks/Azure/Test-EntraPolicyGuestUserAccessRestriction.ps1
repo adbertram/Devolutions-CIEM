@@ -23,10 +23,15 @@ function Test-EntraPolicyGuestUserAccessRestriction {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
+
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
 
     # Guest user role IDs
     $restrictedRoleId = 'a0b1b346-4d3e-4e8b-98f8-753987be4970'  # Most restrictive
@@ -34,7 +39,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
     $memberRoleId = '2af84b1e-32c8-42b7-82bc-daa82404023b'      # Same as members (most permissive)
 
     # Check if Authorization Policy data is available
-    if (-not $script:EntraService.AuthorizationPolicy) {
+    if (-not $svc.AuthorizationPolicy) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -45,11 +50,11 @@ function Test-EntraPolicyGuestUserAccessRestriction {
     }
     else {
         # Authorization policy can be returned as an array, get the first item
-        $authPolicy = if ($script:EntraService.AuthorizationPolicy -is [array]) {
-            $script:EntraService.AuthorizationPolicy | Select-Object -First 1
+        $authPolicy = if ($svc.AuthorizationPolicy -is [array]) {
+            $svc.AuthorizationPolicy | Select-Object -First 1
         }
         else {
-            $script:EntraService.AuthorizationPolicy
+            $svc.AuthorizationPolicy
         }
 
         # Check the guestUserRoleId setting

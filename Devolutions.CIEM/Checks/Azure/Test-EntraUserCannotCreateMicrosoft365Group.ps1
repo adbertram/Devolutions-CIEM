@@ -20,10 +20,15 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
+
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
 
     # Default to FAIL
     $status = 'FAIL'
@@ -32,8 +37,8 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
     $resourceName = 'Microsoft365 Groups'
 
     # Check if Group Settings data is available
-    if ($script:EntraService.GroupSettings -and $script:EntraService.GroupSettings.Count -gt 0) {
-        foreach ($setting in $script:EntraService.GroupSettings) {
+    if ($svc.GroupSettings -and $svc.GroupSettings.Count -gt 0) {
+        foreach ($setting in $svc.GroupSettings) {
             # Look for Group.Unified settings
             $isGroupUnified = if ($setting.PSObject.Properties['displayName']) {
                 $setting.displayName -eq 'Group.Unified'

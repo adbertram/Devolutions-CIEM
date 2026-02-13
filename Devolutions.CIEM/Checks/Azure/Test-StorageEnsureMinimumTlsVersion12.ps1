@@ -17,7 +17,10 @@ function Test-StorageEnsureMinimumTlsVersion12 {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -27,6 +30,7 @@ function Test-StorageEnsureMinimumTlsVersion12 {
         PassMessage   = "Storage account '{0}' has minimum TLS version set to TLS 1.2."
         FailMessage   = "Storage account '{0}' has minimum TLS version set to '{1}'. Set minimum TLS version to TLS1_2."
         DefaultValue  = 'not set (defaults to older version)'
+        ServiceCache  = $ServiceCache
     }
     Test-StorageAccountProperty @params
 }

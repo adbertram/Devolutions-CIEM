@@ -27,16 +27,21 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         [CIEMScanResult[]] Array of scan result objects.
 
     .NOTES
-        Data source: $script:IAMService[$subscriptionId].CustomRoles
+        Data source: $svc[$subscriptionId].CustomRoles
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
+
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'IAM' }).CacheData
 
     # Lock-related permissions to check for
     $lockPermissions = @(
@@ -48,8 +53,8 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         '*/locks/write'
     )
 
-    foreach ($subscriptionId in $script:IAMService.Keys) {
-        $iamData = $script:IAMService[$subscriptionId]
+    foreach ($subscriptionId in $svc.Keys) {
+        $iamData = $svc[$subscriptionId]
 
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {

@@ -17,7 +17,10 @@ function Test-StorageAccountKeyAccessDisabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -26,6 +29,7 @@ function Test-StorageAccountKeyAccessDisabled {
         ExpectedValue = $false
         PassMessage   = "Storage account '{0}' has shared key access disabled."
         FailMessage   = "Storage account '{0}' has shared key access enabled. Disable shared key access to enforce Entra ID authentication."
+        ServiceCache  = $ServiceCache
     }
     Test-StorageAccountProperty @params
 }

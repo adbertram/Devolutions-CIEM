@@ -17,7 +17,10 @@ function Test-StorageInfrastructureEncryptionIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -27,6 +30,7 @@ function Test-StorageInfrastructureEncryptionIsEnabled {
         PassMessage   = "Storage account '{0}' has infrastructure encryption (double encryption) enabled."
         FailMessage   = "Storage account '{0}' does not have infrastructure encryption enabled. Enable infrastructure encryption for double encryption protection."
         DefaultValue  = $false
+        ServiceCache  = $ServiceCache
     }
     Test-StorageAccountProperty @params
 }

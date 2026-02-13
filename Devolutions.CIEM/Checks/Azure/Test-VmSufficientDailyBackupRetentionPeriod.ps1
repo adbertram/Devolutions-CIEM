@@ -13,7 +13,10 @@ function Test-VmSufficientDailyBackupRetentionPeriod {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

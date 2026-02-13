@@ -18,13 +18,18 @@ function Test-KeyvaultKeyRotationEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
-    foreach ($subscriptionId in $script:KeyVaultService.Keys) {
-        $kvData = $script:KeyVaultService[$subscriptionId]
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'KeyVault' }).CacheData
+
+    foreach ($subscriptionId in $svc.Keys) {
+        $kvData = $svc[$subscriptionId]
 
         foreach ($vault in $kvData.KeyVaults) {
             $keys = $kvData.Keys[$vault.name]

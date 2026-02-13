@@ -26,6 +26,9 @@ function Test-KeyVaultItemExpiration {
         $Check,
 
         [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache,
+
+        [Parameter(Mandatory)]
         [ValidateSet('Keys', 'Secrets')]
         [string]$ItemType,
 
@@ -35,6 +38,8 @@ function Test-KeyVaultItemExpiration {
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'KeyVault' }).CacheData
+
     $rbacLabel = if ($RequireRbac) { 'RBAC' } else { 'Non-RBAC' }
     $itemTypeLower = $ItemType.ToLower()
     $itemTypeSingular = $itemTypeLower.TrimEnd('s')
@@ -43,8 +48,8 @@ function Test-KeyVaultItemExpiration {
     $totalVaults = 0
     $matchedVaults = 0
 
-    foreach ($subscriptionId in $script:KeyVaultService.Keys) {
-        $kvData = $script:KeyVaultService[$subscriptionId]
+    foreach ($subscriptionId in $svc.Keys) {
+        $kvData = $svc[$subscriptionId]
 
         foreach ($vault in $kvData.KeyVaults) {
             $totalVaults++

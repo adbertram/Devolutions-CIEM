@@ -18,7 +18,10 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -26,6 +29,7 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
         PropertyName  = 'allowedToCreateApps'
         PassMessage   = 'Users cannot register applications. Application registration is restricted to administrators.'
         FailMessage   = 'Users can register applications. This setting should be disabled to require administrator approval for application registration.'
+        ServiceCache  = $ServiceCache
     }
     Test-EntraAuthorizationPolicyBooleanSetting @params
 }

@@ -20,16 +20,21 @@ function Test-EntraSecurityDefaultsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
-    if (-not $script:EntraService.SecurityDefaults) {
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+
+    if (-not $svc.SecurityDefaults) {
         [CIEMScanResult]::Create($Check, 'SKIPPED', 'Unable to retrieve Security Defaults policy - missing permissions', 'N/A', 'Security Defaults')
     }
     else {
-        $securityDefaults = $script:EntraService.SecurityDefaults
+        $securityDefaults = $svc.SecurityDefaults
         $isEnabled = $securityDefaults.isEnabled -eq $true
 
         if ($isEnabled) {

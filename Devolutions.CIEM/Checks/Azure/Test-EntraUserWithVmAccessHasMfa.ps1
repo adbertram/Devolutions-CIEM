@@ -24,10 +24,16 @@ function Test-EntraUserWithVmAccessHasMfa {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
+
+    $entra = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+    $iam = ($ServiceCache | Where-Object { $_.ServiceName -eq 'IAM' }).CacheData
 
     # VM-related role definition IDs (matches Prowler)
     $vmRoleDefinitionIds = @(
@@ -41,7 +47,7 @@ function Test-EntraUserWithVmAccessHasMfa {
     )
 
     # Check if required data is available
-    if (-not $script:EntraService.UserMFAStatus) {
+    if (-not $entra.UserMFAStatus) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -50,7 +56,7 @@ function Test-EntraUserWithVmAccessHasMfa {
             'User MFA Status'
         )
     }
-    elseif (-not $script:IAMService -or -not $script:IAMService.RoleAssignments) {
+    elseif (-not $iam -or -not $iam.RoleAssignments) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -62,14 +68,14 @@ function Test-EntraUserWithVmAccessHasMfa {
     else {
         # Build MFA status lookup
         $mfaStatusLookup = @{}
-        foreach ($mfaStatus in $script:EntraService.UserMFAStatus) {
+        foreach ($mfaStatus in $entra.UserMFAStatus) {
             $mfaStatusLookup[$mfaStatus.id] = $mfaStatus
         }
 
         # Find users with VM-related role assignments
         $usersWithVmAccess = @{}
 
-        foreach ($assignment in $script:IAMService.RoleAssignments) {
+        foreach ($assignment in $iam.RoleAssignments) {
             # Check if this is a VM-related role
             $roleDefinitionId = $assignment.roleDefinitionId
             if ($roleDefinitionId) {

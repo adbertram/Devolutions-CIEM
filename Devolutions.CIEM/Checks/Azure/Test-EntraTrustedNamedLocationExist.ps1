@@ -19,13 +19,18 @@ function Test-EntraTrustedNamedLocationExist {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+
     # Check if Named Locations data is available
-    if (-not $script:EntraService.NamedLocations) {
+    if (-not $svc.NamedLocations) {
         [CIEMScanResult]::Create(
             $Check,
             'FAIL',
@@ -37,7 +42,7 @@ function Test-EntraTrustedNamedLocationExist {
     else {
         # Look for trusted named locations with IP ranges
         $trustedIpLocation = $null
-        foreach ($location in $script:EntraService.NamedLocations) {
+        foreach ($location in $svc.NamedLocations) {
             # Check for isTrusted and ipRanges (IP-based locations)
             $isTrusted = if ($location.PSObject.Properties['isTrusted']) {
                 $location.isTrusted -eq $true

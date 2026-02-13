@@ -26,19 +26,24 @@ function Test-IamSubscriptionRolesOwnerCustomNotCreated {
         [CIEMScanResult[]] Array of scan result objects.
 
     .NOTES
-        Data source: $script:IAMService[$subscriptionId].CustomRoles
+        Data source: $svc[$subscriptionId].CustomRoles
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
-    foreach ($subscriptionId in $script:IAMService.Keys) {
-        $iamData = $script:IAMService[$subscriptionId]
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'IAM' }).CacheData
+
+    foreach ($subscriptionId in $svc.Keys) {
+        $iamData = $svc[$subscriptionId]
 
         # Check if role definitions were loaded
         if (-not $iamData.RoleDefinitions) {

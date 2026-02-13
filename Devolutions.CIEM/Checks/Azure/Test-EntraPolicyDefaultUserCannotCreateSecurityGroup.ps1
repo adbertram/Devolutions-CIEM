@@ -18,7 +18,10 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -26,6 +29,7 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
         PropertyName  = 'allowedToCreateSecurityGroups'
         PassMessage   = 'Users are restricted from creating security groups in Azure portals, API or PowerShell'
         FailMessage   = 'Users can create security groups in Azure portals, API or PowerShell. This should be restricted to administrators only.'
+        ServiceCache  = $ServiceCache
     }
     Test-EntraAuthorizationPolicyBooleanSetting @params
 }

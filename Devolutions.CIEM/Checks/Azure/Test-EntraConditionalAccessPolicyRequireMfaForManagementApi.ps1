@@ -18,14 +18,19 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
+
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
     $azureManagementApiAppId = '797f4846-ba00-4fd7-ba43-dac1f8f63013'
 
     # Check if Conditional Access policies data is available
-    if (-not $script:EntraService.ConditionalAccessPolicies) {
+    if (-not $svc.ConditionalAccessPolicies) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -38,7 +43,7 @@ function Test-EntraConditionalAccessPolicyRequireMfaForManagementApi {
         # Look for enabled policies that require MFA for Azure Management API
         $mfaPolicyNames = @()
 
-        foreach ($policy in $script:EntraService.ConditionalAccessPolicies) {
+        foreach ($policy in $svc.ConditionalAccessPolicies) {
             # Skip disabled policies
             if ($policy.state -ne 'enabled') {
                 continue

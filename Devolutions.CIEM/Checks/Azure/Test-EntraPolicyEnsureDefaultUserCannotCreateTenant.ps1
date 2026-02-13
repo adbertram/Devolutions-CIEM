@@ -18,7 +18,10 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $params = @{
@@ -26,6 +29,7 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
         PropertyName  = 'allowedToCreateTenants'
         PassMessage   = 'Non-admin users are restricted from creating new tenants'
         FailMessage   = 'Non-admin users can create new tenants. This should be restricted to administrators only.'
+        ServiceCache  = $ServiceCache
     }
     Test-EntraAuthorizationPolicyBooleanSetting @params
 }

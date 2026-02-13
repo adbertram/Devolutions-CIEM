@@ -17,16 +17,21 @@ function Test-StorageGeoRedundantEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Storage' }).CacheData
+
     # SKU names that provide geo-redundancy
     $geoRedundantSkus = @('Standard_GRS', 'Standard_RAGRS', 'Standard_GZRS', 'Standard_RAGZRS')
 
-    foreach ($subscriptionId in $script:StorageService.Keys) {
-        $storageData = $script:StorageService[$subscriptionId]
+    foreach ($subscriptionId in $svc.Keys) {
+        $storageData = $svc[$subscriptionId]
 
         foreach ($account in $storageData.StorageAccounts) {
             $accountName = $account.name

@@ -36,6 +36,9 @@ function Test-StorageAccountProperty {
         $Check,
 
         [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache,
+
+        [Parameter(Mandatory)]
         [string]$PropertyPath,
 
         [Parameter(Mandatory)]
@@ -53,8 +56,10 @@ function Test-StorageAccountProperty {
 
     $ErrorActionPreference = 'Stop'
 
-    foreach ($subscriptionId in $script:StorageService.Keys) {
-        $storageData = $script:StorageService[$subscriptionId]
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Storage' }).CacheData
+
+    foreach ($subscriptionId in $svc.Keys) {
+        $storageData = $svc[$subscriptionId]
 
         foreach ($account in $storageData.StorageAccounts) {
             $accountName = $account.name

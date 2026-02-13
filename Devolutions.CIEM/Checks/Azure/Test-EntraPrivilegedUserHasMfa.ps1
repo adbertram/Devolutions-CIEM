@@ -21,13 +21,18 @@ function Test-EntraPrivilegedUserHasMfa {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+
     # Check if required data is available
-    if (-not $script:EntraService.DirectoryRoles) {
+    if (-not $svc.DirectoryRoles) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -36,7 +41,7 @@ function Test-EntraPrivilegedUserHasMfa {
             'Directory Roles'
         )
     }
-    elseif (-not $script:EntraService.UserMFAStatus) {
+    elseif (-not $svc.UserMFAStatus) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -50,11 +55,11 @@ function Test-EntraPrivilegedUserHasMfa {
         $privilegedUsers = @{}
         $userRoles = @{}
 
-        if ($script:EntraService.DirectoryRoleMembers) {
-            foreach ($role in $script:EntraService.DirectoryRoles) {
+        if ($svc.DirectoryRoleMembers) {
+            foreach ($role in $svc.DirectoryRoles) {
                 $roleId = $role.id
                 $roleName = $role.displayName
-                $members = $script:EntraService.DirectoryRoleMembers[$roleId]
+                $members = $svc.DirectoryRoleMembers[$roleId]
 
                 if ($members) {
                     foreach ($member in $members) {
@@ -82,7 +87,7 @@ function Test-EntraPrivilegedUserHasMfa {
         else {
             # Build MFA status lookup
             $mfaStatusLookup = @{}
-            foreach ($mfaStatus in $script:EntraService.UserMFAStatus) {
+            foreach ($mfaStatus in $svc.UserMFAStatus) {
                 $mfaStatusLookup[$mfaStatus.id] = $mfaStatus
             }
 

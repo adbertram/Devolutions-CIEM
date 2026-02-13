@@ -21,22 +21,27 @@ function Test-IamRoleUserAccessAdminRestricted {
         [CIEMScanResult[]] Array of scan result objects, one per role assignment.
 
     .NOTES
-        Data source: $script:IAMService[$subscriptionId].RoleAssignments and RoleDefinitions
+        Data source: $svc[$subscriptionId].RoleAssignments and RoleDefinitions
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'IAM' }).CacheData
+
     # User Access Administrator built-in role definition ID
     $userAccessAdminRoleId = '18d7d88d-d35e-4fb5-a5c3-7773c20a72d9'
 
-    foreach ($subscriptionId in $script:IAMService.Keys) {
-        $iamData = $script:IAMService[$subscriptionId]
+    foreach ($subscriptionId in $svc.Keys) {
+        $iamData = $svc[$subscriptionId]
 
         # Check if role assignments were loaded
         if (-not $iamData.RoleAssignments) {

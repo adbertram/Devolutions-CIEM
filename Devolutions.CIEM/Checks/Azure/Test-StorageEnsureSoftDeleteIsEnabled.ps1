@@ -17,13 +17,18 @@ function Test-StorageEnsureSoftDeleteIsEnabled {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
-    foreach ($subscriptionId in $script:StorageService.Keys) {
-        $storageData = $script:StorageService[$subscriptionId]
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Storage' }).CacheData
+
+    foreach ($subscriptionId in $svc.Keys) {
+        $storageData = $svc[$subscriptionId]
 
         foreach ($account in $storageData.StorageAccounts) {
             $accountName = $account.name

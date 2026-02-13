@@ -17,12 +17,17 @@ function Test-EntraGlobalAdminCountWithinLimit {
     [OutputType([CIEMScanResult[]])]
     param(
         [Parameter(Mandatory)]
-        $Check
+        $Check,
+
+        [Parameter(Mandatory)]
+        [CIEMServiceCache[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
 
-    if (-not $script:EntraService.DirectoryRoles) {
+    $svc = ($ServiceCache | Where-Object { $_.ServiceName -eq 'Entra' }).CacheData
+
+    if (-not $svc.DirectoryRoles) {
         [CIEMScanResult]::Create(
             $Check,
             'SKIPPED',
@@ -33,7 +38,7 @@ function Test-EntraGlobalAdminCountWithinLimit {
         return
     }
 
-    $globalAdminRole = $script:EntraService.DirectoryRoles | Where-Object { $_.displayName -eq 'Global Administrator' } | Select-Object -First 1
+    $globalAdminRole = $svc.DirectoryRoles | Where-Object { $_.displayName -eq 'Global Administrator' } | Select-Object -First 1
 
     if (-not $globalAdminRole) {
         [CIEMScanResult]::Create(
@@ -46,7 +51,7 @@ function Test-EntraGlobalAdminCountWithinLimit {
         return
     }
 
-    $memberLookup = $script:EntraService.DirectoryRoleMembers[$globalAdminRole.id]
+    $memberLookup = $svc.DirectoryRoleMembers[$globalAdminRole.id]
     $numGlobalAdmins = if ($null -eq $memberLookup) { 0 } else { @($memberLookup).Count }
 
     if ($numGlobalAdmins -lt 5) {
