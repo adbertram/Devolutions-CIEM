@@ -219,11 +219,16 @@ function Invoke-CIEMScan {
                     # (empty CacheData + StrictMode causes dot-notation property access to throw)
                     $failedServices = @($checkCaches | Where-Object { -not $_.Success })
                     if ($failedServices) {
-                        $failedNames = $failedServices.ServiceName -join ', '
-                        Write-Verbose "Skipping check $($check.Id) - service(s) failed to initialize: $failedNames"
+                        $failedDetails = @($failedServices | ForEach-Object {
+                            $svcName = $_.ServiceName
+                            $errorDetail = if ($_.Errors -and $_.Errors.Count -gt 0) { $_.Errors[0] } else { 'unknown error' }
+                            "$svcName`: $errorDetail"
+                        })
+                        $failedMessage = "Required service(s) unavailable: $($failedDetails -join '; ')"
+                        Write-Verbose "Skipping check $($check.Id) - service(s) failed to initialize: $failedMessage"
                         $statusCounts['SKIPPED']++
                         $findingCount++
-                        $finding = [CIEMScanResult]::Create($check, 'SKIPPED', "Required service(s) unavailable: $failedNames", 'N/A', 'N/A')
+                        $finding = [CIEMScanResult]::Create($check, 'SKIPPED', $failedMessage, 'N/A', 'N/A')
                         [void]$allFindings.Add($finding)
                         $finding
                         continue

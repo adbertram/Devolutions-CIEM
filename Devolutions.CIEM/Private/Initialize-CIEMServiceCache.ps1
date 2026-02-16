@@ -75,7 +75,7 @@ function Initialize-CIEMServiceCache {
             # Invoke the plain script, capturing streams
             $capturedWarnings = $null
             $capturedErrors = $null
-            $returnedData = & $scriptPath -SubscriptionIds $SubscriptionIds `
+            $returnedData = . $scriptPath -SubscriptionIds $SubscriptionIds `
                 -WarningVariable capturedWarnings `
                 -ErrorVariable capturedErrors
 

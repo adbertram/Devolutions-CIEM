@@ -6,6 +6,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Comprehensive Graph API error patterns for catch blocks
+$graphPermissionErrors = 'Access denied|missing permissions|403|Forbidden|Authorization_RequestDenied|Insufficient privileges|InvalidAuthenticationToken|Authentication_MissingOrMalformed|Unauthorized'
+$graphLicenseErrors = 'RequestFromNonPremiumTenantOrB2CTenant|premium license|premium subscription'
+
 $graphApiBase = (Get-CIEMProvider -Name 'Azure').Endpoints.graphApi
 
 # Initialize service hashtable
@@ -28,7 +32,7 @@ try {
     $data.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
 }
 catch {
-    if ($_.Exception.Message -match 'Access denied|missing permissions|403|Forbidden') {
+    if ($_.Exception.Message -match $graphPermissionErrors) {
         Write-CIEMLog -Severity WARNING -Message "Users data unavailable - missing permissions. User-related checks will be skipped."
         $data.Users = $null
     }
@@ -46,7 +50,7 @@ try {
 }
 catch {
     # Check for common licensing/permission errors
-    if ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license|Access denied|missing permissions|403|Forbidden') {
+    if ($_.Exception.Message -match "$graphLicenseErrors|$graphPermissionErrors") {
         Write-CIEMLog -Severity WARNING -Message "MFA status data unavailable - Azure AD Premium license required. MFA-related checks will be skipped."
         $data.UserMFAStatus = $null
         $data.MFAStatusUnavailable = $true
@@ -78,12 +82,12 @@ foreach ($endpoint in $apiEndpoints.GetEnumerator()) {
         $data[$endpoint.Key] = Invoke-AzureApi @params
     }
     catch {
-        if ($_.Exception.Message -match 'Access denied|missing permissions|403|Forbidden') {
+        if ($_.Exception.Message -match $graphPermissionErrors) {
             $reason = if ($endpoint.Value.RequiresPremium) { 'Azure AD Premium license required' } else { 'missing permissions' }
             Write-CIEMLog -Severity WARNING -Message "$($endpoint.Key) data unavailable - $reason. Related checks will be skipped."
             $data[$endpoint.Key] = $null
         }
-        elseif ($endpoint.Value.RequiresPremium -and ($_.Exception.Message -match 'RequestFromNonPremiumTenantOrB2CTenant|premium license')) {
+        elseif ($endpoint.Value.RequiresPremium -and ($_.Exception.Message -match $graphLicenseErrors)) {
             Write-CIEMLog -Severity WARNING -Message "$($endpoint.Key) data unavailable - Azure AD Premium license required."
             $data[$endpoint.Key] = $null
         }
@@ -100,7 +104,18 @@ if ($data.DirectoryRoles) {
             Uri          = "$graphApiBase/directoryRoles/$($role.id)/members"
             ResourceName = "DirectoryRole Members ($($role.displayName))"
         }
-        $data.DirectoryRoleMembers[$role.id] = Invoke-AzureApi @params
+        try {
+            $data.DirectoryRoleMembers[$role.id] = Invoke-AzureApi @params
+        }
+        catch {
+            if ($_.Exception.Message -match $graphPermissionErrors) {
+                Write-CIEMLog -Severity WARNING -Message "DirectoryRole Members ($($role.displayName)) unavailable - missing permissions. Role member checks may be incomplete."
+                $data.DirectoryRoleMembers[$role.id] = $null
+            }
+            else {
+                throw
+            }
+        }
     }
 }
 
