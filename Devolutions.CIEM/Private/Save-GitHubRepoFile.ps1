@@ -72,6 +72,7 @@ function Save-GitHubRepoFile {
     $shouldThrow = $ErrorActionPreference -eq 'Stop'
 
     $ErrorActionPreference = 'Stop'
+    $ProgressPreference = 'SilentlyContinue'
 
     $uri = "https://raw.githubusercontent.com/$Owner/$Repo/$Ref/$Path"
     $headers = @{

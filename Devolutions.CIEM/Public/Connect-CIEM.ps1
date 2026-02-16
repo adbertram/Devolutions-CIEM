@@ -50,6 +50,7 @@ function Connect-CIEM {
     )
 
     $ErrorActionPreference = 'Stop'
+    $ProgressPreference = 'SilentlyContinue'
 
     Write-CIEMLog -Message "Connect-CIEM called with Provider=[$($Provider -join ',')] Force=$Force" -Severity INFO -Component 'Connect-CIEM'
 
@@ -177,6 +178,7 @@ function Connect-CIEMAzure {
     param()
 
     $ErrorActionPreference = 'Stop'
+    $ProgressPreference = 'SilentlyContinue'
 
     Write-CIEMLog -Message "Connect-CIEMAzure started" -Severity INFO -Component 'Connect-CIEMAzure'
 

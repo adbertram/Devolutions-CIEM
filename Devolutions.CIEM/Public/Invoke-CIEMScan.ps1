@@ -96,9 +96,11 @@ function Invoke-CIEMScan {
     $allFindings = [System.Collections.ArrayList]::new()
 
     Write-Verbose "Starting CIEM scan for provider: $Provider"
+    $progressActivity = "CIEM Scan ($Provider)"
 
     try {
         # Connect to provider (handles all auth internally, returns context)
+        Write-Progress -Activity $progressActivity -Status "Connecting to $Provider..." -PercentComplete 0
         $connectResult = Connect-CIEM -Provider $Provider -Force
         $providerResult = $connectResult.Providers | Where-Object { $_.Provider -eq $Provider }
 
@@ -121,9 +123,15 @@ function Invoke-CIEMScan {
         $providerObj = Get-CIEMProvider -Name $Provider
         $serviceCacheLookup = @{}
 
+        Write-Progress -Activity $progressActivity -Status "Initializing services..." -PercentComplete 5
+
         switch ($Provider) {
             'Azure' {
+                $svcIndex = 0
                 Initialize-CIEMServiceCache -Provider $providerObj -Name $servicesToInit -SubscriptionIds $subscriptionIds | ForEach-Object {
+                    $svcIndex++
+                    $svcPct = 5 + [math]::Floor(($svcIndex / @($servicesToInit).Count) * 15)
+                    Write-Progress -Activity $progressActivity -Status "Initializing services..." -CurrentOperation $_.ServiceName -PercentComplete $svcPct
                     $serviceCacheLookup[$_.ServiceName] = $_
                     if ($_.Success) {
                         Write-Verbose "Initialized $($_.ServiceName) in $([math]::Round($_.Duration.TotalSeconds, 2))s"
@@ -190,8 +198,13 @@ function Invoke-CIEMScan {
         Write-Verbose "Executing checks..."
         $findingCount = 0
         $statusCounts = @{ PASS = 0; FAIL = 0; MANUAL = 0; SKIPPED = 0 }
+        $checkIndex = 0
+        $totalChecks = @($checks).Count
 
         foreach ($check in $checks) {
+            $checkIndex++
+            $checkPct = 20 + [math]::Floor(($checkIndex / $totalChecks) * 80)
+            Write-Progress -Activity $progressActivity -Status "Running check $checkIndex of $totalChecks" -CurrentOperation $check.Title -PercentComplete $checkPct
             $functionName = $availableFunctions[$check.Id]
 
             if (-not $functionName) {
@@ -282,11 +295,13 @@ function Invoke-CIEMScan {
         Write-Verbose "Status summary: $($statusSummary -join ', ')"
 
         # Update ScanRun with results and mark as completed
+        Write-Progress -Activity $progressActivity -Completed
         Update-CIEMScanRun -ScanRun $scanRun -Status Completed -ScanResults @($allFindings) | Out-Null
         Write-Verbose "ScanRun completed: $($scanRun.Id)"
     }
     catch {
         # Update ScanRun with failure status
+        Write-Progress -Activity $progressActivity -Completed
         Update-CIEMScanRun -ScanRun $scanRun -Status Failed -ScanResults @($allFindings) -ErrorMessage $_.Exception.Message | Out-Null
         Write-Verbose "ScanRun failed: $($scanRun.Id) - $($_.Exception.Message)"
         throw

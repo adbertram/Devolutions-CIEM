@@ -59,6 +59,9 @@ function Invoke-AzureApi {
         [switch]$Raw
     )
 
+    # Suppress Invoke-RestMethod progress bar (noisy in PSU)
+    $ProgressPreference = 'SilentlyContinue'
+
     # Capture caller's ErrorAction before we override
     $shouldThrow = $ErrorActionPreference -eq 'Stop'
 

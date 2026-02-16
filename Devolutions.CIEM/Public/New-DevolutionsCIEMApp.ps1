@@ -24,8 +24,8 @@ function New-DevolutionsCIEMApp {
         function New-CIEMNavigation {
             @(
                 New-UDListItem -Label 'Dashboard' -Icon (New-UDIcon -Icon 'Home') -Href '/ciem'
-                New-UDListItem -Label 'Cloud Checks' -Icon (New-UDIcon -Icon 'ListCheck') -Href '/ciem/checks'
                 New-UDListItem -Label 'Scan' -Icon (New-UDIcon -Icon 'Play') -Href '/ciem/scan'
+                New-UDListItem -Label 'Scan History' -Icon (New-UDIcon -Icon 'ClockRotateLeft') -Href '/ciem/history'
                 New-UDListItem -Label 'Configuration' -Icon (New-UDIcon -Icon 'Cog') -Href '/ciem/config'
                 New-UDListItem -Label 'About' -Icon (New-UDIcon -Icon 'InfoCircle') -Href '/ciem/about'
             )
@@ -60,7 +60,6 @@ function New-DevolutionsCIEMApp {
                                 # Restore to session for faster subsequent access
                                 $Session:CIEMScanResults = $rawResults
                                 $Session:CIEMScanTimestamp = $scanTimestamp
-                                $Session:CIEMIncludePassed = $currentRun.IncludePassed
                             }
                         }
                     }
@@ -168,7 +167,7 @@ function New-DevolutionsCIEMApp {
                                 New-UDTableColumn -Property 'ResourceName' -Title 'Resource'
                             )
                             New-UDButton -Text 'View All Results' -Variant 'outlined' -OnClick {
-                                Invoke-UDRedirect '/ciem/scan'
+                                Invoke-UDRedirect '/ciem/history'
                             } -Style @{ marginTop = '12px' }
                         } else {
                             New-UDStack -Direction 'column' -AlignItems 'center' -Content {
@@ -204,39 +203,12 @@ function New-DevolutionsCIEMApp {
                 New-UDTypography -Text 'Run CIEM Scan' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
                 New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
-                # Provider Selector
-                $enabledProviders = @(Get-CIEMProvider | Where-Object Enabled)
-                if ($enabledProviders.Count -gt 1) {
-                    New-UDCard -Style @{ marginBottom = '20px' } -Content {
-                        New-UDSelect -Id 'scanProvider' -Label 'Cloud Provider' -Option {
-                            foreach ($ep in $enabledProviders) {
-                                New-UDSelectOption -Name $ep.Name -Value $ep.Name
-                            }
-                        } -DefaultValue $enabledProviders[0].Name -FullWidth -OnChange {
-                            $Session:SelectedProvider = $EventData
-                            $Session:SelectedCheckIds = $null
-                            Sync-UDElement -Id 'checkSelectionGrid'
-                        }
-                    }
-                }
-                else {
-                    # Single provider - show as chip, set session
-                    $singleProvider = if ($enabledProviders.Count -eq 1) { $enabledProviders[0].Name } else { 'Azure' }
-                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '20px' } } -Content {
-                        New-UDChip -Label "Provider: $singleProvider" -Icon (New-UDIcon -Icon 'Cloud') -Style @{ backgroundColor = '#1976d2'; color = 'white' }
-                    }
-                    # Hidden element to hold provider value
-                    New-UDElement -Tag 'input' -Id 'scanProvider' -Attributes @{ type = 'hidden'; value = $singleProvider }
-                }
-                $Session:SelectedProvider = if ($enabledProviders.Count -ge 1) { $enabledProviders[0].Name } else { 'Azure' }
-
-                # Scan Configuration Card
-                New-UDCard -Title 'Scan Configuration' -Content {
+                # Check Selection Card
+                New-UDCard -Title 'Check Selection' -Content {
                     # Check selection data grid with checkboxes
                     New-UDDynamic -Id 'checkSelectionGrid' -Content {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                        $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-                        $allChecks = @(Get-CIEMCheck -Provider $selectedProvider)
+                        $allChecks = @(Get-CIEMCheck)
 
                         # Initialize selected checks (default: all) on first load
                         if ($null -eq $Session:SelectedCheckIds) {
@@ -246,43 +218,79 @@ function New-DevolutionsCIEMApp {
                         # Selection summary
                         New-UDDynamic -Id 'selectionSummary' -Content {
                             Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                            $provider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-                            $checks = @(Get-CIEMCheck -Provider $provider)
+                            $checks = @(Get-CIEMCheck)
                             $selectedCount = @($Session:SelectedCheckIds).Count
                             $totalCount = $checks.Count
                             New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '8px' } } -Content {
                                 New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                     New-UDTypography -Text "$selectedCount / $totalCount checks selected" -Variant 'body2' -Style @{ color = '#666' }
-                                    $selectedChecks = @($checks | Where-Object { $Session:SelectedCheckIds -contains $_.Id })
-                                    $sevGroups = $selectedChecks | Group-Object Severity
-                                    foreach ($sg in ($sevGroups | Sort-Object { switch ($_.Name) { 'CRITICAL' { 0 } 'HIGH' { 1 } 'MEDIUM' { 2 } 'LOW' { 3 } default { 4 } } })) {
-                                        $sevColor = Get-SeverityColor -Severity $sg.Name
-                                        New-UDChip -Label "$($sg.Name[0]):$($sg.Count)" -Size 'small' -Style @{ backgroundColor = $sevColor; color = 'white'; height = '22px'; fontSize = '11px' }
-                                    }
                                 }
                             }
                         }
 
                         New-UDDataGrid -Id 'checkSelector' -LoadRows {
                             Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                            $provider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-                            $checks = @(Get-CIEMCheck -Provider $provider)
+                            $checks = @(Get-CIEMCheck)
                             $checksData = $checks | ForEach-Object {
                                 @{
-                                    id       = $_.Id
-                                    checkId  = $_.Id
-                                    title    = $_.Title
-                                    service  = [string]$_.Service
-                                    severity = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                    id              = $_.Id
+                                    checkId         = $_.Id
+                                    title           = $_.Title
+                                    description     = $_.Description
+                                    risk            = $_.Risk
+                                    provider        = [string]$_.Provider
+                                    service         = [string]$_.Service
+                                    severity        = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                    relatedUrl      = $_.RelatedUrl
+                                    remediationText = $_.Remediation.Text
+                                    remediationUrl  = $_.Remediation.Url
                                 }
                             }
                             @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
                         } -Columns @(
+                            New-UDDataGridColumn -Field 'info' -HeaderName 'Info' -Width 60 -Render {
+                                New-UDIconButton -Icon (New-UDIcon -Icon 'InfoCircle') -Size 'small' -OnClick {
+                                    Show-UDModal -Header {
+                                        New-UDTypography -Text $EventData.title -Variant 'h6'
+                                    } -Content {
+                                        $sev = $EventData.severity.ToUpper()
+                                        $sevColor = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
+                                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                New-UDChip -Label $sev -Style @{ backgroundColor = $sevColor; color = 'white' }
+                                                New-UDChip -Label $EventData.provider -Variant 'outlined'
+                                                New-UDChip -Label $EventData.service -Variant 'outlined'
+                                            }
+                                        }
+                                        New-UDTypography -Text 'Description' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                        New-UDTypography -Text $EventData.description -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                        New-UDTypography -Text 'Risk' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                        New-UDTypography -Text $EventData.risk -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                        if ($EventData.remediationText) {
+                                            New-UDTypography -Text 'Remediation' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                            New-UDTypography -Text $EventData.remediationText -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                        }
+                                        New-UDTypography -Text 'Check ID' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
+                                        New-UDTypography -Text $EventData.checkId -Variant 'body2' -Style @{ marginBottom = '16px'; fontFamily = 'monospace' }
+                                    } -Footer {
+                                        New-UDStack -Direction 'row' -Spacing 2 -Content {
+                                            if ($EventData.relatedUrl) {
+                                                New-UDButton -Text 'Documentation' -Variant 'outlined' -OnClick { Invoke-UDRedirect -Url $EventData.relatedUrl -OpenInNewWindow }
+                                            }
+                                            if ($EventData.remediationUrl) {
+                                                New-UDButton -Text 'Remediation' -Variant 'outlined' -OnClick { Show-UDToast -Message 'This is where we could link to Devolutions PAM articles on how PAM remediates this.' -Duration 5000 }
+                                            }
+                                            New-UDButton -Text 'Close' -OnClick { Hide-UDModal }
+                                        }
+                                    } -FullWidth -MaxWidth 'md' -Dividers
+                                }
+                            }
                             New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
                                 $sev = $EventData.severity.ToUpper()
                                 $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
                                 New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                             }
+                            New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 100
                             New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 130
                             New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
                             New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
@@ -290,10 +298,6 @@ function New-DevolutionsCIEMApp {
                             $Session:SelectedCheckIds = @($EventData)
                             Sync-UDElement -Id 'selectionSummary'
                         } -Density 'compact'
-                    }
-
-                    New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px'; marginBottom = '16px' } } -Content {
-                        New-UDCheckbox -Id 'includePassedChecks' -Label 'Include Passed Checks in Results' -Checked $true
                     }
 
                     # Scan Progress Area - stores scan state and results
@@ -308,23 +312,8 @@ function New-DevolutionsCIEMApp {
                                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                 Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
 
-                                # Get selected provider
-                                $selectedProvider = if ($Session:SelectedProvider) { $Session:SelectedProvider } else { 'Azure' }
-
-                                # Connect to provider (handles all auth internally)
-                                Write-CIEMLog -Message "Connecting to $selectedProvider..." -Severity INFO -Component 'PSU-ScanPage'
-                                $connectResult = Connect-CIEM -Provider $selectedProvider -Force
-                                $connectProvider = $connectResult.Providers | Where-Object { $_.Provider -eq $selectedProvider }
-
-                                if ($connectProvider.Status -ne 'Connected') {
-                                    Write-CIEMLog -Message "Connect failed: $($connectProvider.Message)" -Severity ERROR -Component 'PSU-ScanPage'
-                                    Show-UDToast -Message "Connection failed: $($connectProvider.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                                    return
-                                }
-                                Write-CIEMLog -Message "Connected: $($connectProvider.Account)" -Severity INFO -Component 'PSU-ScanPage'
-
                                 # Read selected check IDs from session state
-                                $allChecks = @(Get-CIEMCheck -Provider $selectedProvider)
+                                $allChecks = @(Get-CIEMCheck)
                                 $selectedCheckIds = @($Session:SelectedCheckIds)
 
                                 if ($selectedCheckIds.Count -eq 0) {
@@ -332,11 +321,11 @@ function New-DevolutionsCIEMApp {
                                     return
                                 }
 
-                                $includePassedChecks = (Get-UDElement -Id 'includePassedChecks').checked
-
-                                # Derive selected services for progress message
-                                $selectedServices = @($allChecks | Where-Object { $selectedCheckIds -contains $_.Id } | Select-Object -ExpandProperty Service -Unique)
-                                Write-CIEMLog -Message "Scan config: Checks=$($selectedCheckIds.Count)/$($allChecks.Count), Services=$($selectedServices -join ','), IncludePassed=$includePassedChecks" -Severity INFO -Component 'PSU-ScanPage'
+                                # Derive selected providers and services from selected checks
+                                $selectedChecks = @($allChecks | Where-Object { $selectedCheckIds -contains $_.Id })
+                                $selectedProviders = @($selectedChecks | Select-Object -ExpandProperty Provider -Unique)
+                                $selectedServices = @($selectedChecks | Select-Object -ExpandProperty Service -Unique)
+                                Write-CIEMLog -Message "Scan config: Checks=$($selectedCheckIds.Count)/$($allChecks.Count), Providers=$($selectedProviders -join ','), Services=$($selectedServices -join ',')" -Severity INFO -Component 'PSU-ScanPage'
 
                                 # Show progress area
                                 Set-UDElement -Id 'scanProgressArea' -Content {
@@ -354,23 +343,40 @@ function New-DevolutionsCIEMApp {
                                 $scanStart = Get-Date
 
                                 # Update status
-                                Set-UDElement -Id 'scanStatusText' -Properties @{ children = "Scanning $($selectedCheckIds.Count) checks across $($selectedServices.Count) services..." }
+                                Set-UDElement -Id 'scanStatusText' -Properties @{ children = "Scanning $($selectedCheckIds.Count) checks across $($selectedProviders -join ', ')..." }
                                 Show-UDToast -Message "Starting CIEM scan: $($selectedCheckIds.Count) checks across $($selectedServices -join ', ')" -Duration 3000
 
-                                # Run the actual scan — use -CheckId when subset selected, omit when all selected
+                                # Connect to all selected providers
+                                Write-CIEMLog -Message "Connecting to providers: $($selectedProviders -join ', ')..." -Severity INFO -Component 'PSU-ScanPage'
+                                $connectResult = Connect-CIEM -Provider $selectedProviders -Force
+                                foreach ($cp in $connectResult.Providers) {
+                                    if ($cp.Status -ne 'Connected') {
+                                        Write-CIEMLog -Message "Connect failed for $($cp.Provider): $($cp.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                                        Show-UDToast -Message "Connection failed for $($cp.Provider): $($cp.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                                        return
+                                    }
+                                }
+                                Write-CIEMLog -Message "All providers connected" -Severity INFO -Component 'PSU-ScanPage'
+
+                                # Run scan per provider and collect results
                                 Write-CIEMLog -Message "Calling Invoke-CIEMScan..." -Severity INFO -Component 'PSU-ScanPage'
                                 try {
-                                    $scanParams = @{ Provider = $selectedProvider; Service = $selectedServices; IncludePassed = $includePassedChecks }
-                                    if ($selectedCheckIds.Count -lt $allChecks.Count) {
-                                        $scanParams['CheckId'] = $selectedCheckIds
-                                    }
-                                    $scanResults = Invoke-CIEMScan @scanParams -Verbose 4>&1 | ForEach-Object {
-                                        if ($_ -is [System.Management.Automation.VerboseRecord]) {
-                                            Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-ScanPage'
+                                    $scanResults = @()
+                                    foreach ($sp in $selectedProviders) {
+                                        $providerCheckIds = @($selectedChecks | Where-Object { [string]$_.Provider -eq $sp } | Select-Object -ExpandProperty Id)
+                                        $providerServices = @($selectedChecks | Where-Object { [string]$_.Provider -eq $sp } | Select-Object -ExpandProperty Service -Unique)
+                                        $scanParams = @{ Provider = $sp; Service = $providerServices; IncludePassed = $true }
+                                        if ($providerCheckIds.Count -lt @($allChecks | Where-Object { [string]$_.Provider -eq $sp }).Count) {
+                                            $scanParams['CheckId'] = $providerCheckIds
                                         }
-                                        else {
-                                            $_ # Pass through scan results
-                                        }
+                                        $scanResults += @(Invoke-CIEMScan @scanParams -Verbose 4>&1 | ForEach-Object {
+                                            if ($_ -is [System.Management.Automation.VerboseRecord]) {
+                                                Write-CIEMLog -Message $_.Message -Severity DEBUG -Component 'PSU-ScanPage'
+                                            }
+                                            else {
+                                                $_
+                                            }
+                                        })
                                     }
 
                                     # Get the completed ScanRun from cache (Invoke-CIEMScan persists it)
@@ -391,7 +397,7 @@ function New-DevolutionsCIEMApp {
                                     # Store in session for quick page access
                                     $Session:CIEMScanResults = $allResults
                                     $Session:CIEMScanTimestamp = $scanRun.EndTime
-                                    $Session:CIEMIncludePassed = $includePassedChecks
+                                    $Session:CIEMIncludePassed = $true
 
                                     Write-CIEMLog -Message "Persisted $($allResults.Count) scan results (ScanRunId: $($scanRun.Id))" -Severity INFO -Component 'PSU-ScanPage'
 
@@ -407,7 +413,7 @@ function New-DevolutionsCIEMApp {
                                                     if ($manualCount -gt 0) { $summaryParts += "Manual: $manualCount" }
                                                     if ($skippedCount -gt 0) { $summaryParts += "Skipped: $skippedCount" }
                                                     New-UDTypography -Text ($summaryParts -join ' | ') -Variant 'body2' -Style @{ color = '#666' }
-                                                    New-UDTypography -Text 'Expand the scan in the history below to view detailed results.' -Variant 'caption' -Style @{ color = '#666'; marginTop = '4px' }
+                                                    New-UDTypography -Text 'View detailed results on the Scan History page.' -Variant 'caption' -Style @{ color = '#666'; marginTop = '4px' }
                                                 }
                                             }
                                         }
@@ -420,8 +426,8 @@ function New-DevolutionsCIEMApp {
                                     if ($manualCount -gt 0) { $toastParts += "$manualCount manual review" }
                                     Show-UDToast -Message ($toastParts -join ' | ') -Duration 5000 -BackgroundColor '#4caf50'
 
-                                    # Refresh scan history
-                                    Sync-UDElement -Id 'scanHistoryPanel'
+                                    # Redirect to scan history page to view results
+                                    Show-UDToast -Message 'View detailed results on the Scan History page.' -Duration 5000
                                 }
                                 catch {
                                     Write-CIEMLog -Message "Scan failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
@@ -447,209 +453,6 @@ function New-DevolutionsCIEMApp {
                     }
                 }
 
-                # Scan History Card with expandable results
-                New-UDCard -Title 'Scan History & Results' -Style @{ marginTop = '20px' } -Content {
-                    New-UDTypography -Text 'Click on a scan to expand and view detailed results' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '12px' }
-
-                    New-UDDynamic -Id 'scanHistoryPanel' -Content {
-                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                        try {
-                            $scanRuns = @(Get-CIEMScanRun)
-
-                            if ($scanRuns -and $scanRuns.Count -gt 0) {
-                                New-UDDataGrid -LoadRows {
-                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                    $runs = @(Get-CIEMScanRun)
-                                    $historyData = $runs | ForEach-Object {
-                                        @{
-                                            id       = $_.Id
-                                            date     = ([datetime]$_.StartTime).ToString('yyyy-MM-dd HH:mm')
-                                            provider = [string]$_.Provider
-                                            services = ($_.Services -join ', ')
-                                            status   = [string]$_.Status
-                                            failed   = $_.FailedResults
-                                            passed   = $_.PassedResults
-                                            manual   = $_.ManualResults  # show all statuses uniformly
-                                            skipped  = $_.SkippedResults
-                                            duration = $_.Duration
-                                        }
-                                    }
-                                    @($historyData) | Out-UDDataGridData -Context $EventData -TotalRows @($historyData).Count
-                                } -Columns @(
-                                    New-UDDataGridColumn -Field 'date' -HeaderName 'Scan Date' -Width 150
-                                    New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 100
-                                    New-UDDataGridColumn -Field 'services' -HeaderName 'Services' -Flex 1
-                                    New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 110 -Render {
-                                        $statusColors = @{ 'Completed' = '#4caf50'; 'Running' = '#2196f3'; 'Failed' = '#f44336' }
-                                        $color = $statusColors[$EventData.status]
-                                        if (-not $color) { $color = '#666' }
-                                        New-UDChip -Label $EventData.status -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
-                                    }
-                                    New-UDDataGridColumn -Field 'failed' -HeaderName 'Failed' -Width 90 -Render {
-                                        $color = if ($EventData.failed -gt 0) { '#f44336' } else { '#4caf50' }
-                                        New-UDChip -Label $EventData.failed -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
-                                    }
-                                    New-UDDataGridColumn -Field 'passed' -HeaderName 'Passed' -Width 90 -Render {
-                                        New-UDChip -Label $EventData.passed -Size 'small' -Style @{ backgroundColor = '#4caf50'; color = 'white' }
-                                    }
-                                    New-UDDataGridColumn -Field 'manual' -HeaderName 'Manual' -Width 90 -Render {
-                                        $color = if ($EventData.manual -gt 0) { '#1565c0' } else { '#9e9e9e' }
-                                        New-UDChip -Label $EventData.manual -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
-                                    }
-                                    New-UDDataGridColumn -Field 'skipped' -HeaderName 'Skipped' -Width 90 -Render {
-                                        $color = if ($EventData.skipped -gt 0) { '#ff9800' } else { '#9e9e9e' }
-                                        New-UDChip -Label $EventData.skipped -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
-                                    }
-                                    New-UDDataGridColumn -Field 'duration' -HeaderName 'Duration' -Width 100
-                                ) -AutoHeight $true -Pagination -PageSize 10 -ExportOptions @('CSV', 'JSON') -OnExport {
-                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                    $runs = @(Get-CIEMScanRun -IncludeResults)
-
-                                    if ($EventData.Type -eq 'CSV') {
-                                        $csvData = $runs | ForEach-Object {
-                                            [PSCustomObject]@{
-                                                Id        = $_.Id
-                                                Provider  = $_.Provider
-                                                Services  = ($_.Services -join ', ')
-                                                Status    = [string]$_.Status
-                                                StartTime = ([datetime]$_.StartTime).ToString('yyyy-MM-dd HH:mm:ss')
-                                                EndTime   = if ($_.EndTime) { ([datetime]$_.EndTime).ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
-                                                Duration  = $_.Duration
-                                                Failed    = $_.FailedResults
-                                                Passed    = $_.PassedResults
-                                                Manual    = $_.ManualResults  # include all statuses in export
-                                                Skipped   = $_.SkippedResults
-                                            }
-                                        }
-                                        $exportContent = $csvData | ConvertTo-Csv -NoTypeInformation | Out-String
-                                        Out-UDDataGridExport -Data $exportContent -FileName "ciem-scans-$(Get-Date -Format 'yyyyMMdd-HHmmss').csv"
-                                    }
-                                    elseif ($EventData.Type -eq 'JSON') {
-                                        $jsonData = $runs | ForEach-Object {
-                                            [ordered]@{
-                                                id           = $_.Id
-                                                provider     = $_.Provider
-                                                services     = $_.Services
-                                                status       = [string]$_.Status
-                                                startTime    = ([datetime]$_.StartTime).ToString('o')
-                                                endTime      = if ($_.EndTime) { ([datetime]$_.EndTime).ToString('o') } else { $null }
-                                                duration     = $_.Duration
-                                                failedCount  = $_.FailedResults
-                                                passedCount  = $_.PassedResults
-                                                manualCount  = $_.ManualResults  # include all statuses in export
-                                                skippedCount = $_.SkippedResults
-                                                scan_results = @($_.ScanResults | ForEach-Object {
-                                                    [ordered]@{
-                                                        checkId        = $_.Check.Id
-                                                        status         = $_.Status
-                                                        severity       = [string]$_.Check.Severity
-                                                        resourceId     = $_.ResourceId
-                                                        resourceName   = $_.ResourceName
-                                                        location       = $_.Location
-                                                        statusExtended = $_.StatusExtended
-                                                    }
-                                                })
-                                            }
-                                        }
-                                        $exportContent = $jsonData | ConvertTo-Json -Depth 10
-                                        Out-UDDataGridExport -Data $exportContent -FileName "ciem-scans-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
-                                    }
-                                } -LoadDetailContent {
-                                    # Load scan results for this specific scan run
-                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                    $scanRunId = $EventData.row.id
-
-                                    try {
-                                        $scanRun = Get-CIEMScanRun -Id $scanRunId -IncludeResults
-                                        $rawResults = $scanRun.ScanResults
-
-                                        if ($rawResults -and $rawResults.Count -gt 0) {
-                                            $enrichedResults = $rawResults | ForEach-Object {
-                                                $result = $_
-                                                @{
-                                                    id = $result.Check.Id + '_' + ($result.ResourceId -replace '[^\w]', '_')
-                                                    checkId = $result.Check.Id
-                                                    title = $result.Check.Title
-                                                    severity = ([string]$result.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
-                                                    status = $result.Status
-                                                    service = [string]$result.Check.Service
-                                                    resourceId = $result.ResourceId
-                                                    resourceName = $result.ResourceName
-                                                    location = $result.Location
-                                                    description = $result.Check.Description
-                                                    statusExtended = $result.StatusExtended
-                                                    remediation = if ($result.Check.Remediation -and $result.Check.Remediation.Text) { $result.Check.Remediation.Text } else { 'See Devolutions PAM for remediation guidance.' }
-                                                    relatedUrl = $result.Check.RelatedUrl
-                                                }
-                                            }
-
-                                            # Apply passed filter if not included
-                                            if (-not $scanRun.IncludePassed) {
-                                                $enrichedResults = $enrichedResults | Where-Object { $_.status -ne 'PASS' }
-                                            }
-
-                                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '16px'; backgroundColor = '#fafafa' } } -Content {
-                                                # Summary chips (provider-agnostic — show all statuses uniformly)
-                                                $failedCount = @($enrichedResults | Where-Object { $_.status -eq 'FAIL' }).Count
-                                                $passedCount = @($enrichedResults | Where-Object { $_.status -eq 'PASS' }).Count
-                                                $manualCount = @($enrichedResults | Where-Object { $_.status -eq 'MANUAL' }).Count
-                                                $skippedCount = @($enrichedResults | Where-Object { $_.status -eq 'SKIPPED' }).Count
-                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
-                                                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                                        New-UDTypography -Text 'Scan Results' -Variant 'h6'
-                                                        New-UDChip -Label "Failed: $failedCount" -Size 'small' -Style @{ backgroundColor = '#ffebee'; color = '#c62828' }
-                                                        New-UDChip -Label "Passed: $passedCount" -Size 'small' -Style @{ backgroundColor = '#e8f5e9'; color = '#2e7d32' }
-                                                        if ($manualCount -gt 0) { New-UDChip -Label "Manual: $manualCount" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' } }
-                                                        if ($skippedCount -gt 0) { New-UDChip -Label "Skipped: $skippedCount" -Size 'small' -Style @{ backgroundColor = '#fff3e0'; color = '#e65100' } }
-                                                    }
-                                                }
-
-                                                # Results DataGrid - use pre-loaded data from parent scope
-                                                $resultsData = $enrichedResults
-                                                New-UDDataGrid -LoadRows {
-                                                    $resultsData | Out-UDDataGridData -Context $EventData -TotalRows @($resultsData).Count
-                                                } -Columns @(
-                                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 200
-                                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Finding' -Flex 1
-                                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
-                                                        $sev = $EventData.severity.ToUpper()
-                                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } 'INFO' { '#4caf50' } default { '#666' } }
-                                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
-                                                    }
-                                                    New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 100 -Render {
-                                                        $statusColors = @{ 'FAIL' = '#f44336'; 'PASS' = '#4caf50'; 'MANUAL' = '#ff9800'; 'SKIPPED' = '#9e9e9e' }
-                                                        $color = $statusColors[$EventData.status]
-                                                        if (-not $color) { $color = '#666' }
-                                                        New-UDChip -Label $EventData.status -Style @{ backgroundColor = $color; color = 'white' }
-                                                    }
-                                                    New-UDDataGridColumn -Field 'statusExtended' -HeaderName 'Status Description' -Flex 1
-                                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
-                                                    New-UDDataGridColumn -Field 'resourceName' -HeaderName 'Resource' -Width 180
-                                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
-                                            }
-                                        }
-                                        else {
-                                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
-                                                New-UDTypography -Text 'No results available for this scan.' -Variant 'body2' -Style @{ color = '#666' }
-                                            }
-                                        }
-                                    }
-                                    catch {
-                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
-                                            New-UDTypography -Text "Error loading results: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#f44336' }
-                                        }
-                                    }
-                                }
-                            }
-                            else {
-                                New-UDTypography -Text 'No scan history available. Run your first scan above!' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic'; padding = '16px' }
-                            }
-                        }
-                        catch {
-                            New-UDTypography -Text 'Unable to load scan history.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic'; padding = '16px' }
-                        }
-                    }
-                }
             } -Navigation $Navigation -NavigationLayout permanent
         }
 
@@ -1181,79 +984,208 @@ function New-DevolutionsCIEMApp {
             } -Navigation $Navigation -NavigationLayout permanent
         }
 
-        # Helper function to create the Cloud Checks page
-        function New-CIEMCloudChecksPage {
+        # Helper function to create the Scan History page
+        function New-CIEMScanHistoryPage {
             param($Navigation)
 
-            New-UDPage -Name 'Cloud Checks' -Url '/ciem/checks' -Content {
+            New-UDPage -Name 'Scan History' -Url '/ciem/history' -Content {
                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
 
-                New-UDTypography -Text 'Cloud Checks' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
-                New-UDTypography -Text 'Browse all available CIEM security checks' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
+                New-UDTypography -Text 'Scan History' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
+                New-UDTypography -Text 'Click on a scan to expand and view detailed results' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
-                # Checks Data Table Card
                 New-UDCard -Content {
-                    New-UDDynamic -Content {
+                    New-UDDynamic -Id 'scanHistoryPanel' -Content {
+                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         try {
-                            Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                            Write-CIEMLog -Message "Auto-loading installed checks" -Severity INFO -Component 'PSU-CloudChecksPage'
+                            $scanRuns = @(Get-CIEMScanRun)
 
-                            $warnings = @()
-                            $allChecks = @(Get-CIEMCheck -WarningVariable warnings)
-                            if ($warnings.Count -gt 0) {
-                                Write-CIEMLog -Message "Get-CIEMCheck warnings ($($warnings.Count)): $($warnings[0])" -Severity WARNING -Component 'PSU-CloudChecksPage'
-                            }
-                            Write-CIEMLog -Message "Get-CIEMCheck returned $($allChecks.Count) checks" -Severity INFO -Component 'PSU-CloudChecksPage'
-
-                            if ($allChecks.Count -gt 0) {
+                            if ($scanRuns -and $scanRuns.Count -gt 0) {
                                 New-UDDataGrid -LoadRows {
                                     Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                    $checks = @(Get-CIEMCheck)
-                                    $checksData = $checks | ForEach-Object {
+                                    $runs = @(Get-CIEMScanRun)
+                                    $historyData = $runs | ForEach-Object {
                                         @{
-                                            id            = $_.Id
-                                            checkId       = $_.Id
-                                            title         = $_.Title
-                                            provider      = [string]$_.Provider
-                                            service       = [string]$_.Service
-                                            severity      = ([string]$_.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                            id       = $_.Id
+                                            date     = ([datetime]$_.StartTime).ToString('yyyy-MM-dd HH:mm')
+                                            provider = [string]$_.Provider
+                                            services = ($_.Services -join ', ')
+                                            status   = [string]$_.Status
+                                            failed   = $_.FailedResults
+                                            passed   = $_.PassedResults
+                                            manual   = $_.ManualResults
+                                            skipped  = $_.SkippedResults
+                                            duration = $_.Duration
                                         }
                                     }
-                                    @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
+                                    @($historyData) | Out-UDDataGridData -Context $EventData -TotalRows @($historyData).Count
                                 } -Columns @(
-                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
-                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
+                                    New-UDDataGridColumn -Field 'date' -HeaderName 'Scan Date' -Width 150
                                     New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 100
-                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
-                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
-                                        $sev = $EventData.severity.ToUpper()
-                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
-                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                    New-UDDataGridColumn -Field 'services' -HeaderName 'Services' -Flex 1
+                                    New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 110 -Render {
+                                        $statusColors = @{ 'Completed' = '#4caf50'; 'Running' = '#2196f3'; 'Failed' = '#f44336' }
+                                        $color = $statusColors[$EventData.status]
+                                        if (-not $color) { $color = '#666' }
+                                        New-UDChip -Label $EventData.status -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
                                     }
-                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
-                            }
-                            else {
-                                New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
-                                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                                        New-UDIcon -Icon 'Database' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
-                                        New-UDTypography -Text 'No Checks Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                        New-UDTypography -Text 'No security checks are currently installed. Use Sync-ProwlerCheck to download checks from the Prowler repository.' -Variant 'body1' -Style @{ color = '#666' }
+                                    New-UDDataGridColumn -Field 'failed' -HeaderName 'Failed' -Width 90 -Render {
+                                        $color = if ($EventData.failed -gt 0) { '#f44336' } else { '#4caf50' }
+                                        New-UDChip -Label $EventData.failed -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
+                                    New-UDDataGridColumn -Field 'passed' -HeaderName 'Passed' -Width 90 -Render {
+                                        New-UDChip -Label $EventData.passed -Size 'small' -Style @{ backgroundColor = '#4caf50'; color = 'white' }
+                                    }
+                                    New-UDDataGridColumn -Field 'manual' -HeaderName 'Manual' -Width 90 -Render {
+                                        $color = if ($EventData.manual -gt 0) { '#1565c0' } else { '#9e9e9e' }
+                                        New-UDChip -Label $EventData.manual -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
+                                    New-UDDataGridColumn -Field 'skipped' -HeaderName 'Skipped' -Width 90 -Render {
+                                        $color = if ($EventData.skipped -gt 0) { '#ff9800' } else { '#9e9e9e' }
+                                        New-UDChip -Label $EventData.skipped -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                                    }
+                                    New-UDDataGridColumn -Field 'duration' -HeaderName 'Duration' -Width 100
+                                ) -AutoHeight $true -Pagination -PageSize 10 -ExportOptions @('CSV', 'JSON') -OnExport {
+                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                    $runs = @(Get-CIEMScanRun -IncludeResults)
+
+                                    if ($EventData.Type -eq 'CSV') {
+                                        $csvData = $runs | ForEach-Object {
+                                            [PSCustomObject]@{
+                                                Id        = $_.Id
+                                                Provider  = $_.Provider
+                                                Services  = ($_.Services -join ', ')
+                                                Status    = [string]$_.Status
+                                                StartTime = ([datetime]$_.StartTime).ToString('yyyy-MM-dd HH:mm:ss')
+                                                EndTime   = if ($_.EndTime) { ([datetime]$_.EndTime).ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+                                                Duration  = $_.Duration
+                                                Failed    = $_.FailedResults
+                                                Passed    = $_.PassedResults
+                                                Manual    = $_.ManualResults
+                                                Skipped   = $_.SkippedResults
+                                            }
+                                        }
+                                        $exportContent = $csvData | ConvertTo-Csv -NoTypeInformation | Out-String
+                                        Out-UDDataGridExport -Data $exportContent -FileName "ciem-scans-$(Get-Date -Format 'yyyyMMdd-HHmmss').csv"
+                                    }
+                                    elseif ($EventData.Type -eq 'JSON') {
+                                        $jsonData = $runs | ForEach-Object {
+                                            [ordered]@{
+                                                id           = $_.Id
+                                                provider     = $_.Provider
+                                                services     = $_.Services
+                                                status       = [string]$_.Status
+                                                startTime    = ([datetime]$_.StartTime).ToString('o')
+                                                endTime      = if ($_.EndTime) { ([datetime]$_.EndTime).ToString('o') } else { $null }
+                                                duration     = $_.Duration
+                                                failedCount  = $_.FailedResults
+                                                passedCount  = $_.PassedResults
+                                                manualCount  = $_.ManualResults
+                                                skippedCount = $_.SkippedResults
+                                                scan_results = @($_.ScanResults | ForEach-Object {
+                                                    [ordered]@{
+                                                        checkId        = $_.Check.Id
+                                                        status         = $_.Status
+                                                        severity       = [string]$_.Check.Severity
+                                                        resourceId     = $_.ResourceId
+                                                        resourceName   = $_.ResourceName
+                                                        location       = $_.Location
+                                                        statusExtended = $_.StatusExtended
+                                                    }
+                                                })
+                                            }
+                                        }
+                                        $exportContent = $jsonData | ConvertTo-Json -Depth 10
+                                        Out-UDDataGridExport -Data $exportContent -FileName "ciem-scans-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
+                                    }
+                                } -LoadDetailContent {
+                                    # Load scan results for this specific scan run
+                                    Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+                                    $scanRunId = $EventData.row.id
+
+                                    try {
+                                        $scanRun = Get-CIEMScanRun -Id $scanRunId -IncludeResults
+                                        $rawResults = $scanRun.ScanResults
+
+                                        if ($rawResults -and $rawResults.Count -gt 0) {
+                                            $enrichedResults = $rawResults | ForEach-Object {
+                                                $result = $_
+                                                @{
+                                                    id = $result.Check.Id + '_' + ($result.ResourceId -replace '[^\w]', '_')
+                                                    checkId = $result.Check.Id
+                                                    title = $result.Check.Title
+                                                    severity = ([string]$result.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                                    status = $result.Status
+                                                    service = [string]$result.Check.Service
+                                                    resourceId = $result.ResourceId
+                                                    resourceName = $result.ResourceName
+                                                    location = $result.Location
+                                                    description = $result.Check.Description
+                                                    statusExtended = $result.StatusExtended
+                                                    remediation = if ($result.Check.Remediation -and $result.Check.Remediation.Text) { $result.Check.Remediation.Text } else { 'See Devolutions PAM for remediation guidance.' }
+                                                    relatedUrl = $result.Check.RelatedUrl
+                                                }
+                                            }
+
+                                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '16px'; backgroundColor = '#fafafa' } } -Content {
+                                                # Summary chips
+                                                $failedCount = @($enrichedResults | Where-Object { $_.status -eq 'FAIL' }).Count
+                                                $passedCount = @($enrichedResults | Where-Object { $_.status -eq 'PASS' }).Count
+                                                $manualCount = @($enrichedResults | Where-Object { $_.status -eq 'MANUAL' }).Count
+                                                $skippedCount = @($enrichedResults | Where-Object { $_.status -eq 'SKIPPED' }).Count
+                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
+                                                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                        New-UDTypography -Text 'Scan Results' -Variant 'h6'
+                                                        New-UDChip -Label "Failed: $failedCount" -Size 'small' -Style @{ backgroundColor = '#ffebee'; color = '#c62828' }
+                                                        New-UDChip -Label "Passed: $passedCount" -Size 'small' -Style @{ backgroundColor = '#e8f5e9'; color = '#2e7d32' }
+                                                        if ($manualCount -gt 0) { New-UDChip -Label "Manual: $manualCount" -Size 'small' -Style @{ backgroundColor = '#e3f2fd'; color = '#1565c0' } }
+                                                        if ($skippedCount -gt 0) { New-UDChip -Label "Skipped: $skippedCount" -Size 'small' -Style @{ backgroundColor = '#fff3e0'; color = '#e65100' } }
+                                                    }
+                                                }
+
+                                                # Results DataGrid
+                                                $resultsData = $enrichedResults
+                                                New-UDDataGrid -LoadRows {
+                                                    $resultsData | Out-UDDataGridData -Context $EventData -TotalRows @($resultsData).Count
+                                                } -Columns @(
+                                                    New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 200
+                                                    New-UDDataGridColumn -Field 'title' -HeaderName 'Finding' -Flex 1
+                                                    New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
+                                                        $sev = $EventData.severity.ToUpper()
+                                                        $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } 'INFO' { '#4caf50' } default { '#666' } }
+                                                        New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                                    }
+                                                    New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 100 -Render {
+                                                        $statusColors = @{ 'FAIL' = '#f44336'; 'PASS' = '#4caf50'; 'MANUAL' = '#ff9800'; 'SKIPPED' = '#9e9e9e' }
+                                                        $color = $statusColors[$EventData.status]
+                                                        if (-not $color) { $color = '#666' }
+                                                        New-UDChip -Label $EventData.status -Style @{ backgroundColor = $color; color = 'white' }
+                                                    }
+                                                    New-UDDataGridColumn -Field 'statusExtended' -HeaderName 'Status Description' -Flex 1
+                                                    New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 100
+                                                    New-UDDataGridColumn -Field 'resourceName' -HeaderName 'Resource' -Width 180
+                                                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
+                                            }
+                                        }
+                                        else {
+                                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
+                                                New-UDTypography -Text 'No results available for this scan.' -Variant 'body2' -Style @{ color = '#666' }
+                                            }
+                                        }
+                                    }
+                                    catch {
+                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
+                                            New-UDTypography -Text "Error loading results: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#f44336' }
+                                        }
                                     }
                                 }
                             }
+                            else {
+                                New-UDTypography -Text 'No scan history available yet. Run a scan from the Scan page to see results here.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic'; padding = '16px' }
+                            }
                         }
                         catch {
-                            Write-CIEMLog -Message "Load checks failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-CloudChecksPage'
-                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '20px'; textAlign = 'center' } } -Content {
-                                New-UDTypography -Text "Failed to load checks: $($_.Exception.Message)" -Variant 'body1' -Style @{ color = '#f44336' }
-                            }
-                        }
-                    } -LoadingComponent {
-                        New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '40px'; textAlign = 'center' } } -Content {
-                            New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                                New-UDProgress -Circular
-                                New-UDTypography -Text 'Loading security checks...' -Variant 'body1' -Style @{ color = '#666'; marginTop = '16px' }
-                            }
+                            New-UDTypography -Text 'Unable to load scan history.' -Variant 'body2' -Style @{ color = '#666'; fontStyle = 'italic'; padding = '16px' }
                         }
                     }
                 }
@@ -1290,10 +1222,10 @@ function New-DevolutionsCIEMApp {
                     }
 
                     New-UDTypography -Text 'Version Information:' -Variant 'h6' -Style @{ marginTop = '20px' }
+                    $moduleVersion = (Get-Module Devolutions.CIEM -ListAvailable | Select-Object -First 1).Version.ToString()
                     New-UDTable -Data @(
-                        @{ Property = 'Module Version'; Value = '0.2.0' }
-                        @{ Property = 'PSU App Version'; Value = '0.2.0' }
-                        @{ Property = 'PowerShell Universal'; Value = '5.4+' }
+                        @{ Property = 'Module Version'; Value = $moduleVersion }
+                        @{ Property = 'PowerShell Universal'; Value = '5.5+' }
                         @{ Property = 'Author'; Value = 'Adam Bertram' }
                         @{ Property = 'Company'; Value = 'Devolutions Inc.' }
                     ) -Columns @(
@@ -1317,16 +1249,16 @@ function New-DevolutionsCIEMApp {
 
         # Create pages
         $DashboardPage = New-CIEMDashboardPage -Navigation $Navigation
-        $CloudChecksPage = New-CIEMCloudChecksPage -Navigation $Navigation
         $ScanPage = New-CIEMScanPage -Navigation $Navigation
+        $ScanHistoryPage = New-CIEMScanHistoryPage -Navigation $Navigation
         $ConfigPage = New-CIEMConfigPage -Navigation $Navigation
         $AboutPage = New-CIEMAboutPage -Navigation $Navigation
 
         # Return the App
         New-UDApp -Title 'Devolutions CIEM' -Pages @(
             $DashboardPage
-            $CloudChecksPage
             $ScanPage
+            $ScanHistoryPage
             $ConfigPage
             $AboutPage
         ) -DefaultTheme 'Light'
