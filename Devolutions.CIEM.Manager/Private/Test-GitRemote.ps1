@@ -24,11 +24,10 @@ function Test-GitRemote {
         throw "git is required but was not found in PATH."
     }
 
-    $config = Get-CIEMConfig
-    $upstreamRemote = $config.prowler.upstreamRemote
+    $upstreamRemote = 'upstream'
     $remotes = (git remote -v 2>&1) -join "`n"
 
-    if ($remotes -notmatch "$upstreamRemote.*prowler") {
+    if ($remotes -notmatch "(?m)^$upstreamRemote\s.*prowler-cloud/prowler") {
         throw @"
 Upstream remote '$upstreamRemote' not configured. Please run:
     git remote add $upstreamRemote https://github.com/prowler-cloud/prowler.git

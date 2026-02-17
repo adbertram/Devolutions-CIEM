@@ -35,9 +35,6 @@ Description = 'Management tools for Devolutions CIEM module development. Provide
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '7.4'
 
-# Modules that must be imported into the global environment prior to importing this module
-RequiredModules = @('Devolutions.CIEM')
-
 # Functions to export from this module - using wildcard to let PSM1's Export-ModuleMember control exports dynamically.
 FunctionsToExport = @('*')
 
@@ -46,20 +43,6 @@ CmdletsToExport = @()
 
 # Aliases to export from this module
 AliasesToExport = @()
-
-# List of all files packaged with this module
-FileList = 'Devolutions.CIEM.Manager.psd1', 'Devolutions.CIEM.Manager.psm1',
-               'Private/Compare-ProwlerCheck.ps1',
-               'Private/Convert-ProwlerCheck.ps1',
-               'Private/Get-GitHubRepoTree.ps1',
-               'Private/Save-GitHubRepoFile.ps1',
-               'Private/Save-GitHubRepoSparseCheckout.ps1',
-               'Private/Test-GitRemote.ps1',
-               'Public/Get-ProwlerCheck.ps1',
-               'Public/New-CIEMAzureManagedIdentity.ps1',
-               'Public/New-PSUAzureServicePrincipal.ps1',
-               'Public/Remove-CIEMCheck.ps1',
-               'Public/Sync-ProwlerCheck.ps1'
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess.
 PrivateData = @{

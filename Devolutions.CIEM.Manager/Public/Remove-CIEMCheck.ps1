@@ -26,9 +26,7 @@ function Remove-CIEMCheck {
 
     $ErrorActionPreference = 'Stop'
 
-    $config = Get-CIEMConfig
-
-    $ciemChecksPath = Join-Path $script:CIEMModuleRoot 'ciem_checks.json'
+    $ciemChecksPath = Join-Path $script:CIEMModulePath 'ciem_checks.json'
     if (-not (Test-Path $ciemChecksPath)) {
         Write-Error "Checks file not found: $ciemChecksPath"
         return
@@ -70,7 +68,7 @@ function Remove-CIEMCheck {
     # Delete the script file
     if ($foundCheck.checkScript) {
         $providerDisplayName = (Get-Culture).TextInfo.ToTitleCase($foundProvider)
-        $scriptPath = Join-Path -Path $script:CIEMModuleRoot -ChildPath $config.checksPath -AdditionalChildPath $providerDisplayName, $foundCheck.checkScript
+        $scriptPath = Join-Path -Path $script:CIEMModulePath -ChildPath 'Checks' -AdditionalChildPath $providerDisplayName, $foundCheck.checkScript
 
         if (Test-Path $scriptPath) {
             Remove-Item -Path $scriptPath -Force

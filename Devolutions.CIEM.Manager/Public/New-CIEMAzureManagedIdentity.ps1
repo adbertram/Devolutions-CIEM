@@ -69,8 +69,6 @@ function New-CIEMAzureManagedIdentity {
     [CmdletBinding(SupportsShouldProcess)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '',
         Justification = 'Required for Az/MgGraph interop - credentials passed to Azure APIs')]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
-        Justification = 'CLI tooling requires colored user feedback for setup progress')]
     [OutputType([PSCustomObject])]
     param(
         [Parameter(Mandatory)]
@@ -327,22 +325,22 @@ No client secrets or certificates are needed.
 "@
     }
 
-    Write-Host "`nManaged identity configured successfully!" -ForegroundColor Green
-    Write-Host "Web App: $WebAppName"
-    Write-Host "Principal ID: $principalId"
-    Write-Host "Tenant ID: $tenantId"
-    Write-Host "Scope: $Scope"
+    Write-Information "`nManaged identity configured successfully!" -InformationAction Continue
+    Write-Information "Web App: $WebAppName" -InformationAction Continue
+    Write-Information "Principal ID: $principalId" -InformationAction Continue
+    Write-Information "Tenant ID: $tenantId" -InformationAction Continue
+    Write-Information "Scope: $Scope" -InformationAction Continue
 
-    Write-Host "`nPermissions assigned:" -ForegroundColor Cyan
-    Write-Host "  Graph API permissions: $($permissions.Graph.Count)"
+    Write-Information "`nPermissions assigned:" -InformationAction Continue
+    Write-Information "  Graph API permissions: $($permissions.Graph.Count)" -InformationAction Continue
     if ($permissions.AzureRoles.Count -gt 0) {
-        Write-Host "  Azure RBAC roles: $(if (-not $SkipRoleAssignment) { $permissions.AzureRoles -join ', ' } else { 'Skipped' })"
+        Write-Information "  Azure RBAC roles: $(if (-not $SkipRoleAssignment) { $permissions.AzureRoles -join ', ' } else { 'Skipped' })" -InformationAction Continue
     }
 
-    Write-Host "`nTo use managed identity authentication in CIEM:" -ForegroundColor Yellow
-    Write-Host "  1. Navigate to the PSU CIEM app Configuration page"
-    Write-Host "  2. Select 'Managed Identity' as the authentication method"
-    Write-Host "  3. Save the configuration"
+    Write-Information "`nTo use managed identity authentication in CIEM:" -InformationAction Continue
+    Write-Information "  1. Navigate to the PSU CIEM app Configuration page" -InformationAction Continue
+    Write-Information "  2. Select 'Managed Identity' as the authentication method" -InformationAction Continue
+    Write-Information "  3. Save the configuration" -InformationAction Continue
 
     $output
     #endregion

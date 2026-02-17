@@ -11,12 +11,6 @@ function Convert-ProwlerCheck {
     .PARAMETER CheckPath
         Path to a Prowler check directory containing the metadata.json and .py files.
 
-    .PARAMETER CheckId
-        The check ID to convert. Will locate the check in the prowler directory.
-
-    .PARAMETER Provider
-        Cloud provider: azure or aws. Required when using -CheckId.
-
     .PARAMETER OutputDirectory
         Directory to output generated files. Defaults to Private/<Provider>/Checks.
 
@@ -31,23 +25,12 @@ function Convert-ProwlerCheck {
 
     .EXAMPLE
         Convert-ProwlerCheck -CheckPath '/tmp/prowler/providers/azure/services/entra/entra_security_defaults_enabled'
-
-    .EXAMPLE
-        Convert-ProwlerCheck -CheckId 'entra_security_defaults_enabled' -Provider azure
     #>
-    [CmdletBinding(DefaultParameterSetName = 'ByPath')]
+    [CmdletBinding()]
     param(
-        [Parameter(Mandatory, ParameterSetName = 'ByPath', Position = 0)]
+        [Parameter(Mandatory, Position = 0)]
         [ValidateScript({ Test-Path $_ -PathType Container })]
         [string]$CheckPath,
-
-        [Parameter(Mandatory, ParameterSetName = 'ById', Position = 0)]
-        [ValidatePattern('^[a-z][a-z0-9]*(_[a-z0-9]+)+$')]
-        [string]$CheckId,
-
-        [Parameter(Mandatory, ParameterSetName = 'ById')]
-        [ValidateSet('azure', 'aws')]
-        [string]$Provider,
 
         [Parameter()]
         [string]$OutputDirectory,
@@ -63,8 +46,6 @@ function Convert-ProwlerCheck {
     )
 
     $ErrorActionPreference = 'Stop'
-
-    $config = Get-CIEMConfig
 
     #region Helper Functions
 
@@ -268,35 +249,8 @@ function $FunctionName {
 
     #region Main Logic
 
-    # Resolve prowler providers path from CIEM module root
-    $prowlerProvidersPath = Join-Path $script:CIEMModuleRoot $config.prowler.path
-
-    if ($PSCmdlet.ParameterSetName -eq 'ById') {
-        $serviceName = ($CheckId -split '_')[0]
-        $checkSearchPath = Join-Path $prowlerProvidersPath "$Provider/services/$serviceName/$CheckId"
-
-        if (-not (Test-Path $checkSearchPath)) {
-            $foundPath = Get-ChildItem -Path (Join-Path $prowlerProvidersPath "$Provider/services") -Recurse -Directory |
-                Where-Object { $_.Name -eq $CheckId } |
-                Select-Object -First 1 -ExpandProperty FullName
-
-            if ($foundPath) {
-                $CheckPath = $foundPath
-            }
-            else {
-                throw "Check '$CheckId' not found in $Provider/services/"
-            }
-        }
-        else {
-            $CheckPath = $checkSearchPath
-        }
-    }
-
     $CheckPath = Resolve-Path $CheckPath
-
-    if (-not $CheckId) {
-        $CheckId = Split-Path $CheckPath -Leaf
-    }
+    $CheckId = Split-Path $CheckPath -Leaf
 
     $metadataPath = Join-Path $CheckPath "$CheckId.metadata.json"
     if (-not (Test-Path $metadataPath)) {
@@ -310,13 +264,11 @@ function $FunctionName {
         $pythonCode = Get-Content $pythonPath -Raw
     }
 
-    if (-not $Provider) {
-        if ($CheckPath -match 'providers[/\\](azure|aws|gcp)') {
-            $Provider = $Matches[1]
-        }
-        else {
-            throw "Could not determine provider from path. Please specify -Provider parameter."
-        }
+    if ($CheckPath -match 'providers[/\\](azure|aws|gcp)') {
+        $Provider = $Matches[1]
+    }
+    else {
+        throw "Could not determine provider from path '$CheckPath'. Path must contain 'providers/azure', 'providers/aws', or 'providers/gcp'."
     }
 
     $serviceName = $metadata.ServiceName
@@ -329,7 +281,7 @@ function $FunctionName {
 
     if (-not $OutputDirectory) {
         $providerDisplayName = (Get-Culture).TextInfo.ToTitleCase($Provider)
-        $OutputDirectory = Join-Path -Path $script:CIEMModuleRoot -ChildPath $config.checksPath -AdditionalChildPath $providerDisplayName
+        $OutputDirectory = Join-Path -Path $script:CIEMModulePath -ChildPath 'Checks' -AdditionalChildPath $providerDisplayName
     }
 
     $results = @{
@@ -361,7 +313,7 @@ function $FunctionName {
         Write-Verbose $jsonOutput
 
         # Append to centralized ciem_checks.json in the CIEM module
-        $ciemChecksPath = Join-Path $script:CIEMModuleRoot 'ciem_checks.json'
+        $ciemChecksPath = Join-Path $script:CIEMModulePath 'ciem_checks.json'
         $providerKey = $Provider.ToLower()
 
         if (Test-Path $ciemChecksPath) {

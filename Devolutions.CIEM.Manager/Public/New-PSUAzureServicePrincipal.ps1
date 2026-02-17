@@ -391,18 +391,9 @@ $($permissions.AzureRoles | ForEach-Object { "  New-AzRoleAssignment -ObjectId '
         }
     }
     else {
-        # Write TenantId and ClientId to CIEM config (PSU cache)
-        $configSettings = @{
-            'azure.authentication.tenantId' = $tenantId
-            'azure.authentication.servicePrincipal.clientId' = $app.AppId
-        }
-
-        if ($PSCmdlet.ShouldProcess('CIEM config', "Update with TenantId and ClientId")) {
-            Write-Verbose "Writing TenantId and ClientId to CIEM config..."
-            Set-CIEMConfig -Settings $configSettings
-            $secretsCreated = $true
-            Write-Information "`nTenantId and ClientId written to CIEM config" -InformationAction Continue
-        }
+        Write-Information "`nConfigure these values in the CIEM app:" -InformationAction Continue
+        Write-Information "  Tenant ID:  $tenantId" -InformationAction Continue
+        Write-Information "  Client ID:  $($app.AppId)" -InformationAction Continue
 
         Write-Warning "`nFor PSU deployment, create this secret in PSU Admin UI:"
         Write-Verbose "  Platform > Variables > Create Secret Variable (Database vault)"

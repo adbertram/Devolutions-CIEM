@@ -44,7 +44,8 @@ function Get-ProwlerCheck {
     $shouldThrow = $ErrorActionPreference -eq 'Stop'
     $ErrorActionPreference = 'Stop'
 
-    $supportedProviders = (Get-CIEMProvider).Name.ToLower()
+    # Derive supported providers from the checks registered in ciem_checks.json
+    $supportedProviders = @(Get-CIEMCheck | ForEach-Object { $_.Provider.ToLower() } | Select-Object -Unique)
     $providersToQuery = if ($Provider) { @($Provider) } else { $supportedProviders }
 
     Write-Verbose "Searching for Prowler checks via GitHub API..."

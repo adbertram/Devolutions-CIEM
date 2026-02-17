@@ -57,7 +57,8 @@ function Sync-ProwlerCheck {
         @($Provider)
     }
     else {
-        @((Get-CIEMProvider).Name.ToLower())
+        # Derive supported providers from the checks registered in ciem_checks.json
+        @(Get-CIEMCheck | ForEach-Object { $_.Provider.ToLower() } | Select-Object -Unique)
     }
 
     Write-Verbose "Syncing Prowler checks from GitHub..."
