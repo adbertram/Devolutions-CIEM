@@ -144,8 +144,26 @@ function Invoke-CIEMScan {
                 }
             }
             'AWS' {
-                # AWS checks are stubs (MANUAL status) - no service initialization needed
-                Write-Verbose "AWS provider: skipping service initialization (all checks return MANUAL)"
+                $svcIndex = 0
+                Initialize-CIEMServiceCache -Provider $providerObj -Name $servicesToInit | ForEach-Object {
+                    $svcIndex++
+                    $svcPct = 5 + [math]::Floor(($svcIndex / @($servicesToInit).Count) * 15)
+                    Write-Progress -Activity $progressActivity -Status "Initializing services..." -CurrentOperation $_.ServiceName -PercentComplete $svcPct
+                    if ($_.Success) {
+                        $serviceCacheLookup[$_.ServiceName] = $_
+                        Write-Verbose "Initialized $($_.ServiceName) in $([math]::Round($_.Duration.TotalSeconds, 2))s"
+                    } elseif ($_.Errors -and $_.Errors[0] -match 'Service script not found') {
+                        # No service script yet — checks will run without ServiceCache (stubs return MANUAL)
+                        Write-Verbose "No service script for $($_.ServiceName) — checks will run as stubs"
+                    } else {
+                        # Script exists but failed (auth error, etc.) — store for auto-skip
+                        $serviceCacheLookup[$_.ServiceName] = $_
+                        Write-Warning "Failed to initialize $($_.ServiceName): $($_.Errors -join '; ')"
+                    }
+                    foreach ($w in $_.Warnings) {
+                        Write-Warning "[$($_.ServiceName)] $w"
+                    }
+                }
             }
         }
 
@@ -248,8 +266,12 @@ function Invoke-CIEMScan {
                     }
 
                     # Execute check and stream each finding to the pipeline
+                    $invokeParams = @{ Check = $check }
+                    if ($checkCaches.Count -gt 0) {
+                        $invokeParams.ServiceCache = $checkCaches
+                    }
                     $checkFindingCount = 0
-                    foreach ($finding in (& $functionName -Check $check -ServiceCache $checkCaches)) {
+                    foreach ($finding in (& $functionName @invokeParams)) {
                         $checkFindingCount++
                         $findingCount++
                         # Cast enum to string for hashtable key lookup (.ContainsKey doesn't coerce enums)
