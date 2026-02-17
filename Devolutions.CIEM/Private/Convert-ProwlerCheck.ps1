@@ -30,7 +30,7 @@ function Convert-ProwlerCheck {
         Hashtable of permissions to override inferred permissions.
 
     .EXAMPLE
-        Convert-ProwlerCheck -CheckPath './prowler/prowler/providers/azure/services/entra/entra_security_defaults_enabled'
+        Convert-ProwlerCheck -CheckPath '/tmp/prowler/providers/azure/services/entra/entra_security_defaults_enabled'
 
     .EXAMPLE
         Convert-ProwlerCheck -CheckId 'entra_security_defaults_enabled' -Provider azure

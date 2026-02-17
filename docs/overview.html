@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devolutions PSU CIEM Module Overview</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #232736;
+            --border: #2e3347;
+            --text: #e4e6ed;
+            --muted: #8b8fa3;
+            --accent: #6c8cff;
+            --accent-dim: #3a4d8c;
+            --green: #4ade80;
+            --green-dim: #1a3d2a;
+            --orange: #fb923c;
+            --orange-dim: #3d2a1a;
+            --red: #f87171;
+            --red-dim: #3d1a1a;
+            --purple: #c084fc;
+            --purple-dim: #2d1a4d;
+            --cyan: #22d3ee;
+            --yellow: #facc15;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.7;
+        }
+        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+
+        /* Hero */
+        .hero { text-align: center; padding: 56px 0 40px; border-bottom: 1px solid var(--border); margin-bottom: 48px; }
+        .hero h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+        .hero h1 span { color: var(--accent); }
+        .hero .sub { font-size: 1.1rem; color: var(--muted); max-width: 640px; margin: 0 auto 20px; }
+        .pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .pill { padding: 5px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.02em; }
+        .pill-b { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(108,140,255,0.3); }
+        .pill-g { background: var(--green-dim); color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+        .pill-p { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(192,132,252,0.3); }
+
+        /* Sections */
+        .sec { margin-bottom: 52px; }
+        .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        .sec-num { width: 34px; height: 34px; border-radius: 9px; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+        .sec-head h2 { font-size: 1.35rem; font-weight: 600; }
+        .sec > p, .sec > .lead { color: var(--muted); margin-bottom: 20px; font-size: 0.95rem; }
+
+        /* Cards */
+        .grid { display: grid; gap: 16px; }
+        .grid-2 { grid-template-columns: 1fr 1fr; }
+        .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
+        .card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+        .card p, .card .body { color: var(--muted); font-size: 0.88rem; }
+        .card-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .label-blue { color: var(--accent); }
+        .label-green { color: var(--green); }
+        .label-orange { color: var(--orange); }
+        .label-red { color: var(--red); }
+        .label-purple { color: var(--purple); }
+        .label-cyan { color: var(--cyan); }
+
+        /* Wide card */
+        .wide { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 26px; margin-bottom: 16px; }
+        .wide h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 10px; }
+
+        /* Flow */
+        .flow { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 4px 0; margin-bottom: 20px; }
+        .step { flex: 1; min-width: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 14px; text-align: center; }
+        .step .n { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.75rem; margin: 0 auto 8px; }
+        .step h4 { font-size: 0.85rem; margin-bottom: 4px; }
+        .step p { font-size: 0.78rem; color: var(--muted); }
+        .arrow { display: flex; align-items: center; padding: 0 4px; color: var(--accent); font-size: 1.3rem; flex-shrink: 0; }
+
+        /* Severity chips */
+        .sev { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .sev-pass { background: var(--green-dim); color: var(--green); }
+        .sev-fail { background: var(--red-dim); color: var(--red); }
+        .sev-skip { background: var(--surface2); color: var(--muted); }
+        .sev-manual { background: var(--orange-dim); color: var(--orange); }
+        .sev-run { background: var(--accent-dim); color: var(--accent); }
+
+        /* Callout */
+        .callout { background: var(--surface); border-left: 3px solid; border-radius: 0 10px 10px 0; padding: 20px 22px; margin-bottom: 16px; }
+        .callout h4 { font-size: 0.92rem; font-weight: 600; margin-bottom: 6px; }
+        .callout p { color: var(--muted); font-size: 0.88rem; }
+        .callout-blue { border-left-color: var(--accent); }
+        .callout-orange { border-left-color: var(--orange); }
+        .callout-green { border-left-color: var(--green); }
+        .callout-red { border-left-color: var(--red); }
+
+        /* Detect cards */
+        .detect { display: flex; gap: 16px; margin-bottom: 20px; }
+        .detect-card { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: flex; gap: 14px; align-items: flex-start; }
+        .detect-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+
+        /* Tier columns */
+        .tier { background: var(--surface2); border-radius: 8px; padding: 18px; border-top: 3px solid; }
+        .tier h4 { font-size: 0.88rem; margin-bottom: 10px; }
+        .tier ul { list-style: none; font-size: 0.82rem; color: var(--muted); }
+        .tier ul li { padding: 3px 0; }
+        .tier-b { border-top-color: var(--accent); }
+        .tier-g { border-top-color: var(--green); }
+        .tier-r { border-top-color: var(--red); }
+
+        /* Module banner */
+        .banner { background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); border: 1px solid var(--border); border-radius: 14px; padding: 28px; margin-bottom: 48px; display: flex; align-items: center; gap: 24px; }
+        .banner-icon { width: 64px; height: 64px; border-radius: 14px; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; flex-shrink: 0; }
+        .banner h3 { font-size: 1.15rem; margin-bottom: 6px; }
+        .banner p { font-size: 0.88rem; color: var(--muted); margin-bottom: 10px; }
+        .banner-meta { display: flex; gap: 16px; font-size: 0.8rem; color: var(--muted); flex-wrap: wrap; }
+        .banner-meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 4px; }
+
+        /* Pages row */
+        .pages { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+        .page { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+        .page .route { font-family: monospace; font-size: 0.75rem; color: var(--accent); margin-bottom: 2px; }
+        .page .name { font-size: 0.82rem; font-weight: 600; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 1.7rem; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .flow { flex-direction: column; }
+            .arrow { transform: rotate(90deg); justify-content: center; padding: 6px 0; }
+            .detect { flex-direction: column; }
+            .banner { flex-direction: column; text-align: center; }
+            .pages { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        footer { text-align: center; padding: 36px 0; border-top: 1px solid var(--border); margin-top: 28px; color: var(--muted); font-size: 0.82rem; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Hero -->
+    <header class="hero">
+        <h1>Devolutions PSU <span>CIEM</span> Module Overview</h1>
+        <p class="sub">
+            A PowerShell module that plugs into any PowerShell Universal instance to scan Azure and AWS
+            cloud environments for identity and access misconfigurations.
+        </p>
+        <div class="pills">
+            <span class="pill pill-b">PowerShell Core 7.4+</span>
+            <span class="pill pill-g">PSU Gallery Distribution</span>
+            <span class="pill pill-p">Azure &amp; AWS</span>
+        </div>
+    </header>
+
+    <!-- Module Banner -->
+    <div class="banner">
+        <div class="banner-icon">&#x1F4E6;</div>
+        <div>
+            <h3>Devolutions.CIEM Module</h3>
+            <p>
+                Everything described here — the data model, scan engine, check library, and PSU app —
+                is packaged in a single PowerShell module. When imported into a PSU instance the module
+                auto-registers the CIEM app. No manual page or route configuration required.
+            </p>
+            <div class="banner-meta">
+                <span><span class="dot"></span>Published to PowerShell Gallery</span>
+                <span>|</span>
+                <span>140+ Check Scripts</span>
+                <span>|</span>
+                <span>20 Service Definitions</span>
+                <span>|</span>
+                <span>5 App Pages</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════ 1 ═══════════════════════════ -->
+    <section class="sec" id="concepts">
+        <div class="sec-head">
+            <div class="sec-num">1</div>
+            <h2>Core Concepts</h2>
+        </div>
+        <p>
+            The module is built around six key concepts that flow from configuration through to results display.
+        </p>
+        <div class="grid grid-3">
+            <div class="card">
+                <div class="card-label label-blue">Concept</div>
+                <h3>Provider</h3>
+                <p>A configured cloud platform (Azure or AWS) with its authentication method, API endpoints, and optional subscription/account filters.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-green">Concept</div>
+                <h3>Service</h3>
+                <p>A logical grouping of cloud resources (e.g. Entra, IAM, KeyVault, Storage). Each service has an initialization script that pre-fetches all relevant API data.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-purple">Concept</div>
+                <h3>Check</h3>
+                <p>A single security rule defined in a shared metadata file. Includes title, description, severity, risk, remediation guidance, and required permissions.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-orange">Concept</div>
+                <h3>Scan Result</h3>
+                <p>The outcome of running one check against one resource. Carries a status — <span class="sev sev-pass">PASS</span> <span class="sev sev-fail">FAIL</span> <span class="sev sev-manual">MANUAL</span> <span class="sev sev-skip">SKIPPED</span> — plus details and the affected resource.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-red">Concept</div>
+                <h3>Scan Run</h3>
+                <p>A top-level container grouping all results from a single scan execution. Tracks status (<span class="sev sev-run">Running</span> <span class="sev sev-pass">Completed</span> <span class="sev sev-fail">Failed</span>), timing, and aggregate counts.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-cyan">Concept</div>
+                <h3>Service Cache</h3>
+                <p>The pre-fetched API data for a service, wrapped with success/failure status and timing. Checks read from this cache — they never call cloud APIs directly.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 2 ═══════════════════════════ -->
+    <section class="sec" id="relationships">
+        <div class="sec-head">
+            <div class="sec-num">2</div>
+            <h2>How They Fit Together</h2>
+        </div>
+        <p>
+            A Provider authenticates to the cloud. Services fetch data from that cloud. Checks assert conditions
+            against the fetched data. Results are collected into a Scan Run.
+        </p>
+        <div class="wide" style="overflow-x:auto; font-size:0.9rem; line-height:2.4; text-align:center;">
+            <div style="display:inline-block; text-align:left; white-space:pre; font-family:monospace;">
+<span style="color:var(--accent); font-weight:600;">Provider</span> <span style="color:var(--muted);">──authenticates──▸</span> <span style="color:var(--green); font-weight:600;">Service</span> <span style="color:var(--muted);">──pre-fetches──▸</span> <span style="color:var(--cyan); font-weight:600;">Service Cache</span>
+                                                              <span style="color:var(--muted);">│</span>
+<span style="color:var(--purple); font-weight:600;">Check</span> <span style="color:var(--muted);">───────────reads from──────────────────────┘</span>
+  <span style="color:var(--muted);">│</span>
+  <span style="color:var(--muted);">│ emits 0–N</span>
+  <span style="color:var(--muted);">▾</span>
+<span style="color:var(--orange); font-weight:600;">Scan Result</span> <span style="color:var(--muted);">──collected into──▸</span> <span style="color:var(--red); font-weight:600;">Scan Run</span></div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 3 ═══════════════════════════ -->
+    <section class="sec" id="auth">
+        <div class="sec-head">
+            <div class="sec-num">3</div>
+            <h2>Authentication</h2>
+        </div>
+        <p>
+            Each provider carries an authentication context. Azure supports five methods; AWS supports two.
+            The model is polymorphic — every method shares a common base (provider, enabled, method) while
+            adding its own fields (tenant ID, client ID, region, etc.).
+        </p>
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-label label-blue">Azure — 5 Methods</div>
+                <h3>Azure Authentication</h3>
+                <div class="body">
+                    <div style="margin-top:6px;">
+                        <strong>Service Principal (Secret)</strong> — Tenant ID + Client ID + Client Secret<br>
+                        <strong>Service Principal (Certificate)</strong> — Tenant ID + Client ID + Cert Thumbprint<br>
+                        <strong>Managed Identity</strong> — Zero-config for Azure Web App hosting<br>
+                        <strong>Device Code</strong> — Interactive code-based login<br>
+                        <strong>Interactive Browser</strong> — Browser-based sign-in
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label label-orange">AWS — 2 Methods</div>
+                <h3>AWS Authentication</h3>
+                <div class="body">
+                    <div style="margin-top:6px;">
+                        <strong>Current Profile</strong> — Uses existing AWS CLI config (~/.aws/credentials)<br>
+                        <strong>Access Key</strong> — Access Key ID + Secret Access Key + Region
+                    </div>
+                    <div style="margin-top:10px; font-size:0.82rem; color:var(--muted);">AWS support is staged for future implementation.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 4 ═══════════════════════════ -->
+    <section class="sec" id="gather-assert">
+        <div class="sec-head">
+            <div class="sec-num">4</div>
+            <h2>The "Gather Then Assert" Architecture</h2>
+        </div>
+        <p>
+            The scan engine uses a two-phase pattern that separates data collection from evaluation. This is the
+            most important architectural decision in the module.
+        </p>
+
+        <div class="grid grid-2" style="margin-bottom:20px;">
+            <div class="callout callout-red" style="border-radius:10px;">
+                <h4 style="color:var(--red);">Without this pattern</h4>
+                <p>Each check calls cloud APIs independently. 15 Entra checks = 15 duplicate calls to the same endpoints. Slow, rate-limited, wasteful.</p>
+            </div>
+            <div class="callout callout-green" style="border-radius:10px;">
+                <h4 style="color:var(--green);">With this pattern</h4>
+                <p>Each service calls its APIs <strong>once</strong>, caches the results in memory. All checks read from that shared cache. Fast, efficient, no duplicate calls.</p>
+            </div>
+        </div>
+
+        <!-- Phase 1 -->
+        <div class="wide">
+            <div class="card-label label-green">Phase 1 — Services Gather</div>
+            <h3>Pre-fetch all cloud data into service caches</h3>
+            <p style="color:var(--muted); font-size:0.88rem; margin-bottom:14px;">
+                Each of the 20 Azure service scripts (Entra, IAM, KeyVault, Storage, Defender, Monitor, Network, App, Vm, etc.)
+                calls the relevant cloud APIs and returns a data structure. The orchestrator wraps each result with
+                success/failure status and timing metadata.
+            </p>
+            <div class="grid grid-3">
+                <div style="background:var(--surface2); border-radius:8px; padding:14px;">
+                    <div style="font-weight:600; color:var(--accent); font-size:0.85rem; margin-bottom:6px;">Tenant-Scoped</div>
+                    <div style="color:var(--muted); font-size:0.82rem;">
+                        <strong>Entra</strong> — Users, MFA status, directory roles + members, security defaults,
+                        authorization policy, conditional access policies, named locations
+                    </div>
+                </div>
+                <div style="background:var(--surface2); border-radius:8px; padding:14px;">
+                    <div style="font-weight:600; color:var(--accent); font-size:0.85rem; margin-bottom:6px;">Subscription-Scoped</div>
+                    <div style="color:var(--muted); font-size:0.82rem;">
+                        <strong>IAM</strong> — Role definitions, custom roles, role assignments<br>
+                        <strong>Storage</strong> — Storage accounts, blob settings<br>
+                        (Data keyed by subscription ID)
+                    </div>
+                </div>
+                <div style="background:var(--surface2); border-radius:8px; padding:14px;">
+                    <div style="font-weight:600; color:var(--accent); font-size:0.85rem; margin-bottom:6px;">Multi-Plane</div>
+                    <div style="color:var(--muted); font-size:0.82rem;">
+                        <strong>KeyVault</strong> — ARM management plane (vault list, diagnostics) + data plane (keys, secrets).
+                        Gracefully handles 403 on data plane access.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="wide">
+            <div class="card-label label-purple">Phase 2 — Checks Assert</div>
+            <h3>Evaluate cached data against security rules</h3>
+            <p style="color:var(--muted); font-size:0.88rem; margin-bottom:14px;">
+                Every check follows the same contract: it receives check metadata and one or more service caches,
+                then returns zero or more scan results. No check ever makes an API call — it's pure in-memory evaluation.
+            </p>
+            <div class="grid grid-2">
+                <div style="background:var(--surface2); border-radius:8px; padding:14px;">
+                    <div style="font-weight:600; color:var(--green); font-size:0.85rem; margin-bottom:6px;">Simple assertions</div>
+                    <div style="color:var(--muted); font-size:0.82rem;">
+                        "Is security defaults enabled?" — reads one property, returns one PASS or FAIL.<br>
+                        "Are there fewer than 5 Global Admins?" — counts members, compares to threshold.
+                    </div>
+                </div>
+                <div style="background:var(--surface2); border-radius:8px; padding:14px;">
+                    <div style="font-weight:600; color:var(--orange); font-size:0.85rem; margin-bottom:6px;">Per-resource assertions</div>
+                    <div style="color:var(--muted); font-size:0.82rem;">
+                        "Do all privileged users have MFA?" — cross-references role members with MFA status,
+                        emits one FAIL per user without MFA. A single check can produce N results.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="callout callout-orange">
+            <h4 style="color:var(--orange);">Dependency &amp; Auto-Skip</h4>
+            <p>
+                Checks declare which services they depend on. If a service failed to initialize (e.g. missing API
+                permissions), all checks that depend on it are automatically skipped with an explanation — no
+                check code runs at all.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 5 ═══════════════════════════ -->
+    <section class="sec" id="prowler">
+        <div class="sec-head">
+            <div class="sec-num">5</div>
+            <h2>Prowler Sync — Growing the Check Library</h2>
+        </div>
+        <p>
+            Checks are not written from scratch. They originate from
+            <a href="https://github.com/prowler-cloud/prowler" style="color:var(--accent);">Prowler</a>, an
+            open-source Python cloud security tool. A built-in sync pipeline imports new checks from
+            the Prowler GitHub repository and converts them to CIEM-compatible PowerShell.
+        </p>
+
+        <div class="flow" style="margin: 24px 0;">
+            <div class="step">
+                <div class="n">1</div>
+                <h4>Discover</h4>
+                <p>Query GitHub API for all upstream Prowler checks</p>
+            </div>
+            <div class="arrow">&rarr;</div>
+            <div class="step">
+                <div class="n">2</div>
+                <h4>Diff</h4>
+                <p>Compare upstream IDs against locally registered checks</p>
+            </div>
+            <div class="arrow">&rarr;</div>
+            <div class="step">
+                <div class="n">3</div>
+                <h4>Download</h4>
+                <p>Git sparse checkout fetches only new check directories</p>
+            </div>
+            <div class="arrow">&rarr;</div>
+            <div class="step">
+                <div class="n">4</div>
+                <h4>Convert</h4>
+                <p>Generate PowerShell script scaffold + JSON metadata entry</p>
+            </div>
+            <div class="arrow">&rarr;</div>
+            <div class="step">
+                <div class="n">5</div>
+                <h4>Implement</h4>
+                <p>Developer fills in assertion logic using the gather/assert pattern</p>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="callout callout-green" style="border-radius:10px;">
+                <h4 style="color:var(--green);">Auto-populated from Prowler</h4>
+                <p>
+                    Check ID, title, description, risk assessment, severity level, remediation URL,
+                    related documentation, service name, and inferred permissions.
+                </p>
+            </div>
+            <div class="callout callout-orange" style="border-radius:10px;">
+                <h4 style="color:var(--orange);">Requires manual work</h4>
+                <p>
+                    The assertion logic (reading service cache data, evaluating conditions, emitting results).
+                    May also need a new service script if the check targets a new cloud service.
+                </p>
+            </div>
+        </div>
+
+        <div class="callout callout-blue">
+            <h4 style="color:var(--accent);">Efficient incremental sync</h4>
+            <p>
+                The full Prowler repository tree is fetched in a single cached GitHub API call. When no new
+                checks exist, the operation completes with just that one call — no git clone needed. For
+                bulk imports, sparse checkout downloads only the new directories regardless of count.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 6 ═══════════════════════════ -->
+    <section class="sec" id="app">
+        <div class="sec-head">
+            <div class="sec-num">6</div>
+            <h2>PSU App Pages</h2>
+        </div>
+        <p>
+            The module auto-registers a PSU app at <code style="font-size:0.85rem; background:var(--surface2); padding:2px 6px; border-radius:4px;">/ciem</code>
+            with five pages that handle the full user workflow from configuration to results review.
+        </p>
+
+        <div class="pages">
+            <div class="page"><div class="route">/ciem</div><div class="name">Dashboard</div></div>
+            <div class="page"><div class="route">/ciem/scan</div><div class="name">Run Scan</div></div>
+            <div class="page"><div class="route">/ciem/history</div><div class="name">Scan History</div></div>
+            <div class="page"><div class="route">/ciem/config</div><div class="name">Configuration</div></div>
+            <div class="page"><div class="route">/ciem/about</div><div class="name">About</div></div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="card">
+                <div class="card-label label-blue">Dashboard</div>
+                <h3>Results at a glance</h3>
+                <p>Summary cards (total, failed, passed, critical), severity breakdown chart, results-by-service chart, and top critical findings table from the most recent scan.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-green">Run Scan</div>
+                <h3>Select checks and execute</h3>
+                <p>Browsable grid of all checks with per-check detail modals showing description, risk, and remediation. Select which checks to run, click start, and watch progress in real time.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-purple">Scan History</div>
+                <h3>Review past scans</h3>
+                <p>Lists the last 10 scan runs with timestamp, status, result counts, and duration. Click a row to expand the full results with severity color-coding.</p>
+            </div>
+            <div class="card">
+                <div class="card-label label-orange">Configuration</div>
+                <h3>Provider authentication</h3>
+                <p>Auto-detects the hosting environment and shows a dynamic form that adjusts fields based on selected provider and auth method. Tests connection on save.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 7 ═══════════════════════════ -->
+    <section class="sec" id="config">
+        <div class="sec-head">
+            <div class="sec-num">7</div>
+            <h2>Environment Detection &amp; Configuration</h2>
+        </div>
+        <p>
+            The Configuration page automatically detects where the PSU instance is running and adapts accordingly.
+        </p>
+
+        <div class="detect">
+            <div class="detect-card">
+                <div class="detect-icon" style="background:rgba(108,140,255,0.15); color:var(--accent);">&#9729;</div>
+                <div>
+                    <h3 style="font-size:0.95rem; margin-bottom:4px;">Azure Web App <span class="pill pill-b" style="font-size:0.65rem; margin-left:6px;">Auto-Detected</span></h3>
+                    <p style="color:var(--muted); font-size:0.85rem;">
+                        Managed Identity available and recommended. All five Azure auth methods shown.
+                    </p>
+                </div>
+            </div>
+            <div class="detect-card">
+                <div class="detect-icon" style="background:rgba(74,222,128,0.15); color:var(--green);">&#9881;</div>
+                <div>
+                    <h3 style="font-size:0.95rem; margin-bottom:4px;">On-Premises <span class="pill pill-g" style="font-size:0.65rem; margin-left:6px;">Auto-Detected</span></h3>
+                    <p style="color:var(--muted); font-size:0.85rem;">
+                        Managed Identity unavailable (warning shown). Service Principal or Interactive methods recommended.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <p>
+            The detection works by checking for Azure App Service environment variables. The result determines
+            which auth methods are available and which warnings to display. The form dynamically adjusts
+            its fields as the user switches between providers and auth methods.
+        </p>
+
+        <div style="margin-top:20px;">
+            <div class="card-label label-red" style="margin-bottom:10px;">Three-Tier Storage</div>
+            <div class="grid grid-3">
+                <div class="tier tier-b">
+                    <h4 style="color:var(--accent);">General Config</h4>
+                    <ul>
+                        <li>Scan settings (throttle, timeout)</li>
+                        <li>Active cloud provider</li>
+                        <li>Output preferences</li>
+                        <li>PAM remediation URL</li>
+                    </ul>
+                </div>
+                <div class="tier tier-g">
+                    <h4 style="color:var(--green);">Provider Config</h4>
+                    <ul>
+                        <li>Auth method selection</li>
+                        <li>Tenant ID, Client ID</li>
+                        <li>API endpoints</li>
+                        <li>Subscription filters</li>
+                    </ul>
+                </div>
+                <div class="tier tier-r">
+                    <h4 style="color:var(--red);">PSU Secrets (Encrypted)</h4>
+                    <ul>
+                        <li>Client secrets</li>
+                        <li>Certificate thumbprints</li>
+                        <li>AWS access keys</li>
+                        <li>Managed identity client IDs</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 8 ═══════════════════════════ -->
+    <section class="sec" id="flow">
+        <div class="sec-head">
+            <div class="sec-num">8</div>
+            <h2>End-to-End Scan Flow</h2>
+        </div>
+        <p>From clicking "Start Scan" to results on the Dashboard, data flows through five phases.</p>
+
+        <div class="wide">
+            <div class="card-label label-blue">Phase 1 — Initialization</div>
+            <div class="flow">
+                <div class="step"><div class="n">A</div><h4>Collect</h4><p>Selected check IDs from the UI</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">B</div><h4>Create Scan Run</h4><p>Status = Running, start timer</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">C</div><h4>Persist</h4><p>Save to cache + scan history</p></div>
+            </div>
+        </div>
+        <div class="wide">
+            <div class="card-label label-green">Phase 2 — Authentication</div>
+            <div class="flow">
+                <div class="step"><div class="n">A</div><h4>Load Config</h4><p>Provider + auth context from cache</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">B</div><h4>Load Secrets</h4><p>Credentials from PSU secrets</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">C</div><h4>Get Tokens</h4><p>ARM, Graph, KeyVault tokens</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">D</div><h4>Subscriptions</h4><p>List and filter by scope</p></div>
+            </div>
+        </div>
+        <div class="wide">
+            <div class="card-label label-cyan">Phase 3 — Service Initialization</div>
+            <div class="flow">
+                <div class="step"><div class="n">A</div><h4>Identify Services</h4><p>From selected checks + dependencies</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">B</div><h4>Run Scripts</h4><p>Each service fetches its API data</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">C</div><h4>Wrap Results</h4><p>Success/failure + timing metadata</p></div>
+            </div>
+        </div>
+        <div class="wide">
+            <div class="card-label label-purple">Phase 4 — Check Execution</div>
+            <div class="flow">
+                <div class="step"><div class="n">A</div><h4>Validate Deps</h4><p>Skip checks with failed services</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">B</div><h4>Execute Checks</h4><p>Assert against cached data</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">C</div><h4>Stream Results</h4><p>0–N results per check to pipeline</p></div>
+            </div>
+        </div>
+        <div class="wide">
+            <div class="card-label label-red">Phase 5 — Persist &amp; Display</div>
+            <div class="flow">
+                <div class="step"><div class="n">A</div><h4>Complete Run</h4><p>Calculate duration + counts</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">B</div><h4>Save to Cache</h4><p>Results serialized to PSU cache</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">C</div><h4>Dashboard</h4><p>Charts, tables, severity cards</p></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 9 ═══════════════════════════ -->
+    <section class="sec" id="storage">
+        <div class="sec-head">
+            <div class="sec-num">9</div>
+            <h2>Data Persistence</h2>
+        </div>
+        <p>
+            All persistent state is stored in the PSU cache (key-value store with optional persistence to disk).
+            Sensitive credentials are stored separately in PSU's encrypted secrets store.
+        </p>
+
+        <div class="grid grid-2" style="margin-bottom:20px;">
+            <div class="card">
+                <div class="card-label label-blue">PSU Cache</div>
+                <h3>Configuration &amp; scan data</h3>
+                <div class="body">
+                    <strong>Config</strong> — Global scan settings and active provider.<br>
+                    <strong>Providers</strong> — Provider configs with auth context and endpoints.<br>
+                    <strong>Scan Runs</strong> — Per-run metadata (status, timing, counts). One key per run.<br>
+                    <strong>Scan Results</strong> — Per-run result arrays. Separated for lazy loading.<br>
+                    <strong>History</strong> — Last 10 scan summaries for the history page.<br>
+                    <strong>Current Run</strong> — ID of the active scan (for progress display).
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label label-red">PSU Secrets</div>
+                <h3>Encrypted credentials</h3>
+                <div class="body">
+                    Client secrets, certificate thumbprints, certificate passwords, managed identity client IDs,
+                    AWS access keys, and secret keys. Never stored in the cache — only in PSU's encrypted
+                    secrets store, accessed via the Secrets PSDrive.
+                </div>
+            </div>
+        </div>
+
+        <div class="callout callout-orange">
+            <h4 style="color:var(--orange);">Serialization Constraint</h4>
+            <p>
+                PowerShell class instances stored in PSU cache serialize to just their type name, losing all property
+                data. The module converts all objects to plain key-value objects before caching. This is a known
+                PSU/PowerShell interop constraint that the module handles transparently.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════ 10 ═══════════════════════════ -->
+    <section class="sec" id="distribution">
+        <div class="sec-head">
+            <div class="sec-num">10</div>
+            <h2>Distribution &amp; Deployment</h2>
+        </div>
+        <p>
+            The module is published to the PowerShell Gallery and imported into PSU instances. Once imported,
+            PSU auto-discovers the app definition and mounts it — zero manual setup.
+        </p>
+
+        <div class="flow" style="margin-bottom:24px;">
+            <div class="step"><div class="n">1</div><h4>Develop</h4><p>Edit module source</p></div>
+            <div class="arrow">&rarr;</div>
+            <div class="step"><div class="n">2</div><h4>Publish</h4><p>Auto-bump version, push to PSGallery</p></div>
+            <div class="arrow">&rarr;</div>
+            <div class="step"><div class="n">3</div><h4>Import</h4><p>PSU imports module from Gallery</p></div>
+            <div class="arrow">&rarr;</div>
+            <div class="step"><div class="n">4</div><h4>Auto-Register</h4><p>App manifest discovered, app mounted at /ciem</p></div>
+            <div class="arrow">&rarr;</div>
+            <div class="step"><div class="n">5</div><h4>Configure &amp; Scan</h4><p>User sets up auth and runs scans</p></div>
+        </div>
+
+        <div class="callout callout-green">
+            <h4 style="color:var(--green);">Auto-Registration</h4>
+            <p>
+                The module contains a PSU app manifest file that PSU discovers on import. This manifest points to the
+                single function that defines the entire app (all 5 pages, navigation, and event handlers).
+                PSU customers install the module from the Gallery and the CIEM app appears automatically — no
+                dashboard configuration, no script imports, no page routing.
+            </p>
+        </div>
+    </section>
+
+    <footer>
+        <p>Devolutions PSU CIEM Module Overview &mdash; Devolutions.CIEM</p>
+    </footer>
+
+</div>
+</body>
+</html>

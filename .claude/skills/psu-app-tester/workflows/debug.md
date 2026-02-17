@@ -2,7 +2,7 @@
 
 <required_reading>
 When PSU docs don't have the answer, use WebSearch for "PowerShell Universal v5 [topic]".
-PSU docs location: `./prowler/docs/psu-docs/`
+PSU docs location: `./docs/psu-docs/`
 </required_reading>
 
 <critical_rule>
@@ -69,8 +69,8 @@ source .env && curl -s -H "Authorization: Bearer $PSU_TOKEN" \
 ## Step 7: Read PSU cmdlet documentation
 
 For PSU API issues, check:
-- `./prowler/docs/psu-docs/cmdlets/` - Cmdlet reference
-- `./prowler/docs/psu-docs/platform/variables.md` - Secret management
+- `./docs/psu-docs/cmdlets/` - Cmdlet reference
+- `./docs/psu-docs/platform/variables.md` - Secret management
 
 ## Step 8: Web search for unknown issues
 

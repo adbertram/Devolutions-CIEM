@@ -49,7 +49,7 @@ Module: `./Devolutions.CIEM/Devolutions.CIEM.psm1` (contains New-DevolutionsCIEM
 Manifest: `./Devolutions.CIEM/Devolutions.CIEM.psd1`
 Management: `./scripts/PSUniversal.psm1` (Publish-PSUModule, Connect-PSU, Restart-PSUApp)
 Test Harness: `./scripts/Invoke-TestCommand.ps1` (unified command runner for local/PSU)
-PSU Docs: `./prowler/docs/psu-docs/`
+PSU Docs: `./docs/psu-docs/`
 Azure URL: https://devolutions-ciem-psu.azurewebsites.net/ciem/ciem/
 </project_structure>
 
@@ -69,7 +69,7 @@ Determine user intent:
 </routing>
 
 <reference_index>
-PSU Documentation: `./prowler/docs/psu-docs/`
+PSU Documentation: `./docs/psu-docs/`
 - apps/ - PSU App component docs
 - cmdlets/ - PSU cmdlet reference
 - platform/variables.md - Secret management

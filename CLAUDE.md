@@ -335,7 +335,7 @@ Full PSU v5 documentation for Azure hosting is available at `docs/psu-docs/confi
 
 ## Architecture Planning
 
-The architecture planning document is at `docs/architecture-planning.md`. It covers:
+The architecture planning document is at `docs/devolutions-ciem-app-architecture.md`. It covers:
 
 - **Approach**: Native PowerShell port of Prowler identity checks (no Python dependency)
 - **V1 Scope**: Azure + AWS identity-focused checks only

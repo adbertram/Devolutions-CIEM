@@ -35,8 +35,5 @@ function Get-CIEMDefaultConfig {
         pam = [PSCustomObject]@{
             remediationUrl = 'https://devolutions.net/pam'
         }
-        prowler = [PSCustomObject]@{
-            path = '../prowler/prowler/providers'
-        }
     }
 }
