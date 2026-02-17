@@ -38,143 +38,158 @@ function New-DevolutionsCIEMApp {
             New-UDPage -Name 'Dashboard' -Url '/ciem' -Content {
                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
 
-                # Load scan results from: 1) session, 2) ScanRun cache
-                $rawResults = $null
-                $scanTimestamp = $null
-
-                # Priority 1: Session storage
-                if ($Session:CIEMScanResults -and $Session:CIEMScanResults.Count -gt 0) {
-                    $rawResults = $Session:CIEMScanResults
-                    $scanTimestamp = $Session:CIEMScanTimestamp
-                }
-                # Priority 2: Get most recent ScanRun from cache
-                else {
-                    try {
-                        $scanRuns = @(Get-CIEMScanRun -IncludeResults)
-                        if ($scanRuns -and $scanRuns.Count -gt 0) {
-                            $currentRun = $scanRuns[0]
-                            if ($currentRun.ScanResults -and $currentRun.ScanResults.Count -gt 0) {
-                                $rawResults = $currentRun.ScanResults
-                                $scanTimestamp = $currentRun.EndTime
-
-                                # Restore to session for faster subsequent access
-                                $Session:CIEMScanResults = $rawResults
-                                $Session:CIEMScanTimestamp = $scanTimestamp
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
                 New-UDTypography -Text 'Devolutions CIEM Dashboard' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
                 New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
-                if ($rawResults -and $rawResults.Count -gt 0) {
-                    $ScanResults = $rawResults | ForEach-Object {
-                        [PSCustomObject]@{
-                            Id = $_.Check.Id
-                            CheckId = $_.Check.Id
-                            Title = $_.Check.Title
-                            Severity = ([string]$_.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
-                            Status = $_.Status
-                            Provider = if ($_.Check.Provider) { [string]$_.Check.Provider } else { 'Azure' }
-                            Service = [string]$_.Check.Service
-                            ResourceName = $_.ResourceName
-                        }
+                # Load available scan runs for the selector (only those with results)
+                $scanRuns = @(Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
+
+                if ($scanRuns -and $scanRuns.Count -gt 0) {
+                    # Initialize selected scan run to most recent if not already set
+                    if (-not $Session:SelectedScanRunId) {
+                        $Session:SelectedScanRunId = $scanRuns[0].Id
                     }
 
-                    $FailedResults = @($ScanResults | Where-Object { $_.Status -eq 'FAIL' })
-                    $PassedResults = @($ScanResults | Where-Object { $_.Status -eq 'PASS' })
-                    $CriticalCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'CRITICAL' }).Count
-                    $HighCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'HIGH' }).Count
-                    $MediumCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'MEDIUM' }).Count
-                    $LowCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'LOW' }).Count
-
-                    # Show scan timestamp
-                    $timestampStr = if ($scanTimestamp) { ([datetime]$scanTimestamp).ToString('yyyy-MM-dd HH:mm:ss') } else { 'Unknown' }
+                    # Scan Run Selector + Run New Scan button
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '20px' } } -Content {
                         New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                            New-UDChip -Label "Last Scan: $timestampStr" -Icon (New-UDIcon -Icon 'Clock') -Size 'small' -Style @{ backgroundColor = '#e3f2fd' }
+                            New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '400px' } } -Content {
+                                New-UDSelect -Id 'scanRunSelector' -Label 'Select Scan Run' -Option {
+                                    $runs = @(Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
+                                    foreach ($run in $runs) {
+                                        $statusIcon = switch ([string]$run.Status) { 'Completed' { '✓' } 'Failed' { '✗' } default { '…' } }
+                                        $label = "$statusIcon $(([datetime]$run.StartTime).ToString('yyyy-MM-dd HH:mm')) - $([string]$run.Provider) ($($run.TotalResults) results, $($run.FailedResults) failed)"
+                                        New-UDSelectOption -Name $label -Value $run.Id
+                                    }
+                                } -DefaultValue $Session:SelectedScanRunId -OnChange {
+                                    $Session:SelectedScanRunId = $EventData[0]
+                                    Sync-UDElement -Id 'dashboardContent'
+                                } -FullWidth
+                            }
                             New-UDButton -Text 'Run New Scan' -Variant 'outlined' -Size 'small' -OnClick {
                                 Invoke-UDRedirect '/ciem/scan'
                             }
                         }
                     }
 
-                    New-UDGrid -Container -Content {
-                        New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
-                            New-UDCard -Title 'Total Results' -Content {
-                                New-UDTypography -Text @($ScanResults).Count -Variant 'h3' -Style @{ color = '#1976d2'; textAlign = 'center' }
-                            } -Style @{ textAlign = 'center' }
-                        }
-                        New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
-                            New-UDCard -Title 'Failed Checks' -Content {
-                                New-UDTypography -Text $FailedResults.Count -Variant 'h3' -Style @{ color = '#f44336'; textAlign = 'center' }
-                            } -Style @{ textAlign = 'center' }
-                        }
-                        New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
-                            New-UDCard -Title 'Passed Checks' -Content {
-                                New-UDTypography -Text $PassedResults.Count -Variant 'h3' -Style @{ color = '#4caf50'; textAlign = 'center' }
-                            } -Style @{ textAlign = 'center' }
-                        }
-                        New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
-                            New-UDCard -Title 'Critical Issues' -Content {
-                                New-UDTypography -Text $CriticalCount -Variant 'h3' -Style @{ color = '#9c27b0'; textAlign = 'center' }
-                            } -Style @{ textAlign = 'center' }
-                        }
-                    }
+                    # Dynamic dashboard content that refreshes when scan run selection changes
+                    New-UDDynamic -Id 'dashboardContent' -Content {
+                        Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
 
-                    New-UDGrid -Container -Content {
-                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                            New-UDCard -Title 'Results by Severity' -Content {
-                                $SeverityData = @(
-                                    @{ Name = 'Critical'; Count = $CriticalCount; color = '#9c27b0' }
-                                    @{ Name = 'High'; Count = $HighCount; color = '#f44336' }
-                                    @{ Name = 'Medium'; Count = $MediumCount; color = '#ff9800' }
-                                    @{ Name = 'Low'; Count = $LowCount; color = '#2196f3' }
-                                ) | Where-Object { $_.Count -gt 0 }
-                                if ($SeverityData.Count -gt 0) {
-                                    New-UDChartJS -Type 'doughnut' -Data $SeverityData -DataProperty Count -LabelProperty Name -BackgroundColor @('#9c27b0', '#f44336', '#ff9800', '#2196f3')
+                        $scanRunId = $Session:SelectedScanRunId
+                        if (-not $scanRunId) { return }
+
+                        $scanRun = Get-CIEMScanRun -Id $scanRunId -IncludeResults
+                        if (-not $scanRun) {
+                            New-UDTypography -Text 'Scan run not found.' -Style @{ color = '#666'; padding = '20px' }
+                            return
+                        }
+
+                        $rawResults = $scanRun.ScanResults
+                        $scanTimestamp = $scanRun.EndTime
+
+                        if ($rawResults -and @($rawResults).Count -gt 0) {
+                            $ScanResults = $rawResults | ForEach-Object {
+                                [PSCustomObject]@{
+                                    Id = $_.Check.Id
+                                    CheckId = $_.Check.Id
+                                    Title = $_.Check.Title
+                                    Severity = ([string]$_.Check.Severity -replace '^(.)', { $_.Groups[1].Value.ToUpper() })
+                                    Status = $_.Status
+                                    Provider = if ($_.Check.Provider) { [string]$_.Check.Provider } else { 'Azure' }
+                                    Service = [string]$_.Check.Service
+                                    ResourceName = $_.ResourceName
+                                }
+                            }
+
+                            $FailedResults = @($ScanResults | Where-Object { $_.Status -eq 'FAIL' })
+                            $PassedResults = @($ScanResults | Where-Object { $_.Status -eq 'PASS' })
+                            $CriticalCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'CRITICAL' }).Count
+                            $HighCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'HIGH' }).Count
+                            $MediumCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'MEDIUM' }).Count
+                            $LowCount = @($FailedResults | Where-Object { $_.Severity.ToUpper() -eq 'LOW' }).Count
+
+                            New-UDGrid -Container -Content {
+                                New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
+                                    New-UDCard -Title 'Total Results' -Content {
+                                        New-UDTypography -Text @($ScanResults).Count -Variant 'h3' -Style @{ color = '#1976d2'; textAlign = 'center' }
+                                    } -Style @{ textAlign = 'center' }
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
+                                    New-UDCard -Title 'Failed Checks' -Content {
+                                        New-UDTypography -Text $FailedResults.Count -Variant 'h3' -Style @{ color = '#f44336'; textAlign = 'center' }
+                                    } -Style @{ textAlign = 'center' }
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
+                                    New-UDCard -Title 'Passed Checks' -Content {
+                                        New-UDTypography -Text $PassedResults.Count -Variant 'h3' -Style @{ color = '#4caf50'; textAlign = 'center' }
+                                    } -Style @{ textAlign = 'center' }
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
+                                    New-UDCard -Title 'Critical Issues' -Content {
+                                        New-UDTypography -Text $CriticalCount -Variant 'h3' -Style @{ color = '#9c27b0'; textAlign = 'center' }
+                                    } -Style @{ textAlign = 'center' }
+                                }
+                            }
+
+                            New-UDGrid -Container -Content {
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDCard -Title 'Results by Severity' -Content {
+                                        $SeverityData = @(
+                                            @{ Name = 'Critical'; Count = $CriticalCount; color = '#9c27b0' }
+                                            @{ Name = 'High'; Count = $HighCount; color = '#f44336' }
+                                            @{ Name = 'Medium'; Count = $MediumCount; color = '#ff9800' }
+                                            @{ Name = 'Low'; Count = $LowCount; color = '#2196f3' }
+                                        ) | Where-Object { $_.Count -gt 0 }
+                                        if ($SeverityData.Count -gt 0) {
+                                            New-UDChartJS -Type 'doughnut' -Data $SeverityData -DataProperty Count -LabelProperty Name -BackgroundColor @('#9c27b0', '#f44336', '#ff9800', '#2196f3')
+                                        } else {
+                                            New-UDTypography -Text 'No failed results' -Style @{ textAlign = 'center'; padding = '40px' }
+                                        }
+                                    }
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDCard -Title 'Results by Service' -Content {
+                                        $ServiceData = $FailedResults | Group-Object -Property Service | ForEach-Object { @{ Name = $_.Name; Count = $_.Count } }
+                                        if ($ServiceData.Count -gt 0) {
+                                            New-UDChartJS -Type 'bar' -Data $ServiceData -DataProperty Count -LabelProperty Name -BackgroundColor '#1976d2'
+                                        } else {
+                                            New-UDTypography -Text 'No failed results' -Style @{ textAlign = 'center'; padding = '40px' }
+                                        }
+                                    }
+                                }
+                            }
+
+                            New-UDCard -Title 'Critical & High Results' -Style @{ marginTop = '20px' } -Content {
+                                $CriticalHighResults = $FailedResults | Where-Object { $_.Severity.ToUpper() -in @('CRITICAL', 'HIGH') } | Select-Object -First 5
+                                if (@($CriticalHighResults).Count -gt 0) {
+                                    New-UDTable -Data $CriticalHighResults -Columns @(
+                                        New-UDTableColumn -Property 'CheckId' -Title 'Check ID'
+                                        New-UDTableColumn -Property 'Title' -Title 'Result'
+                                        New-UDTableColumn -Property 'Severity' -Title 'Severity' -Render {
+                                            $sev = $EventData.Severity.ToUpper()
+                                            $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } default { '#666' } }
+                                            New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                        }
+                                        New-UDTableColumn -Property 'Service' -Title 'Service'
+                                        New-UDTableColumn -Property 'ResourceName' -Title 'Resource'
+                                    )
+                                    New-UDButton -Text 'View All Results' -Variant 'outlined' -OnClick {
+                                        Invoke-UDRedirect '/ciem/history'
+                                    } -Style @{ marginTop = '12px' }
                                 } else {
-                                    New-UDTypography -Text 'No failed results' -Style @{ textAlign = 'center'; padding = '40px' }
+                                    New-UDStack -Direction 'column' -AlignItems 'center' -Content {
+                                        New-UDIcon -Icon 'CheckCircle' -Size '3x' -Style @{ color = '#4caf50'; marginBottom = '12px' }
+                                        New-UDTypography -Text 'No critical or high severity results!' -Style @{ color = '#4caf50' }
+                                    }
                                 }
                             }
                         }
-                        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                            New-UDCard -Title 'Results by Service' -Content {
-                                $ServiceData = $FailedResults | Group-Object -Property Service | ForEach-Object { @{ Name = $_.Name; Count = $_.Count } }
-                                if ($ServiceData.Count -gt 0) {
-                                    New-UDChartJS -Type 'bar' -Data $ServiceData -DataProperty Count -LabelProperty Name -BackgroundColor '#1976d2'
-                                } else {
-                                    New-UDTypography -Text 'No failed results' -Style @{ textAlign = 'center'; padding = '40px' }
-                                }
-                            }
+                        else {
+                            New-UDTypography -Text 'No results for this scan run.' -Style @{ color = '#666'; padding = '20px' }
                         }
-                    }
-
-                    New-UDCard -Title 'Recent Critical & High Results' -Style @{ marginTop = '20px' } -Content {
-                        $CriticalHighResults = $FailedResults | Where-Object { $_.Severity.ToUpper() -in @('CRITICAL', 'HIGH') } | Select-Object -First 5
-                        if (@($CriticalHighResults).Count -gt 0) {
-                            New-UDTable -Data $CriticalHighResults -Columns @(
-                                New-UDTableColumn -Property 'CheckId' -Title 'Check ID'
-                                New-UDTableColumn -Property 'Title' -Title 'Result'
-                                New-UDTableColumn -Property 'Severity' -Title 'Severity' -Render {
-                                    $sev = $EventData.Severity.ToUpper()
-                                    $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } default { '#666' } }
-                                    New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
-                                }
-                                New-UDTableColumn -Property 'Service' -Title 'Service'
-                                New-UDTableColumn -Property 'ResourceName' -Title 'Resource'
-                            )
-                            New-UDButton -Text 'View All Results' -Variant 'outlined' -OnClick {
-                                Invoke-UDRedirect '/ciem/history'
-                            } -Style @{ marginTop = '12px' }
-                        } else {
-                            New-UDStack -Direction 'column' -AlignItems 'center' -Content {
-                                New-UDIcon -Icon 'CheckCircle' -Size '3x' -Style @{ color = '#4caf50'; marginBottom = '12px' }
-                                New-UDTypography -Text 'No critical or high severity results!' -Style @{ color = '#4caf50' }
-                            } -Style @{ padding = '20px' }
-                        }
+                    } -LoadingComponent {
+                        New-UDProgress -Circular
                     }
                 }
                 else {
