@@ -220,6 +220,11 @@ function Invoke-CIEMScan {
         $totalChecks = @($checks).Count
 
         foreach ($check in $checks) {
+            if ($check.Disabled) {
+                Write-Verbose "Skipping disabled check: $($check.Id)"
+                continue
+            }
+
             $checkIndex++
             $checkPct = 20 + [math]::Floor(($checkIndex / $totalChecks) * 80)
             Write-Progress -Activity $progressActivity -Status "Running check $checkIndex of $totalChecks" -CurrentOperation $check.Title -PercentComplete $checkPct

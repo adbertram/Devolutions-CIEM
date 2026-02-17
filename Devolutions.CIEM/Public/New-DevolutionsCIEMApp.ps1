@@ -225,20 +225,41 @@ function New-DevolutionsCIEMApp {
                         Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                         $allChecks = @(Get-CIEMCheck)
 
-                        # Initialize selected checks (default: all) on first load
+                        # Initialize session state on first load
                         if ($null -eq $Session:SelectedCheckIds) {
-                            $Session:SelectedCheckIds = @($allChecks | Select-Object -ExpandProperty Id)
+                            $Session:SelectedCheckIds = @($allChecks | Where-Object { -not $_.Disabled } | Select-Object -ExpandProperty Id)
+                        }
+                        if ($null -eq $Session:CheckStatusFilter) {
+                            $Session:CheckStatusFilter = 'enabled'
                         }
 
                         # Selection summary
                         New-UDDynamic -Id 'selectionSummary' -Content {
                             Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                             $checks = @(Get-CIEMCheck)
+                            $enabledCount = @($checks | Where-Object { -not $_.Disabled }).Count
+                            $disabledCount = @($checks | Where-Object { $_.Disabled }).Count
                             $selectedCount = @($Session:SelectedCheckIds).Count
-                            $totalCount = $checks.Count
                             New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '8px' } } -Content {
                                 New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                    New-UDTypography -Text "$selectedCount / $totalCount checks selected" -Variant 'body2' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$selectedCount / $enabledCount enabled checks selected ($disabledCount disabled)" -Variant 'body2' -Style @{ color = '#666' }
+                                }
+                            }
+                        }
+
+                        # Status filter
+                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '12px' } } -Content {
+                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                New-UDTypography -Text 'Status:' -Variant 'body2' -Style @{ color = '#666'; marginRight = '4px' }
+                                New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '140px' } } -Content {
+                                    New-UDSelect -Id 'checkStatusFilter' -DefaultValue $Session:CheckStatusFilter -OnChange {
+                                        $Session:CheckStatusFilter = $EventData
+                                        Sync-UDElement -Id 'checkSelectionGrid'
+                                    } -Option {
+                                        New-UDSelectOption -Name 'Enabled' -Value 'enabled'
+                                        New-UDSelectOption -Name 'Disabled' -Value 'disabled'
+                                        New-UDSelectOption -Name 'All' -Value 'all'
+                                    }
                                 }
                             }
                         }
@@ -246,6 +267,15 @@ function New-DevolutionsCIEMApp {
                         New-UDDataGrid -Id 'checkSelector' -LoadRows {
                             Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                             $checks = @(Get-CIEMCheck)
+
+                            # Apply status filter
+                            $statusFilter = $Session:CheckStatusFilter
+                            if ($statusFilter -eq 'enabled') {
+                                $checks = @($checks | Where-Object { -not $_.Disabled })
+                            } elseif ($statusFilter -eq 'disabled') {
+                                $checks = @($checks | Where-Object { $_.Disabled })
+                            }
+
                             $checksData = $checks | ForEach-Object {
                                 @{
                                     id              = $_.Id
@@ -259,10 +289,36 @@ function New-DevolutionsCIEMApp {
                                     relatedUrl      = $_.RelatedUrl
                                     remediationText = $_.Remediation.Text
                                     remediationUrl  = $_.Remediation.Url
+                                    disabled        = [bool]$_.Disabled
                                 }
                             }
                             @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
                         } -Columns @(
+                            New-UDDataGridColumn -Field 'selected' -HeaderName '' -Width 60 -Render {
+                                $currentId = $EventData.checkId
+                                $isDisabled = $EventData.disabled
+                                if ($isDisabled) {
+                                    New-UDTooltip -Content {
+                                        New-UDCheckBox -Disabled
+                                    } -TooltipContent {
+                                        New-UDTypography -Text 'Check not yet implemented' -Variant 'body2'
+                                    }
+                                } else {
+                                    $isChecked = @($Session:SelectedCheckIds) -contains $currentId
+                                    New-UDCheckBox -Checked $isChecked -OnChange {
+                                        $selected = [System.Collections.ArrayList]@($Session:SelectedCheckIds)
+                                        if ($EventData) {
+                                            if ($selected -notcontains $currentId) {
+                                                [void]$selected.Add($currentId)
+                                            }
+                                        } else {
+                                            [void]$selected.Remove($currentId)
+                                        }
+                                        $Session:SelectedCheckIds = @($selected)
+                                        Sync-UDElement -Id 'selectionSummary'
+                                    }
+                                }
+                            }
                             New-UDDataGridColumn -Field 'info' -HeaderName 'Info' -Width 60 -Render {
                                 New-UDIconButton -Icon (New-UDIcon -Icon 'InfoCircle') -Size 'small' -OnClick {
                                     Show-UDModal -Header {
@@ -302,17 +358,30 @@ function New-DevolutionsCIEMApp {
                             }
                             New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
                                 $sev = $EventData.severity.ToUpper()
-                                $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
-                                New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                if ($EventData.disabled) {
+                                    New-UDChip -Label $sev -Style @{ backgroundColor = '#e0e0e0'; color = '#bbb' }
+                                } else {
+                                    $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                    New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
+                                }
                             }
-                            New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 100
-                            New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 130
-                            New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1
-                            New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280
-                        ) -CheckboxSelection -DisableRowSelectionOnClick -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -OnSelectionChange {
-                            $Session:SelectedCheckIds = @($EventData)
-                            Sync-UDElement -Id 'selectionSummary'
-                        } -Density 'compact'
+                            New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 100 -Render {
+                                $textColor = if ($EventData.disabled) { '#bbb' } else { 'inherit' }
+                                New-UDElement -Tag 'span' -Attributes @{ style = @{ color = $textColor } } -Content { $EventData.provider }
+                            }
+                            New-UDDataGridColumn -Field 'service' -HeaderName 'Service' -Width 130 -Render {
+                                $textColor = if ($EventData.disabled) { '#bbb' } else { 'inherit' }
+                                New-UDElement -Tag 'span' -Attributes @{ style = @{ color = $textColor } } -Content { $EventData.service }
+                            }
+                            New-UDDataGridColumn -Field 'title' -HeaderName 'Title' -Flex 1 -Render {
+                                $textColor = if ($EventData.disabled) { '#bbb' } else { 'inherit' }
+                                New-UDElement -Tag 'span' -Attributes @{ style = @{ color = $textColor } } -Content { $EventData.title }
+                            }
+                            New-UDDataGridColumn -Field 'checkId' -HeaderName 'Check ID' -Width 280 -Render {
+                                $textColor = if ($EventData.disabled) { '#bbb' } else { 'inherit' }
+                                New-UDElement -Tag 'span' -Attributes @{ style = @{ color = $textColor } } -Content { $EventData.checkId }
+                            }
+                        ) -DisableRowSelectionOnClick -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -Density 'compact'
                     }
 
                     # Scan Progress Area - stores scan state and results
@@ -327,9 +396,10 @@ function New-DevolutionsCIEMApp {
                                 Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
                                 Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
 
-                                # Read selected check IDs from session state
+                                # Read selected check IDs from session state, strip any disabled checks
                                 $allChecks = @(Get-CIEMCheck)
-                                $selectedCheckIds = @($Session:SelectedCheckIds)
+                                $enabledCheckIds = @($allChecks | Where-Object { -not $_.Disabled } | Select-Object -ExpandProperty Id)
+                                $selectedCheckIds = @($Session:SelectedCheckIds | Where-Object { $enabledCheckIds -contains $_ })
 
                                 if ($selectedCheckIds.Count -eq 0) {
                                     Show-UDToast -Message 'Please select at least one check.' -Duration 5000 -BackgroundColor '#ff9800'

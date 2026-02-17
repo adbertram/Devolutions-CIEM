@@ -115,6 +115,16 @@ Present the final PowerShell function to the user with:
 - Any semantic differences or limitations noted
 </step>
 
+<step name="enable-check">
+After writing the converted PowerShell check to its file, enable the check in `ciem_checks.json`:
+
+```bash
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Manager; Enable-CIEMCheck -CheckId '<check-id>'"
+```
+
+This marks the check as active so it runs in scans and becomes selectable in the PSU app UI.
+</step>
+
 </process>
 
 <success_criteria>

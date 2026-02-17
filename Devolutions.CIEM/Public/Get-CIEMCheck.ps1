@@ -98,6 +98,7 @@ function Get-CIEMCheck {
                 RelatedUrl    = $jsonObj.relatedUrl
                 CheckScript   = $jsonObj.checkScript
                 DependsOn     = @($jsonObj.dependsOn | Where-Object { $_ })
+                Disabled      = [bool]$jsonObj.disabled
                 Permissions   = & {
                     $raw = $jsonObj.permissions
                     $p = @{ Graph = @(); ARM = @(); KeyVaultDataPlane = @(); IAM = @() }

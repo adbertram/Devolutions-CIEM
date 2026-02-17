@@ -242,6 +242,7 @@ function $FunctionName {
             checkScript  = "$FunctionName.ps1"
             dependsOn    = @($Metadata.DependsOn | Where-Object { $_ })
             permissions  = $Perms
+            disabled     = $true
         }
     }
 

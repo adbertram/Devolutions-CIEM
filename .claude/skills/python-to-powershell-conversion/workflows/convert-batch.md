@@ -76,6 +76,16 @@ Present final results:
 - Count: total converted, any skipped (with reasons)
 </step>
 
+<step name="enable-checks">
+After all conversions are complete, enable the converted checks in `ciem_checks.json`:
+
+```bash
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Manager; @('check-id-1','check-id-2') | Enable-CIEMCheck"
+```
+
+This marks the checks as active so they run in scans and become selectable in the PSU app UI.
+</step>
+
 </process>
 
 <success_criteria>

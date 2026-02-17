@@ -44,6 +44,7 @@ class CIEMCheck {
     [string]$CheckScript
     [string[]]$DependsOn
     [CIEMCheckPermissions]$Permissions
+    [bool]$Disabled
 
     CIEMCheck() {}
 }
