@@ -27,9 +27,6 @@ $script:GraphAccessToken = $null
 # Initialize PSU environment detection (populated on first access)
 $script:PSUEnvironment = $null
 
-# GitHub tree cache - reduces API calls from 67+ to 1 per ref (unauthenticated limit: 60/hr)
-$script:GitHubTreeCache = @{}
-
 # Get class, public, private, and check function definition files
 # Note: Errors during file enumeration indicate a broken module structure and should fail loudly
 $classesPath = Join-Path -Path $PSScriptRoot -ChildPath 'Classes'

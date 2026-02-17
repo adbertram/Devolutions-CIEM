@@ -20,7 +20,12 @@ function Test-GitRemote {
 
     $ErrorActionPreference = 'Stop'
 
-    $upstreamRemote = $script:Config.prowler.upstreamRemote
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        throw "git is required but was not found in PATH."
+    }
+
+    $config = Get-CIEMConfig
+    $upstreamRemote = $config.prowler.upstreamRemote
     $remotes = (git remote -v 2>&1) -join "`n"
 
     if ($remotes -notmatch "$upstreamRemote.*prowler") {

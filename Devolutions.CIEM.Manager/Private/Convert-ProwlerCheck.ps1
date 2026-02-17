@@ -64,6 +64,8 @@ function Convert-ProwlerCheck {
 
     $ErrorActionPreference = 'Stop'
 
+    $config = Get-CIEMConfig
+
     #region Helper Functions
 
     # Converts snake_case text to PascalCase (e.g., 'my_check_name' -> 'MyCheckName')
@@ -266,8 +268,8 @@ function $FunctionName {
 
     #region Main Logic
 
-    # Resolve prowler providers path from config
-    $prowlerProvidersPath = Join-Path $script:ModuleRoot $script:Config.prowler.path
+    # Resolve prowler providers path from CIEM module root
+    $prowlerProvidersPath = Join-Path $script:CIEMModuleRoot $config.prowler.path
 
     if ($PSCmdlet.ParameterSetName -eq 'ById') {
         $serviceName = ($CheckId -split '_')[0]
@@ -327,7 +329,7 @@ function $FunctionName {
 
     if (-not $OutputDirectory) {
         $providerDisplayName = (Get-Culture).TextInfo.ToTitleCase($Provider)
-        $OutputDirectory = Join-Path -Path $script:ModuleRoot -ChildPath $script:Config.checksPath -AdditionalChildPath $providerDisplayName
+        $OutputDirectory = Join-Path -Path $script:CIEMModuleRoot -ChildPath $config.checksPath -AdditionalChildPath $providerDisplayName
     }
 
     $results = @{
@@ -358,8 +360,8 @@ function $FunctionName {
         Write-Verbose "JSON Metadata:"
         Write-Verbose $jsonOutput
 
-        # Append to centralized ciem_checks.json
-        $ciemChecksPath = Join-Path $script:ModuleRoot 'ciem_checks.json'
+        # Append to centralized ciem_checks.json in the CIEM module
+        $ciemChecksPath = Join-Path $script:CIEMModuleRoot 'ciem_checks.json'
         $providerKey = $Provider.ToLower()
 
         if (Test-Path $ciemChecksPath) {

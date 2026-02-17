@@ -49,20 +49,20 @@ function Compare-ProwlerCheck {
     if ($Provider) { $prowlerParams['Provider'] = $Provider }
     if ($Service) { $prowlerParams['Service'] = $Service }
 
-    Write-CIEMLog 'Fetching upstream Prowler checks...'
+    Write-Verbose 'Fetching upstream Prowler checks...'
     $prowlerIds = @(Get-ProwlerCheck @prowlerParams | ForEach-Object { $_.Name })
-    Write-CIEMLog "  Prowler checks: $($prowlerIds.Count)"
+    Write-Verbose "  Prowler checks: $($prowlerIds.Count)"
 
     $ciemParams = @{}
     if ($Provider) { $ciemParams['Provider'] = $Provider }
     if ($Service) { $ciemParams['Service'] = $Service }
 
-    Write-CIEMLog 'Fetching local CIEM checks...'
+    Write-Verbose 'Fetching local CIEM checks...'
     $ciemIds = @(Get-CIEMCheck @ciemParams | ForEach-Object { $_.Id })
-    Write-CIEMLog "  CIEM checks: $($ciemIds.Count)"
+    Write-Verbose "  CIEM checks: $($ciemIds.Count)"
 
     if ($prowlerIds.Count -eq 0 -and $ciemIds.Count -eq 0) {
-        Write-CIEMLog 'Both sets are empty, nothing to compare.'
+        Write-Verbose 'Both sets are empty, nothing to compare.'
         return
     }
 
