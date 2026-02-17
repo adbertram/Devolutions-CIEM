@@ -95,6 +95,57 @@ Publish-PSUModule -ModulePath ./Devolutions.CIEM -LocalOnly
 
 ---
 
+## Manager Module (`Devolutions.CIEM.Manager`)
+
+Development-only module for managing CIEM checks, syncing Prowler checks, and provisioning Azure infrastructure. **Not deployed to PSU** — used locally during development only.
+
+```powershell
+Import-Module ./Devolutions.CIEM.Manager
+```
+
+**Important:** The Manager module is self-contained — no dependency on `Devolutions.CIEM` at import time. It reads `ciem_checks.json` directly from the sibling `Devolutions.CIEM/` directory.
+
+### Public Functions
+
+| Function | Purpose |
+|----------|---------|
+| `Sync-ProwlerCheck` | Sync Prowler checks from GitHub into `ciem_checks.json` |
+| `Get-ProwlerCheck` | List/filter Prowler checks from the upstream repo |
+| `Remove-CIEMCheck` | Remove a check from `ciem_checks.json` |
+| `New-CIEMAzureManagedIdentity` | Create Azure managed identity for CIEM scanning |
+| `New-PSUAzureServicePrincipal` | Create Azure service principal for PSU |
+
+### Private Helpers
+
+| Function | Purpose |
+|----------|---------|
+| `Get-CIEMCheck` | Read/filter checks from `ciem_checks.json` (disk-based, no CIEM module needed) |
+| `Get-CIEMRequiredPermission` | Aggregate required permissions across checks |
+| `Convert-ProwlerCheck` | Convert a Prowler check directory to CIEM format |
+| `Compare-ProwlerCheck` | Compare local checks against upstream Prowler |
+| `Get-GitHubRepoTree` | GitHub API tree listing (cached to reduce API calls) |
+| `Save-GitHubRepoFile` / `Save-GitHubRepoSparseCheckout` | Download files from GitHub |
+| `Test-GitRemote` | Validate git remote availability |
+
+### When to Use
+
+- **Adding/removing/syncing checks:** Use Manager module functions, not manual JSON editing
+- **Querying check metadata during development:** `Get-CIEMCheck -Provider Azure -Service Entra`
+- **Checking required permissions:** `Get-CIEMRequiredPermission -Service KeyVault`
+- **Provisioning Azure resources:** `New-CIEMAzureManagedIdentity`, `New-PSUAzureServicePrincipal`
+
+### Module Layout
+
+```
+Devolutions.CIEM.Manager/
+├── Devolutions.CIEM.Manager.psd1   # Manifest (v0.1.0, no RequiredModules)
+├── Devolutions.CIEM.Manager.psm1   # Loader (resolves sibling CIEM module path)
+├── Private/                         # Internal helpers
+└── Public/                          # Exported functions
+```
+
+---
+
 ## Testing Commands
 
 Use `scripts/Invoke-TestCommand.ps1` to run PowerShell commands against the module. It handles module import, PSU connection, and credential loading automatically.

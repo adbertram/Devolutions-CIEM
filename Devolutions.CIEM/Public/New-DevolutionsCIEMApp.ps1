@@ -707,12 +707,14 @@ function New-DevolutionsCIEMApp {
                             New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
                                 try {
                                     Import-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-                                    $permissions = Get-CIEMRequiredPermission
+                                    $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
+                                    if (-not $selectedProvider) { $selectedProvider = 'Azure' }
+                                    $permissions = Get-CIEMRequiredPermission -Provider $selectedProvider
                                     Show-UDModal -Header {
-                                        New-UDTypography -Text 'Required Permissions for CIEM Scans' -Variant 'h6'
+                                        New-UDTypography -Text "Required Permissions for $selectedProvider CIEM Scans" -Variant 'h6'
                                     } -Content {
                                         New-UDElement -Tag 'div' -Content {
-                                            New-UDTypography -Text "The following permissions are required for the service principal to run all $($permissions.CheckCount) security checks:" -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                            New-UDTypography -Text "The following permissions are required to run all $($permissions.CheckCount) $selectedProvider security checks:" -Variant 'body2' -Style @{ marginBottom = '16px' }
 
                                             if ($permissions.Graph.Count -gt 0) {
                                                 New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
@@ -740,6 +742,16 @@ function New-DevolutionsCIEMApp {
                                                 New-UDList -Content {
                                                     foreach ($perm in $permissions.KeyVaultDataPlane) {
                                                         New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Lock' -Size 'sm')
+                                                    }
+                                                }
+                                            }
+
+                                            if ($permissions.IAM.Count -gt 0) {
+                                                New-UDTypography -Text 'AWS IAM Actions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                                New-UDTypography -Text 'Attach an IAM policy to your scanning identity (user or role) that grants these actions.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                                New-UDList -Content {
+                                                    foreach ($perm in $permissions.IAM) {
+                                                        New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'UserShield' -Size 'sm')
                                                     }
                                                 }
                                             }
