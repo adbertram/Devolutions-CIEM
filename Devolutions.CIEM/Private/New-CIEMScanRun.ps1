@@ -5,8 +5,8 @@ function New-CIEMScanRun {
     .DESCRIPTION
         Creates a new CIEMScanRun instance with a unique ID, start time,
         and Running status. Used internally by Invoke-CIEMScan.
-    .PARAMETER Provider
-        The cloud provider being scanned (Azure or AWS).
+    .PARAMETER Providers
+        One or more cloud providers being scanned (e.g. 'Azure', 'AWS').
     .PARAMETER Services
         Array of services to be scanned.
     .PARAMETER IncludePassed
@@ -15,15 +15,15 @@ function New-CIEMScanRun {
         CIEMScanRun
         A new ScanRun object ready for tracking.
     .EXAMPLE
-        $scanRun = New-CIEMScanRun -Provider 'Azure' -Services @('Entra', 'IAM')
+        $scanRun = New-CIEMScanRun -Providers @('Azure', 'AWS') -Services @('Entra', 'IAM')
 
-        Creates a new scan run for Azure targeting the Entra and IAM services.
+        Creates a new scan run for Azure and AWS targeting the Entra and IAM services.
     #>
     [CmdletBinding()]
     [OutputType([CIEMScanRun])]
     param(
         [Parameter(Mandatory)]
-        [string]$Provider,
+        [string[]]$Providers,
 
         [Parameter(Mandatory)]
         [string[]]$Services,
@@ -32,7 +32,7 @@ function New-CIEMScanRun {
         [bool]$IncludePassed = $false
     )
 
-    $scanRun = [CIEMScanRun]::new($Provider, $Services, $IncludePassed)
+    $scanRun = [CIEMScanRun]::new($Providers, $Services, $IncludePassed)
     $scanRun.Status = [CIEMScanRunStatus]::Running
     Write-Verbose "Created ScanRun: $($scanRun.Id)"
     return $scanRun

@@ -166,7 +166,7 @@
             <div class="banner-meta">
                 <span><span class="dot"></span>Published to PowerShell Gallery</span>
                 <span>|</span>
-                <span>140+ Check Scripts</span>
+                <span>747 Check Definitions (51 Implemented)</span>
                 <span>|</span>
                 <span>20 Service Definitions</span>
                 <span>|</span>
@@ -198,7 +198,7 @@
             <div class="card">
                 <div class="card-label label-purple">Concept</div>
                 <h3>Check</h3>
-                <p>A single security rule defined in a shared metadata file. Includes title, description, severity, risk, remediation guidance, and required permissions.</p>
+                <p>A single security rule defined in a shared metadata file. Includes title, description, severity, risk, remediation guidance, required permissions, and a disabled flag. Checks synced from Prowler start disabled until their assertion logic is implemented.</p>
             </div>
             <div class="card">
                 <div class="card-label label-orange">Concept</div>
@@ -415,6 +415,12 @@
                 <h4>Implement</h4>
                 <p>Developer fills in assertion logic using the gather/assert pattern</p>
             </div>
+            <div class="arrow">&rarr;</div>
+            <div class="step">
+                <div class="n">6</div>
+                <h4>Enable</h4>
+                <p>Enable-CIEMCheck marks the check active for scans</p>
+            </div>
         </div>
 
         <div class="grid grid-2">
@@ -440,6 +446,16 @@
                 The full Prowler repository tree is fetched in a single cached GitHub API call. When no new
                 checks exist, the operation completes with just that one call — no git clone needed. For
                 bulk imports, sparse checkout downloads only the new directories regardless of count.
+            </p>
+        </div>
+
+        <div class="callout callout-orange">
+            <h4 style="color:var(--orange);">Disabled by default</h4>
+            <p>
+                Newly synced checks are created with <code style="font-size:0.85rem; background:var(--surface2); padding:2px 6px; border-radius:4px;">disabled: true</code>.
+                They appear greyed out in the UI and are excluded from scans until a developer converts the Python
+                logic to PowerShell and runs <code style="font-size:0.85rem; background:var(--surface2); padding:2px 6px; border-radius:4px;">Enable-CIEMCheck</code>.
+                This prevents stub checks from producing misleading results.
             </p>
         </div>
     </section>
@@ -472,7 +488,7 @@
             <div class="card">
                 <div class="card-label label-green">Run Scan</div>
                 <h3>Select checks and execute</h3>
-                <p>Browsable grid of all checks with per-check detail modals showing description, risk, and remediation. Select which checks to run, click start, and watch progress in real time.</p>
+                <p>Browsable grid of all checks with per-check detail modals showing description, risk, and remediation. A status filter (Enabled / Disabled / All) controls visibility. Disabled checks appear greyed out with tooltips. Select enabled checks to run, click start, and watch progress in real time.</p>
             </div>
             <div class="card">
                 <div class="card-label label-purple">Scan History</div>
@@ -601,11 +617,13 @@
         <div class="wide">
             <div class="card-label label-purple">Phase 4 — Check Execution</div>
             <div class="flow">
-                <div class="step"><div class="n">A</div><h4>Validate Deps</h4><p>Skip checks with failed services</p></div>
+                <div class="step"><div class="n">A</div><h4>Filter Disabled</h4><p>Skip checks marked as disabled</p></div>
                 <div class="arrow">&rarr;</div>
-                <div class="step"><div class="n">B</div><h4>Execute Checks</h4><p>Assert against cached data</p></div>
+                <div class="step"><div class="n">B</div><h4>Validate Deps</h4><p>Skip checks with failed services</p></div>
                 <div class="arrow">&rarr;</div>
-                <div class="step"><div class="n">C</div><h4>Stream Results</h4><p>0–N results per check to pipeline</p></div>
+                <div class="step"><div class="n">C</div><h4>Execute Checks</h4><p>Assert against cached data</p></div>
+                <div class="arrow">&rarr;</div>
+                <div class="step"><div class="n">D</div><h4>Stream Results</h4><p>0–N results per check to pipeline</p></div>
             </div>
         </div>
         <div class="wide">

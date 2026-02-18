@@ -27,17 +27,19 @@ $script:GraphAccessToken = $null
 # Initialize PSU environment detection (populated on first access)
 $script:PSUEnvironment = $null
 
-# Get class, public, private, and check function definition files
+# Get class, public, private, page, and check function definition files
 # Note: Errors during file enumeration indicate a broken module structure and should fail loudly
 $classesPath = Join-Path -Path $PSScriptRoot -ChildPath 'Classes'
 $privatePath = Join-Path -Path $PSScriptRoot -ChildPath 'Private'
-$publicPath = Join-Path -Path $PSScriptRoot -ChildPath 'Public'
-$checksPath = Join-Path -Path $PSScriptRoot -ChildPath 'Checks'
+$pagesPath   = Join-Path -Path $PSScriptRoot -ChildPath 'Pages'
+$publicPath  = Join-Path -Path $PSScriptRoot -ChildPath 'Public'
+$checksPath  = Join-Path -Path $PSScriptRoot -ChildPath 'Checks'
 
 $Classes = @()
 $Private = @()
-$Public = @()
-$Checks = @()
+$Pages   = @()
+$Public  = @()
+$Checks  = @()
 
 if (Test-Path -Path $classesPath) {
     $Classes = @(Get-ChildItem -Path "$classesPath\*.ps1" -ErrorAction Stop)
@@ -45,6 +47,10 @@ if (Test-Path -Path $classesPath) {
 
 if (Test-Path -Path $privatePath) {
     $Private = @(Get-ChildItem -Path "$privatePath\*.ps1" -ErrorAction Stop)
+}
+
+if (Test-Path -Path $pagesPath) {
+    $Pages = @(Get-ChildItem -Path "$pagesPath\*.ps1" -ErrorAction Stop)
 }
 
 if (Test-Path -Path $publicPath) {
@@ -55,8 +61,9 @@ if (Test-Path -Path $checksPath) {
     $Checks = @(Get-ChildItem -Path $checksPath -Filter '*.ps1' -Recurse -ErrorAction Stop)
 }
 
-# Dot source the files (classes first, then private, checks, public)
-foreach ($import in @($Classes + $Private + $Checks + $Public)) {
+# Dot source the files (classes first, then private, pages, checks, public)
+# Pages are loaded before Public so New-DevolutionsCIEMApp can call page functions
+foreach ($import in @($Classes + $Private + $Pages + $Checks + $Public)) {
     try {
         Write-Verbose "Importing $($import.FullName)"
         . $import.FullName
@@ -79,9 +86,6 @@ foreach ($file in $Public) {
 # Initialize configuration from PSU cache (or defaults if not in PSU)
 # This must happen after functions are dot-sourced so Get-CIEMConfig is available
 $script:Config = Get-CIEMConfig
-
-# Migrate old config-based provider storage to CIEM:Providers cache (one-time)
-Import-CIEMProviderMigration
 
 # Register dynamic tab-completion for -Provider and -Name parameters
 Register-CIEMArgumentCompleters
