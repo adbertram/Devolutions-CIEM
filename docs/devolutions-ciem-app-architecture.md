@@ -2,19 +2,34 @@
 
 ## Project Overview
 
-Devolutions CIEM (Cloud Infrastructure Entitlement Management) is a PowerShell Universal (PSU) module that provides cloud security scanning functionality, focusing on identity and entitlement issues.
+Devolutions CIEM (Cloud Infrastructure Entitlement Management) is a PowerShell Universal (PSU) module that provides cloud entitlement analysis, focusing on discovering overprivileged identities, dormant permissions, and role right-sizing.
 
 ### Business Context
 
 - **Distribution Model**: PSU app published to the PSU Gallery (not standalone deployment)
 - **Pricing**: Free add-on for PSU customers (no additional cost beyond PSU license)
 - **Strategic Purpose**: Lead generation for Devolutions PAM solution; CIEM is a Gartner inclusion criteria for PAM
+- **Differentiation**: CIEM is a niche segment where organizations see value in lightweight solutions — unlike CSPM which is a commodity already bundled free in cloud platforms (e.g., Defender for Cloud)
 - **Action Flow**: CIEM identifies findings → users are redirected to Devolutions PAM to take action
 
-### Stakeholder Requirements (Marc-André Moreau)
+### CSPM vs CIEM Distinction (CRITICAL)
 
-Key requirements from project lead:
+Per stakeholder feedback, the project must be positioned as **true CIEM, not lightweight CSPM**.
 
+**What we built initially (CSPM-like):**
+- CIS best-practice validation checks (MFA enabled, key rotation, etc.)
+- Prowler-ported checks that validate security posture
+- This is commodity — cloud platforms already offer it for free
+
+**What true CIEM requires:**
+- **Control relationship discovery** — Map relationships between cloud objects and identify risks (e.g., an internet-exposed VM holding Azure privileges that allow pivoting into infrastructure)
+- **Dormant permission detection** — Identify users/service principals holding privileged roles they haven't used in 180+ days (via Entra sign-in logs, AWS CloudTrail)
+- **Role right-sizing** — Propose custom roles aligned with least privilege to replace overly broad roles detected in the environment
+- **Risk-to-PAM mapping** — Connect detected risk levels and privileged roles to Devolutions PAM (this is closer to CIEM than posture checks)
+
+### Stakeholder Feedback (Marc-André Moreau)
+
+**Initial requirements:**
 1. "For taking action on the findings, we'd redirect people to our PAM solution"
 2. "Basically a goodie that enhances the value of PSU and covers CIEM (one of the Gartner inclusion criteria for PAM)"
 3. "We'd give it away for free / open source - of course you'd need to pay for PSU, but it wouldn't cost more to use it"
@@ -22,6 +37,14 @@ Key requirements from project lead:
 5. "The focus should be on finding overprivileged account and permissions issues"
 6. "We could do a module for Active Directory through LDAP, mapping users permissions and groups" (future scope)
 7. "If there's no good fit, we're fine with just building minimal functionality as a PowerShell module on top of the first-class PowerShell modules for each cloud"
+
+**Demo review feedback (repositioning directive):**
+- The initial demo delivered a lightweight CSPM, not a CIEM — checks only touch IAM superficially
+- CSPM is a commodity; most cloud users already have one — limited added value
+- Multi-cloud monitoring (AWS, Azure, GCP in one console) is the only CSPM value-add
+- CIEM is a niche segment where a lightweight solution has real value because organizations haven't adopted one yet
+- **Directive**: Keep the PSU showcase as foundation, but pivot to CIEM features — dormant roles via Entra sign-in logs, oversized role detection, least-privilege recommendations
+- The PSU app itself was praised as "an excellent showcase of what PSU is capable of"
 
 ---
 
@@ -46,14 +69,14 @@ Key requirements from project lead:
 
 | Aspect | Decision |
 |--------|----------|
-| **Approach** | Native PowerShell port (no Python dependency) |
+| **Approach** | Native PowerShell (no Python dependency) |
 | **V1 Providers** | Azure + AWS |
-| **Check Scope** | All Prowler checks (Azure + AWS) |
-| **Compliance Mapping** | Not in v1 |
+| **Core Focus** | CIEM: dormant permissions, role right-sizing, control relationships |
+| **CSPM Checks** | Retained as secondary feature (Prowler-ported posture checks) |
 | **Cloud SDKs** | Az.* modules, AWS.Tools.* modules |
 | **PSU Integration** | PSU App with Pages for scan config and results |
 | **Data Persistence** | Job output (snapshot per scan, no historical queries) |
-| **PAM Integration** | Link to documentation (placeholder for future) |
+| **PAM Integration** | Risk-to-PAM mapping (connect findings to PAM privileged roles) |
 | **Distribution** | PSU Gallery via PowerShell Gallery with RequiredModules |
 | **AD Support** | Architected for extensibility, not implemented in v1 |
 
@@ -61,17 +84,41 @@ Key requirements from project lead:
 
 ## V1 Scope
 
-### In Scope
+### Primary: CIEM Features (Differentiators)
 
-#### Providers
-- **Azure**: All Prowler checks
-- **AWS**: All Prowler checks
+These are the features that differentiate us from free CSPM tools and justify the project:
 
-#### Check Categories
+#### Dormant Permission Detection
+- Analyze Entra sign-in logs to identify users/service principals with privileged roles unused in 180+ days
+- Analyze AWS CloudTrail to detect IAM roles/users with unused permissions
+- Flag dormant privileged accounts as high-risk findings
 
-All checks from Prowler are synced and scaffolded. Check scripts are generated as stubs that require manual PowerShell implementation. Services covered include all Prowler-supported services for each provider.
+#### Role Right-Sizing
+- Detect overly broad role assignments (e.g., Contributor/Owner at subscription scope)
+- Propose custom roles aligned with least privilege based on actual usage patterns
+- Compare assigned permissions vs. actually-used permissions
 
-#### Authentication Methods
+#### Control Relationship Discovery
+- Map relationships between cloud objects (VMs, identities, network exposure)
+- Identify high-risk combinations (e.g., internet-exposed VM with privileged Azure identity)
+- Surface attack paths that chain entitlements together
+
+#### Risk-to-PAM Mapping
+- Connect detected risk levels and privileged roles to Devolutions PAM
+- Deeper than a documentation link — map findings to PAM-actionable items
+
+### Secondary: CSPM Posture Checks (Retained)
+
+The existing Prowler-ported checks are retained as a secondary feature layer:
+- CIS best-practice validation (MFA, key rotation, etc.)
+- All synced Prowler checks for Azure and AWS
+- Useful as a baseline but not the differentiator
+
+### Providers
+- **Azure**: Entra ID sign-in logs, RBAC analysis, resource relationships
+- **AWS**: CloudTrail analysis, IAM policy analysis, resource relationships
+
+### Authentication Methods
 - **Azure**: Managed Identity (auto-detect), Service Principal (env vars), Az CLI context
 - **AWS**: Instance Profile (auto-detect), Access Keys, IAM role assumption
 
@@ -82,8 +129,7 @@ All checks from Prowler are synced and scaffolded. Check scripts are generated a
 - Historical findings / trending
 - Custom database tables
 - GCP, Kubernetes, M365, GitHub, Oracle Cloud providers
-- Deep PAM integration (API calls, ticket creation)
-- Non-Prowler checks
+- Deep PAM API integration (ticket creation, automated onboarding)
 
 ---
 
@@ -404,47 +450,51 @@ function Test-SomeCheckName {
 
 ## Open Questions / Decisions Needed
 
-### 1. Check Inventory
-Need to analyze Prowler's codebase and produce a concrete list of identity-focused checks to port for Azure and AWS. This provides actual scope and effort estimate.
+### 1. Dormant Permission Data Sources
+What log sources to use for detecting dormant permissions?
+- **Azure**: Entra sign-in logs (requires Microsoft Graph `AuditLog.Read.All`), Azure Activity logs
+- **AWS**: CloudTrail (requires `cloudtrail:LookupEvents`), IAM Access Analyzer
+- **Question**: What lookback period? 90 days? 180 days? Configurable?
 
-### 2. Authentication UX
+### 2. Right-Sizing Implementation Depth
+How deep should role right-sizing go in V1?
+- **Option A**: Flag overly broad roles only (Contributor/Owner at wide scope)
+- **Option B**: Propose specific custom role definitions based on usage
+- **Option C**: Full used-vs-assigned permission diff
+- **Recommendation**: Start with Option A, add Option B as fast follow
+
+### 3. Control Relationship Scope
+How much infrastructure mapping in V1?
+- **Option A**: Identity-to-resource mapping only (who has access to what)
+- **Option B**: Add network exposure context (internet-facing resources with privileged identities)
+- **Option C**: Full attack path analysis
+- **Recommendation**: Option B — identity mapping plus network exposure gives high-value findings
+
+### 4. Authentication UX
 When configuring a scan, how should users specify credentials?
 - **Option A**: Auto-detect and only prompt when needed
 - **Option B**: Explicit fields for all auth options
 - **Recommendation**: Auto-detect with fallback prompts
 
-### 3. Scan Scope Selection
-How granular should scope selection be in V1?
-- **Azure**: Entire tenant? Specific subscriptions? Resource groups?
-- **AWS**: Entire account? Specific regions? Specific services?
-- **Recommendation**: Start with subscription/account level, add granularity later
-
-### 4. Error Handling During Scans
-If a check fails (insufficient permissions, API error):
-- **Option A**: Stop entirely and report error
-- **Option B**: Skip that check and continue, note as "SKIPPED"
-- **Option C**: Retry with backoff
-- **Recommendation**: Skip and continue (matches Prowler behavior)
-
-### 5. Upstream Sync Strategy
-How to stay current with Prowler's check updates:
-- **Option A**: One-time port, independent evolution
-- **Option B**: Periodic manual sync
-- **Option C**: Automated transpilation (ambitious)
-- **Recommendation**: Start with Option A, evaluate sync need based on Prowler release frequency
+### 5. CSPM Check Retention
+How to handle existing Prowler-ported CSPM checks?
+- Keep as secondary feature layer (still runs, lower priority in UI)
+- Do not invest further in porting new CSPM checks — focus effort on CIEM features
+- Existing checks remain useful as baseline posture validation
 
 ---
 
 ## Next Steps
 
-1. [ ] Inventory Prowler identity-focused checks for Azure and AWS
-2. [ ] Design check execution framework in PowerShell
-3. [ ] Create module scaffold with PSU integration
-4. [ ] Port highest-priority Azure checks
-5. [ ] Port highest-priority AWS checks
-6. [ ] Build PSU App UI (scan config + results viewer)
-7. [ ] Test in Azure App Service environment
-8. [ ] Publish to PowerShell Gallery with PSU tag
+1. [ ] Design dormant permission detection for Azure (Entra sign-in logs)
+2. [ ] Design dormant permission detection for AWS (CloudTrail)
+3. [ ] Implement role right-sizing analysis (overly broad role detection)
+4. [ ] Implement identity-to-resource relationship mapping
+5. [ ] Add network exposure context to relationship mapping
+6. [ ] Build risk-to-PAM mapping for findings
+7. [ ] Update PSU App UI to surface CIEM findings (dormant roles, right-sizing recommendations)
+8. [ ] Test against real Azure/AWS environments
+9. [ ] Publish updated module to PowerShell Gallery
 
 ---
 

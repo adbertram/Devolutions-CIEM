@@ -16,7 +16,19 @@ Key context from discussions with Marc-André Moreau:
 - **Distribution**: PSU app published to the PSU Gallery (not standalone deployment)
 - **Business Model**: Free add-on for PSU customers (no additional cost beyond PSU license)
 - **Strategic Purpose**: Lead generation for Devolutions PAM solution; CIEM is a Gartner inclusion criteria for PAM
+- **Differentiation**: CIEM is niche and valuable — CSPM is a commodity already bundled free in cloud platforms
 - **Action Flow**: CIEM identifies findings → users are redirected to Devolutions PAM to take action
+
+### CSPM vs CIEM Positioning (CRITICAL)
+
+Per Marc-André's demo review: the initial implementation was CSPM (CIS best-practice checks), not true CIEM. The project must focus on **CIEM-specific features** that differentiate from free tools:
+
+- **Dormant permission detection** — Users/service principals with unused privileged roles (via sign-in logs)
+- **Role right-sizing** — Propose least-privilege custom roles to replace overly broad assignments
+- **Control relationship discovery** — Map identity-to-resource relationships and surface attack paths
+- **Risk-to-PAM mapping** — Connect findings to Devolutions PAM privileged roles
+
+Existing Prowler-ported CSPM checks are retained as a secondary feature but are NOT the differentiator.
 
 ### Slack Context
 
@@ -388,8 +400,10 @@ Full PSU v5 documentation for Azure hosting is available at `docs/psu-docs/confi
 
 The architecture planning document is at `docs/devolutions-ciem-app-architecture.md`. It covers:
 
-- **Approach**: Native PowerShell port of Prowler identity checks (no Python dependency)
-- **V1 Scope**: Azure + AWS identity-focused checks only
+- **Approach**: Native PowerShell (no Python dependency)
+- **Primary Focus**: CIEM features — dormant permissions, role right-sizing, control relationships
+- **Secondary**: Prowler-ported CSPM checks (retained, not the differentiator)
+- **V1 Providers**: Azure + AWS
 - **Distribution**: PSU Gallery module with `RequiredModules` for Az.* and AWS.Tools.*
 - **PSU Integration**: PSU App with scan configuration and results viewer pages
 - **Data Model**: Finding objects stored as job output (no custom tables)
@@ -400,8 +414,9 @@ The architecture planning document is at `docs/devolutions-ciem-app-architecture
 |--------|----------|
 | Runtime | Pure PowerShell (no Python) |
 | V1 Providers | Azure, AWS |
-| Check Focus | Identity/entitlement only |
+| Core Focus | CIEM: dormant permissions, role right-sizing, control relationships |
+| CSPM Checks | Retained as secondary layer (Prowler-ported) |
 | Compliance Mapping | Not in v1 |
 | Historical Data | Not in v1 (snapshot per scan) |
 | AD Support | Future (architected for extensibility) |
-| PAM Integration | Link to docs only (placeholder) |
+| PAM Integration | Risk-to-PAM mapping (deeper than link to docs) |
