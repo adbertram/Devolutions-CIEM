@@ -28,3 +28,19 @@ class CIEMAzurePermissions : CIEMGraphNode {
 
     CIEMAzurePermissions() { $this.NodeType = [CIEMGraphNodeType]::AzurePermissions }
 }
+
+class CIEMAzureResourceTypeNode : CIEMGraphNode {
+    [string]$ResourceTypeName     # "KeyVault", etc. (matches CIEMAzureResourceType.Name)
+    [string]$DisplayName          # "Key Vault", etc.
+    [string]$ArmProviderPrefix    # "Microsoft.KeyVault/vaults", etc.
+
+    CIEMAzureResourceTypeNode() { $this.NodeType = [CIEMGraphNodeType]::AzureResourceType }
+}
+
+class CIEMAWSResourceTypeNode : CIEMGraphNode {
+    [string]$ResourceTypeName     # "S3Bucket", etc. (matches CIEMAWSResourceType.Name)
+    [string]$DisplayName          # "S3 Bucket", etc.
+    [string]$ArnServicePrefix     # "s3", "ec2", etc.
+
+    CIEMAWSResourceTypeNode() { $this.NodeType = [CIEMGraphNodeType]::AWSResourceType }
+}

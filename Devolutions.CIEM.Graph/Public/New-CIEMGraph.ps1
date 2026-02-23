@@ -160,6 +160,24 @@ function New-CIEMGraph {
         Write-Warning "Permission relationships config not found at: $rprPath"
     }
 
+    # Phase 6: Create resource type nodes from parent module's canonical vocabulary
+    Write-Verbose "Phase 6: Creating resource type nodes..."
+    $rtCount = 0
+    # Determine provider from data: Azure if we have Entra data, AWS when supported
+    if ($EntraData.Users -or $EntraData.Groups -or $EntraData.ServicePrincipals) {
+        $azureResourceTypes = @(Get-CIEMResourceType -Provider 'Azure')
+        foreach ($rt in $azureResourceTypes) {
+            $rtNode = [CIEMAzureResourceTypeNode]::new()
+            $rtNode.Id = "type:$($rt.Name)"
+            $rtNode.ResourceTypeName = $rt.Name
+            $rtNode.DisplayName = $rt.DisplayName
+            $rtNode.ArmProviderPrefix = $rt.ArmProviderPrefix
+            $graph.AddNode($rtNode)
+            $rtCount++
+        }
+    }
+    Write-Verbose "  Added $rtCount resource type nodes"
+
     Write-Verbose "Graph build complete: $($graph.Nodes.Count) nodes, $($graph.Edges.Count) edges"
 
     return $graph

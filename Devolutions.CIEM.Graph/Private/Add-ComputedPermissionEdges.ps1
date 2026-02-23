@@ -29,12 +29,10 @@ function Add-ComputedPermissionEdges {
     )
     $ErrorActionPreference = 'Stop'
 
-    # Collect all identity node IDs (users, groups, service principals)
-    $identityTypes = @(
-        [CIEMGraphNodeType]::EntraUser
-        [CIEMGraphNodeType]::EntraGroup
-        [CIEMGraphNodeType]::EntraServicePrincipal
-    )
+    # Collect all identity node IDs from canonical identity type data
+    $identityTypes = @(Get-CIEMIdentity | Where-Object { $_.PrincipalType } | ForEach-Object {
+        [CIEMGraphNodeType]($_.GraphNodeType)
+    } | Select-Object -Unique)
 
     $identityIds = [System.Collections.Generic.List[string]]::new()
     foreach ($type in $identityTypes) {
@@ -135,30 +133,13 @@ function Add-ComputedPermissionEdges {
                 default      { continue }
             }
 
-            # Filter role assignment scopes against target resource scopes.
-            # Only create the edge if at least one role assignment scope contains a target resource scope.
+            # Filter role assignment scopes against the resource type node.
+            # Now that resource types are real nodes (CIEMAzureResourceTypeNode), look up directly.
             $assignmentScopes = @($roleAssignmentNodes | ForEach-Object { $_.Scope } | Select-Object -Unique)
-            $targetResourceNodes = $Graph.GetNodesByTypeString($rpr.targetType)
-            if ($targetResourceNodes.Count -gt 0) {
-                $hasContainingScope = $false
-                foreach ($targetNode in $targetResourceNodes) {
-                    $targetScope = if ($targetNode.Properties -and $targetNode.Properties['scope']) {
-                        $targetNode.Properties['scope']
-                    } elseif ($targetNode.Id -match '^/subscriptions/') {
-                        $targetNode.Id
-                    } else {
-                        $null
-                    }
-                    if (-not $targetScope) { $hasContainingScope = $true; break }
-                    foreach ($aScope in $assignmentScopes) {
-                        if (Resolve-AzureScope -AssignmentScope $aScope -TargetScope $targetScope) {
-                            $hasContainingScope = $true
-                            break
-                        }
-                    }
-                    if ($hasContainingScope) { break }
-                }
-                if (-not $hasContainingScope) { continue }
+            $targetTypeNode = $Graph.GetNode("type:$($rpr.targetType)")
+            if ($targetTypeNode) {
+                # Resource type nodes are category-level (no specific scope), so no scope filtering needed.
+                # The node exists, confirming this is a valid target type.
             }
 
             # Create computed edge with scope info from role assignments

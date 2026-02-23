@@ -1,0 +1,44 @@
+{
+    "azure": [
+        {
+            "name": "EntraUser",
+            "displayName": "User",
+            "type": "Human",
+            "principalType": "User",
+            "graphNodeType": "EntraUser",
+            "description": "Microsoft Entra ID user account (member or guest)"
+        },
+        {
+            "name": "EntraGroup",
+            "displayName": "Group",
+            "type": "Collection",
+            "principalType": "Group",
+            "graphNodeType": "EntraGroup",
+            "description": "Microsoft Entra ID security or Microsoft 365 group"
+        },
+        {
+            "name": "EntraServicePrincipal",
+            "displayName": "Service Principal",
+            "type": "Workload",
+            "principalType": "ServicePrincipal",
+            "graphNodeType": "EntraServicePrincipal",
+            "description": "Application service principal registered in Entra ID"
+        },
+        {
+            "name": "EntraManagedIdentity",
+            "displayName": "Managed Identity",
+            "type": "Workload",
+            "principalType": "ServicePrincipal",
+            "graphNodeType": "EntraServicePrincipal",
+            "description": "System-assigned or user-assigned managed identity (represented as service principal in Entra ID)"
+        },
+        {
+            "name": "EntraApplication",
+            "displayName": "Application",
+            "type": "Workload",
+            "principalType": null,
+            "graphNodeType": "EntraApplication",
+            "description": "Application registration (backing object for a service principal)"
+        }
+    ]
+}

@@ -29,8 +29,11 @@ CompanyName = 'Devolutions Inc.'
 # Copyright statement for this module
 Copyright = '(c) 2026 Devolutions Inc. All rights reserved.'
 
+# Modules that must be imported into the global environment prior to importing this module
+RequiredModules = @('Devolutions.CIEM')
+
 # Description of the functionality provided by this module
-Description = 'CIEM identity-to-resource relationship graph module. Maps Azure RBAC, Entra ID identities, group memberships, service principals, and app roles to compute permission relationships (CAN_READ/WRITE/MANAGE). Pure PowerShell with no external dependencies.'
+Description = 'CIEM identity-to-resource relationship graph module. Maps Azure RBAC, Entra ID identities, group memberships, service principals, and app roles to compute permission relationships (CAN_READ/WRITE/MANAGE). Depends on Devolutions.CIEM for shared resource type vocabulary.'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '7.4'

@@ -21,7 +21,7 @@ function Show-CIEMGraphIdentitySearch {
     if (-not $gData) { return }
 
     $identityType = $Session:GraphState["IdentityType_$pfx"]
-    if (-not $identityType) { $identityType = 'EntraUser' }
+    if (-not $identityType) { $identityType = (Get-CIEMIdentity -Provider $ProviderName | Select-Object -First 1).GraphNodeType }
     $options = @(Get-CIEMGraphIdentityOptions -Data $gData -NodeType $identityType)
 
     $autocompleteOnChange = [scriptblock]::Create(@"
@@ -83,6 +83,62 @@ function Show-CIEMGraphIdentityResults {
             if ($EventData.IsDirect) { 'Direct' } else { 'Inherited' }
         }
     ) -Paging -PageSize 10
+}
+
+function Show-CIEMGraphResourceDiagram {
+    <#
+    .SYNOPSIS
+        Renders a Mermaid diagram of identities with access to a resource type.
+    .DESCRIPTION
+        Called via [scriptblock]::Create() when the user clicks Visualize.
+        Builds the Mermaid diagram via ConvertTo-CIEMGraphMermaid and renders
+        it in an iframe using the same pattern as the ResourceGraph page.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ProviderName,
+
+        [string]$IdPrefix = ''
+    )
+
+    $pfx = "${IdPrefix}${ProviderName}"
+
+    $gData = Get-PSUCache -Key "CIEM:Graph:$ProviderName" -ErrorAction SilentlyContinue
+    if (-not $gData) {
+        New-UDTypography -Text 'No graph data available.' -Style @{ color = '#666'; padding = '20px'; textAlign = 'center' }
+        return
+    }
+
+    $resourceType = $Session:GraphState["ResourceType_$pfx"]
+    if (-not $resourceType) { $resourceType = 'KeyVault' }
+
+    try {
+        $mermaidDiagram = ConvertTo-CIEMGraphMermaid -Data $gData -TargetType $resourceType
+
+        # Render Mermaid in an iframe (same pattern as ResourceGraph page)
+        $diagramJson = ($mermaidDiagram | ConvertTo-Json -Compress)
+        $iframeHtml = @"
+<!DOCTYPE html>
+<html><head>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.3/dist/mermaid.min.js" integrity="sha384-R63zfMfSwJF4xCR11wXii+QUsbiBIdiDzDbtxia72oGWfkT7WHJfmD/I/eeHPJyT" crossorigin="anonymous"></script>
+<style>body{margin:0;padding:16px;font-family:sans-serif;background:#fff;overflow:auto;} .mermaid{text-align:center;}</style>
+</head><body>
+<div class="mermaid" id="diagram"></div>
+<script>
+mermaid.initialize({startOnLoad:false,theme:'default',securityLevel:'strict'});
+var diagramText = $diagramJson;
+document.getElementById('diagram').textContent = diagramText;
+mermaid.run({nodes:[document.getElementById('diagram')]});
+</script>
+</body></html>
+"@
+        $encodedHtml = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($iframeHtml))
+        New-UDHtml -Markup "<iframe src='data:text/html;base64,$encodedHtml' style='width:100%;min-height:500px;border:1px solid #e0e0e0;border-radius:4px;' frameborder='0'></iframe>"
+    }
+    catch {
+        New-UDTypography -Text "Diagram rendering error: $($_.Exception.Message)" -Style @{ color = '#f44336'; padding = '20px' }
+    }
 }
 
 function Show-CIEMGraphResourceResults {
@@ -161,15 +217,19 @@ function Show-CIEMGraphSummary {
         New-UDTypography -Text "Tenant: $($s.TenantId) | Built: $buildTime" -Variant 'caption' -Style @{ color = '#999' }
     }
 
-    # Node counts by type
-    $nodeTypes = @(
-        @{ Name = 'Users';              Count = $s.NodeCounts.Users;             Color = '#1976d2' }
-        @{ Name = 'Groups';             Count = $s.NodeCounts.Groups;            Color = '#4caf50' }
-        @{ Name = 'Service Principals'; Count = $s.NodeCounts.ServicePrincipals; Color = '#ff9800' }
-        @{ Name = 'Applications';       Count = $s.NodeCounts.Applications;      Color = '#9c27b0' }
-        @{ Name = 'Role Assignments';   Count = $s.NodeCounts.RoleAssignments;   Color = '#f44336' }
-        @{ Name = 'Role Definitions';   Count = $s.NodeCounts.RoleDefinitions;   Color = '#607d8b' }
-    )
+    # Node counts by type — identity types from Get-CIEMIdentity, RBAC types fixed
+    $identityColors = @{ 'Human' = '#1976d2'; 'Collection' = '#4caf50'; 'Workload' = '#ff9800' }
+    $nodeTypes = [System.Collections.ArrayList]::new()
+    foreach ($ident in (Get-CIEMIdentity -Provider $ProviderName | Where-Object { $_.Name -eq $_.GraphNodeType })) {
+        $count = if ($s.NodeCounts.PSObject.Properties.Name -contains $ident.GraphNodeType) { $s.NodeCounts.($ident.GraphNodeType) } else { 0 }
+        [void]$nodeTypes.Add(@{ Name = $ident.DisplayName + 's'; Count = $count; Color = $identityColors[$ident.Type] })
+    }
+    if ($s.NodeCounts.PSObject.Properties.Name -contains 'AzureRoleAssignment') {
+        [void]$nodeTypes.Add(@{ Name = 'Role Assignments'; Count = $s.NodeCounts.AzureRoleAssignment; Color = '#f44336' })
+    }
+    if ($s.NodeCounts.PSObject.Properties.Name -contains 'AzureRoleDefinition') {
+        [void]$nodeTypes.Add(@{ Name = 'Role Definitions'; Count = $s.NodeCounts.AzureRoleDefinition; Color = '#607d8b' })
+    }
 
     New-UDTypography -Text 'Node Distribution' -Variant 'h6' -Style @{ marginBottom = '12px'; marginTop = '16px' }
     New-UDGrid -Container -Content {
@@ -264,10 +324,12 @@ function New-CIEMGraphTabContent {
             New-UDGrid -Container -Spacing 2 -Content {
                 # Identity type selector
                 New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 3 -Content {
-                    New-UDSelect -Id "identityTypeSelect_$pfx" -Label 'Identity Type' -DefaultValue 'EntraUser' -Option {
-                        New-UDSelectOption -Name 'User' -Value 'EntraUser'
-                        New-UDSelectOption -Name 'Group' -Value 'EntraGroup'
-                        New-UDSelectOption -Name 'Service Principal' -Value 'EntraServicePrincipal'
+                    $identityTypes = @(Get-CIEMIdentity -Provider $ProviderName | Where-Object { $_.Name -eq $_.GraphNodeType })
+                    $defaultIdentityType = ($identityTypes | Select-Object -First 1).GraphNodeType
+                    New-UDSelect -Id "identityTypeSelect_$pfx" -Label 'Identity Type' -DefaultValue $defaultIdentityType -Option {
+                        foreach ($ident in (Get-CIEMIdentity -Provider $ProviderName | Where-Object { $_.Name -eq $_.GraphNodeType })) {
+                            New-UDSelectOption -Name $ident.DisplayName -Value $ident.GraphNodeType
+                        }
                     } -OnChange ([scriptblock]::Create(@"
                         `$Session:GraphState['IdentityType_$pfx'] = `$EventData
                         `$Session:GraphState['SelectedIdentityId_$pfx'] = `$null
@@ -310,17 +372,9 @@ function New-CIEMGraphTabContent {
             New-UDGrid -Container -Spacing 2 -Content {
                 New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 4 -Content {
                     New-UDSelect -Id "resourceTypeSelect_$pfx" -Label 'Resource Type' -DefaultValue 'KeyVault' -Option {
-                        New-UDSelectOption -Name 'AKS' -Value 'AKS'
-                        New-UDSelectOption -Name 'Container Registry' -Value 'ContainerRegistry'
-                        New-UDSelectOption -Name 'Cosmos DB' -Value 'CosmosDB'
-                        New-UDSelectOption -Name 'Key Vault' -Value 'KeyVault'
-                        New-UDSelectOption -Name 'Network Security Group' -Value 'NetworkSecurityGroup'
-                        New-UDSelectOption -Name 'Resource Group' -Value 'ResourceGroup'
-                        New-UDSelectOption -Name 'SQL Server' -Value 'SqlServer'
-                        New-UDSelectOption -Name 'Storage Account' -Value 'StorageAccount'
-                        New-UDSelectOption -Name 'Subscription' -Value 'Subscription'
-                        New-UDSelectOption -Name 'Virtual Machine' -Value 'VirtualMachine'
-                        New-UDSelectOption -Name 'Web App' -Value 'WebApp'
+                        foreach ($rt in (Get-CIEMResourceType -Provider 'Azure')) {
+                            New-UDSelectOption -Name $rt.DisplayName -Value $rt.Name
+                        }
                     } -OnChange ([scriptblock]::Create(@"
                         `$Session:GraphState['ResourceType_$pfx'] = `$EventData
 "@))
@@ -336,14 +390,20 @@ function New-CIEMGraphTabContent {
 "@))
                 }
                 New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 4 -Content {
-                    New-UDElement -Tag 'div' -Attributes @{ style = @{ paddingTop = '16px' } } -Content {
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ paddingTop = '16px'; display = 'flex'; gap = '8px' } } -Content {
                         New-UDButton -Text 'Search' -Variant 'contained' -Color 'primary' -OnClick ([scriptblock]::Create("Sync-UDElement -Id 'resourceResults_$pfx'"))
+                        New-UDButton -Text 'Visualize' -Variant 'outlined' -Color 'primary' -OnClick ([scriptblock]::Create("Sync-UDElement -Id 'resourceDiagram_$pfx'"))
                     }
                 }
             }
 
             # Resource Results
             New-UDDynamic -Id "resourceResults_$pfx" -Content ([scriptblock]::Create("Show-CIEMGraphResourceResults -ProviderName '$ProviderName' -IdPrefix '$IdPrefix'")) -LoadingComponent {
+                New-UDProgress -Circular
+            }
+
+            # Mermaid Diagram (rendered on Visualize click)
+            New-UDDynamic -Id "resourceDiagram_$pfx" -Content ([scriptblock]::Create("Show-CIEMGraphResourceDiagram -ProviderName '$ProviderName' -IdPrefix '$IdPrefix'")) -LoadingComponent {
                 New-UDProgress -Circular
             }
         }
@@ -468,7 +528,7 @@ function New-CIEMGraphPage {
                 foreach ($prefix in @('', 'all_')) {
                     $stateKey = "${prefix}${tabProvName}"
                     if (-not $Session:GraphState["IdentityType_$stateKey"]) {
-                        $Session:GraphState["IdentityType_$stateKey"] = 'EntraUser'
+                        $Session:GraphState["IdentityType_$stateKey"] = (Get-CIEMIdentity -Provider $tabProvName | Select-Object -First 1).GraphNodeType
                     }
                 }
 

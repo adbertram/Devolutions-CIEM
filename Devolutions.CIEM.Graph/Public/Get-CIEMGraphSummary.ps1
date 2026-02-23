@@ -37,28 +37,37 @@ function Get-CIEMGraphSummary {
         $Data.Nodes.PSObject.Properties | ForEach-Object { $_.Value }
     }
 
-    # Node counts by type
-    $nodeCounts = [ordered]@{
-        Users             = 0
-        Groups            = 0
-        ServicePrincipals = 0
-        Applications      = 0
-        RoleAssignments   = 0
-        RoleDefinitions   = 0
+    # Build identity type set from canonical data
+    $identityGraphNodeTypes = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($ident in (Get-CIEMIdentity | Where-Object { $_.Name -eq $_.GraphNodeType })) {
+        [void]$identityGraphNodeTypes.Add($ident.GraphNodeType)
     }
+
+    # Node counts keyed by GraphNodeType (identity types) or fixed keys (RBAC/resource)
+    $nodeCounts = [ordered]@{}
+    foreach ($gnt in $identityGraphNodeTypes) { $nodeCounts[$gnt] = 0 }
+    $nodeCounts['AzureRoleAssignment'] = 0
+    $nodeCounts['AzureRoleDefinition'] = 0
+    $nodeCounts['ResourceType']        = 0
+
     # Build quick lookup structures while iterating nodes once
     $groupNodes = [System.Collections.Generic.List[object]]::new()
     $userNodes = [System.Collections.Generic.List[object]]::new()
 
     foreach ($node in $nodeValues) {
         $nt = [string]$node.NodeType
-        switch ($nt) {
-            'EntraUser'             { $nodeCounts.Users++; $userNodes.Add($node) }
-            'EntraGroup'            { $nodeCounts.Groups++; $groupNodes.Add($node) }
-            'EntraServicePrincipal' { $nodeCounts.ServicePrincipals++ }
-            'EntraApplication'      { $nodeCounts.Applications++ }
-            'AzureRoleAssignment'   { $nodeCounts.RoleAssignments++ }
-            'AzureRoleDefinition'   { $nodeCounts.RoleDefinitions++ }
+        if ($identityGraphNodeTypes.Contains($nt)) {
+            $nodeCounts[$nt]++
+            if ($nt -eq 'EntraGroup') { $groupNodes.Add($node) }
+            elseif ($nt -eq 'EntraUser') { $userNodes.Add($node) }
+        }
+        else {
+            switch ($nt) {
+                'AzureRoleAssignment'   { $nodeCounts['AzureRoleAssignment']++ }
+                'AzureRoleDefinition'   { $nodeCounts['AzureRoleDefinition']++ }
+                'AzureResourceType'     { $nodeCounts['ResourceType']++ }
+                'AWSResourceType'       { $nodeCounts['ResourceType']++ }
+            }
         }
     }
 

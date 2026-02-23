@@ -65,12 +65,6 @@ class CIEMGraph {
         return @($this.Nodes.Values | Where-Object { $_.NodeType -eq $Type })
     }
 
-    # String-based lookup for resource target types (e.g., "SqlServer", "KeyVault")
-    # that may not have corresponding CIEMGraphNodeType enum values.
-    [CIEMGraphNode[]] GetNodesByTypeString([string]$TypeName) {
-        return @($this.Nodes.Values | Where-Object { $_.NodeType.ToString() -eq $TypeName })
-    }
-
     # Traverse a chain of relationships from a start node
     # E.g., Traverse("user1", @("HAS_ROLE_ASSIGNMENT", "USES_ROLE", "HAS_PERMISSIONS"))
     # Returns the terminal nodes reached at the end of the chain
@@ -144,6 +138,8 @@ class CIEMGraph {
             'CIEMAzureRoleAssignment'    = [CIEMAzureRoleAssignment]
             'CIEMAzureRoleDefinition'    = [CIEMAzureRoleDefinition]
             'CIEMAzurePermissions'       = [CIEMAzurePermissions]
+            'CIEMAzureResourceTypeNode'  = [CIEMAzureResourceTypeNode]
+            'CIEMAWSResourceTypeNode'    = [CIEMAWSResourceTypeNode]
         }
 
         # Reconstruct nodes (handles both hashtable and PSCustomObject from JSON round-trip)

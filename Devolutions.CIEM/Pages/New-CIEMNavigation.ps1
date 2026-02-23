@@ -15,7 +15,6 @@ function New-CIEMNavigation {
         New-UDListItem -Label 'Scan' -Icon (New-UDIcon -Icon 'Play') -Href '/ciem/scan'
         New-UDListItem -Label 'Scan History' -Icon (New-UDIcon -Icon 'ClockRotateLeft') -Href '/ciem/history'
         New-UDListItem -Label 'Identity Graph' -Icon (New-UDIcon -Icon 'ProjectDiagram') -Href '/ciem/graph'
-        New-UDListItem -Label 'Resource Graph' -Icon (New-UDIcon -Icon 'Sitemap') -Href '/ciem/resourcegraph'
         New-UDListItem -Label 'Configuration' -Icon (New-UDIcon -Icon 'Cog') -Href '/ciem/config'
         New-UDListItem -Label 'About' -Icon (New-UDIcon -Icon 'InfoCircle') -Href '/ciem/about'
     )
