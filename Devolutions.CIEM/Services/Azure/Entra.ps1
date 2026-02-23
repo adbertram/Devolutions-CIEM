@@ -23,11 +23,17 @@ $data = @{
     ConditionalAccessPolicies = $null
     NamedLocations            = $null
     GroupSettings             = $null
+    Groups                    = $null
+    GroupMembers              = @{}
+    GroupOwners               = @{}
+    ServicePrincipals         = $null
+    Applications              = $null
+    AppRoleAssignments        = @{}
 }
 
 # Load paginated resources
 Write-CIEMLog -Severity DEBUG -Message "Loading users..."
-$usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType"
+$usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType,department,jobTitle&`$expand=manager(`$select=id)"
 try {
     $data.Users = @(Get-AllGraphPage -Uri $usersUri -ResourceName "Users")
 }
@@ -119,14 +125,136 @@ if ($data.DirectoryRoles) {
     }
 }
 
-# Log summary
-$counts = @{
-    Users    = if ($data.Users) { $data.Users.Count } else { 0 }
-    Roles    = if ($data.DirectoryRoles) { $data.DirectoryRoles.Count } else { 0 }
-    Policies = if ($data.ConditionalAccessPolicies) { $data.ConditionalAccessPolicies.Count } else { 0 }
-    MFAData  = if ($data.UserMFAStatus) { $data.UserMFAStatus.Count } else { 'N/A (Premium required)' }
+# Load groups
+Write-CIEMLog -Severity DEBUG -Message "Loading groups..."
+$groupsUri = "$graphApiBase/groups?`$select=id,displayName,securityEnabled,isAssignableToRole,groupTypes,visibility"
+try {
+    $data.Groups = @(Get-AllGraphPage -Uri $groupsUri -ResourceName "Groups")
+}
+catch {
+    if ($_.Exception.Message -match $graphPermissionErrors) {
+        Write-CIEMLog -Severity WARNING -Message "Groups data unavailable - missing permissions. Group-related checks will be skipped."
+        $data.Groups = $null
+    }
+    else { throw }
 }
 
-Write-CIEMLog -Severity DEBUG -Message "Entra service initialized: $($counts.Users) users, $($counts.Roles) roles, $($counts.Policies) CA policies, MFA data: $($counts.MFAData)"
+# Load members for each group
+# TODO: Optimize with Microsoft Graph $batch API (up to 20 calls per batch) to reduce
+# serial API calls. In large tenants (500+ groups), these N+1 calls dominate scan time.
+$data.GroupMembers = @{}
+if ($data.Groups) {
+    $groupCount = $data.Groups.Count
+    Write-CIEMLog -Severity DEBUG -Message "Loading group members for $groupCount groups..."
+    $groupIdx = 0
+    foreach ($group in $data.Groups) {
+        $groupIdx++
+        if ($groupIdx % 50 -eq 0) {
+            Write-CIEMLog -Severity DEBUG -Message "Loading group members: $groupIdx of $groupCount..."
+        }
+        try {
+            $data.GroupMembers[$group.id] = @(Get-AllGraphPage -Uri "$graphApiBase/groups/$($group.id)/members?`$select=id,displayName,userPrincipalName,`@odata.type" -ResourceName "Group Members ($($group.displayName))")
+        }
+        catch {
+            if ($_.Exception.Message -match $graphPermissionErrors) {
+                Write-CIEMLog -Severity WARNING -Message "Group Members ($($group.displayName)) unavailable - missing permissions."
+                $data.GroupMembers[$group.id] = $null
+            }
+            else { throw }
+        }
+    }
+}
+
+# Load owners for each group
+$data.GroupOwners = @{}
+if ($data.Groups) {
+    $groupCount = $data.Groups.Count
+    Write-CIEMLog -Severity DEBUG -Message "Loading group owners for $groupCount groups..."
+    $groupIdx = 0
+    foreach ($group in $data.Groups) {
+        $groupIdx++
+        if ($groupIdx % 50 -eq 0) {
+            Write-CIEMLog -Severity DEBUG -Message "Loading group owners: $groupIdx of $groupCount..."
+        }
+        try {
+            $data.GroupOwners[$group.id] = @(Get-AllGraphPage -Uri "$graphApiBase/groups/$($group.id)/owners?`$select=id,displayName,userPrincipalName,`@odata.type" -ResourceName "Group Owners ($($group.displayName))")
+        }
+        catch {
+            if ($_.Exception.Message -match $graphPermissionErrors) {
+                Write-CIEMLog -Severity WARNING -Message "Group Owners ($($group.displayName)) unavailable - missing permissions."
+                $data.GroupOwners[$group.id] = $null
+            }
+            else { throw }
+        }
+    }
+}
+
+# Load service principals
+Write-CIEMLog -Severity DEBUG -Message "Loading service principals..."
+$spUri = "$graphApiBase/servicePrincipals?`$select=id,appId,displayName,servicePrincipalType,accountEnabled,signInAudience,tags"
+try {
+    $data.ServicePrincipals = @(Get-AllGraphPage -Uri $spUri -ResourceName "ServicePrincipals")
+}
+catch {
+    if ($_.Exception.Message -match $graphPermissionErrors) {
+        Write-CIEMLog -Severity WARNING -Message "ServicePrincipals data unavailable - missing permissions."
+        $data.ServicePrincipals = $null
+    }
+    else { throw }
+}
+
+# Load applications
+Write-CIEMLog -Severity DEBUG -Message "Loading applications..."
+$appsUri = "$graphApiBase/applications?`$select=id,appId,displayName,publisherDomain,signInAudience"
+try {
+    $data.Applications = @(Get-AllGraphPage -Uri $appsUri -ResourceName "Applications")
+}
+catch {
+    if ($_.Exception.Message -match $graphPermissionErrors) {
+        Write-CIEMLog -Severity WARNING -Message "Applications data unavailable - missing permissions."
+        $data.Applications = $null
+    }
+    else { throw }
+}
+
+# Load app role assignments per service principal
+$data.AppRoleAssignments = @{}
+if ($data.ServicePrincipals) {
+    $spCount = $data.ServicePrincipals.Count
+    Write-CIEMLog -Severity DEBUG -Message "Loading app role assignments for $spCount service principals..."
+    $spIdx = 0
+    foreach ($sp in $data.ServicePrincipals) {
+        $spIdx++
+        if ($spIdx % 50 -eq 0) {
+            Write-CIEMLog -Severity DEBUG -Message "Loading app role assignments: $spIdx of $spCount..."
+        }
+        try {
+            $assignments = @(Get-AllGraphPage -Uri "$graphApiBase/servicePrincipals/$($sp.id)/appRoleAssignedTo" -ResourceName "AppRoleAssignments ($($sp.displayName))")
+            if ($assignments.Count -gt 0) {
+                $data.AppRoleAssignments[$sp.id] = $assignments
+            }
+        }
+        catch {
+            if ($_.Exception.Message -match $graphPermissionErrors) {
+                Write-CIEMLog -Severity WARNING -Message "AppRoleAssignments ($($sp.displayName)) unavailable - missing permissions."
+                $data.AppRoleAssignments[$sp.id] = $null
+            }
+            else { throw }
+        }
+    }
+}
+
+# Log summary
+$counts = @{
+    Users             = if ($data.Users) { $data.Users.Count } else { 0 }
+    Roles             = if ($data.DirectoryRoles) { $data.DirectoryRoles.Count } else { 0 }
+    Policies          = if ($data.ConditionalAccessPolicies) { $data.ConditionalAccessPolicies.Count } else { 0 }
+    MFAData           = if ($data.UserMFAStatus) { $data.UserMFAStatus.Count } else { 'N/A (Premium required)' }
+    Groups            = if ($data.Groups) { $data.Groups.Count } else { 0 }
+    ServicePrincipals = if ($data.ServicePrincipals) { $data.ServicePrincipals.Count } else { 0 }
+    Applications      = if ($data.Applications) { $data.Applications.Count } else { 0 }
+}
+
+Write-CIEMLog -Severity DEBUG -Message "Entra service initialized: $($counts.Users) users, $($counts.Roles) roles, $($counts.Policies) CA policies, $($counts.Groups) groups, $($counts.ServicePrincipals) service principals, $($counts.Applications) applications, MFA data: $($counts.MFAData)"
 
 $data

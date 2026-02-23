@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devolutions.net/ciem/cloud-resource-graph.schema.json",
+  "title": "Cloud Resource Dependency Graph",
+  "description": "Provider-specific graph of cloud resources and their dependencies. Each graph instance represents one provider's resource inventory and relationships.",
+  "type": "object",
+  "required": ["provider", "discoveredAt", "resources", "relationships"],
+  "properties": {
+    "provider": {
+      "type": "string",
+      "description": "Cloud provider identifier",
+      "enum": ["azure", "aws"]
+    },
+    "scope": {
+      "type": "object",
+      "description": "The scope of discovery — what was queried to build this graph",
+      "properties": {
+        "azure": {
+          "type": "object",
+          "properties": {
+            "tenantId": { "type": "string" },
+            "subscriptionIds": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "aws": {
+          "type": "object",
+          "properties": {
+            "accountId": { "type": "string" },
+            "regions": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "discoveredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this graph snapshot was built"
+    },
+    "resources": {
+      "type": "array",
+      "description": "All discovered cloud resources (graph nodes)",
+      "items": { "$ref": "#/$defs/resource" }
+    },
+    "relationships": {
+      "type": "array",
+      "description": "All discovered relationships between resources (graph edges)",
+      "items": { "$ref": "#/$defs/relationship" }
+    }
+  },
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "required": ["id", "type", "name", "provider"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Provider-native unique identifier. Azure: full ARM resource ID. AWS: ARN."
+        },
+        "type": {
+          "type": "string",
+          "description": "Provider-specific resource type. Azure: 'Microsoft.Compute/virtualMachines'. AWS: 'AWS::EC2::Instance'."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable display name"
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["azure", "aws"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Normalized category for cross-provider grouping",
+          "enum": [
+            "compute",
+            "network",
+            "storage",
+            "database",
+            "identity",
+            "security",
+            "container",
+            "serverless",
+            "messaging",
+            "monitoring",
+            "management",
+            "other"
+          ]
+        },
+        "location": {
+          "type": "string",
+          "description": "Region or location. Azure: 'westus2'. AWS: 'us-east-1'."
+        },
+        "parent": {
+          "type": "string",
+          "description": "ID of the containing resource. Azure: resource group ID. AWS: VPC ID, account ID, etc."
+        },
+        "tags": {
+          "type": "object",
+          "description": "Resource tags as key-value pairs",
+          "additionalProperties": { "type": "string" }
+        },
+        "properties": {
+          "type": "object",
+          "description": "Provider-specific resource properties. Schema varies by resource type — see provider definition files.",
+          "additionalProperties": true
+        },
+        "discoveredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "discoverySource": {
+          "type": "string",
+          "description": "How this resource was discovered",
+          "enum": [
+            "resource-graph",
+            "aws-config",
+            "api-direct",
+            "arm-template",
+            "cloudformation",
+            "inferred"
+          ]
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "required": ["sourceId", "targetId", "type", "provider"],
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "ID of the source resource (the dependent or parent)"
+        },
+        "targetId": {
+          "type": "string",
+          "description": "ID of the target resource (the dependency or child)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Relationship type — provider-specific. See provider relationship-types definition files."
+        },
+        "provider": {
+          "type": "string",
+          "enum": ["azure", "aws"]
+        },
+        "direction": {
+          "type": "string",
+          "description": "Semantic direction of the relationship",
+          "enum": ["depends_on", "depended_by", "contains", "contained_in", "associated", "bound_to"]
+        },
+        "properties": {
+          "type": "object",
+          "description": "Relationship-specific metadata. E.g., for IAM: permission level, role name.",
+          "additionalProperties": true
+        },
+        "discoverySource": {
+          "type": "string",
+          "description": "How this relationship was discovered",
+          "enum": [
+            "resource-property-parse",
+            "aws-config-relationship",
+            "api-direct",
+            "iam-policy-analysis",
+            "inferred"
+          ]
+        }
+      }
+    }
+  }
+}

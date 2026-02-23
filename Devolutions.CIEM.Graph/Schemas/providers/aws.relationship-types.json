@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AWS Relationship Types",
+  "description": "AWS relationship types. AWS Config provides 4 native relationship types. Supplementary types are derived from IAM policy analysis and resource property parsing.",
+  "provider": "aws",
+  "relationshipTypes": {
+    "CONTAINS": {
+      "displayName": "Contains",
+      "direction": "contains",
+      "description": "Parent resource contains child resources.",
+      "discoveryMethod": "aws-config-relationship",
+      "awsConfigName": "contains",
+      "examples": [
+        { "source": "AWS::EC2::VPC", "target": "AWS::EC2::Subnet" },
+        { "source": "AWS::ECS::Cluster", "target": "AWS::ECS::Service" },
+        { "source": "AWS::RDS::DBCluster", "target": "AWS::RDS::DBInstance" },
+        { "source": "AWS::CloudFormation::Stack", "target": "*" }
+      ]
+    },
+    "CONTAINED_IN": {
+      "displayName": "Contained In",
+      "direction": "contained_in",
+      "description": "Inverse of CONTAINS. Child belongs to parent.",
+      "discoveryMethod": "aws-config-relationship",
+      "awsConfigName": "is contained in",
+      "examples": [
+        { "source": "AWS::EC2::Subnet", "target": "AWS::EC2::VPC" },
+        { "source": "AWS::EC2::Instance", "target": "AWS::EC2::Subnet" }
+      ]
+    },
+    "ASSOCIATED_WITH": {
+      "displayName": "Associated With",
+      "direction": "associated",
+      "description": "Logical association between resources. AWS Config's most common relationship type.",
+      "discoveryMethod": "aws-config-relationship",
+      "awsConfigName": "is associated with",
+      "examples": [
+        { "source": "AWS::EC2::Instance", "target": "AWS::EC2::SecurityGroup" },
+        { "source": "AWS::Lambda::Function", "target": "AWS::EC2::SecurityGroup" },
+        { "source": "AWS::IAM::Role", "target": "AWS::IAM::Policy" },
+        { "source": "AWS::RDS::DBInstance", "target": "AWS::EC2::SecurityGroup" }
+      ]
+    },
+    "ATTACHED_TO": {
+      "displayName": "Attached To",
+      "direction": "bound_to",
+      "description": "Physical or logical attachment (EBS to EC2, EIP to ENI).",
+      "discoveryMethod": "aws-config-relationship",
+      "awsConfigName": "is attached to",
+      "examples": [
+        { "source": "AWS::EC2::Volume", "target": "AWS::EC2::Instance" },
+        { "source": "AWS::EC2::EIP", "target": "AWS::EC2::NetworkInterface" },
+        { "source": "AWS::EC2::NetworkInterface", "target": "AWS::EC2::Instance" }
+      ]
+    },
+    "ASSUMES_ROLE": {
+      "displayName": "Assumes Role",
+      "direction": "associated",
+      "description": "A compute resource or identity assumes an IAM role. Derived from IAM trust policies and instance profiles — NOT from AWS Config.",
+      "discoveryMethod": "iam-policy-analysis",
+      "examples": [
+        { "source": "AWS::EC2::Instance", "target": "AWS::IAM::Role", "note": "Via instance profile" },
+        { "source": "AWS::Lambda::Function", "target": "AWS::IAM::Role", "note": "Via execution role" },
+        { "source": "AWS::ECS::Service", "target": "AWS::IAM::Role", "note": "Via task role" }
+      ]
+    },
+    "GRANTS_ACCESS": {
+      "displayName": "Grants Access",
+      "direction": "associated",
+      "description": "An IAM policy grants access to a resource. Derived from policy document analysis — NOT from AWS Config relationships.",
+      "discoveryMethod": "iam-policy-analysis",
+      "examples": [
+        { "source": "AWS::IAM::Policy", "target": "AWS::S3::Bucket", "note": "Via Resource ARN in policy statement" },
+        { "source": "AWS::IAM::Policy", "target": "AWS::DynamoDB::Table" },
+        { "source": "AWS::IAM::Policy", "target": "AWS::KMS::Key" }
+      ]
+    },
+    "ENCRYPTED_BY": {
+      "displayName": "Encrypted By",
+      "direction": "depends_on",
+      "description": "Resource encryption is managed by a KMS key.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "AWS::EC2::Volume", "target": "AWS::KMS::Key" },
+        { "source": "AWS::RDS::DBInstance", "target": "AWS::KMS::Key" },
+        { "source": "AWS::S3::Bucket", "target": "AWS::KMS::Key" }
+      ]
+    },
+    "TRIGGERS": {
+      "displayName": "Triggers",
+      "direction": "associated",
+      "description": "Event-driven invocation. One resource triggers another (e.g., S3 event → Lambda, SNS → SQS).",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "AWS::S3::Bucket", "target": "AWS::Lambda::Function", "note": "Via bucket notification config" },
+        { "source": "AWS::SNS::Topic", "target": "AWS::SQS::Queue", "note": "Via subscription" },
+        { "source": "AWS::SNS::Topic", "target": "AWS::Lambda::Function" }
+      ]
+    },
+    "LOAD_BALANCED": {
+      "displayName": "Load Balanced",
+      "direction": "associated",
+      "description": "Traffic distribution from a load balancer to target resources.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "AWS::ElasticLoadBalancingV2::LoadBalancer", "target": "AWS::EC2::Instance" },
+        { "source": "AWS::ElasticLoadBalancingV2::LoadBalancer", "target": "AWS::ECS::Service" }
+      ]
+    }
+  }
+}

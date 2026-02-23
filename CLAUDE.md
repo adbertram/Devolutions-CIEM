@@ -1,5 +1,15 @@
 # Devolutions CIEM
 
+## Default PSU Instance (CRITICAL)
+
+**ALWAYS default to the LOCAL PSU instance** (`http://localhost:5001`) for all operations unless the user explicitly says "Azure" or "production". This applies to:
+
+- **Opening PSU:** Open `http://localhost:5001`, not the Azure URL
+- **Publishing modules:** Use `Publish-PSUModule -LocalOnly` (not the default Azure publish)
+- **Testing commands:** Use `-Destination local` or `-Destination local_psu_app`
+- **File manager / log scripts:** Use `--local` flag
+- **`Connect-PSU`:** Use `Connect-PSU -Local`
+
 ## Project Context
 
 This project is a CIEM (Cloud Infrastructure Entitlement Management) solution built on PowerShell Universal (PSU).

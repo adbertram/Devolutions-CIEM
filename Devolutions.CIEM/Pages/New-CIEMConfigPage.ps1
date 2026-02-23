@@ -22,16 +22,18 @@ function New-CIEMConfigPage {
         $envInfo = Get-PSUInstalledEnvironment
 
         # Get current provider (default to Azure)
-        $currentProvider = if ($CurrentConfig.cloudProvider) { $CurrentConfig.cloudProvider } else { 'Azure' }
+        $currentProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
+        if (-not $currentProvider) { $currentProvider = 'Azure' }
 
         # Store original auth values in session state for change detection on save
         # Only initialize on first page load (not on dynamic refreshes)
         if (-not $Session:OriginalAuthValues) {
+            $azProvider = Get-CIEMProvider -Name $currentProvider
             $Session:OriginalAuthValues = @{
                 Provider = $currentProvider
-                Method = if ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
-                TenantId = Get-CIEMSecret 'CIEM_Azure_TenantId'
-                ClientId = Get-CIEMSecret 'CIEM_Azure_ClientId'
+                Method = if ($azProvider.Authentication.Method) { $azProvider.Authentication.Method } else { 'ServicePrincipalSecret' }
+                TenantId = $azProvider.Authentication.TenantId
+                ClientId = $azProvider.Authentication.ClientId
                 CertThumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
             }
         }
@@ -76,7 +78,8 @@ function New-CIEMConfigPage {
                 if (-not $selectedProvider) { $selectedProvider = 'Azure' }
 
                 if ($selectedProvider -eq 'AWS') {
-                    $awsAuthMethod = if ($CurrentConfig.aws.authentication.method) { $CurrentConfig.aws.authentication.method } else { 'CurrentProfile' }
+                    $awsProvider = Get-CIEMProvider -Name 'AWS'
+                    $awsAuthMethod = if ($awsProvider.Authentication.Method) { $awsProvider.Authentication.Method } else { 'CurrentProfile' }
 
                     New-UDElement -Tag 'div' -Content {
                         New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
@@ -91,7 +94,8 @@ function New-CIEMConfigPage {
                 }
                 else {
                     # Azure authentication methods
-                    $azureAuthMethod = if ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
+                    $azProviderForMethod = Get-CIEMProvider -Name 'Azure'
+                    $azureAuthMethod = if ($azProviderForMethod.Authentication.Method) { $azProviderForMethod.Authentication.Method } else { 'ServicePrincipalSecret' }
 
                     New-UDElement -Tag 'div' -Content {
                         New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
@@ -117,8 +121,10 @@ function New-CIEMConfigPage {
                 # Read from UI if available (after user interaction), otherwise fall back to config
                 $uiProvider = (Get-UDElement -Id 'cloudProvider').value
                 $uiMethod = (Get-UDElement -Id 'authMethod').value
-                $selectedProvider = if ($uiProvider) { $uiProvider } elseif ($CurrentConfig.cloudProvider) { $CurrentConfig.cloudProvider } else { 'Azure' }
-                $selectedMethod = if ($uiMethod) { $uiMethod } elseif ($CurrentConfig.azure.authentication.method) { $CurrentConfig.azure.authentication.method } else { 'ServicePrincipalSecret' }
+                $defaultProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
+                $selectedProvider = if ($uiProvider) { $uiProvider } elseif ($defaultProvider) { $defaultProvider } else { 'Azure' }
+                $providerForFields = Get-CIEMProvider -Name $selectedProvider
+                $selectedMethod = if ($uiMethod) { $uiMethod } elseif ($providerForFields.Authentication.Method) { $providerForFields.Authentication.Method } else { 'ServicePrincipalSecret' }
 
                 # Check for ManagedIdentity warning
                 $envCheck = Get-PSUInstalledEnvironment
@@ -126,12 +132,10 @@ function New-CIEMConfigPage {
                     New-UDAlert -Severity 'warning' -Text 'Managed Identity will not work in on-premises deployments. Please choose a different authentication method.' -Style @{ marginBottom = '16px' }
                 }
 
-                # Load credentials: TenantId/ClientId from PSU cache, secrets from PSU secrets
-                $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-                $configForCreds = Get-CIEMConfig
+                # Load credentials: TenantId/ClientId from provider cache, secrets from PSU secrets
                 $storedCreds = @{
-                    TenantId = $configForCreds.azure.authentication.tenantId
-                    ClientId = $configForCreds.azure.authentication.servicePrincipal.clientId
+                    TenantId = $providerForFields.Authentication.TenantId
+                    ClientId = $providerForFields.Authentication.ClientId
                     ClientSecretExists = $false
                     CertThumbprint = $null
                     CertPasswordExists = $false
@@ -198,9 +202,9 @@ function New-CIEMConfigPage {
                     }
                 }
                 elseif ($selectedProvider -eq 'AWS') {
-                    $awsConfig = Get-CIEMConfig
-                    $awsStoredProfile = $awsConfig.aws.authentication.profile
-                    $awsStoredRegion = $awsConfig.aws.authentication.region
+                    $awsProviderForFields = Get-CIEMProvider -Name 'AWS'
+                    $awsStoredProfile = $awsProviderForFields.Authentication.Profile
+                    $awsStoredRegion = $awsProviderForFields.Authentication.Region
                     $awsAccessKeyExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_AWS_AccessKeyId'))
                     $awsSecretKeyExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_AWS_SecretAccessKey'))
 
@@ -374,9 +378,6 @@ function New-CIEMConfigPage {
 
                         # Collect form values into typed auth context + secret params
                         Write-CIEMLog -Message "Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
-
-                        # Active provider is a config concern, not an auth context concern
-                        Set-CIEMConfig -Settings @{ 'cloudProvider' = $provider }
 
                         # Build simple save params — no typed objects needed (avoids PS class scoping in PSU runspaces)
                         $saveParams = @{

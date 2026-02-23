@@ -82,14 +82,16 @@ function Connect-CIEM {
         $providerKey = $p.ToString()
 
         if (-not $Force.IsPresent -and $script:AuthContext[$providerKey]) {
-            Write-CIEMLog -Message "$p is already connected (AccountId: $($script:AuthContext[$providerKey].AccountId)). Skipping." -Severity INFO -Component 'Connect-CIEM'
+            $existing = $script:AuthContext[$providerKey]
+            Write-CIEMLog -Message "$p is already connected (AccountId: $($existing.AccountId)). Skipping." -Severity INFO -Component 'Connect-CIEM'
             Write-Verbose "$p is already connected. Use -Force to re-authenticate."
             $results.Add([PSCustomObject]@{
-                Provider = $p
-                Status   = 'AlreadyConnected'
-                Account  = $script:AuthContext[$providerKey].AccountId
-                TenantId = $script:AuthContext[$providerKey].TenantId
-                Message  = 'Already authenticated. Use -Force to re-authenticate.'
+                Provider        = $p
+                Status          = 'AlreadyConnected'
+                Account         = $existing.AccountId
+                TenantId        = $existing.TenantId
+                SubscriptionIds = @($existing.SubscriptionIds)
+                Message         = 'Already authenticated. Use -Force to re-authenticate.'
             })
             continue
         }
@@ -103,12 +105,13 @@ function Connect-CIEM {
                     Write-CIEMLog -Message "Azure connection successful. AccountId: $($authContext.AccountId), TenantId: $($authContext.TenantId), Subscriptions: $(@($authContext.SubscriptionIds).Count)" -Severity INFO -Component 'Connect-CIEM'
 
                     $results.Add([PSCustomObject]@{
-                        Provider      = 'Azure'
-                        Status        = 'Connected'
-                        Account       = $authContext.AccountId
-                        TenantId      = $authContext.TenantId
-                        Subscriptions = @($authContext.SubscriptionIds).Count
-                        Message       = "Connected as $($authContext.AccountType)"
+                        Provider        = 'Azure'
+                        Status          = 'Connected'
+                        Account         = $authContext.AccountId
+                        TenantId        = $authContext.TenantId
+                        Subscriptions   = @($authContext.SubscriptionIds).Count
+                        SubscriptionIds = @($authContext.SubscriptionIds)
+                        Message         = "Connected as $($authContext.AccountType)"
                     })
                 }
                 'AWS' {

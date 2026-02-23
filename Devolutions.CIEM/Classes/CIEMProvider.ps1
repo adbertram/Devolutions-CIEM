@@ -2,7 +2,9 @@ class CIEMProvider {
     [string]$Name                              # 'Azure', 'AWS', 'GCP', etc.
     [bool]$Enabled
     [bool]$IsDefault
-    [CIEMAuthenticationContext]$Authentication  # Typed auth context (base or subclass)
+    # Untyped to avoid PSU runspace class isolation issues.
+    # Expected shape: { Provider, Enabled, Method, TenantId?, ClientId?, ManagedIdentityClientId? }
+    [PSCustomObject]$Authentication
     [PSCustomObject]$Endpoints                  # Provider-specific API endpoints
     [string[]]$ResourceFilter                   # Subscription IDs / Account IDs
 

@@ -142,7 +142,7 @@ function New-CIEMProvider {
     $allProviders = @($providers) + @($newProviderObj)
 
     # Persist to PSU cache
-    Set-PSUCache -Key 'CIEM:Providers' -Value $allProviders -ErrorAction SilentlyContinue
+    Set-PSUCache -Key 'CIEM:Providers' -Value $allProviders -Persist -ErrorAction SilentlyContinue
 
     # Return the new provider with computed CheckCount
     $checksPath = Join-Path -Path $script:ModuleRoot -ChildPath "Checks/$Name"

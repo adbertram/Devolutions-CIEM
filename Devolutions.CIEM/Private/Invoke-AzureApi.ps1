@@ -20,6 +20,13 @@ function Invoke-AzureApi {
     .PARAMETER ResourceName
         A friendly name for the resource being loaded, used in verbose/warning messages.
 
+    .PARAMETER Method
+        HTTP method to use. Defaults to GET.
+
+    .PARAMETER Body
+        Request body for POST/PUT/PATCH requests. Pass a hashtable or PSCustomObject;
+        it will be serialized to JSON automatically.
+
     .PARAMETER Raw
         Return the raw response object (StatusCode, Content) instead of parsed content.
         Used internally for pagination support.
@@ -35,6 +42,10 @@ function Invoke-AzureApi {
 
     .EXAMPLE
         Invoke-AzureApi -Uri $armUri -Api ARM -ResourceName 'KeyVaults'
+
+    .EXAMPLE
+        # POST with body (e.g., Azure Resource Graph query)
+        Invoke-AzureApi -Uri $rgUri -Method POST -Body @{ query = 'Resources | limit 10'; subscriptions = @($subId) } -ResourceName 'Resource Graph'
 
     .EXAMPLE
         # Throw on error instead of warning
@@ -54,6 +65,13 @@ function Invoke-AzureApi {
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$ResourceName,
+
+        [Parameter()]
+        [ValidateSet('GET', 'POST', 'PUT', 'PATCH', 'DELETE')]
+        [string]$Method = 'GET',
+
+        [Parameter()]
+        [object]$Body,
 
         [Parameter()]
         [switch]$Raw
@@ -83,12 +101,28 @@ function Invoke-AzureApi {
     # Get tokens via centralized helper
     $tokens = Get-CIEMToken
 
+    # Serialize body to JSON if provided
+    $jsonBody = $null
+    if ($Body) {
+        $jsonBody = $Body | ConvertTo-Json -Depth 20 -Compress
+    }
+
     # Helper to invoke REST API with proper error handling
     # Invoke-RestMethod throws HttpResponseException on 4xx/5xx even with -ErrorAction SilentlyContinue
     function Invoke-SafeRestMethod {
-        param($Uri, $Headers)
+        param($Uri, $Headers, $Method, $JsonBody)
         try {
-            $restResponse = Invoke-RestMethod -Uri $Uri -Method GET -Headers $Headers -ErrorAction Stop
+            $restParams = @{
+                Uri         = $Uri
+                Method      = $Method
+                Headers     = $Headers
+                ErrorAction = 'Stop'
+            }
+            if ($JsonBody) {
+                $restParams.Body        = $JsonBody
+                $restParams.ContentType = 'application/json'
+            }
+            $restResponse = Invoke-RestMethod @restParams
             [PSCustomObject]@{
                 StatusCode = 200
                 Content    = $restResponse | ConvertTo-Json -Depth 20
@@ -119,17 +153,17 @@ function Invoke-AzureApi {
                 return
             }
             $headers = @{ Authorization = "Bearer $($tokens.GraphToken)" }
-            $response = Invoke-SafeRestMethod -Uri $Uri -Headers $headers
+            $response = Invoke-SafeRestMethod -Uri $Uri -Headers $headers -Method $Method -JsonBody $jsonBody
         }
         'ARM' {
             if (-not $tokens.ARMToken) {
-                # Fall back to Invoke-AzRestMethod which uses Az context
-                $response = Invoke-AzRestMethod -Uri $Uri -Method GET
+                $msg = "ARM API call requested but no ARM token available. Run Connect-CIEM first."
+                if ($shouldThrow) { throw $msg }
+                Write-Warning $msg
+                return
             }
-            else {
-                $headers = @{ Authorization = "Bearer $($tokens.ARMToken)" }
-                $response = Invoke-SafeRestMethod -Uri $Uri -Headers $headers
-            }
+            $headers = @{ Authorization = "Bearer $($tokens.ARMToken)" }
+            $response = Invoke-SafeRestMethod -Uri $Uri -Headers $headers -Method $Method -JsonBody $jsonBody
         }
         'KeyVault' {
             if (-not $tokens.KeyVaultToken) {
@@ -139,7 +173,7 @@ function Invoke-AzureApi {
                 return
             }
             $headers = @{ Authorization = "Bearer $($tokens.KeyVaultToken)" }
-            $response = Invoke-SafeRestMethod -Uri $Uri -Headers $headers
+            $response = Invoke-SafeRestMethod -Uri $Uri -Headers $headers -Method $Method -JsonBody $jsonBody
         }
     }
 

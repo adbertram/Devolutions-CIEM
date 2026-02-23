@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Azure Resource Types",
+  "description": "Azure resource type definitions and the property paths where dependency references are found. Used to drive dependency discovery by parsing Azure Resource Graph results.",
+  "provider": "azure",
+  "resourceTypes": {
+    "Microsoft.Compute/virtualMachines": {
+      "category": "compute",
+      "displayName": "Virtual Machine",
+      "icon": "server",
+      "dependencyPaths": {
+        "networkInterfaces": "properties.networkProfile.networkInterfaces[].id",
+        "osDisk": "properties.storageProfile.osDisk.managedDisk.id",
+        "dataDisks": "properties.storageProfile.dataDisks[].managedDisk.id",
+        "availabilitySet": "properties.availabilitySet.id",
+        "proximityPlacementGroup": "properties.proximityPlacementGroup.id",
+        "virtualMachineScaleSet": "properties.virtualMachineScaleSet.id",
+        "hostGroup": "properties.hostGroup.id",
+        "identity": "identity.userAssignedIdentities"
+      }
+    },
+    "Microsoft.Network/networkInterfaces": {
+      "category": "network",
+      "displayName": "Network Interface",
+      "icon": "ethernet",
+      "dependencyPaths": {
+        "subnet": "properties.ipConfigurations[].properties.subnet.id",
+        "publicIPAddress": "properties.ipConfigurations[].properties.publicIPAddress.id",
+        "networkSecurityGroup": "properties.networkSecurityGroup.id"
+      }
+    },
+    "Microsoft.Network/virtualNetworks": {
+      "category": "network",
+      "displayName": "Virtual Network",
+      "icon": "project-diagram",
+      "dependencyPaths": {
+        "subnets": "properties.subnets[].id",
+        "peerings": "properties.virtualNetworkPeerings[].properties.remoteVirtualNetwork.id",
+        "ddosProtectionPlan": "properties.ddosProtectionPlan.id"
+      }
+    },
+    "Microsoft.Network/virtualNetworks/subnets": {
+      "category": "network",
+      "displayName": "Subnet",
+      "icon": "sitemap",
+      "dependencyPaths": {
+        "networkSecurityGroup": "properties.networkSecurityGroup.id",
+        "routeTable": "properties.routeTable.id",
+        "natGateway": "properties.natGateway.id",
+        "serviceEndpoints": "properties.serviceEndpoints[].service"
+      }
+    },
+    "Microsoft.Network/publicIPAddresses": {
+      "category": "network",
+      "displayName": "Public IP Address",
+      "icon": "globe",
+      "dependencyPaths": {
+        "ipConfiguration": "properties.ipConfiguration.id"
+      }
+    },
+    "Microsoft.Network/networkSecurityGroups": {
+      "category": "security",
+      "displayName": "Network Security Group",
+      "icon": "shield-alt",
+      "dependencyPaths": {
+        "subnets": "properties.subnets[].id",
+        "networkInterfaces": "properties.networkInterfaces[].id"
+      }
+    },
+    "Microsoft.Network/loadBalancers": {
+      "category": "network",
+      "displayName": "Load Balancer",
+      "icon": "balance-scale",
+      "dependencyPaths": {
+        "frontendIPConfigurations": "properties.frontendIPConfigurations[].properties.publicIPAddress.id",
+        "backendAddressPools": "properties.backendAddressPools[].properties.backendIPConfigurations[].id",
+        "subnet": "properties.frontendIPConfigurations[].properties.subnet.id"
+      }
+    },
+    "Microsoft.Storage/storageAccounts": {
+      "category": "storage",
+      "displayName": "Storage Account",
+      "icon": "database",
+      "dependencyPaths": {
+        "virtualNetworkRules": "properties.networkAcls.virtualNetworkRules[].id",
+        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
+      }
+    },
+    "Microsoft.Compute/disks": {
+      "category": "storage",
+      "displayName": "Managed Disk",
+      "icon": "hdd",
+      "dependencyPaths": {
+        "managedBy": "managedBy",
+        "diskEncryptionSet": "properties.encryption.diskEncryptionSetId"
+      }
+    },
+    "Microsoft.KeyVault/vaults": {
+      "category": "security",
+      "displayName": "Key Vault",
+      "icon": "key",
+      "dependencyPaths": {
+        "virtualNetworkRules": "properties.networkAcls.virtualNetworkRules[].id",
+        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
+      }
+    },
+    "Microsoft.Sql/servers": {
+      "category": "database",
+      "displayName": "SQL Server",
+      "icon": "database",
+      "dependencyPaths": {
+        "identity": "identity.userAssignedIdentities",
+        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id",
+        "virtualNetworkRules": "properties.virtualNetworkRules[].properties.virtualNetworkSubnetId"
+      }
+    },
+    "Microsoft.Sql/servers/databases": {
+      "category": "database",
+      "displayName": "SQL Database",
+      "icon": "table",
+      "dependencyPaths": {
+        "elasticPool": "properties.elasticPoolId",
+        "server": "_parentResourceId"
+      }
+    },
+    "Microsoft.Web/sites": {
+      "category": "compute",
+      "displayName": "App Service / Function App",
+      "icon": "window-maximize",
+      "dependencyPaths": {
+        "serverFarm": "properties.serverFarmId",
+        "virtualNetworkSubnet": "properties.virtualNetworkSubnetId",
+        "identity": "identity.userAssignedIdentities"
+      }
+    },
+    "Microsoft.Web/serverFarms": {
+      "category": "compute",
+      "displayName": "App Service Plan",
+      "icon": "layer-group",
+      "dependencyPaths": {}
+    },
+    "Microsoft.ContainerRegistry/registries": {
+      "category": "container",
+      "displayName": "Container Registry",
+      "icon": "box",
+      "dependencyPaths": {
+        "identity": "identity.userAssignedIdentities",
+        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
+      }
+    },
+    "Microsoft.ContainerService/managedClusters": {
+      "category": "container",
+      "displayName": "AKS Cluster",
+      "icon": "dharmachakra",
+      "dependencyPaths": {
+        "agentPoolSubnet": "properties.agentPoolProfiles[].vnetSubnetID",
+        "dnsServiceIP": "properties.networkProfile.dnsServiceIP",
+        "identity": "identity.userAssignedIdentities",
+        "nodeResourceGroup": "properties.nodeResourceGroup"
+      }
+    },
+    "Microsoft.DocumentDB/databaseAccounts": {
+      "category": "database",
+      "displayName": "Cosmos DB Account",
+      "icon": "atom",
+      "dependencyPaths": {
+        "virtualNetworkRules": "properties.virtualNetworkRules[].id",
+        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
+      }
+    },
+    "Microsoft.Network/applicationGateways": {
+      "category": "network",
+      "displayName": "Application Gateway",
+      "icon": "door-open",
+      "dependencyPaths": {
+        "subnet": "properties.gatewayIPConfigurations[].properties.subnet.id",
+        "frontendPublicIP": "properties.frontendIPConfigurations[].properties.publicIPAddress.id",
+        "backendAddresses": "properties.backendAddressPools[].properties.backendAddresses"
+      }
+    },
+    "Microsoft.Network/privateEndpoints": {
+      "category": "network",
+      "displayName": "Private Endpoint",
+      "icon": "lock",
+      "dependencyPaths": {
+        "subnet": "properties.subnet.id",
+        "privateLinkServiceConnections": "properties.privateLinkServiceConnections[].properties.privateLinkServiceId"
+      }
+    },
+    "Microsoft.ManagedIdentity/userAssignedIdentities": {
+      "category": "identity",
+      "displayName": "User Assigned Managed Identity",
+      "icon": "id-badge",
+      "dependencyPaths": {}
+    },
+    "Microsoft.Authorization/roleAssignments": {
+      "category": "identity",
+      "displayName": "Role Assignment",
+      "icon": "user-shield",
+      "dependencyPaths": {
+        "principalId": "properties.principalId",
+        "roleDefinitionId": "properties.roleDefinitionId",
+        "scope": "properties.scope"
+      }
+    }
+  }
+}

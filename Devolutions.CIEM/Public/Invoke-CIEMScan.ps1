@@ -194,6 +194,53 @@ function Invoke-CIEMScan {
                 }
             }
 
+            # Build identity-to-resource relationship graph (if Graph module is available)
+            if (Get-Module -ListAvailable -Name 'Devolutions.CIEM.Graph' -ErrorAction SilentlyContinue) {
+                try {
+                    Import-Module Devolutions.CIEM.Graph -ErrorAction Stop
+                    $entraCache = $serviceCacheLookup['Entra']
+                    $iamCache = $serviceCacheLookup['IAM']
+
+                    if ($entraCache -and $entraCache.Success) {
+                        $graphEntraData = $entraCache.CacheData
+                        $graphIAMData = if ($iamCache -and $iamCache.Success) { $iamCache.CacheData } else { @{} }
+
+                        Write-Verbose "[$providerName] Building identity relationship graph..."
+                        $sw = [Diagnostics.Stopwatch]::StartNew()
+                        $ciemGraph = New-CIEMGraph -EntraData $graphEntraData -IAMData $graphIAMData -TenantId $authContext.TenantId
+                        $sw.Stop()
+                        Write-Verbose "[$providerName] Graph built in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s: $($ciemGraph.Nodes.Count) nodes, $($ciemGraph.Edges.Count) edges"
+
+                        # Inject as synthetic service cache entry
+                        $graphCache = [CIEMServiceCache]::new()
+                        $graphCache.ServiceName = 'Graph'
+                        $graphCache.Success = $true
+                        $graphCache.Duration = $sw.Elapsed
+                        $graphCache.Errors = @()
+                        $graphCache.Warnings = @()
+                        $graphCache.Output = @()
+                        $graphCache.CacheData = @{ Graph = $ciemGraph }
+                        $serviceCacheLookup['Graph'] = $graphCache
+
+                        # Store graph in PSU cache for UI access (Identity Graph page)
+                        $exported = Export-CIEMGraph -Graph $ciemGraph
+                        try {
+                            Set-PSUCache -Key "CIEM:Graph:$providerName" -Value $exported -Persist -ErrorAction Stop
+                            Write-Verbose "[$providerName] Graph stored in PSU cache for UI access"
+                        }
+                        catch {
+                            Write-Warning "[$providerName] Failed to store graph in PSU cache: $($_.Exception.Message)"
+                        }
+                    }
+                    else {
+                        Write-Verbose "[$providerName] Skipping graph build — Entra service cache unavailable"
+                    }
+                }
+                catch {
+                    Write-Warning "[$providerName] Graph build failed (non-fatal): $($_.Exception.Message)"
+                }
+            }
+
             # Load check metadata for this provider
             $getCheckParams = @{ Provider = $providerName }
             if ($CheckId -and $CheckId.Count -eq 1) { $getCheckParams.CheckId = $CheckId[0] }

@@ -183,7 +183,11 @@ FileList = '.universal\dashboards.ps1', 'ciem_checks.json',
                'Public/Reset-CIEMConfig.ps1',
                'Public/Test-CIEMAuthenticationContext.ps1',
                'Public/Get-CIEMScanRun.ps1',
-               'Public/Get-CIEMScanResult.ps1'
+               'Public/Get-CIEMScanResult.ps1',
+               'Public/Get-CIEMRelationshipColor.ps1',
+               'Public/Get-CIEMResourceGraphResources.ps1',
+               'Pages/New-CIEMGraphPage.ps1',
+               'Pages/New-CIEMResourceGraphPage.ps1'
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
 PrivateData = @{

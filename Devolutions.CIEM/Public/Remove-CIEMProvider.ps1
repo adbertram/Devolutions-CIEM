@@ -59,5 +59,5 @@ function Remove-CIEMProvider {
     }
 
     # Persist to PSU cache
-    Set-PSUCache -Key 'CIEM:Providers' -Value @($toCache) -ErrorAction SilentlyContinue
+    Set-PSUCache -Key 'CIEM:Providers' -Value @($toCache) -Persist -ErrorAction SilentlyContinue
 }

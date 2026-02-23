@@ -25,8 +25,11 @@ function Update-CIEMProvider {
     .PARAMETER ResourceFilter
         New array of subscription IDs or account IDs.
 
+    .PARAMETER PassThru
+        Returns the updated provider object. By default, this function produces no output.
+
     .OUTPUTS
-        [PSCustomObject] The updated provider object with computed CheckCount.
+        [PSCustomObject] When -PassThru is specified, the updated provider object with computed CheckCount.
 
     .EXAMPLE
         Update-CIEMProvider -Name 'GCP' -Enabled $true
@@ -53,7 +56,10 @@ function Update-CIEMProvider {
         [PSCustomObject]$Endpoints,
 
         [Parameter()]
-        [string[]]$ResourceFilter
+        [string[]]$ResourceFilter,
+
+        [Parameter()]
+        [switch]$PassThru
     )
 
     $ErrorActionPreference = 'Stop'
@@ -125,8 +131,9 @@ function Update-CIEMProvider {
     }
 
     # Persist to PSU cache
-    Set-PSUCache -Key 'CIEM:Providers' -Value @($toCache) -ErrorAction SilentlyContinue
+    Set-PSUCache -Key 'CIEM:Providers' -Value @($toCache) -Persist -ErrorAction SilentlyContinue
 
-    # Return the updated provider with CheckCount
-    Get-CIEMProvider -Name $Name
+    if ($PassThru) {
+        Get-CIEMProvider -Name $Name
+    }
 }

@@ -1,0 +1,162 @@
+[
+    {
+        "targetType": "SqlServer",
+        "permissions": ["Microsoft.Sql/servers/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "SqlServer",
+        "permissions": ["Microsoft.Sql/servers/read", "Microsoft.Sql/servers/databases/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "SqlServer",
+        "permissions": ["Microsoft.Sql/servers/write", "Microsoft.Sql/servers/databases/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "KeyVault",
+        "permissions": ["Microsoft.KeyVault/vaults/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "KeyVault",
+        "permissions": ["Microsoft.KeyVault/vaults/read", "Microsoft.KeyVault/vaults/secrets/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "KeyVault",
+        "permissions": ["Microsoft.KeyVault/vaults/write", "Microsoft.KeyVault/vaults/secrets/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "StorageAccount",
+        "permissions": ["Microsoft.Storage/storageAccounts/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "StorageAccount",
+        "permissions": ["Microsoft.Storage/storageAccounts/read", "Microsoft.Storage/storageAccounts/listKeys/action"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "StorageAccount",
+        "permissions": ["Microsoft.Storage/storageAccounts/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "VirtualMachine",
+        "permissions": ["Microsoft.Compute/virtualMachines/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "VirtualMachine",
+        "permissions": ["Microsoft.Compute/virtualMachines/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "VirtualMachine",
+        "permissions": ["Microsoft.Compute/virtualMachines/write", "Microsoft.Compute/virtualMachines/start/action", "Microsoft.Compute/virtualMachines/restart/action"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "NetworkSecurityGroup",
+        "permissions": ["Microsoft.Network/networkSecurityGroups/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "NetworkSecurityGroup",
+        "permissions": ["Microsoft.Network/networkSecurityGroups/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "NetworkSecurityGroup",
+        "permissions": ["Microsoft.Network/networkSecurityGroups/write", "Microsoft.Network/networkSecurityGroups/securityRules/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "WebApp",
+        "permissions": ["Microsoft.Web/sites/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "WebApp",
+        "permissions": ["Microsoft.Web/sites/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "WebApp",
+        "permissions": ["Microsoft.Web/sites/write", "Microsoft.Web/sites/config/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "ContainerRegistry",
+        "permissions": ["Microsoft.ContainerRegistry/registries/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "ContainerRegistry",
+        "permissions": ["Microsoft.ContainerRegistry/registries/read", "Microsoft.ContainerRegistry/registries/pull/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "ContainerRegistry",
+        "permissions": ["Microsoft.ContainerRegistry/registries/write", "Microsoft.ContainerRegistry/registries/push/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "CosmosDB",
+        "permissions": ["Microsoft.DocumentDB/databaseAccounts/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "CosmosDB",
+        "permissions": ["Microsoft.DocumentDB/databaseAccounts/read", "Microsoft.DocumentDB/databaseAccounts/listKeys/action"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "CosmosDB",
+        "permissions": ["Microsoft.DocumentDB/databaseAccounts/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "AKS",
+        "permissions": ["Microsoft.ContainerService/managedClusters/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "AKS",
+        "permissions": ["Microsoft.ContainerService/managedClusters/read", "Microsoft.ContainerService/managedClusters/listClusterUserCredential/action"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "AKS",
+        "permissions": ["Microsoft.ContainerService/managedClusters/write"],
+        "relationship": "CAN_WRITE"
+    },
+    {
+        "targetType": "Subscription",
+        "permissions": ["*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "Subscription",
+        "permissions": ["*/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "ResourceGroup",
+        "permissions": ["Microsoft.Resources/subscriptions/resourceGroups/*"],
+        "relationship": "CAN_MANAGE"
+    },
+    {
+        "targetType": "ResourceGroup",
+        "permissions": ["Microsoft.Resources/subscriptions/resourceGroups/read"],
+        "relationship": "CAN_READ"
+    },
+    {
+        "targetType": "ResourceGroup",
+        "permissions": ["Microsoft.Resources/subscriptions/resourceGroups/write"],
+        "relationship": "CAN_WRITE"
+    }
+]

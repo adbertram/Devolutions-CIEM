@@ -27,6 +27,14 @@ $script:GraphAccessToken = $null
 # Initialize PSU environment detection (populated on first access)
 $script:PSUEnvironment = $null
 
+# Color mapping for relationship chips (used by Get-CIEMRelationshipColor and Graph page functions)
+$script:RelationshipColors = @{
+    'CAN_MANAGE' = '#f44336'
+    'CAN_WRITE'  = '#ff9800'
+    'CAN_READ'   = '#4caf50'
+    'HAS_ROLE'   = '#1976d2'
+}
+
 # Get class, public, private, page, and check function definition files
 # Note: Errors during file enumeration indicate a broken module structure and should fail loudly
 $classesPath = Join-Path -Path $PSScriptRoot -ChildPath 'Classes'
@@ -73,9 +81,11 @@ foreach ($import in @($Classes + $Private + $Pages + $Checks + $Public)) {
     }
 }
 
-# Export public functions
-# Parse each public file to find all function definitions and export them
-foreach ($file in $Public) {
+# Export public and page functions
+# Page functions (Show-*, New-CIEM*Page, etc.) must be exported because PSU's
+# [scriptblock]::Create() pattern resolves function names in the caller's scope.
+# Without exporting, PSU dashboard runspaces cannot invoke page component functions.
+foreach ($file in @($Public + $Pages)) {
     $content = Get-Content -Path $file.FullName -Raw
     $functionNames = [regex]::Matches($content, '(?m)^function\s+([A-Za-z0-9-]+)') | ForEach-Object { $_.Groups[1].Value }
     foreach ($funcName in $functionNames) {

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Azure Relationship Types",
+  "description": "Defines the relationship types that can exist between Azure resources. Each type has a semantic direction and describes how it is discovered.",
+  "provider": "azure",
+  "relationshipTypes": {
+    "CONTAINS": {
+      "displayName": "Contains",
+      "direction": "contains",
+      "description": "Parent contains child resource. Subscription → Resource Group → Resources.",
+      "inverse": "CONTAINED_IN",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Resources/subscriptions", "target": "Microsoft.Resources/resourceGroups" },
+        { "source": "Microsoft.Resources/resourceGroups", "target": "*" },
+        { "source": "Microsoft.Network/virtualNetworks", "target": "Microsoft.Network/virtualNetworks/subnets" }
+      ]
+    },
+    "CONTAINED_IN": {
+      "displayName": "Contained In",
+      "direction": "contained_in",
+      "description": "Inverse of CONTAINS. Child belongs to parent.",
+      "inverse": "CONTAINS",
+      "discoveryMethod": "resource-property-parse"
+    },
+    "NETWORK_ATTACHED": {
+      "displayName": "Network Attached",
+      "direction": "depends_on",
+      "description": "Resource is attached to a network component (NIC, subnet, VNet).",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.Network/networkInterfaces" },
+        { "source": "Microsoft.Network/networkInterfaces", "target": "Microsoft.Network/virtualNetworks/subnets" },
+        { "source": "Microsoft.Web/sites", "target": "Microsoft.Network/virtualNetworks/subnets" },
+        { "source": "Microsoft.ContainerService/managedClusters", "target": "Microsoft.Network/virtualNetworks/subnets" }
+      ]
+    },
+    "STORAGE_ATTACHED": {
+      "displayName": "Storage Attached",
+      "direction": "depends_on",
+      "description": "Resource depends on a storage resource (disk, storage account).",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.Compute/disks" }
+      ]
+    },
+    "SECURITY_APPLIED": {
+      "displayName": "Security Applied",
+      "direction": "bound_to",
+      "description": "Security resource is bound to a target (NSG → subnet, NSG → NIC).",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Network/networkSecurityGroups", "target": "Microsoft.Network/virtualNetworks/subnets" },
+        { "source": "Microsoft.Network/networkSecurityGroups", "target": "Microsoft.Network/networkInterfaces" }
+      ]
+    },
+    "PRIVATE_ENDPOINT": {
+      "displayName": "Private Endpoint Connection",
+      "direction": "associated",
+      "description": "Private endpoint provides private network access to a service.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Network/privateEndpoints", "target": "Microsoft.Storage/storageAccounts" },
+        { "source": "Microsoft.Network/privateEndpoints", "target": "Microsoft.KeyVault/vaults" },
+        { "source": "Microsoft.Network/privateEndpoints", "target": "Microsoft.Sql/servers" }
+      ]
+    },
+    "HOSTED_ON": {
+      "displayName": "Hosted On",
+      "direction": "depends_on",
+      "description": "Compute workload runs on a hosting resource.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Web/sites", "target": "Microsoft.Web/serverFarms" },
+        { "source": "Microsoft.Sql/servers/databases", "target": "Microsoft.Sql/servers" }
+      ]
+    },
+    "IDENTITY_ASSIGNED": {
+      "displayName": "Identity Assigned",
+      "direction": "associated",
+      "description": "A managed identity is assigned to a resource.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" },
+        { "source": "Microsoft.Web/sites", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" },
+        { "source": "Microsoft.ContainerService/managedClusters", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" }
+      ]
+    },
+    "ROLE_ASSIGNED": {
+      "displayName": "Role Assigned",
+      "direction": "associated",
+      "description": "An RBAC role assignment grants a principal permissions at a scope.",
+      "discoveryMethod": "iam-policy-analysis",
+      "examples": [
+        { "source": "Microsoft.Authorization/roleAssignments", "target": "*", "note": "Scope is the target resource or resource group" }
+      ]
+    },
+    "VNET_PEERED": {
+      "displayName": "VNet Peered",
+      "direction": "associated",
+      "description": "Two virtual networks are peered for cross-network communication.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Network/virtualNetworks", "target": "Microsoft.Network/virtualNetworks" }
+      ]
+    },
+    "LOAD_BALANCED": {
+      "displayName": "Load Balanced",
+      "direction": "associated",
+      "description": "Traffic is distributed to backend resources via a load balancer or application gateway.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Network/loadBalancers", "target": "Microsoft.Network/networkInterfaces" },
+        { "source": "Microsoft.Network/applicationGateways", "target": "Microsoft.Network/virtualNetworks/subnets" }
+      ]
+    },
+    "ENCRYPTION_MANAGED": {
+      "displayName": "Encryption Managed By",
+      "direction": "depends_on",
+      "description": "Resource encryption is managed by a Key Vault or disk encryption set.",
+      "discoveryMethod": "resource-property-parse",
+      "examples": [
+        { "source": "Microsoft.Compute/disks", "target": "Microsoft.KeyVault/vaults" }
+      ]
+    }
+  }
+}

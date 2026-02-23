@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AWS Resource Types",
+  "description": "AWS resource type definitions. Unlike Azure, AWS Config provides first-class relationships — so dependency paths here document Config's relationship coverage and supplementary API calls needed for gaps.",
+  "provider": "aws",
+  "resourceTypes": {
+    "AWS::EC2::Instance": {
+      "category": "compute",
+      "displayName": "EC2 Instance",
+      "icon": "server",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with", "is attached to", "is contained in"],
+      "supplementaryPaths": {
+        "iamInstanceProfile": "IamInstanceProfile.Arn"
+      }
+    },
+    "AWS::EC2::VPC": {
+      "category": "network",
+      "displayName": "VPC",
+      "icon": "project-diagram",
+      "configRelationships": true,
+      "configRelationshipTypes": ["contains"]
+    },
+    "AWS::EC2::Subnet": {
+      "category": "network",
+      "displayName": "Subnet",
+      "icon": "sitemap",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is contained in", "contains"]
+    },
+    "AWS::EC2::SecurityGroup": {
+      "category": "security",
+      "displayName": "Security Group",
+      "icon": "shield-alt",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with"]
+    },
+    "AWS::EC2::NetworkInterface": {
+      "category": "network",
+      "displayName": "Network Interface",
+      "icon": "ethernet",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with", "is attached to"]
+    },
+    "AWS::EC2::EIP": {
+      "category": "network",
+      "displayName": "Elastic IP",
+      "icon": "globe",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is attached to"]
+    },
+    "AWS::EC2::Volume": {
+      "category": "storage",
+      "displayName": "EBS Volume",
+      "icon": "hdd",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is attached to"]
+    },
+    "AWS::ElasticLoadBalancingV2::LoadBalancer": {
+      "category": "network",
+      "displayName": "ALB/NLB",
+      "icon": "balance-scale",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with"]
+    },
+    "AWS::S3::Bucket": {
+      "category": "storage",
+      "displayName": "S3 Bucket",
+      "icon": "archive",
+      "configRelationships": true,
+      "configRelationshipTypes": [],
+      "supplementaryPaths": {
+        "bucketPolicy": "requires s3:GetBucketPolicy API call"
+      }
+    },
+    "AWS::RDS::DBInstance": {
+      "category": "database",
+      "displayName": "RDS Instance",
+      "icon": "database",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with", "is contained in"],
+      "supplementaryPaths": {
+        "subnetGroup": "DBSubnetGroup.DBSubnetGroupName",
+        "securityGroups": "VpcSecurityGroups[].VpcSecurityGroupId"
+      }
+    },
+    "AWS::RDS::DBCluster": {
+      "category": "database",
+      "displayName": "RDS Cluster (Aurora)",
+      "icon": "database",
+      "configRelationships": true,
+      "configRelationshipTypes": ["contains"]
+    },
+    "AWS::Lambda::Function": {
+      "category": "serverless",
+      "displayName": "Lambda Function",
+      "icon": "bolt",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with"],
+      "supplementaryPaths": {
+        "role": "Role",
+        "vpcConfig": "VpcConfig.SubnetIds[], VpcConfig.SecurityGroupIds[]",
+        "layers": "Layers[].Arn"
+      }
+    },
+    "AWS::DynamoDB::Table": {
+      "category": "database",
+      "displayName": "DynamoDB Table",
+      "icon": "table",
+      "configRelationships": true,
+      "configRelationshipTypes": []
+    },
+    "AWS::ECS::Cluster": {
+      "category": "container",
+      "displayName": "ECS Cluster",
+      "icon": "dharmachakra",
+      "configRelationships": true,
+      "configRelationshipTypes": ["contains"]
+    },
+    "AWS::ECS::Service": {
+      "category": "container",
+      "displayName": "ECS Service",
+      "icon": "cogs",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is contained in", "is associated with"]
+    },
+    "AWS::EKS::Cluster": {
+      "category": "container",
+      "displayName": "EKS Cluster",
+      "icon": "dharmachakra",
+      "configRelationships": false,
+      "supplementaryPaths": {
+        "role": "RoleArn",
+        "subnets": "ResourcesVpcConfig.SubnetIds[]",
+        "securityGroups": "ResourcesVpcConfig.SecurityGroupIds[]"
+      }
+    },
+    "AWS::SQS::Queue": {
+      "category": "messaging",
+      "displayName": "SQS Queue",
+      "icon": "inbox",
+      "configRelationships": true,
+      "configRelationshipTypes": []
+    },
+    "AWS::SNS::Topic": {
+      "category": "messaging",
+      "displayName": "SNS Topic",
+      "icon": "bell",
+      "configRelationships": true,
+      "configRelationshipTypes": []
+    },
+    "AWS::IAM::Role": {
+      "category": "identity",
+      "displayName": "IAM Role",
+      "icon": "user-shield",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with"],
+      "supplementaryPaths": {
+        "attachedPolicies": "requires iam:ListAttachedRolePolicies",
+        "inlinePolicies": "requires iam:ListRolePolicies + iam:GetRolePolicy",
+        "assumeRolePolicy": "AssumeRolePolicyDocument"
+      }
+    },
+    "AWS::IAM::User": {
+      "category": "identity",
+      "displayName": "IAM User",
+      "icon": "user",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with"],
+      "supplementaryPaths": {
+        "groups": "requires iam:ListGroupsForUser",
+        "attachedPolicies": "requires iam:ListAttachedUserPolicies"
+      }
+    },
+    "AWS::IAM::Policy": {
+      "category": "identity",
+      "displayName": "IAM Policy",
+      "icon": "file-contract",
+      "configRelationships": true,
+      "configRelationshipTypes": ["is associated with"]
+    },
+    "AWS::KMS::Key": {
+      "category": "security",
+      "displayName": "KMS Key",
+      "icon": "key",
+      "configRelationships": true,
+      "configRelationshipTypes": [],
+      "supplementaryPaths": {
+        "keyPolicy": "requires kms:GetKeyPolicy"
+      }
+    },
+    "AWS::CloudFormation::Stack": {
+      "category": "management",
+      "displayName": "CloudFormation Stack",
+      "icon": "layer-group",
+      "configRelationships": true,
+      "configRelationshipTypes": ["contains"]
+    }
+  }
+}
