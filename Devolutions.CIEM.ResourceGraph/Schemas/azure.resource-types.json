@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Azure Resource Types — VM Dependency Tree",
+  "description": "All Azure resource types reachable from a VM dependency chain. Used to drive dependency discovery by parsing Azure Resource Graph results.",
+  "provider": "azure",
+  "resourceTypes": {
+    "Microsoft.Compute/virtualMachines": {
+      "category": "compute",
+      "displayName": "Virtual Machine",
+      "dependencyPaths": {
+        "networkInterfaces": {
+          "path": "properties.networkProfile.networkInterfaces[].id"
+        },
+        "osDisk": {
+          "path": "properties.storageProfile.osDisk.managedDisk.id"
+        },
+        "dataDisks": {
+          "path": "properties.storageProfile.dataDisks[].managedDisk.id"
+        },
+        "availabilitySet": {
+          "path": "properties.availabilitySet.id"
+        },
+        "proximityPlacementGroup": {
+          "path": "properties.proximityPlacementGroup.id"
+        },
+        "virtualMachineScaleSet": {
+          "path": "properties.virtualMachineScaleSet.id"
+        },
+        "hostGroup": {
+          "path": "properties.hostGroup.id"
+        }
+      }
+    },
+    "Microsoft.Network/networkInterfaces": {
+      "category": "network",
+      "displayName": "Network Interface",
+      "dependencyPaths": {
+        "subnet": {
+          "path": "properties.ipConfigurations[].properties.subnet.id"
+        },
+        "publicIPAddress": {
+          "path": "properties.ipConfigurations[].properties.publicIPAddress.id"
+        },
+        "networkSecurityGroup": {
+          "path": "properties.networkSecurityGroup.id"
+        }
+      }
+    },
+    "Microsoft.Compute/disks": {
+      "category": "storage",
+      "displayName": "Managed Disk",
+      "dependencyPaths": {
+        "managedBy": {
+          "path": "managedBy"
+        },
+        "diskEncryptionSet": {
+          "path": "properties.encryption.diskEncryptionSetId"
+        }
+      }
+    },
+    "Microsoft.Network/virtualNetworks": {
+      "category": "network",
+      "displayName": "Virtual Network",
+      "dependencyPaths": {
+        "subnets": {
+          "path": "properties.subnets[].id"
+        },
+        "peerings": {
+          "path": "properties.virtualNetworkPeerings[].properties.remoteVirtualNetwork.id"
+        },
+        "ddosProtectionPlan": {
+          "path": "properties.ddosProtectionPlan.id"
+        }
+      }
+    },
+    "Microsoft.Network/virtualNetworks/subnets": {
+      "category": "network",
+      "displayName": "Subnet",
+      "dependencyPaths": {
+        "networkSecurityGroup": {
+          "path": "properties.networkSecurityGroup.id"
+        },
+        "routeTable": {
+          "path": "properties.routeTable.id"
+        },
+        "natGateway": {
+          "path": "properties.natGateway.id"
+        }
+      }
+    },
+    "Microsoft.Network/publicIPAddresses": {
+      "category": "network",
+      "displayName": "Public IP Address",
+      "dependencyPaths": {
+        "ipConfiguration": {
+          "path": "properties.ipConfiguration.id"
+        }
+      }
+    },
+    "Microsoft.Network/networkSecurityGroups": {
+      "category": "security",
+      "displayName": "Network Security Group",
+      "dependencyPaths": {
+        "subnets": {
+          "path": "properties.subnets[].id"
+        },
+        "networkInterfaces": {
+          "path": "properties.networkInterfaces[].id"
+        }
+      }
+    },
+    "Microsoft.Network/routeTables": {
+      "category": "network",
+      "displayName": "Route Table",
+      "dependencyPaths": {
+        "subnets": {
+          "path": "properties.subnets[].id"
+        }
+      }
+    },
+    "Microsoft.Network/natGateways": {
+      "category": "network",
+      "displayName": "NAT Gateway",
+      "dependencyPaths": {
+        "publicIpAddresses": {
+          "path": "properties.publicIpAddresses[].id"
+        },
+        "publicIpPrefixes": {
+          "path": "properties.publicIpPrefixes[].id"
+        },
+        "subnets": {
+          "path": "properties.subnets[].id"
+        }
+      }
+    },
+    "Microsoft.Network/loadBalancers": {
+      "category": "network",
+      "displayName": "Load Balancer",
+      "dependencyPaths": {
+        "frontendIPConfigurations": {
+          "path": "properties.frontendIPConfigurations[].properties.publicIPAddress.id"
+        },
+        "backendAddressPools": {
+          "path": "properties.backendAddressPools[].properties.backendIPConfigurations[].id"
+        },
+        "subnet": {
+          "path": "properties.frontendIPConfigurations[].properties.subnet.id"
+        }
+      }
+    },
+    "Microsoft.Compute/availabilitySets": {
+      "category": "compute",
+      "displayName": "Availability Set",
+      "dependencyPaths": {
+        "virtualMachines": {
+          "path": "properties.virtualMachines[].id"
+        },
+        "proximityPlacementGroup": {
+          "path": "properties.proximityPlacementGroup.id"
+        }
+      }
+    },
+    "Microsoft.Compute/proximityPlacementGroups": {
+      "category": "compute",
+      "displayName": "Proximity Placement Group",
+      "dependencyPaths": {
+        "virtualMachines": {
+          "path": "properties.virtualMachines[].id"
+        },
+        "availabilitySets": {
+          "path": "properties.availabilitySets[].id"
+        }
+      }
+    },
+    "Microsoft.Compute/virtualMachineScaleSets": {
+      "category": "compute",
+      "displayName": "Virtual Machine Scale Set",
+      "dependencyPaths": {
+        "proximityPlacementGroup": {
+          "path": "properties.proximityPlacementGroup.id"
+        },
+        "hostGroup": {
+          "path": "properties.hostGroup.id"
+        }
+      }
+    },
+    "Microsoft.Compute/hostGroups": {
+      "category": "compute",
+      "displayName": "Dedicated Host Group",
+      "dependencyPaths": {}
+    },
+    "Microsoft.Compute/diskEncryptionSets": {
+      "category": "security",
+      "displayName": "Disk Encryption Set",
+      "dependencyPaths": {
+        "keyVault": {
+          "path": "properties.activeKey.sourceVault.id"
+        }
+      }
+    },
+    "Microsoft.Network/ddosProtectionPlans": {
+      "category": "security",
+      "displayName": "DDoS Protection Plan",
+      "dependencyPaths": {
+        "virtualNetworks": {
+          "path": "properties.virtualNetworks[].id"
+        }
+      }
+    }
+  }
+}
+
+
