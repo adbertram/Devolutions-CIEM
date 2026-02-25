@@ -123,13 +123,6 @@ Azure has two distinct permission systems:
 | Subscription | ARG | `CIEMAzureSubscription` | ResourceContainers | `microsoft.resources/subscriptions` |
 | ResourceGroup | ARG | `CIEMAzureResourceGroup` | ResourceContainers | `microsoft.resources/subscriptions/resourcegroups` |
 | VirtualMachine | ARG | `CIEMAzureVirtualMachine` | Resources | `microsoft.compute/virtualmachines` |
-| StorageAccount | ARG | `CIEMAzureStorageAccount` | Resources | `microsoft.storage/storageaccounts` |
-| KeyVault | ARG | `CIEMAzureKeyVault` | Resources | `microsoft.keyvault/vaults` |
-| SqlServer | ARG | `CIEMAzureSqlServer` | Resources | `microsoft.sql/servers` |
-| WebApp | ARG | `CIEMAzureWebApp` | Resources | `microsoft.web/sites` |
-| AKS | ARG | `CIEMAzureAKS` | Resources | `microsoft.containerservice/managedclusters` |
-| ContainerRegistry | ARG | `CIEMAzureContainerRegistry` | Resources | `microsoft.containerregistry/registries` |
-| CosmosDB | ARG | `CIEMAzureCosmosDB` | Resources | `microsoft.documentdb/databaseaccounts` |
 | NetworkSecurityGroup | ARG | `CIEMAzureNetworkSecurityGroup` | Resources | `microsoft.network/networksecuritygroups` |
 
 Subscription and ResourceGroup serve dual purpose: they are resources AND scopes that contain other resources.
@@ -508,17 +501,10 @@ Methods: `GetDuration()`, `UpdateCounts()`, `UpdateProviderSummaries()`, `Comple
 
 | Name | Provider | DisplayName | ServiceName | ArmProviderPrefix / ArnServicePrefix |
 |------|----------|-------------|-------------|--------------------------------------|
-| AKS | Azure | AKS | Aks | `Microsoft.ContainerService/managedClusters` |
-| ContainerRegistry | Azure | Container Registry | Containerregistry | `Microsoft.ContainerRegistry/registries` |
-| CosmosDB | Azure | Cosmos DB | Cosmosdb | `Microsoft.DocumentDB/databaseAccounts` |
-| KeyVault | Azure | Key Vault | KeyVault | `Microsoft.KeyVault/vaults` |
 | NetworkSecurityGroup | Azure | Network Security Group | Network | `Microsoft.Network/networkSecurityGroups` |
 | ResourceGroup | Azure | Resource Group | *(null)* | `Microsoft.Resources/subscriptions/resourceGroups` |
-| SqlServer | Azure | SQL Server | Sqlserver | `Microsoft.Sql/servers` |
-| StorageAccount | Azure | Storage Account | Storage | `Microsoft.Storage/storageAccounts` |
 | Subscription | Azure | Subscription | *(null)* | *(null)* |
 | VirtualMachine | Azure | Virtual Machine | Vm | `Microsoft.Compute/virtualMachines` |
-| WebApp | Azure | Web App | App | `Microsoft.Web/sites` |
 | S3Bucket | AWS | S3 Bucket | S3 | `s3` |
 | EC2Instance | AWS | EC2 Instance | EC2 | `ec2` |
 | IAMRole | AWS | IAM Role | IAM | `iam` |
@@ -811,122 +797,6 @@ All Azure resources share the ARM envelope. Class properties are pulled from top
 | ProvisioningState | string | `properties.provisioningState` |
 | VmId | string | `properties.vmId` |
 
-### Storage Account
-
-| | |
-|---|---|
-| Class | `CIEMAzureStorageAccount` |
-| Source | ARG `Resources` where `type == 'microsoft.storage/storageaccounts'` |
-| Function | `Get-CIEMAzureStorageAccount [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| SupportsHttpsTrafficOnly | bool | `properties.supportsHttpsTrafficOnly` |
-| MinimumTlsVersion | string | `properties.minimumTlsVersion` |
-| AllowBlobPublicAccess | bool | `properties.allowBlobPublicAccess` |
-| AllowSharedKeyAccess | bool | `properties.allowSharedKeyAccess` |
-| NetworkDefaultAction | string | `properties.networkAcls.defaultAction` |
-| EncryptionKeySource | string | `properties.encryption.keySource` |
-
-### Key Vault
-
-| | |
-|---|---|
-| Class | `CIEMAzureKeyVault` |
-| Source | ARG `Resources` where `type == 'microsoft.keyvault/vaults'` |
-| Function | `Get-CIEMAzureKeyVault [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| VaultUri | string | `properties.vaultUri` |
-| EnableRbacAuthorization | bool | `properties.enableRbacAuthorization` |
-| EnableSoftDelete | bool | `properties.enableSoftDelete` |
-| EnablePurgeProtection | bool | `properties.enablePurgeProtection` |
-| SoftDeleteRetentionInDays | int | `properties.softDeleteRetentionInDays` |
-| NetworkDefaultAction | string | `properties.networkAcls.defaultAction` |
-
-### SQL Server
-
-| | |
-|---|---|
-| Class | `CIEMAzureSqlServer` |
-| Source | ARG `Resources` where `type == 'microsoft.sql/servers'` |
-| Function | `Get-CIEMAzureSqlServer [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| FullyQualifiedDomainName | string | `properties.fullyQualifiedDomainName` |
-| AdministratorLogin | string | `properties.administratorLogin` |
-| State | string | `properties.state` |
-| Version | string | `properties.version` |
-
-### Web App
-
-| | |
-|---|---|
-| Class | `CIEMAzureWebApp` |
-| Source | ARG `Resources` where `type == 'microsoft.web/sites'` |
-| Function | `Get-CIEMAzureWebApp [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| DefaultHostName | string | `properties.defaultHostName` |
-| State | string | `properties.state` |
-| HttpsOnly | bool | `properties.httpsOnly` |
-| ServerFarmId | string | `properties.serverFarmId` |
-
-### AKS
-
-| | |
-|---|---|
-| Class | `CIEMAzureAKS` |
-| Source | ARG `Resources` where `type == 'microsoft.containerservice/managedclusters'` |
-| Function | `Get-CIEMAzureAKS [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| KubernetesVersion | string | `properties.kubernetesVersion` |
-| DnsPrefix | string | `properties.dnsPrefix` |
-| Fqdn | string | `properties.fqdn` |
-| ProvisioningState | string | `properties.provisioningState` |
-| PowerStateCode | string | `properties.powerState.code` |
-
-### Container Registry
-
-| | |
-|---|---|
-| Class | `CIEMAzureContainerRegistry` |
-| Source | ARG `Resources` where `type == 'microsoft.containerregistry/registries'` |
-| Function | `Get-CIEMAzureContainerRegistry [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| LoginServer | string | `properties.loginServer` |
-| AdminUserEnabled | bool | `properties.adminUserEnabled` |
-| ProvisioningState | string | `properties.provisioningState` |
-
-### Cosmos DB
-
-| | |
-|---|---|
-| Class | `CIEMAzureCosmosDB` |
-| Source | ARG `Resources` where `type == 'microsoft.documentdb/databaseaccounts'` |
-| Function | `Get-CIEMAzureCosmosDB [-SubscriptionId] [-ResourceGroup]` |
-
-| Property | Type | ARG Field |
-|----------|------|-----------|
-| *(ARM envelope)* | | |
-| DatabaseAccountOfferType | string | `properties.databaseAccountOfferType` |
-| DocumentEndpoint | string | `properties.documentEndpoint` |
-| EnableAutomaticFailover | bool | `properties.enableAutomaticFailover` |
-| ConsistencyLevel | string | `properties.consistencyPolicy.defaultConsistencyLevel` |
-
 ### Network Security Group
 
 | | |
@@ -1167,15 +1037,8 @@ Defined in `Devolutions.CIEM.Graph/Data/permission_relationships.json`. Maps ARM
 
 | Target Type | CAN_READ Permissions | CAN_WRITE Permissions | CAN_MANAGE Permissions |
 |-------------|----------------------|-----------------------|------------------------|
-| SqlServer | `servers/read`, `servers/databases/read` | `servers/write`, `servers/databases/write` | `servers/*` |
-| KeyVault | `vaults/read`, `vaults/secrets/read` | `vaults/write`, `vaults/secrets/write` | `vaults/*` |
-| StorageAccount | `storageAccounts/read`, `storageAccounts/listKeys/action` | `storageAccounts/write` | `storageAccounts/*` |
 | VirtualMachine | `virtualMachines/read` | `virtualMachines/write`, `start/action`, `restart/action` | `virtualMachines/*` |
 | NetworkSecurityGroup | `networkSecurityGroups/read` | `networkSecurityGroups/write`, `securityRules/write` | `networkSecurityGroups/*` |
-| WebApp | `sites/read` | `sites/write`, `sites/config/write` | `sites/*` |
-| ContainerRegistry | `registries/read`, `registries/pull/read` | `registries/write`, `registries/push/write` | `registries/*` |
-| CosmosDB | `databaseAccounts/read`, `databaseAccounts/listKeys/action` | `databaseAccounts/write` | `databaseAccounts/*` |
-| AKS | `managedClusters/read`, `listClusterUserCredential/action` | `managedClusters/write` | `managedClusters/*` |
 | Subscription | `*/read` | — | `*` |
 | ResourceGroup | `subscriptions/resourceGroups/read` | `subscriptions/resourceGroups/write` | `subscriptions/resourceGroups/*` |
 

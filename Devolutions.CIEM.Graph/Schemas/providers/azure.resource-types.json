@@ -77,15 +77,6 @@
         "subnet": "properties.frontendIPConfigurations[].properties.subnet.id"
       }
     },
-    "Microsoft.Storage/storageAccounts": {
-      "category": "storage",
-      "displayName": "Storage Account",
-      "icon": "database",
-      "dependencyPaths": {
-        "virtualNetworkRules": "properties.networkAcls.virtualNetworkRules[].id",
-        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
-      }
-    },
     "Microsoft.Compute/disks": {
       "category": "storage",
       "displayName": "Managed Disk",
@@ -93,89 +84,6 @@
       "dependencyPaths": {
         "managedBy": "managedBy",
         "diskEncryptionSet": "properties.encryption.diskEncryptionSetId"
-      }
-    },
-    "Microsoft.KeyVault/vaults": {
-      "category": "security",
-      "displayName": "Key Vault",
-      "icon": "key",
-      "dependencyPaths": {
-        "virtualNetworkRules": "properties.networkAcls.virtualNetworkRules[].id",
-        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
-      }
-    },
-    "Microsoft.Sql/servers": {
-      "category": "database",
-      "displayName": "SQL Server",
-      "icon": "database",
-      "dependencyPaths": {
-        "identity": "identity.userAssignedIdentities",
-        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id",
-        "virtualNetworkRules": "properties.virtualNetworkRules[].properties.virtualNetworkSubnetId"
-      }
-    },
-    "Microsoft.Sql/servers/databases": {
-      "category": "database",
-      "displayName": "SQL Database",
-      "icon": "table",
-      "dependencyPaths": {
-        "elasticPool": "properties.elasticPoolId",
-        "server": "_parentResourceId"
-      }
-    },
-    "Microsoft.Web/sites": {
-      "category": "compute",
-      "displayName": "App Service / Function App",
-      "icon": "window-maximize",
-      "dependencyPaths": {
-        "serverFarm": "properties.serverFarmId",
-        "virtualNetworkSubnet": "properties.virtualNetworkSubnetId",
-        "identity": "identity.userAssignedIdentities"
-      }
-    },
-    "Microsoft.Web/serverFarms": {
-      "category": "compute",
-      "displayName": "App Service Plan",
-      "icon": "layer-group",
-      "dependencyPaths": {}
-    },
-    "Microsoft.ContainerRegistry/registries": {
-      "category": "container",
-      "displayName": "Container Registry",
-      "icon": "box",
-      "dependencyPaths": {
-        "identity": "identity.userAssignedIdentities",
-        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
-      }
-    },
-    "Microsoft.ContainerService/managedClusters": {
-      "category": "container",
-      "displayName": "AKS Cluster",
-      "icon": "dharmachakra",
-      "dependencyPaths": {
-        "agentPoolSubnet": "properties.agentPoolProfiles[].vnetSubnetID",
-        "dnsServiceIP": "properties.networkProfile.dnsServiceIP",
-        "identity": "identity.userAssignedIdentities",
-        "nodeResourceGroup": "properties.nodeResourceGroup"
-      }
-    },
-    "Microsoft.DocumentDB/databaseAccounts": {
-      "category": "database",
-      "displayName": "Cosmos DB Account",
-      "icon": "atom",
-      "dependencyPaths": {
-        "virtualNetworkRules": "properties.virtualNetworkRules[].id",
-        "privateEndpoints": "properties.privateEndpointConnections[].properties.privateEndpoint.id"
-      }
-    },
-    "Microsoft.Network/applicationGateways": {
-      "category": "network",
-      "displayName": "Application Gateway",
-      "icon": "door-open",
-      "dependencyPaths": {
-        "subnet": "properties.gatewayIPConfigurations[].properties.subnet.id",
-        "frontendPublicIP": "properties.frontendIPConfigurations[].properties.publicIPAddress.id",
-        "backendAddresses": "properties.backendAddressPools[].properties.backendAddresses"
       }
     },
     "Microsoft.Network/privateEndpoints": {

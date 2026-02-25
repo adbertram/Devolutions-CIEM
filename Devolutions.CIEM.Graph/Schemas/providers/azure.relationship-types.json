@@ -30,15 +30,13 @@
       "discoveryMethod": "resource-property-parse",
       "examples": [
         { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.Network/networkInterfaces" },
-        { "source": "Microsoft.Network/networkInterfaces", "target": "Microsoft.Network/virtualNetworks/subnets" },
-        { "source": "Microsoft.Web/sites", "target": "Microsoft.Network/virtualNetworks/subnets" },
-        { "source": "Microsoft.ContainerService/managedClusters", "target": "Microsoft.Network/virtualNetworks/subnets" }
+        { "source": "Microsoft.Network/networkInterfaces", "target": "Microsoft.Network/virtualNetworks/subnets" }
       ]
     },
     "STORAGE_ATTACHED": {
       "displayName": "Storage Attached",
       "direction": "depends_on",
-      "description": "Resource depends on a storage resource (disk, storage account).",
+      "description": "Resource depends on a storage resource (disk).",
       "discoveryMethod": "resource-property-parse",
       "examples": [
         { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.Compute/disks" }
@@ -58,22 +56,7 @@
       "displayName": "Private Endpoint Connection",
       "direction": "associated",
       "description": "Private endpoint provides private network access to a service.",
-      "discoveryMethod": "resource-property-parse",
-      "examples": [
-        { "source": "Microsoft.Network/privateEndpoints", "target": "Microsoft.Storage/storageAccounts" },
-        { "source": "Microsoft.Network/privateEndpoints", "target": "Microsoft.KeyVault/vaults" },
-        { "source": "Microsoft.Network/privateEndpoints", "target": "Microsoft.Sql/servers" }
-      ]
-    },
-    "HOSTED_ON": {
-      "displayName": "Hosted On",
-      "direction": "depends_on",
-      "description": "Compute workload runs on a hosting resource.",
-      "discoveryMethod": "resource-property-parse",
-      "examples": [
-        { "source": "Microsoft.Web/sites", "target": "Microsoft.Web/serverFarms" },
-        { "source": "Microsoft.Sql/servers/databases", "target": "Microsoft.Sql/servers" }
-      ]
+      "discoveryMethod": "resource-property-parse"
     },
     "IDENTITY_ASSIGNED": {
       "displayName": "Identity Assigned",
@@ -81,9 +64,7 @@
       "description": "A managed identity is assigned to a resource.",
       "discoveryMethod": "resource-property-parse",
       "examples": [
-        { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" },
-        { "source": "Microsoft.Web/sites", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" },
-        { "source": "Microsoft.ContainerService/managedClusters", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" }
+        { "source": "Microsoft.Compute/virtualMachines", "target": "Microsoft.ManagedIdentity/userAssignedIdentities" }
       ]
     },
     "ROLE_ASSIGNED": {
@@ -110,17 +91,7 @@
       "description": "Traffic is distributed to backend resources via a load balancer or application gateway.",
       "discoveryMethod": "resource-property-parse",
       "examples": [
-        { "source": "Microsoft.Network/loadBalancers", "target": "Microsoft.Network/networkInterfaces" },
-        { "source": "Microsoft.Network/applicationGateways", "target": "Microsoft.Network/virtualNetworks/subnets" }
-      ]
-    },
-    "ENCRYPTION_MANAGED": {
-      "displayName": "Encryption Managed By",
-      "direction": "depends_on",
-      "description": "Resource encryption is managed by a Key Vault or disk encryption set.",
-      "discoveryMethod": "resource-property-parse",
-      "examples": [
-        { "source": "Microsoft.Compute/disks", "target": "Microsoft.KeyVault/vaults" }
+        { "source": "Microsoft.Network/loadBalancers", "target": "Microsoft.Network/networkInterfaces" }
       ]
     }
   }

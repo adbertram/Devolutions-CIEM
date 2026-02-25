@@ -1,21 +1,11 @@
 {
     "azure": [
-        { "name": "AKS", "displayName": "AKS", "serviceName": "Aks", "armProviderPrefix": "Microsoft.ContainerService/managedClusters" },
-        { "name": "ContainerRegistry", "displayName": "Container Registry", "serviceName": "Containerregistry", "armProviderPrefix": "Microsoft.ContainerRegistry/registries" },
-        { "name": "CosmosDB", "displayName": "Cosmos DB", "serviceName": "Cosmosdb", "armProviderPrefix": "Microsoft.DocumentDB/databaseAccounts" },
-        { "name": "KeyVault", "displayName": "Key Vault", "serviceName": "KeyVault", "armProviderPrefix": "Microsoft.KeyVault/vaults" },
         { "name": "NetworkSecurityGroup", "displayName": "Network Security Group", "serviceName": "Network", "armProviderPrefix": "Microsoft.Network/networkSecurityGroups" },
         { "name": "ResourceGroup", "displayName": "Resource Group", "serviceName": null, "armProviderPrefix": "Microsoft.Resources/subscriptions/resourceGroups" },
-        { "name": "SqlServer", "displayName": "SQL Server", "serviceName": "Sqlserver", "armProviderPrefix": "Microsoft.Sql/servers" },
-        { "name": "StorageAccount", "displayName": "Storage Account", "serviceName": "Storage", "armProviderPrefix": "Microsoft.Storage/storageAccounts" },
         { "name": "Subscription", "displayName": "Subscription", "serviceName": null, "armProviderPrefix": null },
-        { "name": "VirtualMachine", "displayName": "Virtual Machine", "serviceName": "Vm", "armProviderPrefix": "Microsoft.Compute/virtualMachines" },
-        { "name": "WebApp", "displayName": "Web App", "serviceName": "App", "armProviderPrefix": "Microsoft.Web/sites" }
+        { "name": "VirtualMachine", "displayName": "Virtual Machine", "serviceName": "Vm", "armProviderPrefix": "Microsoft.Compute/virtualMachines" }
     ],
     "aws": [
-        { "name": "S3Bucket", "displayName": "S3 Bucket", "serviceName": "S3", "arnServicePrefix": "s3" },
-        { "name": "EC2Instance", "displayName": "EC2 Instance", "serviceName": "EC2", "arnServicePrefix": "ec2" },
-        { "name": "IAMRole", "displayName": "IAM Role", "serviceName": "IAM", "arnServicePrefix": "iam" },
-        { "name": "LambdaFunction", "displayName": "Lambda Function", "serviceName": "Lambda", "arnServicePrefix": "lambda" }
+        { "name": "EC2Instance", "displayName": "EC2 Instance", "serviceName": "EC2", "arnServicePrefix": "ec2" }
     ]
 }

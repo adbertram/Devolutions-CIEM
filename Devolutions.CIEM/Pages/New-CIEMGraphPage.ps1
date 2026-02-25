@@ -92,7 +92,7 @@ function Show-CIEMGraphResourceDiagram {
     .DESCRIPTION
         Called via [scriptblock]::Create() when the user clicks Visualize.
         Builds the Mermaid diagram via ConvertTo-CIEMGraphMermaid and renders
-        it in an iframe using the same pattern as the ResourceGraph page.
+        it in an iframe using a base64-encoded data URI.
     #>
     [CmdletBinding()]
     param(
@@ -116,7 +116,7 @@ function Show-CIEMGraphResourceDiagram {
     try {
         $mermaidDiagram = ConvertTo-CIEMGraphMermaid -Data $gData -TargetType $resourceType
 
-        # Render Mermaid in an iframe (same pattern as ResourceGraph page)
+        # Render Mermaid in an iframe via base64-encoded data URI
         $diagramJson = ($mermaidDiagram | ConvertTo-Json -Compress)
         $iframeHtml = @"
 <!DOCTYPE html>
