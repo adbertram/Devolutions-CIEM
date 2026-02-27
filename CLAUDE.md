@@ -117,54 +117,34 @@ Publish-PSUModule -ModulePath ./Devolutions.CIEM -LocalOnly
 
 ---
 
-## Manager Module (`Devolutions.CIEM.Manager`)
+## Check Management Functions
 
-Development-only module for managing CIEM checks, syncing Prowler checks, and provisioning Azure infrastructure. **Not deployed to PSU** — used locally during development only.
+Development-only functions for managing CIEM checks, syncing Prowler checks, and provisioning Azure infrastructure. These are exported from the Checks module (`psu-app/modules/Devolutions.CIEM.Checks/`) and available after importing `Devolutions.CIEM`.
 
-```powershell
-Import-Module ./Devolutions.CIEM.Manager
-```
-
-**Important:** The Manager module is self-contained — no dependency on `Devolutions.CIEM` at import time. It reads `ciem_checks.json` directly from the sibling `Devolutions.CIEM/` directory.
-
-### Public Functions
+### Prowler Sync & Check Management
 
 | Function | Purpose |
 |----------|---------|
-| `Sync-ProwlerCheck` | Sync Prowler checks from GitHub into `ciem_checks.json` |
+| `Sync-ProwlerCheck` | Sync Prowler checks from GitHub (sparse checkout) |
 | `Get-ProwlerCheck` | List/filter Prowler checks from the upstream repo |
-| `Remove-CIEMCheck` | Remove a check from `ciem_checks.json` |
-| `New-CIEMAzureManagedIdentity` | Create Azure managed identity for CIEM scanning |
-| `New-PSUAzureServicePrincipal` | Create Azure service principal for PSU |
+| `Enable-CIEMCheck` | Enable a check (set disabled flag to false) |
+| `Disable-CIEMCheck` | Disable a check (set disabled flag to true) |
+| `Compare-ProwlerCheck` | Diff upstream Prowler checks vs local CIEM checks |
+| `Convert-ProwlerCheck` | Convert a Prowler check directory to CIEM format |
 
-### Private Helpers
+### Azure Infrastructure Provisioning
 
 | Function | Purpose |
 |----------|---------|
-| `Get-CIEMCheck` | Read/filter checks from `ciem_checks.json` (disk-based, no CIEM module needed) |
-| `Get-CIEMRequiredPermission` | Aggregate required permissions across checks |
-| `Convert-ProwlerCheck` | Convert a Prowler check directory to CIEM format |
-| `Compare-ProwlerCheck` | Compare local checks against upstream Prowler |
-| `Get-GitHubRepoTree` | GitHub API tree listing (cached to reduce API calls) |
-| `Save-GitHubRepoFile` / `Save-GitHubRepoSparseCheckout` | Download files from GitHub |
-| `Test-GitRemote` | Validate git remote availability |
+| `New-CIEMAzureManagedIdentity` | Configure Azure managed identity with CIEM permissions |
+| `New-PSUAzureServicePrincipal` | Create Azure service principal for PSU |
 
 ### When to Use
 
-- **Adding/removing/syncing checks:** Use Manager module functions, not manual JSON editing
-- **Querying check metadata during development:** `Get-CIEMCheck -Provider Azure -Service Entra`
+- **Adding/removing/syncing checks:** `Sync-ProwlerCheck`, `Enable-CIEMCheck`, `Disable-CIEMCheck`
+- **Querying check metadata:** `Get-CIEMCheck -Provider Azure -Service Entra`
 - **Checking required permissions:** `Get-CIEMRequiredPermission -Service KeyVault`
 - **Provisioning Azure resources:** `New-CIEMAzureManagedIdentity`, `New-PSUAzureServicePrincipal`
-
-### Module Layout
-
-```
-Devolutions.CIEM.Manager/
-├── Devolutions.CIEM.Manager.psd1   # Manifest (v0.1.0, no RequiredModules)
-├── Devolutions.CIEM.Manager.psm1   # Loader (resolves sibling CIEM module path)
-├── Private/                         # Internal helpers
-└── Public/                          # Exported functions
-```
 
 ---
 
@@ -430,3 +410,38 @@ The architecture planning document is at `docs/devolutions-ciem-app-architecture
 | Historical Data | Not in v1 (snapshot per scan) |
 | AD Support | Future (architected for extensibility) |
 | PAM Integration | Risk-to-PAM mapping (deeper than link to docs) |
+
+---
+
+## Database CRUD Convention (MANDATORY)
+
+**Every database table MUST have a corresponding class and full CRUD functions.**
+
+### Required per table
+
+1. **Class** — In the owning module's `Classes/` directory. Properties match table columns (PascalCase).
+2. **New-CIEM[Azure]<Entity>** — INSERT. Fails if record exists. Returns created object.
+3. **Get-CIEM[Azure]<Entity>** — SELECT with optional filter parameters. Returns `[ClassName[]]`.
+4. **Update-CIEM[Azure]<Entity>** — UPDATE partial fields via `$PSBoundParameters.ContainsKey`. Supports `-PassThru`.
+5. **Save-CIEM[Azure]<Entity>** — INSERT OR REPLACE (upsert). Fire-and-forget for bulk operations.
+6. **Remove-CIEM[Azure]<Entity>** — DELETE with `SupportsShouldProcess`. Supports `-Id`, `-ProviderId` (bulk), and `-InputObject`.
+
+### Parameter set pattern
+
+Every write function (New/Update/Save/Remove) must have two parameter sets:
+- **ByProperties** — Individual typed parameters for each column
+- **InputObject** — Accepts `[ClassName[]]` (array) with `ValueFromPipeline` for pipeline and bulk support
+
+### Naming
+
+- Base module tables: `Verb-CIEM<Entity>` (e.g., `New-CIEMCheck`)
+- Azure module tables: `Verb-CIEMAzure<Entity>` (e.g., `New-CIEMAzureSecurityPrincipal`)
+- AWS module tables: `Verb-CIEMAWS<Entity>` (future)
+
+### When adding a new table
+
+1. Add schema to the appropriate `Data/*.sql` file
+2. Create the class in `Classes/`
+3. Create all 5 CRUD functions in `Public/`
+4. Add functions to the module's `.psd1` `FunctionsToExport`
+5. If the table is provider-specific collected data, integrate with the provider's `Save/Get-CIEMCollectedData`

@@ -54,7 +54,10 @@ $repoRoot = Split-Path -Parent $scriptRoot
 switch ($Destination) {
     'local' {
         Write-Host "[local] Importing module..." -ForegroundColor Cyan
-        Import-Module (Join-Path $repoRoot 'Devolutions.CIEM') -Force -ErrorAction Stop
+        Import-Module (Join-Path $repoRoot 'PSUSQLite') -Force -ErrorAction Stop
+        Import-Module (Join-Path $repoRoot 'Devolutions.CIEM.Base') -Force -ErrorAction Stop
+        Import-Module (Join-Path $repoRoot 'Devolutions.CIEM.Graph') -Force -ErrorAction Stop
+        Import-Module (Join-Path $repoRoot 'Devolutions.CIEM.Checks') -Force -ErrorAction Stop
         Write-Host "[local] Executing scriptblock..." -ForegroundColor Cyan
         & $ScriptBlock
     }

@@ -1,0 +1,4 @@
+# PSU App Registration for Devolutions CIEM
+# This file is auto-discovered by PowerShell Universal when the module is installed
+
+New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem' -Module 'Devolutions.CIEM.PSU' -Command 'New-DevolutionsCIEMApp' -Description 'Cloud Infrastructure Entitlement Management (CIEM) - Azure identity and access security scanner'

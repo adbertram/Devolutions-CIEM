@@ -177,3 +177,5 @@ _temp/
 local-psu/
 .playwright-cli/
 plans/
+
+_temp/
