@@ -120,24 +120,15 @@ function Save-CIEMAuthenticationContext {
         New-CIEMProvider -Name $Provider | Out-Null
     }
 
-    # Persist auth profile row via WriteAuth callback
+    # Persist auth profile via WriteAuth callback (uses PSU Variables, no SQL connection needed)
     $providerId = $Provider.ToLower()
     $now = (Get-Date).ToString('o')
-    $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
-    try {
-        if ($reg -and $reg.WriteAuth) {
-            & $reg.WriteAuth $conn $providerId $newAuth $now
-        }
-    }
-    finally {
-        $conn.Dispose()
+    if ($reg -and $reg.WriteAuth) {
+        & $reg.WriteAuth $null $providerId $newAuth $now
     }
 
-    # Point provider at the auth profile and enable it
-    $profileId = if ($newAuth.PSObject.Properties['ProfileId'] -and $newAuth.ProfileId) { $newAuth.ProfileId } else { $null }
-    $updateParams = @{ Name = $Provider; Enabled = $true }
-    if ($profileId) { $updateParams.AuthProfileId = $profileId }
-    Update-CIEMProvider @updateParams | Out-Null
+    # Enable the provider
+    Update-CIEMProvider -Name $Provider -Enabled $true | Out-Null
 
     # Refresh module-level config
     $script:Config = Get-CIEMConfig

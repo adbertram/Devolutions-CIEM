@@ -19,9 +19,6 @@ function Update-CIEMProvider {
     .PARAMETER IsDefault
         Set this provider as the default. Clears IsDefault on all others.
 
-    .PARAMETER AuthProfileId
-        ID of the active authentication profile for this provider.
-
     .PARAMETER PassThru
         Returns the updated provider object. By default, this function produces no output.
 
@@ -45,9 +42,6 @@ function Update-CIEMProvider {
 
         [Parameter()]
         [switch]$IsDefault,
-
-        [Parameter()]
-        [string]$AuthProfileId,
 
         [Parameter()]
         [switch]$PassThru
@@ -74,13 +68,6 @@ function Update-CIEMProvider {
         if ($PSBoundParameters.ContainsKey('Enabled')) {
             Invoke-PSUSQLiteQuery -Connection $conn -Query "UPDATE providers SET enabled = @enabled, updated_at = @now WHERE id = @id" -Parameters @{
                 id = $providerId; enabled = if ($Enabled) { 1 } else { 0 }; now = $now
-            } -AsNonQuery | Out-Null
-        }
-
-        # Update auth_profile_id
-        if ($PSBoundParameters.ContainsKey('AuthProfileId')) {
-            Invoke-PSUSQLiteQuery -Connection $conn -Query "UPDATE providers SET auth_profile_id = @auth_profile_id, updated_at = @now WHERE id = @id" -Parameters @{
-                id = $providerId; auth_profile_id = $AuthProfileId; now = $now
             } -AsNonQuery | Out-Null
         }
 

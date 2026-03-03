@@ -40,7 +40,7 @@ function Get-CIEMProvider {
 
     # Build SQL dynamically from registered provider types
     $selectColumns = [System.Collections.Generic.List[string]]::new()
-    $selectColumns.Add('p.id, p.name, p.type, p.enabled, p.is_default, p.auth_profile_id, p.created_at, p.updated_at')
+    $selectColumns.Add('p.id, p.name, p.type, p.enabled, p.is_default, p.created_at, p.updated_at')
 
     $joinClauses = [System.Collections.Generic.List[string]]::new()
 
@@ -77,7 +77,6 @@ function Get-CIEMProvider {
         $provider.Name = $row.name
         $provider.Enabled = [bool]$row.enabled
         $provider.IsDefault = [bool]$row.is_default
-        $provider.AuthProfileId = $row.auth_profile_id
 
         # Reconstruct authentication via registered provider type callback
         $reg = $script:ProviderTypes[$row.type]

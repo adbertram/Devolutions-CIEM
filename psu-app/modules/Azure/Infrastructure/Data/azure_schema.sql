@@ -6,25 +6,6 @@
 -- Azure Infrastructure Tables
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS azure_authentication_profiles (
-    id TEXT PRIMARY KEY,
-    provider_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    method TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1,
-    tenant_id TEXT NOT NULL,
-    client_id TEXT,
-    managed_identity_client_id TEXT,
-    secret_name TEXT,
-    secret_type TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE (provider_id, name),
-    FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_azure_auth_profiles_provider ON azure_authentication_profiles(provider_id);
-
 CREATE TABLE IF NOT EXISTS azure_provider_apis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,

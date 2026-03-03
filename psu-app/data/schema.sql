@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS providers (
     type TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1,
     is_default INTEGER NOT NULL DEFAULT 0,
-    auth_profile_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

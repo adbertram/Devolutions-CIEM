@@ -24,54 +24,37 @@ function Register-CIEMAzureProviderType {
             }
         }
 
-        # -- QueryAuth: JOIN via auth_profile_id FK --
+        # -- QueryAuth: No SQL join needed (auth profiles stored in PSU Variables) --
         QueryAuth = {
-            @{
-                Columns    = "ap.name AS auth_profile_name, ap.method AS auth_method, ap.tenant_id AS auth_tenant_id, ap.client_id AS auth_client_id"
-                JoinClause = "LEFT JOIN azure_authentication_profiles ap ON ap.id = p.auth_profile_id"
-            }
+            @{ Columns = ''; JoinClause = '' }
         }
 
-        # -- ReadAuth: Return display info from query row (includes TenantId/ClientId from JOIN) --
+        # -- ReadAuth: Read active auth profile from PSU Variable --
         ReadAuth = {
             param($Row, [bool]$IncludeSecrets)
 
-            $method = if ($Row.PSObject.Properties['auth_method'] -and $Row.auth_method) { $Row.auth_method }
-                      elseif ($Row.PSObject.Properties['Method']) { $Row.Method }
-                      else { '' }
-
-            $profileName = if ($Row.PSObject.Properties['auth_profile_name'] -and $Row.auth_profile_name) { $Row.auth_profile_name }
-                           elseif ($Row.PSObject.Properties['ProfileName']) { $Row.ProfileName }
-                           else { '' }
-
-            $tenantId = if ($Row.PSObject.Properties['auth_tenant_id'] -and $Row.auth_tenant_id) { $Row.auth_tenant_id }
-                        elseif ($Row.PSObject.Properties['TenantId']) { $Row.TenantId }
-                        else { '' }
-
-            $clientId = if ($Row.PSObject.Properties['auth_client_id'] -and $Row.auth_client_id) { $Row.auth_client_id }
-                        elseif ($Row.PSObject.Properties['ClientId']) { $Row.ClientId }
-                        else { '' }
+            $profile = @(Get-CIEMAzureAuthenticationProfile -ProviderId $Row.id -IsActive $true) | Select-Object -First 1
 
             [PSCustomObject]@{
                 Provider    = 'Azure'
-                Enabled     = [bool]$method
-                Method      = $method
-                ProfileName = $profileName
-                TenantId    = $tenantId
-                ClientId    = $clientId
+                Enabled     = [bool]$profile
+                Method      = if ($profile) { $profile.Method } else { '' }
+                ProfileName = if ($profile) { $profile.Name } else { '' }
+                TenantId    = if ($profile) { $profile.TenantId } else { '' }
+                ClientId    = if ($profile) { $profile.ClientId } else { '' }
             }
         }
 
-        # -- WriteAuth: Handle bool (enable/disable) only --
-        # Full profile CRUD goes through *-CIEMAzureAuthenticationProfile functions
+        # -- WriteAuth: Persist auth profile via PSU Variable --
         WriteAuth = {
             param($Connection, [string]$ProviderId, $Auth, [string]$Timestamp)
 
             if ($Auth -is [bool]) {
-                # Sync enabled flag only
-                Invoke-PSUSQLiteQuery -Connection $Connection -Query "UPDATE azure_authentication_profiles SET is_active = @enabled, updated_at = @now WHERE provider_id = @id" -Parameters @{
-                    id = $ProviderId; enabled = if ($Auth) { 1 } else { 0 }; now = $Timestamp
-                } -AsNonQuery | Out-Null
+                # Sync enabled flag on all profiles for this provider
+                $profiles = @(Get-CIEMAzureAuthenticationProfile -ProviderId $ProviderId)
+                foreach ($p in $profiles) {
+                    Update-CIEMAzureAuthenticationProfile -Id $p.Id -IsActive $Auth
+                }
             }
             else {
                 # Full UPSERT via profile
@@ -89,8 +72,6 @@ function Register-CIEMAzureProviderType {
                     'ServicePrincipalSecret' {
                         $secretName = "CIEM_Azure_${profileId}_ClientSecret"
                         $secretType = 'ClientSecret'
-                        # Migrate: if the auth object stored a secret via BuildAuth, it was already saved
-                        # under the profile-scoped name. Also check for legacy name and copy if needed.
                         $legacySecret = Get-CIEMSecret 'CIEM_Azure_ClientSecret'
                         $profileSecret = Get-CIEMSecret $secretName
                         if ($legacySecret -and -not $profileSecret) {
@@ -110,20 +91,7 @@ function Register-CIEMAzureProviderType {
                     }
                 }
 
-                Invoke-PSUSQLiteQuery -Connection $Connection -Query @"
-INSERT OR REPLACE INTO azure_authentication_profiles (id, provider_id, name, method, is_active, tenant_id, client_id, managed_identity_client_id, secret_name, secret_type, created_at, updated_at)
-VALUES (@id, @provider_id, 'Default', @method, 1, @tenant_id, @client_id, @managed_identity_client_id, @secret_name, @secret_type, @now, @now)
-"@ -Parameters @{
-                    id                         = $profileId
-                    provider_id                = $ProviderId
-                    method                     = $method
-                    tenant_id                  = $tenantId
-                    client_id                  = $clientId
-                    managed_identity_client_id = $managedIdentityClientId
-                    secret_name                = $secretName
-                    secret_type                = $secretType
-                    now                        = $Timestamp
-                } -AsNonQuery | Out-Null
+                Save-CIEMAzureAuthenticationProfile -Id $profileId -ProviderId $ProviderId -Name 'Default' -Method $method -IsActive $true -TenantId $tenantId -ClientId $clientId -ManagedIdentityClientId $managedIdentityClientId -SecretName $secretName -SecretType $secretType
             }
         }
 

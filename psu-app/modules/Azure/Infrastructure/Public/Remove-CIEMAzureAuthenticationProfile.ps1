@@ -6,20 +6,52 @@ function Remove-CIEMAzureAuthenticationProfile {
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [CIEMAzureAuthenticationProfile[]]$InputObject
     )
+    begin {
+        $idsToRemove = [System.Collections.Generic.List[string]]::new()
+    }
     process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 if ($PSCmdlet.ShouldProcess($item.Id, 'Remove Azure authentication profile')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_authentication_profiles WHERE id = @id" -Parameters @{ id = $item.Id } -AsNonQuery | Out-Null
+                    $idsToRemove.Add($item.Id)
                 }
             }
-        } elseif ($PSCmdlet.ParameterSetName -eq 'ByProvider') {
+        }
+    }
+    end {
+        $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+        if (-not $inPSUContext) { return }
+
+        # Read current array from PSU Variable
+        $raw = (Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue).Value
+        $profiles = @()
+        if ($raw) { $profiles = @($raw | ConvertFrom-Json) }
+
+        $originalCount = $profiles.Count
+
+        if ($PSCmdlet.ParameterSetName -eq 'ByProvider') {
             if ($PSCmdlet.ShouldProcess("provider '$ProviderId'", 'Remove all Azure authentication profiles')) {
-                Invoke-CIEMQuery -Query "DELETE FROM azure_authentication_profiles WHERE provider_id = @pid" -Parameters @{ pid = $ProviderId } -AsNonQuery | Out-Null
+                $profiles = @($profiles | Where-Object { $_.ProviderId -ne $ProviderId })
+            }
+        } elseif ($PSCmdlet.ParameterSetName -eq 'ById') {
+            if ($PSCmdlet.ShouldProcess($Id, 'Remove Azure authentication profile')) {
+                $profiles = @($profiles | Where-Object { $_.Id -ne $Id })
             }
         } else {
-            if ($PSCmdlet.ShouldProcess($Id, 'Remove Azure authentication profile')) {
-                Invoke-CIEMQuery -Query "DELETE FROM azure_authentication_profiles WHERE id = @id" -Parameters @{ id = $Id } -AsNonQuery | Out-Null
+            # InputObject — ids collected in process block
+            if ($idsToRemove.Count -gt 0) {
+                $profiles = @($profiles | Where-Object { $_.Id -notin $idsToRemove })
+            }
+        }
+
+        # Write back only if changed
+        if ($profiles.Count -ne $originalCount) {
+            $json = if ($profiles.Count -eq 0) { '[]' } else { ConvertTo-Json -InputObject @($profiles) -Depth 10 -Compress }
+            $existingVar = Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue
+            if ($existingVar) {
+                Set-PSUVariable -Variable $existingVar -Value $json | Out-Null
+            } else {
+                New-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -Value $json | Out-Null
             }
         }
     }

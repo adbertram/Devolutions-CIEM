@@ -10,32 +10,37 @@ function Get-CIEMAzureAuthenticationProfile {
     )
 
     $ErrorActionPreference = 'Stop'
-    $conditions = @(); $params = @{}
 
-    if ($PSBoundParameters.ContainsKey('Id')) { $conditions += "id = @id"; $params.id = $Id }
-    if ($PSBoundParameters.ContainsKey('ProviderId')) { $conditions += "provider_id = @provider_id"; $params.provider_id = $ProviderId }
-    if ($PSBoundParameters.ContainsKey('Name')) { $conditions += "name = @name"; $params.name = $Name }
-    if ($PSBoundParameters.ContainsKey('Method')) { $conditions += "method = @method"; $params.method = $Method }
-    if ($PSBoundParameters.ContainsKey('IsActive')) { $conditions += "is_active = @is_active"; $params.is_active = if ($IsActive) { 1 } else { 0 } }
+    # Read profiles from PSU Variable (returns empty if not in PSU context)
+    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+    if (-not $inPSUContext) { return @() }
 
-    $query = "SELECT * FROM azure_authentication_profiles"
-    if ($conditions.Count -gt 0) { $query += " WHERE " + ($conditions -join ' AND ') }
+    $raw = (Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue).Value
+    $profiles = @()
+    if ($raw) { $profiles = @($raw | ConvertFrom-Json) }
 
-    $rows = @(Invoke-CIEMQuery -Query $query -Parameters $params)
-    @(foreach ($row in $rows) {
+    # Filter in memory
+    if ($PSBoundParameters.ContainsKey('Id'))         { $profiles = @($profiles | Where-Object { $_.Id -eq $Id }) }
+    if ($PSBoundParameters.ContainsKey('ProviderId'))  { $profiles = @($profiles | Where-Object { $_.ProviderId -eq $ProviderId }) }
+    if ($PSBoundParameters.ContainsKey('Name'))        { $profiles = @($profiles | Where-Object { $_.Name -eq $Name }) }
+    if ($PSBoundParameters.ContainsKey('Method'))      { $profiles = @($profiles | Where-Object { $_.Method -eq $Method }) }
+    if ($PSBoundParameters.ContainsKey('IsActive'))    { $profiles = @($profiles | Where-Object { [bool]$_.IsActive -eq $IsActive }) }
+
+    # Convert to class instances
+    @(foreach ($entry in $profiles) {
         $obj = [CIEMAzureAuthenticationProfile]::new()
-        $obj.Id = $row.id
-        $obj.ProviderId = $row.provider_id
-        $obj.Name = $row.name
-        $obj.Method = $row.method
-        $obj.IsActive = [bool]$row.is_active
-        $obj.TenantId = $row.tenant_id
-        $obj.ClientId = $row.client_id
-        $obj.ManagedIdentityClientId = $row.managed_identity_client_id
-        $obj.SecretName = $row.secret_name
-        $obj.SecretType = $row.secret_type
-        $obj.CreatedAt = if ($row.created_at) { [datetime]$row.created_at } else { [datetime]::MinValue }
-        $obj.UpdatedAt = if ($row.updated_at) { [datetime]$row.updated_at } else { [datetime]::MinValue }
+        $obj.Id = $entry.Id
+        $obj.ProviderId = $entry.ProviderId
+        $obj.Name = $entry.Name
+        $obj.Method = $entry.Method
+        $obj.IsActive = [bool]$entry.IsActive
+        $obj.TenantId = $entry.TenantId
+        $obj.ClientId = $entry.ClientId
+        $obj.ManagedIdentityClientId = $entry.ManagedIdentityClientId
+        $obj.SecretName = $entry.SecretName
+        $obj.SecretType = $entry.SecretType
+        $obj.CreatedAt = if ($entry.CreatedAt) { [datetime]$entry.CreatedAt } else { [datetime]::MinValue }
+        $obj.UpdatedAt = if ($entry.UpdatedAt) { [datetime]$entry.UpdatedAt } else { [datetime]::MinValue }
         $obj
     })
 }

@@ -2,7 +2,6 @@ class CIEMProvider {
     [string]$Name                              # 'Azure', 'AWS', 'GCP', etc.
     [bool]$Enabled
     [bool]$IsDefault
-    [string]$AuthProfileId                     # FK to provider-specific auth profile table
     # Untyped to avoid PSU runspace class isolation issues.
     # Expected shape: { Provider, Enabled, Method, TenantId?, ClientId?, ManagedIdentityClientId? }
     [PSCustomObject]$Authentication

@@ -16,18 +16,57 @@ function Save-CIEMAzureAuthenticationProfile {
         [CIEMAzureAuthenticationProfile[]]$InputObject
     )
     process {
+        $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+        if (-not $inPSUContext) { return }
+
         $items = if ($PSCmdlet.ParameterSetName -eq 'InputObject') { $InputObject } else { @($null) }
         foreach ($item in $items) {
             $now = (Get-Date).ToString('o')
+
             if ($item) {
-                $p = @{ id=$item.Id; provider_id=$item.ProviderId; name=$item.Name; method=$item.Method; is_active=if($item.IsActive){1}else{0}; tenant_id=$item.TenantId; client_id=$item.ClientId; managed_identity_client_id=$item.ManagedIdentityClientId; secret_name=$item.SecretName; secret_type=$item.SecretType; now=$now }
+                $entry = [PSCustomObject]@{
+                    Id = $item.Id; ProviderId = $item.ProviderId; Name = $item.Name; Method = $item.Method
+                    IsActive = $item.IsActive; TenantId = $item.TenantId; ClientId = $item.ClientId
+                    ManagedIdentityClientId = $item.ManagedIdentityClientId; SecretName = $item.SecretName
+                    SecretType = $item.SecretType; CreatedAt = $now; UpdatedAt = $now
+                }
+                $cId = $item.Id
             } else {
-                $p = @{ id=$Id; provider_id=$ProviderId; name=$Name; method=$Method; is_active=if($IsActive){1}else{0}; tenant_id=$TenantId; client_id=$ClientId; managed_identity_client_id=$ManagedIdentityClientId; secret_name=$SecretName; secret_type=$SecretType; now=$now }
+                $entry = [PSCustomObject]@{
+                    Id = $Id; ProviderId = $ProviderId; Name = $Name; Method = $Method
+                    IsActive = $IsActive; TenantId = $TenantId; ClientId = $ClientId
+                    ManagedIdentityClientId = $ManagedIdentityClientId; SecretName = $SecretName
+                    SecretType = $SecretType; CreatedAt = $now; UpdatedAt = $now
+                }
+                $cId = $Id
             }
-            Invoke-CIEMQuery -Query @"
-INSERT OR REPLACE INTO azure_authentication_profiles (id, provider_id, name, method, is_active, tenant_id, client_id, managed_identity_client_id, secret_name, secret_type, created_at, updated_at)
-VALUES (@id, @provider_id, @name, @method, @is_active, @tenant_id, @client_id, @managed_identity_client_id, @secret_name, @secret_type, @now, @now)
-"@ -Parameters $p -AsNonQuery | Out-Null
+
+            # Read current array from PSU Variable
+            $raw = (Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue).Value
+            $profiles = [System.Collections.Generic.List[object]]::new()
+            if ($raw) { @($raw | ConvertFrom-Json) | ForEach-Object { $profiles.Add($_) } }
+
+            # Upsert: replace existing or append
+            $existingIdx = -1
+            for ($i = 0; $i -lt $profiles.Count; $i++) {
+                if ($profiles[$i].Id -eq $cId) { $existingIdx = $i; break }
+            }
+            if ($existingIdx -ge 0) {
+                $entry.CreatedAt = $profiles[$existingIdx].CreatedAt
+                $profiles[$existingIdx] = $entry
+            } else {
+                $profiles.Add($entry)
+            }
+
+            # Write back
+            $array = @($profiles.ToArray())
+            $json = if ($array.Count -eq 0) { '[]' } else { ConvertTo-Json -InputObject $array -Depth 10 -Compress }
+            $existingVar = Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue
+            if ($existingVar) {
+                Set-PSUVariable -Variable $existingVar -Value $json | Out-Null
+            } else {
+                New-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -Value $json | Out-Null
+            }
         }
     }
 }
