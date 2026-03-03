@@ -37,7 +37,7 @@ function Invoke-TestCommand {
         [string]$Environment = 'local',
 
         [Parameter()]
-        [int]$TimeoutSeconds = 120
+        [int]$TimeoutSeconds = 30
     )
 
     $ErrorActionPreference = 'Stop'

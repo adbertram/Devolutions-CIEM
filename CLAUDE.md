@@ -54,27 +54,21 @@ slack dm read mamoreau --limit 50
 
 ---
 
-## PSU Research Delegation (MANDATORY)
+## PSU Delegation (MANDATORY)
 
-**ALL PowerShell Universal research tasks MUST be delegated to the `psu-expert` agent.**
+**ALL PowerShell Universal operations MUST be delegated to the `psu-expert` agent.** This includes research, configuration, troubleshooting, publishing, restarting, script management, job management, and any other PSU-specific action.
 
-Do NOT attempt to answer PSU questions by:
-- Using WebSearch to find PSU documentation
-- Using microsoft_docs_search or other MCP tools
-- Guessing based on general PowerShell knowledge
+Do NOT:
+- Run PSU API calls, cmdlets, or server operations directly
+- Use WebSearch, microsoft_docs_search, or other tools for PSU questions
+- Guess based on general PowerShell knowledge
 
 Instead, invoke the psu-expert agent via the Task tool. The psu-expert has:
 - Local PSU v5 documentation at `docs/psu-docs/`
 - Access to the Azure PSU server filesystem
 - Deep knowledge of PSU APIs, cmdlets, and configuration
 
-**Examples of questions to delegate:**
-- "How do I programmatically import modules in PSU?"
-- "What REST API endpoints does PSU provide?"
-- "How do I configure PSU app authentication?"
-- "Why isn't my PSU dashboard loading?"
-
-**When to delegate:** Any question about PSU features, APIs, configuration, troubleshooting, or best practices.
+**When to delegate:** Any PSU operation — research, API calls, server management, script registration, job management, troubleshooting, or configuration.
 
 ---
 

@@ -117,6 +117,30 @@ Use `scripts/invoke_command_in_azure_webapp.sh` for advanced troubleshooting:
 - Querying the PSU REST API
 - Investigating runtime issues that require API access
 
+## CRITICAL: PSU Safety Rules
+
+- **NEVER modify PSU's database.db directly** via sqlite3 or any SQL tool. PSU manages its own
+  database state. Direct modifications break authentication flows and corrupt internal state.
+  Use PSU's REST API or cmdlets instead.
+- **Local PSU admin API endpoints require authentication.** Do not use bare `curl` against
+  `/api/v1/*` endpoints. Use `Invoke-TestCommand` which runs inside PSU context.
+
+## PSU Job Lifecycle
+
+- `DELETE /api/v1/job/{id}` returns 200 but does NOT delete or archive jobs
+- There is no `Remove-PSUJob` or `Set-PSUJob` cmdlet
+- To archive jobs programmatically, use `Microsoft.Data.Sqlite` from within PSU
+- `$JobId` is NOT an automatic PSU variable available in script context
+- When using `-Module`/`-Command` parameter set on `New-PSUScript`, do NOT add `-Name`
+  (causes parameter set conflict). The name auto-derives as `ModuleName\CommandName`.
+
+## Efficiency Rules
+
+- **Combine operations into single Invoke-TestCommand calls.** Each call creates a PSU Job
+  with timeout overhead. Combine multiple queries into one scriptblock.
+  Good: `Invoke-TestCommand -ScriptBlock { Get-PSUScript; Get-PSUJob -First 5 -Integrated }`
+  Bad: Three separate Invoke-TestCommand calls for script list, job invoke, job status.
+
 ## Core Responsibilities
 
 1. **Creating PSU Apps & Dashboards**
