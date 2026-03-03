@@ -1,0 +1,142 @@
+
+NAME
+    New-UDChartJSMonitor
+    
+SYNOPSIS
+    A chart that continuously updates with new data.
+    
+    
+SYNTAX
+    New-UDChartJSMonitor [[-Id] <String>] [[-Type] <String>] [[-DataPointHistory] <Int32>] [[-Options] <Hashtable>] [[-ChartBackgroundColor] <DashboardColor[]>] [[-ChartBorderColor] <DashboardColor[]>] [-Labels] <String[]> [-AutoRefresh] [[-RefreshInterval] <Int32>] [-LoadData] <Endpoint> [<CommonParameters>]
+    
+    
+DESCRIPTION
+    A chart that continuously updates with new data.
+    
+
+PARAMETERS
+    -Id <String>
+        The ID of the chart. Defaults to a new GUID.
+        
+        Required?                    false
+        Position?                    1
+        Default value                [Guid]::NewGuid()
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Type <String>
+        The type of chart to display. Defaults to 'line'.
+        
+        Required?                    false
+        Position?                    2
+        Default value                line
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -DataPointHistory <Int32>
+        The number of data points to display on the chart. Defaults to 10.
+        
+        Required?                    false
+        Position?                    3
+        Default value                10
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Options <Hashtable>
+        The options for the chart. See the ChartJS documentation for more information.
+        
+        Required?                    false
+        Position?                    4
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -ChartBackgroundColor <DashboardColor[]>
+        The background color of the chart.
+        
+        Required?                    false
+        Position?                    5
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -ChartBorderColor <DashboardColor[]>
+        The border color of the chart.
+        
+        Required?                    false
+        Position?                    6
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Labels <String[]>
+        The labels for the chart.
+        
+        Required?                    true
+        Position?                    7
+        Default value                @()
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -AutoRefresh [<SwitchParameter>]
+        Automatically refresh the chart.
+        
+        Required?                    false
+        Position?                    named
+        Default value                False
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -RefreshInterval <Int32>
+        The interval to refresh the chart in seconds.
+        
+        Required?                    false
+        Position?                    8
+        Default value                5
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -LoadData <Endpoint>
+        The endpoint to load data from.
+        
+        Required?                    true
+        Position?                    9
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    
+OUTPUTS
+    
+    -------------------------- EXAMPLE 1 --------------------------
+    
+    PS >New-UDChartJSMonitor -LoadData {
+    PS >     Get-Random -Max 100 | Out-UDChartJSMonitorData
+    PS > } -Labels "Random" -ChartBackgroundColor "#297741" -RefreshInterval 1
+    
+    
+    
+    
+    
+    
+    
+RELATED LINKS
+
+

@@ -1,0 +1,133 @@
+
+NAME
+    New-UDCardMedia
+    
+SYNOPSIS
+    Creates a new card media.
+    
+    
+SYNTAX
+    New-UDCardMedia [-Id <String>] [-Component <String>] [-Alt <String>] [-Height <String>] [-Image <String>] [-Title <String>] [-Sx <Hashtable>] [-Style <Hashtable>] [<CommonParameters>]
+    
+    New-UDCardMedia [-Id <String>] [-Component <String>] [-Alt <String>] [-Height <String>] [-Title <String>] [-Source <String>] [-Sx <Hashtable>] [-Style <Hashtable>] [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Creates a new card media. Used with New-UDCard.
+    
+
+PARAMETERS
+    -Id <String>
+        The ID of the component. It defaults to a random GUID.
+        
+        Required?                    false
+        Position?                    named
+        Default value                ([Guid]::NewGuid()).ToString()
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Component <String>
+        The type of media component. This can be img, video or audio.
+        
+        Required?                    false
+        Position?                    named
+        Default value                img
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Alt <String>
+        The alt text for the media.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Height <String>
+        The height of the media.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Image <String>
+        The image to display.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Title <String>
+        The title of the media.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Source <String>
+        The source of the media.
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Sx <Hashtable>
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    -Style <Hashtable>
+        
+        Required?                    false
+        Position?                    named
+        Default value                
+        Accept pipeline input?       false
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    
+OUTPUTS
+    System.Collections.Hashtable
+    
+    
+    -------------------------- EXAMPLE 1 --------------------------
+    
+    PS >$Media = New-UDCardMedia -Image 'https://mui.com/static/images/cards/paella.jpg'
+    PS > New-UDCard -Media $Media -Id 'card1'
+    
+    
+    
+    
+    
+    
+    
+RELATED LINKS
+
+

@@ -1,0 +1,55 @@
+
+NAME
+    Out-UDChartJSMonitorData
+    
+SYNOPSIS
+    Formats data for a UDMonitor chart.
+    
+    
+SYNTAX
+    Out-UDChartJSMonitorData [[-Data] <Object>] [<CommonParameters>]
+    
+    
+DESCRIPTION
+    Formats data for a UDMonitor chart.
+    
+
+PARAMETERS
+    -Data <Object>
+        The data to format.
+        
+        Required?                    false
+        Position?                    1
+        Default value                
+        Accept pipeline input?       true (ByValue)
+        Aliases                      
+        Accept wildcard characters?  false
+        
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216). 
+    
+INPUTS
+    
+OUTPUTS
+    
+NOTES
+    
+    
+        General notes
+    
+    -------------------------- EXAMPLE 1 --------------------------
+    
+    PS > See New-UDChartJSMonitor for an example.
+    
+    
+    
+    
+    
+    
+    
+RELATED LINKS
+
+
