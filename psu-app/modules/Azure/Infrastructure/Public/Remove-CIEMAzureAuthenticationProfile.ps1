@@ -4,7 +4,7 @@ function Remove-CIEMAzureAuthenticationProfile {
         [Parameter(Mandatory, ParameterSetName = 'ById')][string]$Id,
         [Parameter(Mandatory, ParameterSetName = 'ByProvider')][string]$ProviderId,
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
-        [CIEMAzureAuthenticationProfile[]]$InputObject
+        [object[]]$InputObject
     )
     begin {
         $idsToRemove = [System.Collections.Generic.List[string]]::new()
@@ -19,14 +19,9 @@ function Remove-CIEMAzureAuthenticationProfile {
         }
     }
     end {
-        $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-        if (-not $inPSUContext) { return }
+        if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) { return }
 
-        # Read current array from PSU Variable
-        $raw = (Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue).Value
-        $profiles = @()
-        if ($raw) { $profiles = @($raw | ConvertFrom-Json) }
-
+        $profiles = @(Get-PSUCache -Key $script:AzureAuthProfilesCacheKey -Integrated -ErrorAction SilentlyContinue)
         $originalCount = $profiles.Count
 
         if ($PSCmdlet.ParameterSetName -eq 'ByProvider') {
@@ -38,21 +33,13 @@ function Remove-CIEMAzureAuthenticationProfile {
                 $profiles = @($profiles | Where-Object { $_.Id -ne $Id })
             }
         } else {
-            # InputObject — ids collected in process block
             if ($idsToRemove.Count -gt 0) {
                 $profiles = @($profiles | Where-Object { $_.Id -notin $idsToRemove })
             }
         }
 
-        # Write back only if changed
         if ($profiles.Count -ne $originalCount) {
-            $json = if ($profiles.Count -eq 0) { '[]' } else { ConvertTo-Json -InputObject @($profiles) -Depth 10 -Compress }
-            $existingVar = Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue
-            if ($existingVar) {
-                Set-PSUVariable -Variable $existingVar -Value $json | Out-Null
-            } else {
-                New-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -Value $json | Out-Null
-            }
+            Set-PSUCache -Key $script:AzureAuthProfilesCacheKey -Value @($profiles) -Persist -ErrorAction Stop
         }
     }
 }

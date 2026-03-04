@@ -25,19 +25,6 @@ function New-CIEMConfigPage {
         $currentProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
         if (-not $currentProvider) { $currentProvider = 'Azure' }
 
-        # Store original auth values in session state for change detection on save
-        # Only initialize on first page load (not on dynamic refreshes)
-        if (-not $Session:OriginalAuthValues) {
-            $azProvider = Get-CIEMProvider -Name $currentProvider
-            $Session:OriginalAuthValues = @{
-                Provider = $currentProvider
-                Method = if ($azProvider.Authentication.Method) { $azProvider.Authentication.Method } else { 'ServicePrincipalSecret' }
-                TenantId = $azProvider.Authentication.TenantId
-                ClientId = $azProvider.Authentication.ClientId
-                CertThumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
-            }
-        }
-
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure cloud provider authentication for CIEM security scans' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
@@ -78,8 +65,7 @@ function New-CIEMConfigPage {
                 if (-not $selectedProvider) { $selectedProvider = 'Azure' }
 
                 if ($selectedProvider -eq 'AWS') {
-                    $awsProvider = Get-CIEMProvider -Name 'AWS'
-                    $awsAuthMethod = if ($awsProvider.Authentication.Method) { $awsProvider.Authentication.Method } else { 'CurrentProfile' }
+                    $awsAuthMethod = 'CurrentProfile'
 
                     New-UDElement -Tag 'div' -Content {
                         New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
@@ -93,17 +79,15 @@ function New-CIEMConfigPage {
                     Sync-UDElement -Id 'authFieldsContainer'
                 }
                 else {
-                    # Azure authentication methods
-                    $azProviderForMethod = Get-CIEMProvider -Name 'Azure'
-                    $azureAuthMethod = if ($azProviderForMethod.Authentication.Method) { $azProviderForMethod.Authentication.Method } else { 'ServicePrincipalSecret' }
+                    # Azure authentication methods — read from auth profile directly
+                    $azProfileForMethod = @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true) | Select-Object -First 1
+                    $azureAuthMethod = if ($azProfileForMethod.Method) { $azProfileForMethod.Method } else { 'ServicePrincipalSecret' }
 
                     New-UDElement -Tag 'div' -Content {
                         New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
                             New-UDSelectOption -Name 'Service Principal (Client Secret)' -Value 'ServicePrincipalSecret'
                             New-UDSelectOption -Name 'Service Principal (Certificate)' -Value 'ServicePrincipalCertificate'
                             New-UDSelectOption -Name 'Managed Identity' -Value 'ManagedIdentity'
-                            New-UDSelectOption -Name 'Device Code' -Value 'DeviceCode'
-                            New-UDSelectOption -Name 'Interactive Browser' -Value 'Interactive'
                         } -DefaultValue $azureAuthMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
                     } -Attributes @{ style = @{ marginBottom = '8px' } }
 
@@ -117,14 +101,17 @@ function New-CIEMConfigPage {
 
             # Dynamic fields based on selected authentication method
             New-UDDynamic -Id 'authFieldsContainer' -Content {
-                Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
                 # Read from UI if available (after user interaction), otherwise fall back to config
                 $uiProvider = (Get-UDElement -Id 'cloudProvider').value
                 $uiMethod = (Get-UDElement -Id 'authMethod').value
                 $defaultProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
                 $selectedProvider = if ($uiProvider) { $uiProvider } elseif ($defaultProvider) { $defaultProvider } else { 'Azure' }
-                $providerForFields = Get-CIEMProvider -Name $selectedProvider
-                $selectedMethod = if ($uiMethod) { $uiMethod } elseif ($providerForFields.Authentication.Method) { $providerForFields.Authentication.Method } else { 'ServicePrincipalSecret' }
+
+                # Read auth method from profile for Azure, default for others
+                $azProfileForFields = if ($selectedProvider -eq 'Azure') {
+                    @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true) | Select-Object -First 1
+                }
+                $selectedMethod = if ($uiMethod) { $uiMethod } elseif ($azProfileForFields.Method) { $azProfileForFields.Method } else { 'ServicePrincipalSecret' }
 
                 # Check for ManagedIdentity warning
                 $envCheck = Get-PSUInstalledEnvironment
@@ -132,22 +119,23 @@ function New-CIEMConfigPage {
                     New-UDAlert -Severity 'warning' -Text 'Managed Identity will not work in on-premises deployments. Please choose a different authentication method.' -Style @{ marginBottom = '16px' }
                 }
 
-                # Load credentials: TenantId/ClientId from provider cache, secrets from PSU secrets
-                $storedCreds = @{
-                    TenantId = $providerForFields.Authentication.TenantId
-                    ClientId = $providerForFields.Authentication.ClientId
-                    ClientSecretExists = $false
-                    CertThumbprint = $null
-                    CertPasswordExists = $false
-                    ManagedIdentityClientId = $null
-                }
-                # Only secrets come from PSU secrets (not TenantId/ClientId which are in cache)
-                $storedCreds.ClientSecretExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_Azure_ClientSecret'))
-                $storedCreds.CertThumbprint = Get-CIEMSecret 'CIEM_Azure_CertThumbprint'
-                $storedCreds.CertPasswordExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_Azure_CertPassword'))
-                $storedCreds.ManagedIdentityClientId = Get-CIEMSecret 'CIEM_Azure_ManagedIdentityClientId'
-
                 if ($selectedProvider -eq 'Azure') {
+                    # Load credentials from auth profile and PSU secrets
+                    $credProfileId = $azProfileForFields.Id
+                    $storedCreds = @{
+                        TenantId = $azProfileForFields.TenantId
+                        ClientId = $azProfileForFields.ClientId
+                        ClientSecretExists = $false
+                        CertPfxExists = $false
+                        CertPasswordExists = $false
+                        ManagedIdentityClientId = $azProfileForFields.ManagedIdentityClientId
+                    }
+                    if ($credProfileId) {
+                        $storedCreds.ClientSecretExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret "CIEM_Azure_${credProfileId}_ClientSecret"))
+                        $storedCreds.CertPfxExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret "CIEM_Azure_${credProfileId}_CertPfx"))
+                        $storedCreds.CertPasswordExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret "CIEM_Azure_${credProfileId}_CertPassword"))
+                    }
+
                     switch ($selectedMethod) {
                         'ServicePrincipalSecret' {
                             New-UDGrid -Container -Spacing 2 -Content {
@@ -173,18 +161,63 @@ function New-CIEMConfigPage {
                                     New-UDTextbox -Id 'azCertClientId' -Label 'Client ID (Application ID)' -Value $storedCreds.ClientId -FullWidth -Placeholder 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
                                 }
                                 New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                    New-UDTypography -Text 'Provide either a certificate thumbprint (for certificates in the local store) or a certificate file path:' -Variant 'caption' -Style @{ color = '#666'; marginTop = '8px'; marginBottom = '8px' }
+                                    New-UDElement -Tag 'div' -Content {
+                                        $certExists = $storedCreds.CertPfxExists
+                                        if ($certExists) {
+                                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                New-UDIcon -Icon 'CheckCircle' -Size 'sm' -Style @{ color = '#4caf50' }
+                                                New-UDTypography -Text 'Certificate file is stored. Upload a new file to replace it.' -Variant 'caption' -Style @{ color = '#666' }
+                                            }
+                                        } else {
+                                            New-UDTypography -Text 'Upload a PFX certificate file for service principal authentication.' -Variant 'caption' -Style @{ color = '#666' }
+                                        }
+                                    } -Attributes @{ style = @{ marginTop = '8px'; marginBottom = '8px' } }
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                                    # Hidden button — reads uploaded file data from localStorage
+                                    New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'none' } } -Content {
+                                        New-UDButton -Id 'azCertProcess' -Text 'Go' -OnClick {
+                                            $Session:UploadedCertBase64 = Invoke-UDJavaScript "localStorage.getItem('__certB64')"
+                                            $Session:UploadedCertFileName = Invoke-UDJavaScript "localStorage.getItem('__certName')"
+                                            Invoke-UDJavaScript "localStorage.removeItem('__certB64'); localStorage.removeItem('__certName')" -IgnoreResult
+                                            Sync-UDElement -Id 'azCertFileDisplay'
+                                        }
+                                    }
+                                    New-UDButton -Text 'Upload Certificate' -Icon (New-UDIcon -Icon 'Upload') -Variant 'outlined' -OnClick {
+                                        Invoke-UDJavaScript @"
+var inp = document.createElement('input');
+inp.type = 'file';
+inp.accept = '.pfx,.p12';
+inp.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+        var base64 = evt.target.result.split(',')[1];
+        localStorage.setItem('__certB64', base64);
+        localStorage.setItem('__certName', file.name);
+        document.getElementById('azCertProcess').click();
+    };
+    reader.readAsDataURL(file);
+};
+inp.click();
+"@
+                                    }
+                                    # Pill showing selected file with remove button
+                                    New-UDDynamic -Id 'azCertFileDisplay' -Content {
+                                        if ($Session:UploadedCertFileName) {
+                                            New-UDChip -Label $Session:UploadedCertFileName -Icon (New-UDIcon -Icon 'File') -OnDelete {
+                                                $Session:UploadedCertBase64 = $null
+                                                $Session:UploadedCertFileName = $null
+                                                Sync-UDElement -Id 'azCertFileDisplay'
+                                            } -Style @{ marginTop = '8px' }
+                                        }
+                                    }
                                 }
                                 New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    New-UDTextbox -Id 'azCertThumbprint' -Label 'Certificate Thumbprint' -Value $storedCreds.CertThumbprint -FullWidth -Placeholder 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
-                                }
-                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    New-UDTextbox -Id 'azCertPath' -Label 'Certificate File Path (.pfx)' -Value $CurrentConfig.azure.authentication.certificate.path -FullWidth -Placeholder '/path/to/certificate.pfx'
-                                }
-                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    $certPwdPlaceholder = if ($storedCreds.CertPasswordExists) { 'Password is stored. Leave empty to keep existing.' } else { 'Certificate file password' }
+                                    $certPwdPlaceholder = if ($storedCreds.CertPasswordExists) { 'Password is stored. Leave empty to keep existing.' } else { 'Certificate file password (leave empty if none)' }
                                     $certPwdValue = if ($storedCreds.CertPasswordExists) { '********' } else { '' }
-                                    New-UDTextbox -Id 'azCertPassword' -Label 'Certificate Password (if applicable)' -Type 'password' -Value $certPwdValue -FullWidth -Placeholder $certPwdPlaceholder
+                                    New-UDTextbox -Id 'azCertPassword' -Label 'Certificate Password' -Type 'password' -Value $certPwdValue -FullWidth -Placeholder $certPwdPlaceholder
                                 }
                             }
                         }
@@ -202,9 +235,6 @@ function New-CIEMConfigPage {
                     }
                 }
                 elseif ($selectedProvider -eq 'AWS') {
-                    $awsProviderForFields = Get-CIEMProvider -Name 'AWS'
-                    $awsStoredProfile = $awsProviderForFields.Authentication.Profile
-                    $awsStoredRegion = $awsProviderForFields.Authentication.Region
                     $awsAccessKeyExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_AWS_AccessKeyId'))
                     $awsSecretKeyExists = -not [string]::IsNullOrEmpty((Get-CIEMSecret 'CIEM_AWS_SecretAccessKey'))
 
@@ -213,10 +243,10 @@ function New-CIEMConfigPage {
                             New-UDAlert -Severity 'info' -Text 'Uses your existing AWS CLI configuration (~/.aws/credentials). Optionally specify a named profile and region.' -Dense -Style @{ marginBottom = '16px' }
                             New-UDGrid -Container -Spacing 2 -Content {
                                 New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    New-UDTextbox -Id 'awsProfile' -Label 'AWS Profile (Optional)' -Value $awsStoredProfile -FullWidth -Placeholder 'default'
+                                    New-UDTextbox -Id 'awsProfile' -Label 'AWS Profile (Optional)' -FullWidth -Placeholder 'default'
                                 }
                                 New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    New-UDTextbox -Id 'awsRegion' -Label 'AWS Region (Optional)' -Value $awsStoredRegion -FullWidth -Placeholder 'us-east-1'
+                                    New-UDTextbox -Id 'awsRegion' -Label 'AWS Region (Optional)' -FullWidth -Placeholder 'us-east-1'
                                 }
                             }
                         }
@@ -233,7 +263,7 @@ function New-CIEMConfigPage {
                                     New-UDTextbox -Id 'awsSecretAccessKey' -Label 'Secret Access Key' -Type 'password' -Value $skValue -FullWidth -Placeholder $skPlaceholder
                                 }
                                 New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    New-UDTextbox -Id 'awsRegion' -Label 'AWS Region (Optional)' -Value $awsStoredRegion -FullWidth -Placeholder 'us-east-1'
+                                    New-UDTextbox -Id 'awsRegion' -Label 'AWS Region (Optional)' -FullWidth -Placeholder 'us-east-1'
                                 }
                             }
                         }
@@ -246,7 +276,7 @@ function New-CIEMConfigPage {
                 New-UDStack -Direction 'row' -Spacing 2 -Content {
                     New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
                         try {
-                            Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+            
                             $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
                             if (-not $selectedProvider) { $selectedProvider = 'Azure' }
                             $permissions = Get-CIEMRequiredPermission -Provider $selectedProvider
@@ -307,44 +337,29 @@ function New-CIEMConfigPage {
 
                     New-UDButton -Id 'testAuthBtn' -Text 'Test Authentication' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
                         try {
-                            Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
                             Write-CIEMLog -Message "Test Authentication button clicked" -Severity INFO -Component 'PSU-ConfigPage'
 
                             $testProvider = (Get-UDElement -Id 'cloudProvider').value
                             if (-not $testProvider) { $testProvider = 'Azure' }
 
-                            # Show progress
-                            Set-UDElement -Id 'testAuthProgress' -Content {
-                                New-CIEMProgressContent -Text "Connecting to $testProvider..."
-                            }
-                            Set-UDElement -Id 'testAuthBtn' -Properties @{ disabled = $true }
+                            Show-UDToast -Message "Connecting to $testProvider..." -Duration 3000
 
-                            # Connect handles all auth logic internally
                             $connectResult = Connect-CIEM -Provider $testProvider -Force
                             $connectProvider = $connectResult.Providers | Where-Object { $_.Provider -eq $testProvider }
                             Write-CIEMLog -Message "Connect-CIEM result: Status=$($connectProvider.Status), Account=$($connectProvider.Account)" -Severity INFO -Component 'PSU-ConfigPage'
 
                             if ($connectProvider.Status -eq 'Connected') {
-                                Set-UDElement -Id 'testAuthProgress' -Content {
-                                    New-CIEMSuccessContent -Text 'Authentication Successful' -Details "Connected as $($connectProvider.Account)"
-                                }
+                                Show-UDToast -Message "Authentication Successful - Connected as $($connectProvider.Account)" -Duration 8000 -BackgroundColor '#4caf50'
                             } else {
                                 Write-CIEMLog -Message "Authentication FAILED: $($connectProvider.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                Set-UDElement -Id 'testAuthProgress' -Content {
-                                    New-CIEMErrorContent -Text 'Authentication Failed' -Details $connectProvider.Message
-                                }
+                                Show-UDToast -Message "Authentication Failed: $($connectProvider.Message)" -Duration 10000 -BackgroundColor '#f44336'
                             }
                         } catch {
                             Write-CIEMLog -Message "Test Authentication exception: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                            Set-UDElement -Id 'testAuthProgress' -Content {
-                                New-CIEMErrorContent -Text 'Authentication Failed' -Details $_.Exception.Message
-                            }
-                        } finally {
-                            Set-UDElement -Id 'testAuthBtn' -Properties @{ disabled = $false }
+                            Show-UDToast -Message "Authentication Failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
                         }
                     }
                 }
-                New-UDElement -Id 'testAuthProgress' -Tag 'div'
             } -Attributes @{ style = @{ marginTop = '16px' } }
         }
 
@@ -352,14 +367,8 @@ function New-CIEMConfigPage {
             New-UDStack -Direction 'row' -Spacing 2 -Content {
                 New-UDButton -Id 'saveConfigBtn' -Text 'Save Configuration' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
                     try {
-                        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+        
                         Write-CIEMLog -Message "Save Configuration button clicked" -Severity INFO -Component 'PSU-ConfigPage'
-
-                        # Show progress
-                        Set-UDElement -Id 'saveConfigProgress' -Content {
-                            New-CIEMProgressContent -Text 'Saving configuration...'
-                        }
-                        Set-UDElement -Id 'saveConfigBtn' -Properties @{ disabled = $true }
 
                         $provider = (Get-UDElement -Id 'cloudProvider').value
                         $authMethod = (Get-UDElement -Id 'authMethod').value
@@ -370,42 +379,76 @@ function New-CIEMConfigPage {
                         Write-CIEMLog -Message "Environment: $($envInfo.Environment), SupportsManagedIdentity: $($envInfo.SupportsManagedIdentity)" -Severity DEBUG -Component 'PSU-ConfigPage'
                         if ($authMethod -eq 'ManagedIdentity' -and -not $envInfo.SupportsManagedIdentity) {
                             Write-CIEMLog -Message "ManagedIdentity selected but not supported in this environment" -Severity WARNING -Component 'PSU-ConfigPage'
-                            Set-UDElement -Id 'saveConfigProgress' -Content {
-                                New-CIEMErrorContent -Text 'Not Available' -Details 'Managed Identity is not available in on-premises deployments.'
-                            }
+                            Show-UDToast -Message 'Managed Identity is not available in on-premises deployments.' -Duration 8000 -BackgroundColor '#f44336'
                             return
                         }
 
-                        # Collect form values into typed auth context + secret params
+                        # Collect form values
                         Write-CIEMLog -Message "Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
 
-                        # Build simple save params — no typed objects needed (avoids PS class scoping in PSU runspaces)
-                        $saveParams = @{
-                            Provider = $provider
-                            Method   = $authMethod
-                        }
+                        # Track save params for change detection
+                        $saveParams = @{ Provider = $provider; Method = $authMethod }
 
                         if ($provider -eq 'Azure') {
                             $tenantId = (Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue).value
                             $saveParams['TenantId'] = $tenantId
 
+                            $activeProfile = @(Get-CIEMAzureAuthenticationProfile -IsActive $true) | Select-Object -First 1
+                            $profileId = if ($activeProfile.Id) { $activeProfile.Id } else { [guid]::NewGuid().ToString() }
+                            $secretName = $null
+                            $secretType = $null
+                            $clientId = $null
+
                             switch ($authMethod) {
                                 'ServicePrincipalSecret' {
-                                    $saveParams['ClientId'] = (Get-UDElement -Id 'azSpClientId').value
+                                    $clientId = (Get-UDElement -Id 'azSpClientId').value
+                                    $saveParams['ClientId'] = $clientId
                                     $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
+                                    $secretName = "CIEM_Azure_${profileId}_ClientSecret"
+                                    $secretType = 'ClientSecret'
                                     if ($clientSecret -and $clientSecret -ne '********') {
                                         $saveParams['ClientSecret'] = $clientSecret
+                                        Set-CIEMSecret $secretName $clientSecret
+                                        Write-CIEMLog -Message "Saved secret to $secretName" -Severity DEBUG -Component 'PSU-ConfigPage'
                                     }
                                 }
                                 'ServicePrincipalCertificate' {
-                                    $saveParams['ClientId'] = (Get-UDElement -Id 'azCertClientId').value
-                                    $thumbprint = (Get-UDElement -Id 'azCertThumbprint').value
-                                    if ($thumbprint) {
-                                        $saveParams['CertThumbprint'] = $thumbprint
+                                    $clientId = (Get-UDElement -Id 'azCertClientId').value
+                                    $saveParams['ClientId'] = $clientId
+                                    $secretName = "CIEM_Azure_${profileId}_CertPfx"
+                                    $secretType = 'CertPfx'
+
+                                    # Store uploaded PFX certificate (base64) in PSU vault
+                                    if ($Session:UploadedCertBase64) {
+                                        $saveParams['CertUploaded'] = $true
+                                        Set-CIEMSecret $secretName $Session:UploadedCertBase64
+                                        Write-CIEMLog -Message "Saved PFX certificate to $secretName (file: $($Session:UploadedCertFileName))" -Severity INFO -Component 'PSU-ConfigPage'
+                                        $Session:UploadedCertBase64 = $null
+                                        $Session:UploadedCertFileName = $null
+                                    }
+
+                                    # Store certificate password if provided
+                                    $certPassword = (Get-UDElement -Id 'azCertPassword').value
+                                    if ($certPassword -and $certPassword -ne '********') {
+                                        Set-CIEMSecret "CIEM_Azure_${profileId}_CertPassword" $certPassword
+                                        Write-CIEMLog -Message "Saved certificate password" -Severity DEBUG -Component 'PSU-ConfigPage'
                                     }
                                 }
-                                # ManagedIdentity, DeviceCode, Interactive — no extra params needed
+                                'ManagedIdentity' {
+                                    # No secrets needed
+                                }
                             }
+
+                            # Save auth profile
+                            Write-CIEMLog -Message "Saving Azure auth profile ($authMethod)..." -Severity INFO -Component 'PSU-ConfigPage'
+                            Save-CIEMAzureAuthenticationProfile -Id $profileId -ProviderId 'azure' -Name 'Default' -Method $authMethod -IsActive $true -TenantId $tenantId -ClientId $clientId -SecretName $secretName -SecretType $secretType
+
+                            # Activate the profile
+                            Set-CIEMAzureAuthenticationProfileActive -Id $profileId
+                            Write-CIEMLog -Message "Azure auth profile saved and activated" -Severity INFO -Component 'PSU-ConfigPage'
+
+                            # Enable the provider
+                            Update-CIEMProvider -Name 'Azure' -Enabled $true | Out-Null
                         }
                         elseif ($provider -eq 'AWS') {
                             $region = (Get-UDElement -Id 'awsRegion' -ErrorAction SilentlyContinue).value
@@ -420,111 +463,26 @@ function New-CIEMConfigPage {
                                     $secretAccessKey = (Get-UDElement -Id 'awsSecretAccessKey').value
                                     if ($accessKeyId -and $accessKeyId -ne '********') {
                                         $saveParams['AccessKeyId'] = $accessKeyId
+                                        Set-CIEMSecret 'CIEM_AWS_AccessKeyId' $accessKeyId
                                     }
                                     if ($secretAccessKey -and $secretAccessKey -ne '********') {
                                         $saveParams['SecretAccessKey'] = $secretAccessKey
+                                        Set-CIEMSecret 'CIEM_AWS_SecretAccessKey' $secretAccessKey
                                     }
                                 }
                             }
+
+                            # Enable the provider
+                            Update-CIEMProvider -Name 'AWS' -Enabled $true | Out-Null
+                            Write-CIEMLog -Message "AWS configuration saved" -Severity INFO -Component 'PSU-ConfigPage'
                         }
 
-                        # Single save path for config + secrets
-                        Write-CIEMLog -Message "Calling Save-CIEMAuthenticationContext ($provider/$authMethod)..." -Severity INFO -Component 'PSU-ConfigPage'
-                        Save-CIEMAuthenticationContext @saveParams
-                        Write-CIEMLog -Message "Save-CIEMAuthenticationContext completed" -Severity INFO -Component 'PSU-ConfigPage'
-
-                        # Detect if authentication settings changed
-                        $authChanged = $false
-                        $originalAuth = $Session:OriginalAuthValues
-                        Write-CIEMLog -Message "Checking if auth changed. Original: Provider=$($originalAuth.Provider), Method=$($originalAuth.Method)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                        if ($originalAuth) {
-                            # Check for changes in provider or method
-                            if ($provider -ne $originalAuth.Provider -or $authMethod -ne $originalAuth.Method) {
-                                $authChanged = $true
-                                Write-CIEMLog -Message "Auth changed: provider or method differs" -Severity DEBUG -Component 'PSU-ConfigPage'
-                            }
-                            # Check for changes in credential-related properties (use saveParams, not typed objects)
-                            else {
-                                if ($saveParams.TenantId -and $saveParams.TenantId -ne $originalAuth.TenantId) { $authChanged = $true }
-                                if ($saveParams.ClientId -and $saveParams.ClientId -ne $originalAuth.ClientId) { $authChanged = $true }
-                                if ($saveParams.ContainsKey('ClientSecret')) { $authChanged = $true }  # any new secret = changed
-                                if ($saveParams.ContainsKey('CertThumbprint') -and $saveParams['CertThumbprint'] -ne $originalAuth.CertThumbprint) { $authChanged = $true }
-                                if ($authChanged) { Write-CIEMLog -Message "Auth changed: credentials differ" -Severity DEBUG -Component 'PSU-ConfigPage' }
-                            }
-                        } else {
-                            # No original values stored (first save), always try to connect
-                            $authChanged = $true
-                            Write-CIEMLog -Message "No original auth values stored, authChanged=$authChanged" -Severity DEBUG -Component 'PSU-ConfigPage'
-                        }
-
-                        # Test authentication if settings changed
-                        Write-CIEMLog -Message "Auth changed: $authChanged, Provider: $provider" -Severity INFO -Component 'PSU-ConfigPage'
-                        if ($authChanged) {
-                            Write-CIEMLog -Message "Auth settings changed - initiating Connect-CIEM for $provider..." -Severity INFO -Component 'PSU-ConfigPage'
-                            Set-UDElement -Id 'saveConfigProgress' -Content {
-                                New-CIEMProgressContent -Text "Testing $provider authentication..."
-                            }
-                            try {
-                                $result = Connect-CIEM -Provider $provider -Force
-                                $providerResult = $result.Providers | Where-Object { $_.Provider -eq $provider }
-                                Write-CIEMLog -Message "Connect-CIEM result: Status=$($providerResult.Status), Account=$($providerResult.Account), Message=$($providerResult.Message)" -Severity INFO -Component 'PSU-ConfigPage'
-                                if ($providerResult.Status -eq 'Connected') {
-                                    Set-UDElement -Id 'saveConfigProgress' -Content {
-                                        New-CIEMSuccessContent -Text 'Configuration Saved' -Details "Connected as $($providerResult.Account)"
-                                    }
-                                    # Track saved values to detect future changes (use $saveParams, not removed $authCtx/$secretParams)
-                                    $Session:OriginalAuthValues = @{
-                                        Provider       = $provider
-                                        Method         = $authMethod
-                                        TenantId       = $saveParams['TenantId']
-                                        ClientId       = $saveParams['ClientId']
-                                        CertThumbprint = $saveParams['CertThumbprint']
-                                    }
-                                    Write-CIEMLog -Message "Session:OriginalAuthValues updated" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                } else {
-                                    Write-CIEMLog -Message "Authentication failed: $($providerResult.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                    Set-UDElement -Id 'saveConfigProgress' -Content {
-                                        New-UDCard -Style @{ backgroundColor = '#fff3e0'; marginTop = '12px'; marginBottom = '12px' } -Content {
-                                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                                New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
-                                                New-UDElement -Tag 'div' -Content {
-                                                    New-UDTypography -Text 'Configuration Saved (Auth Failed)' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#e65100' }
-                                                    New-UDTypography -Text $providerResult.Message -Variant 'body2' -Style @{ color = '#666' }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch {
-                                Write-CIEMLog -Message "Connect-CIEM exception: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                                Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                Set-UDElement -Id 'saveConfigProgress' -Content {
-                                    New-UDCard -Style @{ backgroundColor = '#fff3e0'; marginTop = '12px'; marginBottom = '12px' } -Content {
-                                        New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                            New-UDIcon -Icon 'ExclamationTriangle' -Size 'lg' -Style @{ color = '#ff9800' }
-                                            New-UDElement -Tag 'div' -Content {
-                                                New-UDTypography -Text 'Configuration Saved (Auth Failed)' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#e65100' }
-                                                New-UDTypography -Text $_.Exception.Message -Variant 'body2' -Style @{ color = '#666' }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            Write-CIEMLog -Message "No auth change detected or not Azure - skipping Connect-CIEM" -Severity DEBUG -Component 'PSU-ConfigPage'
-                            Set-UDElement -Id 'saveConfigProgress' -Content {
-                                New-CIEMSuccessContent -Text 'Configuration Saved'
-                            }
-                        }
+                        Show-UDToast -Message 'Configuration saved successfully.' -Duration 5000 -BackgroundColor '#4caf50'
                         Write-CIEMLog -Message "Save Configuration completed successfully" -Severity INFO -Component 'PSU-ConfigPage'
                     } catch {
                         Write-CIEMLog -Message "Save Configuration failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
                         Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                        Set-UDElement -Id 'saveConfigProgress' -Content {
-                            New-CIEMErrorContent -Text 'Save Failed' -Details $_.Exception.Message
-                        }
-                    } finally {
-                        Set-UDElement -Id 'saveConfigBtn' -Properties @{ disabled = $false }
+                        Show-UDToast -Message "Save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
                     }
                 }
 
@@ -534,16 +492,12 @@ function New-CIEMConfigPage {
                         Set-UDElement -Id 'authMethod' -Properties @{ value = 'ServicePrincipalSecret' }
                         Sync-UDElement -Id 'authMethodContainer'
                         Sync-UDElement -Id 'authFieldsContainer'
-                        # Clear any previous progress messages
-                        Set-UDElement -Id 'saveConfigProgress' -Content { }
-                        Set-UDElement -Id 'testAuthProgress' -Content { }
                         Show-UDToast -Message 'Form reset to default values. Click Save to apply.' -Duration 5000 -BackgroundColor '#ff9800'
                     } catch {
                         Show-UDToast -Message "Failed to reset: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
                     }
                 }
             }
-            New-UDElement -Id 'saveConfigProgress' -Tag 'div'
         } -Attributes @{ style = @{ marginTop = '24px' } }
     } -Navigation $Navigation -NavigationLayout permanent
 }

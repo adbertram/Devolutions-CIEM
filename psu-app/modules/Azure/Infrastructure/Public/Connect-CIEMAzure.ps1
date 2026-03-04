@@ -4,9 +4,9 @@ function Connect-CIEMAzure {
         Establishes Azure authentication for CIEM scans.
 
     .DESCRIPTION
-        Queries the active authentication profile directly from the database,
-        resolves credentials from PSU secrets, acquires ARM/Graph/KeyVault tokens,
-        and populates the module-scoped AzureAuthContext.
+        Reads the active authentication profile, resolves credentials from PSU
+        secrets, acquires ARM/Graph/KeyVault tokens, and populates the
+        module-scoped AzureAuthContext.
 
         Supported methods: ServicePrincipalSecret, ServicePrincipalCertificate, ManagedIdentity.
 
@@ -36,12 +36,11 @@ function Connect-CIEMAzure {
         throw "Azure provider not configured. Use New-CIEMProvider -Name 'Azure' to create it."
     }
 
-    # 2. Query active profile directly
-    $profile = @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true)
-    if (-not $profile -or $profile.Count -eq 0) {
-        throw "No active Azure authentication profile found. Use Save-CIEMAuthenticationContext to configure one."
+    # 2. Get the active authentication profile with resolved secrets
+    $profile = @(Get-CIEMAzureAuthenticationProfile -IsActive $true -ResolveSecrets) | Select-Object -First 1
+    if (-not $profile) {
+        throw "No active Azure authentication profile found. Configure one on the Configuration page."
     }
-    $profile = $profile[0]  # Use the first active profile
 
     Write-CIEMLog -Message "Using profile '$($profile.Name)' (method: $($profile.Method))" -Severity INFO -Component 'Connect-CIEMAzure'
 
@@ -55,24 +54,20 @@ function Connect-CIEMAzure {
     $ctx.ClientId = $profile.ClientId
     $ctx.ManagedIdentityClientId = $profile.ManagedIdentityClientId
 
-    # Set module-scoped context early so Save-CIEMToken can write into it
+    # Set module-scoped context early so token assignments work
     $script:AzureAuthContext = $ctx
 
-    # Check if running in PSU context (Secret: drive available)
-    $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
+    # Check if running in PSU context
+    $inPSUContext = $null -ne (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)
     Write-CIEMLog -Message "PSU context detected: $inPSUContext" -Severity INFO -Component 'Connect-CIEMAzure'
 
     # 4. Acquire tokens based on method
     switch ($profile.Method) {
         'ServicePrincipalSecret' {
             Write-CIEMLog -Message "Processing ServicePrincipalSecret authentication via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
+            Write-CIEMLog -Message "ClientSecret resolved: $(if($profile.ClientSecret){'yes'}else{'no'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
-            # Look up secret using profile's SecretName, fall back to legacy name
-            $secretName = if ($profile.SecretName) { $profile.SecretName } else { 'CIEM_Azure_ClientSecret' }
-            $clientSecret = Get-CIEMSecret $secretName
-            Write-CIEMLog -Message "Secret '$secretName': $(if($clientSecret){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
-
-            if (-not $profile.ClientId -or -not $clientSecret -or -not $profile.TenantId) {
+            if (-not $profile.ClientId -or -not $profile.ClientSecret -or -not $profile.TenantId) {
                 $ctx.LastError = "Missing credentials for ServicePrincipalSecret"
                 throw @"
 Authentication method is 'ServicePrincipalSecret' but credentials not found.
@@ -80,7 +75,7 @@ Authentication method is 'ServicePrincipalSecret' but credentials not found.
 Credential sources:
   TenantId: Profile -> $($profile.TenantId) $(if($profile.TenantId){'[FOUND]'}else{'[MISSING]'})
   ClientId: Profile -> $($profile.ClientId) $(if($profile.ClientId){'[FOUND]'}else{'[MISSING]'})
-  ClientSecret: PSU secret -> $secretName $(if($clientSecret){'[FOUND]'}else{'[MISSING]'})
+  ClientSecret: Profile (resolved) $(if($profile.ClientSecret){'[FOUND]'}else{'[MISSING]'})
 
 $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are not available." })
 "@
@@ -93,7 +88,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $armBody = @{
                 client_id     = $profile.ClientId
                 scope         = 'https://management.azure.com/.default'
-                client_secret = $clientSecret
+                client_secret = $profile.ClientSecret
                 grant_type    = 'client_credentials'
             }
             $armTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $armBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
@@ -104,7 +99,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $graphBody = @{
                 client_id     = $profile.ClientId
                 scope         = 'https://graph.microsoft.com/.default'
-                client_secret = $clientSecret
+                client_secret = $profile.ClientSecret
                 grant_type    = 'client_credentials'
             }
             $graphTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $graphBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
@@ -115,7 +110,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $keyVaultBody = @{
                 client_id     = $profile.ClientId
                 scope         = 'https://vault.azure.net/.default'
-                client_secret = $clientSecret
+                client_secret = $profile.ClientSecret
                 grant_type    = 'client_credentials'
             }
             $keyVaultTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $keyVaultBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
@@ -128,9 +123,11 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 $ctx.TokenExpiresAt = (Get-Date).AddSeconds([int]$expiresInSeconds)
             }
 
-            # Store tokens
-            Save-CIEMToken -ARMToken $armTokenResponse.access_token -GraphToken $graphTokenResponse.access_token -KeyVaultToken $keyVaultTokenResponse.access_token
-            Write-CIEMLog -Message "Tokens saved" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Store tokens directly on auth context
+            $ctx.ARMToken = $armTokenResponse.access_token
+            $ctx.GraphToken = $graphTokenResponse.access_token
+            $ctx.KeyVaultToken = $keyVaultTokenResponse.access_token
+            Write-CIEMLog -Message "Tokens stored on auth context" -Severity INFO -Component 'Connect-CIEMAzure'
 
             # Inject ARM token into Az context
             Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
@@ -142,44 +139,38 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         }
         'ServicePrincipalCertificate' {
             Write-CIEMLog -Message "Processing ServicePrincipalCertificate authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Look up thumbprint using profile's SecretName, fall back to legacy name
-            $secretName = if ($profile.SecretName) { $profile.SecretName } else { 'CIEM_Azure_CertThumbprint' }
-            $thumbprint = Get-CIEMSecret $secretName
-            Write-CIEMLog -Message "Secret '$secretName': $(if($thumbprint){'found'}else{'null'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            Write-CIEMLog -Message "Certificate resolved: $(if($profile.Certificate){'yes'}else{'no'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
             if (-not $profile.ClientId -or -not $profile.TenantId) {
                 $ctx.LastError = "Missing TenantId or ClientId for ServicePrincipalCertificate"
                 throw "Authentication method is 'ServicePrincipalCertificate' but tenantId or clientId not found in profile"
             }
 
-            if (-not $thumbprint) {
-                $ctx.LastError = "Certificate thumbprint not found"
-                throw "Certificate authentication requires thumbprint in PSU secret ($secretName)"
+            if (-not $profile.Certificate) {
+                $ctx.LastError = "PFX certificate not found or failed to load"
+                throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Configuration page."
             }
 
-            $connectParams = @{
-                ServicePrincipal      = $true
-                ApplicationId         = $profile.ClientId
-                TenantId              = $profile.TenantId
-                CertificateThumbprint = $thumbprint
-            }
+            # Use MSAL directly with X509Certificate2 (Connect-AzAccount -CertificatePath has EntryPointNotFoundException in PSU)
+            Write-CIEMLog -Message "Acquiring tokens via MSAL with certificate (thumbprint: $($profile.Certificate.Thumbprint))..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $msalApp = [Microsoft.Identity.Client.ConfidentialClientApplicationBuilder]::Create($profile.ClientId).WithCertificate($profile.Certificate).WithAuthority("https://login.microsoftonline.com/$($profile.TenantId)").Build()
 
-            Write-CIEMLog -Message "Calling Connect-AzAccount with certificate..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Connect-AzAccount @connectParams -ErrorAction Stop | Out-Null
-            Write-CIEMLog -Message "Certificate authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
+            $armResult = $msalApp.AcquireTokenForClient([string[]]@('https://management.azure.com/.default')).ExecuteAsync().GetAwaiter().GetResult()
+            $ctx.ARMToken = $armResult.AccessToken
+            Write-CIEMLog -Message "ARM token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
 
-            # Acquire Graph token using Get-AzAccessToken
-            Write-CIEMLog -Message "Acquiring Graph token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $graphTokenResponse = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com" -ErrorAction Stop
-            Save-CIEMToken -GraphToken $graphTokenResponse.Token
-            Write-CIEMLog -Message "Graph token saved" -Severity INFO -Component 'Connect-CIEMAzure'
+            $graphResult = $msalApp.AcquireTokenForClient([string[]]@('https://graph.microsoft.com/.default')).ExecuteAsync().GetAwaiter().GetResult()
+            $ctx.GraphToken = $graphResult.AccessToken
+            Write-CIEMLog -Message "Graph token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
 
-            # Acquire KeyVault token using Get-AzAccessToken
-            Write-CIEMLog -Message "Acquiring KeyVault token via Get-AzAccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $kvTokenResponse = Get-AzAccessToken -ResourceUrl "https://vault.azure.net" -ErrorAction Stop
-            Save-CIEMToken -KeyVaultToken $kvTokenResponse.Token
-            Write-CIEMLog -Message "KeyVault token saved" -Severity INFO -Component 'Connect-CIEMAzure'
+            $kvResult = $msalApp.AcquireTokenForClient([string[]]@('https://vault.azure.net/.default')).ExecuteAsync().GetAwaiter().GetResult()
+            $ctx.KeyVaultToken = $kvResult.AccessToken
+            Write-CIEMLog -Message "KeyVault token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Inject ARM token into Az context so downstream Get-AzContext / Get-AzSubscription work
+            Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
+            Connect-AzAccount -AccessToken $armResult.AccessToken -AccountId $profile.ClientId -TenantId $profile.TenantId -ErrorAction Stop | Out-Null
+            Write-CIEMLog -Message "Certificate authentication completed successfully via MSAL" -Severity INFO -Component 'Connect-CIEMAzure'
 
             $ctx.AccountId = $profile.ClientId
             $ctx.AccountType = 'ServicePrincipal'
@@ -238,9 +229,11 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 $ctx.TokenExpiresAt = [DateTimeOffset]::FromUnixTimeSeconds([long]$expiresOn).LocalDateTime
             }
 
-            # Store tokens
-            Save-CIEMToken -ARMToken $armTokenResponse.access_token -GraphToken $graphTokenResponse.access_token -KeyVaultToken $keyVaultTokenResponse.access_token
-            Write-CIEMLog -Message "Tokens saved" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Store tokens directly on auth context
+            $ctx.ARMToken = $armTokenResponse.access_token
+            $ctx.GraphToken = $graphTokenResponse.access_token
+            $ctx.KeyVaultToken = $keyVaultTokenResponse.access_token
+            Write-CIEMLog -Message "Tokens stored on auth context" -Severity INFO -Component 'Connect-CIEMAzure'
 
             # Extract tenant ID and account ID from ARM token JWT payload
             $tokenParts = $armTokenResponse.access_token.Split('.')

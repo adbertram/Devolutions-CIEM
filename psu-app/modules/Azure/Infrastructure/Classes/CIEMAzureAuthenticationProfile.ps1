@@ -12,6 +12,12 @@ class CIEMAzureAuthenticationProfile {
     [datetime]$CreatedAt
     [datetime]$UpdatedAt
 
+    # Resolved secrets (transient - NOT persisted to PSU Cache)
+    [string]$ClientSecret
+    [string]$CertificatePfxBase64
+    [string]$CertificatePassword
+    [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
+
     CIEMAzureAuthenticationProfile() {
         $this.IsActive = $true
         $this.CreatedAt = Get-Date
