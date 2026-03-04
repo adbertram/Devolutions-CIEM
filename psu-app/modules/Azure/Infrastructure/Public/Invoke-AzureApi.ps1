@@ -104,8 +104,13 @@ function Invoke-AzureApi {
         }
     }
 
-    # Get tokens via centralized helper
-    $tokens = Get-CIEMToken
+    # Read tokens directly from auth context
+    if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
+        $msg = "Not connected to Azure. Run Connect-CIEM first."
+        if ($shouldThrow) { throw $msg }
+        Write-Warning $msg
+        return
+    }
 
     # Serialize body to JSON if provided
     $jsonBody = $null
@@ -149,13 +154,12 @@ function Invoke-AzureApi {
         }
     }
 
-    # Resolve token for the target API
-    $tokenMap = @{
-        Graph    = 'GraphToken'
-        ARM      = 'ARMToken'
-        KeyVault = 'KeyVaultToken'
+    # Resolve token for the target API directly from auth context
+    $token = switch ($Api) {
+        'Graph'    { $script:AzureAuthContext.GraphToken }
+        'ARM'      { $script:AzureAuthContext.ARMToken }
+        'KeyVault' { $script:AzureAuthContext.KeyVaultToken }
     }
-    $token = $tokens.($tokenMap[$Api])
 
     if (-not $token) {
         $msg = "$Api API call requested but no $Api token available. Run Connect-CIEM first."

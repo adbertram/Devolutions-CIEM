@@ -5,11 +5,8 @@ function Get-CIEMProvider {
 
     .DESCRIPTION
         Returns provider objects from the CIEM SQLite database. Each provider
-        includes Name, Enabled, IsDefault, Authentication, Endpoints, ResourceFilter,
+        includes Name, Enabled, IsDefault, Endpoints, ResourceFilter,
         and a computed CheckCount property.
-
-        Authentication details are reconstructed by dispatching to registered
-        provider type callbacks. Unregistered types get a generic auth object.
 
     .PARAMETER Name
         Optional. Return a single provider by name (case-insensitive).
@@ -38,29 +35,7 @@ function Get-CIEMProvider {
 
     $ErrorActionPreference = 'Stop'
 
-    # Build SQL dynamically from registered provider types
-    $selectColumns = [System.Collections.Generic.List[string]]::new()
-    $selectColumns.Add('p.id, p.name, p.type, p.enabled, p.is_default, p.created_at, p.updated_at')
-
-    $joinClauses = [System.Collections.Generic.List[string]]::new()
-
-    foreach ($typeName in $script:ProviderTypes.Keys) {
-        $reg = $script:ProviderTypes[$typeName]
-        if ($reg.QueryAuth) {
-            $queryAuth = & $reg.QueryAuth
-            if ($queryAuth.Columns) {
-                $selectColumns.Add($queryAuth.Columns)
-            }
-            if ($queryAuth.JoinClause) {
-                $joinClauses.Add($queryAuth.JoinClause)
-            }
-        }
-    }
-
-    $query = "SELECT $($selectColumns -join ",`n       ")`nFROM providers p"
-    if ($joinClauses.Count -gt 0) {
-        $query += "`n" + ($joinClauses -join "`n")
-    }
+    $query = "SELECT p.id, p.name, p.type, p.enabled, p.is_default, p.created_at, p.updated_at FROM providers p"
 
     if ($Name) {
         $query += "`nWHERE p.name = @name COLLATE NOCASE"
@@ -77,22 +52,10 @@ function Get-CIEMProvider {
         $provider.Name = $row.name
         $provider.Enabled = [bool]$row.enabled
         $provider.IsDefault = [bool]$row.is_default
-
-        # Reconstruct authentication via registered provider type callback
-        $reg = $script:ProviderTypes[$row.type]
-        if ($reg -and $reg.ReadAuth) {
-            $provider.Authentication = & $reg.ReadAuth $row $false
-        }
-        else {
-            # Unregistered type: generic auth
-            $provider.Authentication = [PSCustomObject]@{
-                Provider = $row.type
-                Enabled  = [bool]$row.enabled
-                Method   = ''
-            }
-        }
+        $provider.Authentication = $null
 
         # Endpoints from registered defaults or empty
+        $reg = $script:ProviderTypes[$row.type]
         if ($reg -and $reg.DefaultEndpoints) {
             $provider.Endpoints = $reg.DefaultEndpoints
         }

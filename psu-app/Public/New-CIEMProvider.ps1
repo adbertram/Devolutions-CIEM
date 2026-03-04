@@ -6,7 +6,7 @@ function New-CIEMProvider {
     .DESCRIPTION
         Adds a new provider to the CIEM SQLite database. Validates name
         uniqueness and applies sensible defaults. Authentication is managed
-        separately via Save-CIEMAuthenticationContext.
+        separately via Save-CIEMAzureAuthenticationProfile.
 
     .PARAMETER Name
         Provider name (e.g., 'Azure', 'AWS', 'GCP'). Must be unique.

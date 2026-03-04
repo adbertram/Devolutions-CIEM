@@ -25,7 +25,7 @@ function Invoke-CIEMAzurePerSubscription {
         [scriptblock]$ScriptBlock
     )
 
-    $subscriptionIds = @((Get-CIEMAzureAuthContext).SubscriptionIds)
+    $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
     $data = @{}
 
     if ($subscriptionIds -and $subscriptionIds.Count -gt 0) {

@@ -37,7 +37,7 @@ function Connect-CIEM {
 
     .NOTES
         This function must be called before running Invoke-CIEMScan or any other
-        scan functions. Use Test-CIEMAuthenticationContext to check connection status.
+        scan functions.
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]

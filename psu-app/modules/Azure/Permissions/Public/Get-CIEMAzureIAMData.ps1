@@ -24,7 +24,7 @@ function Get-CIEMAzureIAMData {
     $ErrorActionPreference = 'Stop'
 
     # Get subscription IDs from runtime auth context
-    $subscriptionIds = @((Get-CIEMAzureAuthContext).SubscriptionIds)
+    $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
 
     # Initialize service hashtable keyed by subscription
     $data = @{}

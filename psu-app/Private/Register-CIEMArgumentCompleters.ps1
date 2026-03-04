@@ -42,9 +42,6 @@ function Register-CIEMArgumentCompleters {
         'New-CIEMScanRun'
         'Get-CIEMCheck'
         'Get-CIEMProviderService'
-        'Test-CIEMAuthenticationContext'
-        'Get-CIEMAuthenticationContext'
-        'Save-CIEMAuthenticationContext'
     )
 
     foreach ($funcName in $providerParamFunctions) {

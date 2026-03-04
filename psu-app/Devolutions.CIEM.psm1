@@ -99,6 +99,7 @@ $script:DatabasePath = $null
 $script:ProviderTypes = @{}
 # Azure
 $script:AzureAuthContext = $null  # [CIEMAzureAuthContext] — set by Connect-CIEMAzure
+$script:AzureAuthProfilesCacheKey = 'CIEM:AuthProfiles:Azure'
 # AWS
 $script:AWSAuthContext = $null
 # PSU
@@ -149,54 +150,6 @@ Write-CIEMLog -Message "Registering provider types..." -Component 'ModuleInit'
 Register-CIEMAzureProviderType
 Register-CIEMAWSProviderType
 Write-CIEMLog -Message "Provider types registered: $($script:ProviderTypes.Keys -join ', ')" -Component 'ModuleInit'
-
-# --- One-time migration: SQLite auth profiles → PSU Variables ---
-$_inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-if ($_inPSUContext) {
-    try {
-        $existingVar = Get-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -ErrorAction SilentlyContinue
-        if (-not $existingVar) {
-            $dbPath = Get-CIEMDatabasePath
-            if ($dbPath -and (Test-Path $dbPath)) {
-                $conn = Open-PSUSQLiteConnection -Database $dbPath
-                try {
-                    $rows = @(Invoke-PSUSQLiteQuery -Connection $conn -Query "SELECT * FROM azure_authentication_profiles" -ErrorAction SilentlyContinue)
-                    if ($rows.Count -gt 0) {
-                        $profiles = @(foreach ($row in $rows) {
-                            [PSCustomObject]@{
-                                Id = $row.id
-                                ProviderId = $row.provider_id
-                                Name = $row.name
-                                Method = $row.method
-                                IsActive = [bool]$row.is_active
-                                TenantId = $row.tenant_id
-                                ClientId = $row.client_id
-                                ManagedIdentityClientId = $row.managed_identity_client_id
-                                SecretName = $row.secret_name
-                                SecretType = $row.secret_type
-                                CreatedAt = if ($row.created_at) { $row.created_at } else { (Get-Date).ToString('o') }
-                                UpdatedAt = if ($row.updated_at) { $row.updated_at } else { (Get-Date).ToString('o') }
-                            }
-                        })
-                        $json = ConvertTo-Json -InputObject @($profiles) -Depth 10 -Compress
-                        New-PSUVariable -Name 'CIEM_AuthProfiles_Azure' -Value $json | Out-Null
-                        Write-CIEMLog -Message "Migrated $($profiles.Count) auth profile(s) from SQLite to PSU Variable" -Severity INFO -Component 'ModuleInit'
-                    }
-                }
-                catch {
-                    # Table might not exist (fresh installs) — that's fine
-                    Write-CIEMLog -Message "Auth profile migration skipped: $($_.Exception.Message)" -Severity DEBUG -Component 'ModuleInit'
-                }
-                finally {
-                    $conn.Dispose()
-                }
-            }
-        }
-    }
-    catch {
-        Write-CIEMLog -Message "Auth profile migration failed: $($_.Exception.Message)" -Severity WARNING -Component 'ModuleInit'
-    }
-}
 
 # --- Argument completers ---
 Register-CIEMArgumentCompleters
