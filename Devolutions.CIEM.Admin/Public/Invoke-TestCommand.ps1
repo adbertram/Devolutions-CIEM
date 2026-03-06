@@ -7,8 +7,8 @@ function Invoke-TestCommand {
         Unified test harness for running commands against the Devolutions CIEM module
         in two PSU contexts:
 
-        - local:  Run on the local PSU instance via Invoke-PSUCommand
-        - azure:  Run on the Azure PSU instance via Invoke-PSUCommand
+        - local:  Run on the local PSU instance via Invoke-CIEMCommand
+        - azure:  Run on the Azure PSU instance via Invoke-CIEMCommand
 
         Handles Connect-PSU and formats the output.
 
@@ -47,14 +47,14 @@ function Invoke-TestCommand {
             Write-Verbose "[local] Connecting to local PSU..."
             Connect-PSU -Local
             Write-Verbose "[local] Executing on local PSU..."
-            Invoke-PSUCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
+            Invoke-CIEMCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
         }
 
         'azure' {
             Write-Verbose "[azure] Connecting to Azure PSU..."
             Connect-PSU
             Write-Verbose "[azure] Executing on Azure PSU..."
-            Invoke-PSUCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
+            Invoke-CIEMCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
         }
     }
 }

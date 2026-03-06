@@ -161,12 +161,28 @@ function Connect-PSU {
         Write-Verbose "Using default resource group: $ResourceGroup"
     }
 
-    # Store connection info
+    # Store connection info for Invoke-CIEMCommand (our REST-based command executor)
     $script:PSUConnection.Url = $Url
     $script:PSUConnection.Token = $Token
     $script:PSUConnection.IsAzure = $isAzure
     $script:PSUConnection.ResourceGroup = $ResourceGroup
     $script:PSUConnection.WebAppName = $WebAppName
+
+    # Also call Connect-PSUServer (the official Universal module cmdlet) so that
+    # PSU cmdlets like Get-PSUScript, Invoke-PSUScript, Get-PSUJob, etc. work
+    # without needing -ComputerName/-AppToken on every call.
+    if (Get-Command Connect-PSUServer -ErrorAction SilentlyContinue) {
+        Write-Verbose "Calling Connect-PSUServer for Universal module cmdlets..."
+        if ($Token) {
+            Connect-PSUServer -ComputerName $Url -AppToken $Token
+        }
+        else {
+            Connect-PSUServer -ComputerName $Url
+        }
+    }
+    else {
+        Write-Warning "Connect-PSUServer not found. Install the 'Universal' module to use PSU cmdlets (Get-PSUScript, Invoke-PSUScript, etc.) directly."
+    }
 
     # Return connection info
     [PSCustomObject]@{

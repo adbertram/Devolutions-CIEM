@@ -12,7 +12,7 @@
         'Get-PSUApp'
         'Get-PSUModule'
         'Install-PSUModule'
-        'Invoke-PSUCommand'
+        'Invoke-CIEMCommand'
         'Invoke-TestCommand'
         'Publish-PSUModule'
         'Remove-PSUModule'

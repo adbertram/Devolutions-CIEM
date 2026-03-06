@@ -1,3 +1,5 @@
+$script:DefaultAppName = 'Devolutions CIEM'
+
 function Publish-PSUModule {
     <#
     .SYNOPSIS
@@ -93,14 +95,61 @@ function Publish-PSUModule {
         }
 
         Write-Host ''
-        Write-Host 'Step 2: Installing module to local PSU...' -ForegroundColor Yellow
+        Write-Host 'Step 2: Bumping version...' -ForegroundColor Yellow
 
-        if ($PSCmdlet.ShouldProcess($moduleName, "Install to local PSU")) {
-            $manifest = Import-PowerShellDataFile -Path $manifestPath
-            $moduleVersion = $manifest.ModuleVersion
-            $projectRoot = Split-Path $ModulePath -Parent
-            $localPsuModulesDir = Join-Path $projectRoot 'local-psu' 'Repository' 'Modules'
-            $targetModuleDir = Join-Path $localPsuModulesDir $moduleName
+        $manifest = Import-PowerShellDataFile -Path $manifestPath
+        $localVersion = [version]$manifest.ModuleVersion
+        $projectRoot = Split-Path $ModulePath -Parent
+        $localPsuModulesDir = Join-Path $projectRoot 'local-psu' 'Repository' 'Modules'
+        $targetModuleDir = Join-Path $localPsuModulesDir $moduleName
+
+        # Check currently installed version in local PSU
+        $installedVersion = $null
+        if (Test-Path $targetModuleDir) {
+            $versionDirs = Get-ChildItem -Path $targetModuleDir -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+' }
+            if ($versionDirs) {
+                $installedVersion = $versionDirs | ForEach-Object { [version]$_.Name } | Sort-Object -Descending | Select-Object -First 1
+            }
+        }
+
+        # Check PowerShell Gallery version
+        $galleryVersion = $null
+        try {
+            $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue 3>$null
+            if ($existing) {
+                $galleryVersion = [version]($existing.Version -replace '-.*$', '')
+            }
+        } catch {}
+
+        # Use the highest of manifest, installed, and gallery versions
+        $baseVersion = $localVersion
+        if ($installedVersion -and $installedVersion -gt $baseVersion) { $baseVersion = $installedVersion }
+        if ($galleryVersion -and $galleryVersion -gt $baseVersion) { $baseVersion = $galleryVersion }
+
+        Write-Host "  Manifest version:  $localVersion" -ForegroundColor Gray
+        if ($installedVersion) {
+            Write-Host "  Installed version: $installedVersion" -ForegroundColor Cyan
+        }
+        if ($galleryVersion) {
+            Write-Host "  Gallery version:   $galleryVersion" -ForegroundColor Cyan
+        }
+
+        $newVersion = Get-BumpedVersion -Base $baseVersion -Component $BumpVersion
+
+        Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
+
+        # Update manifest file
+        $manifestContent = Get-Content -Path $manifestPath -Raw
+        $updatedContent = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
+        Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
+        Write-Host "  [OK] Updated $manifestPath" -ForegroundColor Green
+
+        $moduleVersion = $newVersion.ToString()
+
+        Write-Host ''
+        Write-Host 'Step 3: Installing module to local PSU...' -ForegroundColor Yellow
+
+        if ($PSCmdlet.ShouldProcess($moduleName, "Install v$moduleVersion to local PSU")) {
 
             if (-not (Test-Path $localPsuModulesDir)) {
                 throw "Local PSU modules directory not found: $localPsuModulesDir"
@@ -117,21 +166,22 @@ function Publish-PSUModule {
 
             Write-Host "  [OK] Module installed: $moduleName v$moduleVersion" -ForegroundColor Green
 
+            Write-Host ''
+            Write-Host 'Step 4: Restarting app...' -ForegroundColor Yellow
+            $appName = $script:DefaultAppName
             $dashboardsFile = Get-ChildItem -Path $ModulePath -Filter 'dashboards.ps1' -Recurse | Where-Object { $_.Directory.Name -eq '.universal' } | Select-Object -First 1
             if ($dashboardsFile) {
                 $dashboardContent = Get-Content $dashboardsFile.FullName -Raw
                 if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
                     $appName = $matches[1]
-                    Write-Host ''
-                    Write-Host 'Step 3: Restarting app...' -ForegroundColor Yellow
-                    try {
-                        Restart-PSUApp -Name $appName
-                        Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
-                    }
-                    catch {
-                        Write-Host "  [WARN] Could not restart app '$appName': $_" -ForegroundColor Yellow
-                    }
                 }
+            }
+            try {
+                Restart-PSUApp -Name $appName
+                Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "  [WARN] Could not restart app '$appName': $_" -ForegroundColor Yellow
             }
 
             Write-Host ''
@@ -372,20 +422,21 @@ NuGet API key required. Options:
                 Write-Host "  [OK] Module imported" -ForegroundColor Green
                 $updatedPSU = $true
 
+                $appName = $script:DefaultAppName
                 $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
                 if (Test-Path $dashboardsPath) {
                     $dashboardContent = Get-Content $dashboardsPath -Raw
                     if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
                         $appName = $matches[1]
-                        Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
-                        try {
-                            Restart-PSUApp -Name $appName
-                            Write-Host "  [OK] App restarted" -ForegroundColor Green
-                        }
-                        catch {
-                            Write-Host "  [WARN] Could not restart app: $_" -ForegroundColor Yellow
-                        }
                     }
+                }
+                Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
+                try {
+                    Restart-PSUApp -Name $appName
+                    Write-Host "  [OK] App restarted" -ForegroundColor Green
+                }
+                catch {
+                    Write-Host "  [WARN] Could not restart app: $_" -ForegroundColor Yellow
                 }
             }
             catch {
