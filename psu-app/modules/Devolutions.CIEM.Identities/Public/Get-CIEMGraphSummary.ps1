@@ -16,7 +16,7 @@ function Get-CIEMGraphSummary {
         LargestGroups, and UsersInMostGroups.
 
     .EXAMPLE
-        $graphData = Get-PSUCache -Key 'CIEM:Graph:Latest'
+        $graphData = Get-PSUCache -Key $script:GraphLatestCacheKey
         $summary = Get-CIEMGraphSummary -Data $graphData
     #>
     [CmdletBinding()]

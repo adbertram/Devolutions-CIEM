@@ -12,8 +12,6 @@ function New-CIEMAboutPage {
     )
 
     New-UDPage -Name 'About' -Url '/ciem/about' -Content {
-        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
-
         New-UDTypography -Text 'About Devolutions CIEM' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
 
         New-UDCard -Title 'Cloud Infrastructure Entitlement Management' -Content {
@@ -37,7 +35,7 @@ function New-CIEMAboutPage {
             }
 
             New-UDTypography -Text 'Version Information:' -Variant 'h6' -Style @{ marginTop = '20px' }
-            $moduleVersion = (Get-Module Devolutions.CIEM.PSU -ListAvailable | Select-Object -First 1).Version.ToString()
+            $moduleVersion = (Get-Module Devolutions.CIEM | Select-Object -First 1).Version.ToString()
             New-UDTable -Data @(
                 @{ Property = 'Module Version'; Value = $moduleVersion }
                 @{ Property = 'PowerShell Universal'; Value = '5.5+' }

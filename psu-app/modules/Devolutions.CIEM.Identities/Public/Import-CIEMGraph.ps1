@@ -15,7 +15,7 @@ function Import-CIEMGraph {
         [CIEMGraph] The deserialized graph object.
 
     .EXAMPLE
-        $graphData = Get-PSUCache -Key 'CIEM:Graph:Latest'
+        $graphData = Get-PSUCache -Key $script:GraphLatestCacheKey
         $graph = Import-CIEMGraph -Data $graphData
     #>
     [CmdletBinding()]

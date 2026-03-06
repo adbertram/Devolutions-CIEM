@@ -1,5 +1,5 @@
 BeforeAll {
-    Import-Module (Join-Path $PSScriptRoot '..' 'Devolutions.CIEM.Identities.psd1') -Force
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' 'Devolutions.CIEM.psd1') -Force
 }
 
 Describe 'New-CIEMGraph' {

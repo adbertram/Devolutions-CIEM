@@ -18,7 +18,7 @@ function ConvertTo-CIEMGraphMermaid {
     .PARAMETER Direction
         Mermaid layout direction. Defaults to TD (top-down).
     .EXAMPLE
-        $data = Get-PSUCache -Key 'CIEM:Graph:Azure'
+        $data = Get-PSUCache -Key $script:GraphAzureCacheKey
         ConvertTo-CIEMGraphMermaid -Data $data -TargetType 'KeyVault'
     .EXAMPLE
         ConvertTo-CIEMGraphMermaid -Data $data -TargetType 'SqlServer' -Direction LR

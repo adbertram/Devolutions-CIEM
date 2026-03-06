@@ -12,17 +12,15 @@ function New-CIEMConfigPage {
     )
 
     New-UDPage -Name 'Configuration' -Url '/ciem/config' -Content {
-        # Ensure module functions are available in this page's runspace
-        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
-
         # Load configuration from PSU cache (or defaults if first run)
         $CurrentConfig = Get-CIEMConfig
 
         # Get PSU environment
         $envInfo = Get-PSUInstalledEnvironment
 
-        # Get current provider (default to Azure)
-        $currentProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
+        # Get available providers from database
+        $providers = @(Get-CIEMProvider)
+        $currentProvider = ($providers | Where-Object IsDefault | Select-Object -First 1).Name
         if (-not $currentProvider) { $currentProvider = 'Azure' }
 
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
@@ -51,8 +49,9 @@ function New-CIEMConfigPage {
             # Provider Selection
             New-UDElement -Tag 'div' -Content {
                 New-UDSelect -Id 'cloudProvider' -Label 'Cloud Provider' -Option {
-                    New-UDSelectOption -Name 'Azure' -Value 'Azure'
-                    New-UDSelectOption -Name 'AWS' -Value 'AWS'
+                    foreach ($p in $providers) {
+                        New-UDSelectOption -Name $p.Name -Value $p.Name
+                    }
                 } -DefaultValue $currentProvider -FullWidth -OnChange {
                     # Only sync authMethodContainer - it will sync authFieldsContainer after rendering
                     Sync-UDElement -Id 'authMethodContainer'
@@ -64,39 +63,28 @@ function New-CIEMConfigPage {
                 $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
                 if (-not $selectedProvider) { $selectedProvider = 'Azure' }
 
-                if ($selectedProvider -eq 'AWS') {
-                    $awsAuthMethod = 'CurrentProfile'
+                # Get available auth methods from database
+                $authMethods = @(Get-CIEMProviderAuthMethod -Provider $selectedProvider)
 
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
-                            New-UDSelectOption -Name 'Current Profile (AWS CLI)' -Value 'CurrentProfile'
-                            New-UDSelectOption -Name 'Access Key' -Value 'AccessKey'
-                        } -DefaultValue $awsAuthMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
-                    } -Attributes @{ style = @{ marginBottom = '8px' } }
-
-                    New-UDTypography -Text 'Select the authentication method for your AWS environment.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '16px' }
-
-                    Sync-UDElement -Id 'authFieldsContainer'
+                # Determine current default from active profile (Azure) or first method
+                $defaultMethod = if ($selectedProvider -eq 'Azure') {
+                    $azProfile = @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true) | Select-Object -First 1
+                    if ($azProfile.Method) { $azProfile.Method } else { $authMethods[0].Method }
+                } else {
+                    $authMethods[0].Method
                 }
-                else {
-                    # Azure authentication methods — read from auth profile directly
-                    $azProfileForMethod = @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true) | Select-Object -First 1
-                    $azureAuthMethod = if ($azProfileForMethod.Method) { $azProfileForMethod.Method } else { 'ServicePrincipalSecret' }
 
-                    New-UDElement -Tag 'div' -Content {
-                        New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
-                            New-UDSelectOption -Name 'Service Principal (Client Secret)' -Value 'ServicePrincipalSecret'
-                            New-UDSelectOption -Name 'Service Principal (Certificate)' -Value 'ServicePrincipalCertificate'
-                            New-UDSelectOption -Name 'Managed Identity' -Value 'ManagedIdentity'
-                        } -DefaultValue $azureAuthMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
-                    } -Attributes @{ style = @{ marginBottom = '8px' } }
+                New-UDElement -Tag 'div' -Content {
+                    New-UDSelect -Id 'authMethod' -Label 'Authentication Method' -Option {
+                        foreach ($m in $authMethods) {
+                            New-UDSelectOption -Name $m.DisplayName -Value $m.Method
+                        }
+                    } -DefaultValue $defaultMethod -FullWidth -OnChange { Sync-UDElement -Id 'authFieldsContainer' }
+                } -Attributes @{ style = @{ marginBottom = '8px' } }
 
-                    # Info about authentication methods
-                    New-UDTypography -Text 'Select the authentication method that matches your environment and security requirements.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '16px' }
+                New-UDTypography -Text 'Select the authentication method that matches your environment and security requirements.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '16px' }
 
-                    # Sync auth fields after Azure dropdown is rendered (important for provider switch from AWS to Azure)
-                    Sync-UDElement -Id 'authFieldsContainer'
-                }
+                Sync-UDElement -Id 'authFieldsContainer'
             }
 
             # Dynamic fields based on selected authentication method
@@ -223,14 +211,6 @@ inp.click();
                         }
                         'ManagedIdentity' {
                             # No configuration needed - system-assigned managed identity is used automatically
-                        }
-                        'DeviceCode' {
-                            New-UDAlert -Severity 'info' -Text 'Device Code authentication will prompt you to visit microsoft.com/devicelogin and enter a code. Useful for environments with strict MFA policies or where browser-based login is restricted.' -Dense -Style @{ marginBottom = '16px' }
-                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
-                        }
-                        'Interactive' {
-                            New-UDAlert -Severity 'info' -Text 'Interactive authentication opens a browser window for you to sign in. Supports MFA and all authentication policies.' -Dense -Style @{ marginBottom = '16px' }
-                            New-UDTextbox -Id 'azTenantId' -Label 'Tenant ID (Optional)' -Value $storedCreds.TenantId -FullWidth -Placeholder 'Leave empty for default tenant'
                         }
                     }
                 }

@@ -12,20 +12,18 @@ function New-CIEMScanHistoryPage {
     )
 
     New-UDPage -Name 'Scan History' -Url '/ciem/history' -Content {
-        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
-
         New-UDTypography -Text 'Scan History' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Click on a scan to expand and view detailed results' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
         New-UDCard -Content {
             New-UDDynamic -Id 'scanHistoryPanel' -Content {
-                Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+
                 try {
                     $scanRuns = @(Get-CIEMScanRun)
 
                     if ($scanRuns -and $scanRuns.Count -gt 0) {
                         New-UDDataGrid -LoadRows {
-                            Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+            
                             $runs = @(Get-CIEMScanRun)
                             $historyData = $runs | ForEach-Object {
                                 @{
@@ -69,7 +67,7 @@ function New-CIEMScanHistoryPage {
                             }
                             New-UDDataGridColumn -Field 'duration' -HeaderName 'Duration' -Width 100
                         ) -AutoHeight $true -Pagination -PageSize 10 -ExportOptions @('CSV', 'JSON') -OnExport {
-                            Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+            
                             $runs = @(Get-CIEMScanRun -IncludeResults)
 
                             if ($EventData.Type -eq 'CSV') {
@@ -123,7 +121,7 @@ function New-CIEMScanHistoryPage {
                             }
                         } -LoadDetailContent {
                             # Load scan results for this specific scan run
-                            Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+            
                             $scanRunId = $EventData.row.id
 
                             try {
@@ -176,7 +174,7 @@ function New-CIEMScanHistoryPage {
                                             New-UDDataGridColumn -Field 'title' -HeaderName 'Finding' -Flex 1
                                             New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
                                                 $sev = $EventData.severity.ToUpper()
-                                                $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } 'INFO' { '#4caf50' } default { '#666' } }
+                                                $color = Get-SeverityColor -Severity $sev
                                                 New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                                             }
                                             New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 100 -Render {

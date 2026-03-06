@@ -12,8 +12,6 @@ function New-CIEMScanPage {
     )
 
     New-UDPage -Name 'Scan' -Url '/ciem/scan' -Content {
-        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
-
         New-UDTypography -Text 'Run CIEM Scan' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
@@ -21,7 +19,7 @@ function New-CIEMScanPage {
         New-UDCard -Title 'Check Selection' -Content {
             # Check selection data grid with checkboxes
             New-UDDynamic -Id 'checkSelectionGrid' -Content {
-                Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+
                 $allChecks = @(Get-CIEMCheck)
 
                 # Initialize session state on first load
@@ -31,7 +29,7 @@ function New-CIEMScanPage {
 
                 # Selection summary
                 New-UDDynamic -Id 'selectionSummary' -Content {
-                    Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+    
                     $checks = @(Get-CIEMCheck)
                     $enabledCount = @($checks | Where-Object { -not $_.Disabled }).Count
                     $disabledCount = @($checks | Where-Object { $_.Disabled }).Count
@@ -61,7 +59,7 @@ function New-CIEMScanPage {
                 }
 
                 New-UDDataGrid -Id 'checkSelector' -LoadRows {
-                    Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
+    
                     $checks = @(Get-CIEMCheck)
 
                     # Apply status filter
@@ -99,7 +97,7 @@ function New-CIEMScanPage {
                                 New-UDTypography -Text $EventData.title -Variant 'h6'
                             } -Content {
                                 $sev = $EventData.severity.ToUpper()
-                                $sevColor = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                                $sevColor = Get-SeverityColor -Severity $sev
                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
                                     New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                         New-UDChip -Label $sev -Style @{ backgroundColor = $sevColor; color = 'white' }
@@ -135,7 +133,7 @@ function New-CIEMScanPage {
                         if ($EventData.disabled) {
                             New-UDChip -Label $sev -Style @{ backgroundColor = '#e0e0e0'; color = '#bbb' }
                         } else {
-                            $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } 'MEDIUM' { '#ff9800' } 'LOW' { '#2196f3' } default { '#666' } }
+                            $color = Get-SeverityColor -Severity $sev
                             New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                         }
                     }
@@ -167,24 +165,28 @@ function New-CIEMScanPage {
             New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px' } } -Content {
                 New-UDButton -Id 'startScanBtn' -Text 'Start Scan' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
                     try {
-                        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
                         Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
 
-                        # Read selected check IDs from session state (synced by OnSelectionChange), strip any disabled checks
-                        $allChecks = @(Get-CIEMCheck)
-                        $enabledCheckIds = @($allChecks | Where-Object { -not $_.Disabled } | Select-Object -ExpandProperty Id)
-                        $selectedCheckIds = @(@($Session:SelectedCheckIds) | Where-Object { $enabledCheckIds -contains $_ })
+                        # Read selected check IDs from session state (synced by OnSelectionChange)
+                        $selectedCheckIds = @($Session:SelectedCheckIds | Where-Object { $_ })
 
                         if ($selectedCheckIds.Count -eq 0) {
                             Show-UDToast -Message 'Please select at least one check.' -Duration 5000 -BackgroundColor '#ff9800'
                             return
                         }
 
-                        # Derive selected providers and services from selected checks
-                        $selectedChecks = @($allChecks | Where-Object { $selectedCheckIds -contains $_.Id })
+                        # Query only the selected checks to get provider/service metadata
+                        $selectedChecks = @(Get-CIEMCheck -CheckId $selectedCheckIds | Where-Object { -not $_.Disabled })
+
+                        if ($selectedChecks.Count -eq 0) {
+                            Show-UDToast -Message 'All selected checks are disabled.' -Duration 5000 -BackgroundColor '#ff9800'
+                            return
+                        }
+
+                        $selectedCheckIds = @($selectedChecks | Select-Object -ExpandProperty Id)
                         $selectedProviders = @($selectedChecks | Select-Object -ExpandProperty Provider -Unique)
                         $selectedServices = @($selectedChecks | Select-Object -ExpandProperty Service -Unique)
-                        Write-CIEMLog -Message "Scan config: Checks=$($selectedCheckIds.Count)/$($allChecks.Count), Providers=$($selectedProviders -join ','), Services=$($selectedServices -join ',')" -Severity INFO -Component 'PSU-ScanPage'
+                        Write-CIEMLog -Message "Scan config: Checks=$($selectedCheckIds.Count), Providers=$($selectedProviders -join ','), Services=$($selectedServices -join ',')" -Severity INFO -Component 'PSU-ScanPage'
 
                         # Show progress area
                         Set-UDElement -Id 'scanProgressArea' -Content {
@@ -206,18 +208,16 @@ function New-CIEMScanPage {
                         # Launch scan as a PSU job (runs asynchronously with progress tracking)
                         Write-CIEMLog -Message "Launching CIEM Scan job for providers: $($selectedProviders -join ', ')..." -Severity INFO -Component 'PSU-ScanPage'
                         try {
-                            $scriptParams = @{
+                            # PSU doesn't pass -Parameters to module command scripts, so use cache
+                            $scanConfig = @{
                                 Provider      = $selectedProviders
                                 Service       = $selectedServices
+                                CheckId       = $selectedCheckIds
                                 IncludePassed = $true
                             }
-                            # Only pass CheckId if a subset of checks is selected
-                            $totalProviderChecks = @($allChecks | Where-Object { $selectedProviders -contains [string]$_.Provider }).Count
-                            if ($selectedCheckIds.Count -lt $totalProviderChecks) {
-                                $scriptParams['CheckId'] = $selectedCheckIds
-                            }
+                            Set-PSUCache -Key $script:ScanConfigCacheKey -Value $scanConfig -Integrated
 
-                            $job = Invoke-PSUScript -Name 'CIEM Scan' -Integrated -Parameters $scriptParams
+                            $job = Invoke-PSUScript -Name 'Devolutions.CIEM\New-CIEMScanRun' -Integrated
                             $Session:CurrentScanJobId = $job.Id
                             Write-CIEMLog -Message "CIEM Scan job launched (JobId: $($job.Id))" -Severity INFO -Component 'PSU-ScanPage'
 

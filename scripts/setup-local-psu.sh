@@ -88,7 +88,7 @@ start() {
     export Data__RepositoryPath="$DATA_DIR/Repository"
     export Data__ConnectionString="Data Source=$DATA_DIR/database.db"
     export Logging__Path="$DATA_DIR/LogFiles"
-    export Api__SecurityModel="Integrated"
+    export Api__SecurityModel="Permissive"
 
     # Start PSU in background
     nohup "$PSU_BIN" > "$DATA_DIR/LogFiles/psu-stdout.log" 2>&1 &

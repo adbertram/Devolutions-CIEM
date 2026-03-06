@@ -20,7 +20,7 @@ function Export-CIEMGraph {
 
     .EXAMPLE
         $exported = Export-CIEMGraph -Graph $graph
-        Set-PSUCache -Key 'CIEM:Graph:Latest' -Value $exported
+        Set-PSUCache -Key $script:GraphLatestCacheKey -Value $exported
 
     .EXAMPLE
         Export-CIEMGraph -Graph $graph -Path './graph-export.json'

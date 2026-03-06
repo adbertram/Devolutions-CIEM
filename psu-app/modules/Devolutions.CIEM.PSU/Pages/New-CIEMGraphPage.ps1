@@ -23,11 +23,10 @@ function Get-CIEMGraphDataForPage {
         return $Session:GraphState[$cacheKey]
     }
 
-    # Discover provider module and call its Get-CIEMCollectedData
-    $providerModuleName = "Devolutions.CIEM.$ProviderName"
-    $getDataCmd = Get-Command -Name 'Get-CIEMCollectedData' -Module $providerModuleName -ErrorAction SilentlyContinue
+    # Call Get-CIEMCollectedData (available in module scope via dot-sourcing)
+    $getDataCmd = Get-Command -Name 'Get-CIEMCollectedData' -ErrorAction SilentlyContinue
     if (-not $getDataCmd) {
-        Write-Verbose "Get-CIEMGraphDataForPage: No Get-CIEMCollectedData found in module '$providerModuleName'"
+        Write-Verbose "Get-CIEMGraphDataForPage: Get-CIEMCollectedData not available"
         return $null
     }
 
@@ -512,15 +511,6 @@ function New-CIEMGraphPage {
     )
 
     New-UDPage -Name 'Identity Graph' -Url '/ciem/graph' -Content {
-        try {
-            Import-Module Devolutions.CIEM.PSU -ErrorAction Stop
-            Import-Module Devolutions.CIEM.Identities -ErrorAction Stop
-        }
-        catch {
-            New-UDCard -Content { New-UDTypography -Text "Failed to load required modules: $($_.Exception.Message)" -Style @{ color = '#f44336' } }
-            return
-        }
-
         New-UDTypography -Text 'Identity Graph' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Explore identity-to-resource relationships and permissions' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
@@ -528,11 +518,12 @@ function New-CIEMGraphPage {
         # Test-CIEMCollectedDataExists function (standard provider module interface)
         $enabledProviders = @(Get-CIEMProvider | Where-Object Enabled | Select-Object -ExpandProperty Name)
         $providersWithData = [ordered]@{}
-        foreach ($pName in $enabledProviders) {
-            $providerModuleName = "Devolutions.CIEM.$pName"
-            $testCmd = Get-Command -Name 'Test-CIEMCollectedDataExists' -Module $providerModuleName -ErrorAction SilentlyContinue
-            if ($testCmd -and (& $testCmd -ProviderName $pName)) {
-                $providersWithData[$pName] = $true
+        $testCmd = Get-Command -Name 'Test-CIEMCollectedDataExists' -ErrorAction SilentlyContinue
+        if ($testCmd) {
+            foreach ($pName in $enabledProviders) {
+                if (& $testCmd -ProviderName $pName) {
+                    $providersWithData[$pName] = $true
+                }
             }
         }
 

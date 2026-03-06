@@ -12,8 +12,6 @@ function New-CIEMDashboardPage {
     )
 
     New-UDPage -Name 'Dashboard' -Url '/ciem' -Content {
-        Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
-
         New-UDTypography -Text 'Devolutions CIEM Dashboard' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
@@ -38,7 +36,7 @@ function New-CIEMDashboardPage {
                                 New-UDSelectOption -Name $label -Value $run.Id
                             }
                         } -DefaultValue $Session:SelectedScanRunId -OnChange {
-                            $Session:SelectedScanRunId = $EventData[0]
+                            $Session:SelectedScanRunId = $EventData
                             Sync-UDElement -Id 'dashboardContent'
                         } -FullWidth
                     }
@@ -50,8 +48,6 @@ function New-CIEMDashboardPage {
 
             # Dynamic dashboard content that refreshes when scan run selection changes
             New-UDDynamic -Id 'dashboardContent' -Content {
-                Import-Module Devolutions.CIEM.PSU -Force -ErrorAction SilentlyContinue
-
                 $scanRunId = $Session:SelectedScanRunId
                 if (-not $scanRunId) { return }
 
@@ -161,7 +157,7 @@ function New-CIEMDashboardPage {
                                 New-UDTableColumn -Property 'Title' -Title 'Result'
                                 New-UDTableColumn -Property 'Severity' -Title 'Severity' -Render {
                                     $sev = $EventData.Severity.ToUpper()
-                                    $color = switch ($sev) { 'CRITICAL' { '#9c27b0' } 'HIGH' { '#f44336' } default { '#666' } }
+                                    $color = Get-SeverityColor -Severity $sev
                                     New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                                 }
                                 New-UDTableColumn -Property 'Service' -Title 'Service'
