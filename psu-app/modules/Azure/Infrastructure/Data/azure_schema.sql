@@ -86,3 +86,12 @@ CREATE TABLE IF NOT EXISTS azure_service_data (
 
 CREATE INDEX IF NOT EXISTS idx_azure_service_data_service ON azure_service_data(provider_id, service_name);
 CREATE INDEX IF NOT EXISTS idx_azure_service_data_type ON azure_service_data(provider_id, service_name, resource_type);
+
+-- =============================================================================
+-- Seed Data: Azure Provider APIs (INSERT OR IGNORE — safe for re-runs)
+-- =============================================================================
+
+INSERT OR IGNORE INTO azure_provider_apis (name, base_url, version) VALUES
+('ARM', 'https://management.azure.com', NULL),
+('Graph', 'https://graph.microsoft.com/v1.0', NULL),
+('KeyVault', 'https://vault.azure.net', NULL);

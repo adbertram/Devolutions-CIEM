@@ -21,7 +21,7 @@ function Remove-CIEMAzureAuthenticationProfile {
     end {
         if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) { return }
 
-        $profiles = @(Get-PSUCache -Key $script:AzureAuthProfilesCacheKey -Integrated -ErrorAction SilentlyContinue)
+        $profiles = @(Get-CIEMAzureAuthProfileCache)
         $originalCount = $profiles.Count
 
         if ($PSCmdlet.ParameterSetName -eq 'ByProvider') {
@@ -39,7 +39,7 @@ function Remove-CIEMAzureAuthenticationProfile {
         }
 
         if ($profiles.Count -ne $originalCount) {
-            Set-PSUCache -Key $script:AzureAuthProfilesCacheKey -Value @($profiles) -Persist -ErrorAction Stop
+            Set-CIEMAzureAuthProfileCache -Profiles $profiles
         }
     }
 }

@@ -6,8 +6,8 @@ function Set-CIEMAzureAuthProfileCache {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [System.Collections.Generic.List[object]]$Profiles
+        [object[]]$Profiles
     )
 
-    Set-PSUCache -Key $script:AzureAuthProfilesCacheKey -Value @($Profiles.ToArray()) -Persist
+    Set-PSUCache -Key $script:AzureAuthProfilesCacheKey -Value @($Profiles) -Persist -Integrated
 }

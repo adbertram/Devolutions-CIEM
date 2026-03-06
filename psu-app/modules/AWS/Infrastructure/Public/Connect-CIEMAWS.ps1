@@ -23,10 +23,13 @@ function Connect-CIEMAWS {
         throw "AWS provider not configured. Use New-CIEMProvider -Name 'AWS' to create it."
     }
 
-    $authConfig = $awsProvider.Authentication
-    $authMethod = $authConfig.Method
+    # Read auth config from PSU Cache (mirrors Azure auth profile pattern)
+    $authConfig = try { Get-PSUCache -Key $script:AWSAuthProfileCacheKey -ErrorAction SilentlyContinue } catch { $null }
 
-    Write-CIEMLog -Message "Authentication method from config: $authMethod" -Severity INFO -Component 'Connect-CIEMAWS'
+    # Default to CurrentProfile if no auth config exists
+    $authMethod = if ($authConfig -and $authConfig.Method) { $authConfig.Method } else { 'CurrentProfile' }
+
+    Write-CIEMLog -Message "Authentication method: $authMethod" -Severity INFO -Component 'Connect-CIEMAWS'
 
     $authResult = switch ($authMethod) {
         'CurrentProfile' {
@@ -108,6 +111,11 @@ Credential sources:
 
             $identity = $result | ConvertFrom-Json
             Write-CIEMLog -Message "Authenticated as: $($identity.Arn)" -Severity INFO -Component 'Connect-CIEMAWS'
+
+            # Clean up env vars after successful authentication (avoid leaking to child processes)
+            Remove-Item Env:\AWS_ACCESS_KEY_ID -ErrorAction SilentlyContinue
+            Remove-Item Env:\AWS_SECRET_ACCESS_KEY -ErrorAction SilentlyContinue
+            Remove-Item Env:\AWS_DEFAULT_REGION -ErrorAction SilentlyContinue
 
             [PSCustomObject]@{
                 AccountId   = $identity.Account

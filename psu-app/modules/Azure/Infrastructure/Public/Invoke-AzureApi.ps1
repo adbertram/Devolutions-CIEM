@@ -7,6 +7,13 @@ function Invoke-AzureApi {
         Single point of entry for all Azure API calls. Handles authentication
         internally - callers should not deal with tokens or auth logic.
 
+        Supports two calling patterns:
+        - ByUri: Pass a full URL via -Uri (existing, backward compat)
+        - ByPath: Pass a relative path via -Path with a mandatory -Api selector.
+          The base URL is resolved from the azure_provider_apis table.
+          Optionally pass -SubscriptionId to loop over subscriptions and return
+          a hashtable keyed by subscription ID.
+
         Automatically follows pagination links (@odata.nextLink for Graph API,
         nextLink for ARM API) and streams all results to the pipeline.
         Use -Raw to bypass pagination and get the raw response object.
@@ -15,11 +22,21 @@ function Invoke-AzureApi {
         Use -ErrorAction Stop to throw terminating errors on non-success responses.
 
     .PARAMETER Uri
-        The full API URI to call.
+        The full API URI to call. Mutually exclusive with -Path.
+
+    .PARAMETER Path
+        A relative API path (e.g., '/users?$select=id,displayName'). Requires -Api.
+        Mutually exclusive with -Uri.
 
     .PARAMETER Api
         The API to target: ARM (Azure Resource Manager), Graph (Microsoft Graph),
-        or KeyVault (Key Vault data plane). If not specified, auto-detects from URI.
+        or KeyVault (Key Vault data plane). Required when using -Path; optional
+        with -Uri (auto-detects from URI).
+
+    .PARAMETER SubscriptionId
+        One or more subscription IDs. Only valid with -Path and -Api ARM.
+        Prepends /subscriptions/{id} to -Path and loops, returning a hashtable
+        keyed by subscription ID.
 
     .PARAMETER ResourceName
         A friendly name for the resource being loaded, used in verbose/warning messages.
@@ -42,31 +59,43 @@ function Invoke-AzureApi {
         Returns nothing on error (unless -ErrorAction Stop is specified).
         With -Raw, returns the first page's response object with StatusCode and
         Content properties (no automatic pagination).
+        With -SubscriptionId, returns a [hashtable] keyed by subscription ID.
 
     .EXAMPLE
         Invoke-AzureApi -Uri 'https://graph.microsoft.com/v1.0/users' -ResourceName 'Users'
 
     .EXAMPLE
-        Invoke-AzureApi -Uri $armUri -Api ARM -ResourceName 'KeyVaults'
+        Invoke-AzureApi -Api Graph -Path '/users?$select=id,displayName' -ResourceName 'Users'
+
+    .EXAMPLE
+        Invoke-AzureApi -Api ARM -Path '/providers/Microsoft.Security/pricings?api-version=2024-01-01' -SubscriptionId $subIds -ResourceName 'Pricings'
 
     .EXAMPLE
         # POST with body (e.g., Azure Resource Graph query)
-        Invoke-AzureApi -Uri $rgUri -Method POST -Body @{ query = 'Resources | limit 10'; subscriptions = @($subId) } -ResourceName 'Resource Graph'
+        Invoke-AzureApi -Uri $armUri -Method POST -Body @{ query = 'Resources | limit 10'; subscriptions = @($subId) } -ResourceName 'Resource Graph'
 
     .EXAMPLE
         # Throw on error instead of warning
         Invoke-AzureApi -Uri $uri -ResourceName 'Critical Resource' -ErrorAction Stop
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'ByUri')]
     [OutputType([PSObject])]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'ByUri')]
         [ValidateNotNullOrEmpty()]
         [string]$Uri,
 
-        [Parameter()]
+        [Parameter(Mandatory, ParameterSetName = 'ByPath')]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path,
+
+        [Parameter(ParameterSetName = 'ByUri')]
+        [Parameter(Mandatory, ParameterSetName = 'ByPath')]
         [ValidateSet('ARM', 'Graph', 'KeyVault')]
         [string]$Api,
+
+        [Parameter(ParameterSetName = 'ByPath')]
+        [string[]]$SubscriptionId,
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -90,6 +119,32 @@ function Invoke-AzureApi {
     $shouldThrow = $ErrorActionPreference -eq 'Stop'
 
     $ErrorActionPreference = 'Stop'
+
+    # --- Resolve URI from Path if using ByPath parameter set ---
+    if ($PSCmdlet.ParameterSetName -eq 'ByPath') {
+        $apiRecord = Get-CIEMAzureProviderApi -Name $Api
+        if (-not $apiRecord) {
+            $msg = "No API endpoint record found for '$Api' in azure_provider_apis table."
+            if ($shouldThrow) { throw $msg }
+            Write-Warning $msg
+            return
+        }
+        $baseUrl = $apiRecord.BaseUrl.TrimEnd('/')
+
+        if ($SubscriptionId) {
+            # Loop over subscriptions, return hashtable keyed by sub ID
+            $results = @{}
+            foreach ($subId in $SubscriptionId) {
+                $fullUri = "$baseUrl/subscriptions/$subId/$($Path.TrimStart('/'))"
+                $subResult = Invoke-AzureApi -Uri $fullUri -Api $Api -ResourceName "$ResourceName ($subId)" -Method $Method -Body $Body -Raw:$Raw
+                $results[$subId] = $subResult
+            }
+            return $results
+        }
+        else {
+            $Uri = "$baseUrl/$($Path.TrimStart('/'))"
+        }
+    }
 
     Write-Verbose "Loading $ResourceName..."
 
@@ -141,15 +196,18 @@ function Invoke-AzureApi {
         }
         catch [Microsoft.PowerShell.Commands.HttpResponseException] {
             $statusCode = [int]$_.Exception.Response.StatusCode
+            # Try to capture the error response body for diagnostics
+            $errorBody = $null
+            try { $errorBody = $_.ErrorDetails.Message } catch {}
             [PSCustomObject]@{
                 StatusCode = $statusCode
-                Content    = $null
+                Content    = $errorBody
             }
         }
         catch {
             [PSCustomObject]@{
-                StatusCode = 500
-                Content    = $null
+                StatusCode = 0
+                Content    = $_.Exception.Message
             }
         }
     }
@@ -236,8 +294,17 @@ function Invoke-AzureApi {
                 Write-Verbose $msg
                 $currentResponse = $null
             }
+            0 {
+                # Non-HTTP error (PowerShell exception, network error, etc.)
+                $detail = if ($currentResponse.Content) { $currentResponse.Content } else { 'Unknown error' }
+                $msg = "Failed to load $ResourceName - $detail"
+                if ($shouldThrow) { throw $msg }
+                Write-Warning $msg
+                $currentResponse = $null
+            }
             default {
-                $msg = "Failed to load $ResourceName - Status: $($currentResponse.StatusCode)"
+                $detail = if ($currentResponse.Content) { " - $($currentResponse.Content)" } else { '' }
+                $msg = "Failed to load $ResourceName - Status: $($currentResponse.StatusCode)$detail"
                 if ($shouldThrow) { throw $msg }
                 Write-Warning $msg
                 $currentResponse = $null
