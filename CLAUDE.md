@@ -111,37 +111,6 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 
 ---
 
-## Check Management Functions
-
-Development-only functions for managing CIEM checks, syncing Prowler checks, and provisioning Azure infrastructure. These are exported from the Checks module (`psu-app/modules/Devolutions.CIEM.Checks/`) and available after importing `Devolutions.CIEM`.
-
-### Prowler Sync & Check Management
-
-| Function | Purpose |
-|----------|---------|
-| `Sync-ProwlerCheck` | Sync Prowler checks from GitHub (sparse checkout) |
-| `Get-ProwlerCheck` | List/filter Prowler checks from the upstream repo |
-| `Enable-CIEMCheck` | Enable a check (set disabled flag to false) |
-| `Disable-CIEMCheck` | Disable a check (set disabled flag to true) |
-| `Compare-ProwlerCheck` | Diff upstream Prowler checks vs local CIEM checks |
-| `Convert-ProwlerCheck` | Convert a Prowler check directory to CIEM format |
-
-### Azure Infrastructure Provisioning
-
-| Function | Purpose |
-|----------|---------|
-| `New-CIEMAzureManagedIdentity` | Configure Azure managed identity with CIEM permissions |
-| `New-PSUAzureServicePrincipal` | Create Azure service principal for PSU |
-
-### When to Use
-
-- **Adding/removing/syncing checks:** `Sync-ProwlerCheck`, `Enable-CIEMCheck`, `Disable-CIEMCheck`
-- **Querying check metadata:** `Get-CIEMCheck -Provider Azure -Service Entra`
-- **Checking required permissions:** `Get-CIEMRequiredPermission -Service KeyVault`
-- **Provisioning Azure resources:** `New-CIEMAzureManagedIdentity`, `New-PSUAzureServicePrincipal`
-
----
-
 ## Testing Commands
 
 Use `Invoke-TestCommand` (from the `Devolutions.CIEM.Admin` module) to run PowerShell commands against the CIEM module. It handles PSU connection and credential loading automatically.
@@ -159,7 +128,7 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Invoke-TestCom
 | `local` | `Connect-PSU -Local` then `Invoke-PSUCommand` | Testing in local PSU context (default) |
 | `azure` | `Connect-PSU` then `Invoke-PSUCommand` | Testing against production PSU |
 
-**Always test before publishing.** Use `local` (default) for development, `azure` to validate in production.
+**Always test before publishing.** Use `local` (default) for development, `azure` to validate in production. Run `Invoke-TestCommand -ScriptBlock { ... }` to validate changes work inside PSU before publishing a new version. Do not use publish-debug-publish cycles.
 
 ---
 
@@ -247,148 +216,7 @@ curl -s https://devolutions-ciem-psu.azurewebsites.net/api/v1/alive | jq '.loadi
 
 On first access, PSU will prompt you to create an admin account. Navigate to the URL above and follow the setup wizard.
 
-### Azure Configuration
-
-The following environment variables are configured:
-
-- `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true` - Persistent storage for `/home`
-- `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` - Reverse proxy header handling
-- `Jwt__SigningKey` - Secure JWT signing key (auto-generated)
-- `Api__Url` - Set to the app's public URL
-- `NodeName` - Set to `devolutions-ciem-psu`
-
-### Infrastructure
-
-The Bicep template used for deployment is located at `_temp/psu-deploy.bicep`.
-
-To redeploy or update:
-
-```bash
-# Generate new JWT key and deploy
-JWT_KEY=$(openssl rand -base64 48 | tr -d '\n')
-az deployment group create \
-  --resource-group devolutions-ciem-rg \
-  --template-file _temp/psu-deploy.bicep \
-  --parameters jwtSigningKey="$JWT_KEY" servicePlanPricingTier="S1"
-```
-
-To update PSU version, modify the `version` parameter:
-
-```bash
-az deployment group create \
-  --resource-group devolutions-ciem-rg \
-  --template-file _temp/psu-deploy.bicep \
-  --parameters jwtSigningKey="$JWT_KEY" version="5.5.0"
-```
-
-### Management Commands
-
-```bash
-# Restart the app
-az webapp restart --resource-group devolutions-ciem-rg --name devolutions-ciem-psu
-
-# View app settings
-az webapp config appsettings list --resource-group devolutions-ciem-rg --name devolutions-ciem-psu
-
-# Delete all resources
-az group delete --name devolutions-ciem-rg --yes
-```
-
-### PSU File Manager
-
-Use `scripts/azure_psu_file_manager.sh` to access the PSU server filesystem. Supports `--local` for local PSU.
-
-```bash
-# Azure (default)
-./scripts/azure_psu_file_manager.sh list                    # Root (maps to /home)
-./scripts/azure_psu_file_manager.sh list Repository/Modules # PSU modules
-./scripts/azure_psu_file_manager.sh read Repository/.universal/apps.ps1
-./scripts/azure_psu_file_manager.sh exec "ls -la"
-
-# Local PSU
-./scripts/azure_psu_file_manager.sh --local list
-./scripts/azure_psu_file_manager.sh --local list Repository/Modules
-./scripts/azure_psu_file_manager.sh --local read Repository/.universal/dashboards.ps1
-```
-
-**Key PSU paths:**
-- `Repository/Modules/` - Installed PowerShell modules
-- `Repository/.universal/` - PSU configuration files
-- `Repository/dashboards/` - Dashboard definitions
-- `database.db` - PSU SQLite database
-- `LogFiles/` - Application logs
-
-**Note:** The `exec` command runs in the Kudu sidecar container (Debian), not the PSU container. Use `list` and `read` commands to inspect PSU files.
-
-### Azure Web App Logs
-
-Use the `azlogs` CLI tool (installed globally) to download and analyze Azure Web App logs (platform, container, application, Kudu). The original `scripts/azure_webapp_log_downloader/` was ported to this CLI.
-
-```bash
-# Download a full log package from Azure
-azlogs packages download --app devolutions-ciem-psu --resource-group devolutions-ciem-rg
-
-# List downloaded packages
-azlogs packages list
-
-# Parse and merge logs into searchable JSONL
-azlogs packages parse <package-name>
-
-# Search parsed entries
-azlogs entries list <package-name> --filter "level=ERROR"
-
-# Generate HTML report
-azlogs report generate <package-name>
-```
-
-### PSU Log Script
-
-Use `scripts/download-psu-logs.sh` to download logs. Supports `--local` for local PSU.
-
-```bash
-# Azure (default)
-./scripts/download-psu-logs.sh
-./scripts/download-psu-logs.sh my-logs.log
-
-# Local PSU
-./scripts/download-psu-logs.sh --local
-
-# Then search locally with grep
-grep -i "CIEM" psu-logs-*.log
-grep -i "error" psu-logs-*.log
-```
-
-**Log sources downloaded:**
-| Source | Content | Format |
-|--------|---------|--------|
-| Database | App-level logs (`[App-*]` messages) | `[timestamp] [Level] [App-Name] Message` |
-| Docker | Azure container stdout (ASP.NET Core) | Infrastructure logs |
-| API | PSU `/api/v1/log` endpoint | Infrastructure logs |
-
-**Note:** Database logs are the most useful for debugging app startup issues - they show `[App-Devolutions CIEM]` errors.
-
-### PSU Troubleshooting Script
-
-Use `scripts/invoke_command_in_azure_webapp.sh` for troubleshooting. Supports `--local` for local PSU.
-
-```bash
-# Azure (default)
-./scripts/invoke_command_in_azure_webapp.sh run "ls -la /home/Repository"
-./scripts/invoke_command_in_azure_webapp.sh preset health
-./scripts/invoke_command_in_azure_webapp.sh preset modules
-./scripts/invoke_command_in_azure_webapp.sh api "/api/v1/dashboard"
-
-# Local PSU
-./scripts/invoke_command_in_azure_webapp.sh --local preset health
-./scripts/invoke_command_in_azure_webapp.sh --local preset modules
-./scripts/invoke_command_in_azure_webapp.sh --local run "ls -la Repository"
-```
-
-**Architecture note:** Azure commands run in the Kudu sidecar container. Local commands run against the `local-psu/` directory.
-
-### Documentation
-
-Full PSU v5 documentation for Azure hosting is available at `docs/psu-docs/config/hosting/azure.md`.
+**Note:** Azure config, infrastructure, file manager, logs, and troubleshooting scripts are documented in `.claude/rules/azure-infra.md` (auto-loaded for `_temp/` and `scripts/` paths) and the psu-expert agent.
 
 ---
 
@@ -417,37 +245,6 @@ The architecture planning document is at `docs/devolutions-ciem-app-architecture
 | AD Support | Future (architected for extensibility) |
 | PAM Integration | Risk-to-PAM mapping (deeper than link to docs) |
 
----
 
-## Database CRUD Convention (MANDATORY)
 
-**Every database table MUST have a corresponding class and full CRUD functions.**
-
-### Required per table
-
-1. **Class** — In the owning module's `Classes/` directory. Properties match table columns (PascalCase).
-2. **New-CIEM[Azure]<Entity>** — INSERT. Fails if record exists. Returns created object.
-3. **Get-CIEM[Azure]<Entity>** — SELECT with optional filter parameters. Returns `[ClassName[]]`.
-4. **Update-CIEM[Azure]<Entity>** — UPDATE partial fields via `$PSBoundParameters.ContainsKey`. Supports `-PassThru`.
-5. **Save-CIEM[Azure]<Entity>** — INSERT OR REPLACE (upsert). Fire-and-forget for bulk operations.
-6. **Remove-CIEM[Azure]<Entity>** — DELETE with `SupportsShouldProcess`. Supports `-Id`, `-ProviderId` (bulk), and `-InputObject`.
-
-### Parameter set pattern
-
-Every write function (New/Update/Save/Remove) must have two parameter sets:
-- **ByProperties** — Individual typed parameters for each column
-- **InputObject** — Accepts `[ClassName[]]` (array) with `ValueFromPipeline` for pipeline and bulk support
-
-### Naming
-
-- Base module tables: `Verb-CIEM<Entity>` (e.g., `New-CIEMCheck`)
-- Azure module tables: `Verb-CIEMAzure<Entity>` (e.g., `New-CIEMAzureSecurityPrincipal`)
-- AWS module tables: `Verb-CIEMAWS<Entity>` (future)
-
-### When adding a new table
-
-1. Add schema to the appropriate `Data/*.sql` file
-2. Create the class in `Classes/`
-3. Create all 5 CRUD functions in `Public/`
-4. Add functions to the module's `.psd1` `FunctionsToExport`
-5. If the table is provider-specific collected data, integrate with the provider's `Save/Get-CIEMCollectedData`
+**Note:** Database CRUD convention is documented in `.claude/rules/crud-convention.md` (auto-loaded for `psu-app/` paths). Check management functions are in `.claude/rules/checks-management.md`.

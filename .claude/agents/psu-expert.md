@@ -30,6 +30,10 @@ grep -i "authentication" psu-logs-*.log
 - Docker logs: Azure container stdout (infrastructure)
 - API logs: PSU REST API logs
 
+## Module Manifest Conventions
+
+- **`FunctionsToExport = @('*')`** is the preferred pattern for this project. The psm1 handles explicit exports via `Export-ModuleMember`. Do NOT flag this as a best practice violation or suggest changing it to an explicit list.
+
 ## Documentation Reference
 
 PSU v5 documentation is available at: `docs/psu-docs/`
@@ -117,6 +121,60 @@ Use `scripts/invoke_command_in_azure_webapp.sh` for advanced troubleshooting:
 - Querying the PSU REST API
 - Investigating runtime issues that require API access
 
+## Connect-PSUServer vs Connect-PSU (CRITICAL)
+
+There are TWO different connection mechanisms:
+
+### Connect-PSUServer (Official PSU cmdlet from the `Universal` module)
+- Part of the `Universal` PowerShell module (installed separately: `Install-Module Universal`)
+- Sets connection state in a static .NET scope (process-wide) or runspace scope
+- **Required** for PSU cmdlets to work: `Get-PSUScript`, `Invoke-PSUScript`, `Get-PSUJob`, `Get-PSUApp`, etc.
+- Without calling this first, PSU cmdlets error: `"Specify a computer name or use the Connect-PSUServer command."`
+- Parameters: `-ComputerName` (URL, alias `-Url`), `-AppToken`, `-Credential`, `-UseDefaultCredentials`, `-Scope`
+- Scope: `Process` (default, static .NET) or `Runspace` (only current runspace)
+- Uses gRPC for communication (HTTP/2 with HTTPS, gRPC-Web fallback for HTTP)
+- Disconnect with `Disconnect-PSUServer`
+
+```powershell
+# External connection (from outside PSU)
+Connect-PSUServer -ComputerName http://localhost:5001 -AppToken 'token123'
+Get-PSUScript  # Now works without -ComputerName/-AppToken
+
+# Inside PSU (Integrated environment, Permissive/Integrated security model)
+Get-PSUScript -Integrated  # No credentials needed, uses backchannel
+```
+
+### Connect-PSU (Custom wrapper in Devolutions.CIEM.Admin)
+- Reads credentials from `.env` file (`LOCAL_PSU_URL`/`LOCAL_PSU_TOKEN` or `AZURE_PSU_URL`/`AZURE_PSU_TOKEN`)
+- Stores connection info in `$script:PSUConnection` for `Invoke-PSUCommand` (our custom REST executor)
+- Also calls `Connect-PSUServer` (if available) so PSU cmdlets work too
+- Use `-Local` flag for local PSU instance
+
+```powershell
+Import-Module ./Devolutions.CIEM.Admin
+Connect-PSU -Local          # Reads LOCAL_PSU_URL + LOCAL_PSU_TOKEN from .env, calls Connect-PSUServer
+Get-PSUScript               # Works because Connect-PSUServer was called under the hood
+Invoke-PSUCommand -ScriptBlock { Get-Module }  # Also works via our custom REST executor
+```
+
+### -Integrated Switch (Inside PSU Only)
+- Only works when code is running INSIDE a PSU process (Apps, Scripts, APIs, Schedules)
+- Uses internal backchannel TCP connection, bypasses HTTP API entirely
+- No credentials or URL needed
+- Requires PSU `SecurityModel` to be `Permissive` (default) or `Integrated`
+- Does NOT work from external PowerShell sessions (your terminal, CI/CD, etc.)
+
+### PSU SecurityModel Settings (appsettings.json or API__SecurityModel env var)
+- `Strict`: No `-Integrated` switch, user context required, external API only
+- `Permissive` (default): `-Integrated` allowed, user context passed when available
+- `Integrated`: All calls use backchannel, no user context, no auth needed
+
+### Script Registration with -Module -Command
+- `New-PSUScript -Module 'ModuleName' -Command 'CommandName'` exposes a module function as a PSU script
+- The module MUST be installed/available on the PSU server for this to work
+- Script name auto-derives as `ModuleName\CommandName` -- do NOT add `-Name` (parameter set conflict)
+- Config stored in `.universal/scripts.ps1`, loaded at PSU startup (requires restart for changes)
+
 ## CRITICAL: PSU Safety Rules
 
 - **NEVER modify PSU's database.db directly** via sqlite3 or any SQL tool. PSU manages its own
@@ -133,6 +191,14 @@ Use `scripts/invoke_command_in_azure_webapp.sh` for advanced troubleshooting:
 - `$JobId` is NOT an automatic PSU variable available in script context
 - When using `-Module`/`-Command` parameter set on `New-PSUScript`, do NOT add `-Name`
   (causes parameter set conflict). The name auto-derives as `ModuleName\CommandName`.
+
+## PSU Cache Safety
+
+- `Set-PSUCache -Value $null` throws — PSU rejects null values
+- Use `Set-PSUCache -Value @{} -Persist` to "clear" a cache key, or use `Remove-PSUCache`
+- Always use `-Integrated` flag for `Get-PSUCache`/`Set-PSUCache` when running inside PSU context (Apps, Scripts, Jobs)
+- Always use `-ErrorAction SilentlyContinue` on `Get-PSUCache` for keys that may not exist
+- `Invoke-PSUScript -Parameters @{...}` does NOT pass parameters to `-Module -Command` registered scripts — use PSU Cache to pass config between page and job
 
 ## Efficiency Rules
 

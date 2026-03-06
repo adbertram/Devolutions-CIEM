@@ -50,9 +50,18 @@ This publishes to PSGallery (auto-bumps version), verifies, then imports to Azur
 </step>
 </workflow>
 
+<step name="verify-restart" condition="after publish succeeds">
+Verify the publish output includes a successful app restart message. If the output does NOT confirm the app was restarted, run explicitly:
+```bash
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -Local; Restart-PSUApp -Name 'Devolutions CIEM' -Integrated"
+```
+For azure target, omit `-Local` from `Connect-PSU`.
+</step>
+
 <success_criteria>
 - PowerShell command completes without error
 - Module version and status reported to user
+- App restart confirmed (either from publish output or explicit restart step)
 - For azure: PSGallery URL provided
 </success_criteria>
 
