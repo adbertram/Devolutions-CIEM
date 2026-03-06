@@ -59,6 +59,21 @@ function New-CIEMScanRun {
 
     $ErrorActionPreference = 'Stop'
 
+    # PSU doesn't pass -Parameters to module command scripts, so read from cache
+    if (-not $Provider -and -not $CheckId -and -not $Service) {
+        $scanConfig = Get-PSUCache -Key $script:ScanConfigCacheKey -Integrated -ErrorAction SilentlyContinue
+        if ($scanConfig -and $scanConfig.Provider) {
+            $Provider      = $scanConfig.Provider
+            $CheckId       = $scanConfig.CheckId
+            $Service       = $scanConfig.Service
+            $IncludePassed = [switch]([bool]$scanConfig.IncludePassed)
+            Set-PSUCache -Key $script:ScanConfigCacheKey -Value @{} -Integrated -ErrorAction SilentlyContinue
+            Write-CIEMLog -Message "Loaded scan config from cache: Provider=[$($Provider -join ',')], CheckId=[$($CheckId -join ',')], Service=[$($Service -join ',')]" -Severity INFO -Component 'ScanRun'
+        }
+    }
+
+    Write-CIEMLog -Message "New-CIEMScanRun called: Provider=[$($Provider -join ',')], CheckId=[$($CheckId -join ',')], Service=[$($Service -join ',')], IncludePassed=$IncludePassed" -Severity INFO -Component 'ScanRun'
+
     # --- Resolve providers: default to all enabled when not specified ---
     if (-not $Provider -or $Provider.Count -eq 0) {
         $Provider = @(Get-CIEMProvider | Where-Object Enabled | Select-Object -ExpandProperty Name)

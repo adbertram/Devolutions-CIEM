@@ -19,7 +19,7 @@ function Get-CIEMCheck {
         Filter checks by severity level (critical, high, medium, low).
 
     .PARAMETER CheckId
-        Filter to a specific check by ID.
+        Filter to one or more checks by ID. Accepts a single string or an array.
 
     .OUTPUTS
         [PSCustomObject[]] Array of check objects with properties:
@@ -55,7 +55,7 @@ function Get-CIEMCheck {
         [string]$Severity,
 
         [Parameter()]
-        [string]$CheckId
+        [string[]]$CheckId
     )
 
     $ErrorActionPreference = 'Stop'
@@ -80,8 +80,17 @@ function Get-CIEMCheck {
     }
 
     if ($CheckId) {
-        $conditions += "id = @id"
-        $params.id = $CheckId
+        if ($CheckId.Count -eq 1) {
+            $conditions += "id = @id"
+            $params.id = $CheckId[0]
+        } else {
+            $placeholders = @()
+            for ($i = 0; $i -lt $CheckId.Count; $i++) {
+                $placeholders += "@id$i"
+                $params["id$i"] = $CheckId[$i]
+            }
+            $conditions += "id IN ($($placeholders -join ', '))"
+        }
     }
 
     $query = "SELECT * FROM checks"

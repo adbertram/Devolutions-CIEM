@@ -38,6 +38,7 @@ function Save-CIEMScanRun {
 
         $conn = Open-PSUSQLiteConnection -Database (Get-CIEMDatabasePath)
         try {
+            Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
             $tx = $conn.BeginTransaction()
 
             # Upsert scan run metadata
@@ -47,7 +48,7 @@ function Save-CIEMScanRun {
                 (([datetime]$ScanRun.EndTime) - ([datetime]$ScanRun.StartTime)).TotalSeconds
             } else { $null }
 
-            Invoke-PSUSQLiteQuery -Connection $conn -Query @"
+            Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query @"
 INSERT OR REPLACE INTO scan_runs (id, provider_id, status, resource_filter, resource_providers, include_passed,
     started_at, completed_at, duration_seconds, total_results, failed_results, passed_results, skipped_results, manual_results, error_message)
 VALUES (@id, @provider_id, @status, @resource_filter, @resource_providers, @include_passed,
@@ -73,13 +74,13 @@ VALUES (@id, @provider_id, @status, @resource_filter, @resource_providers, @incl
             # Insert scan results (if present)
             if ($ScanRun.ScanResults -and $ScanRun.ScanResults.Count -gt 0) {
                 # Delete existing results for this run (for upsert behavior)
-                Invoke-PSUSQLiteQuery -Connection $conn -Query "DELETE FROM scan_results WHERE scan_run_id = @id" -Parameters @{ id = $ScanRun.Id } -AsNonQuery | Out-Null
+                Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query "DELETE FROM scan_results WHERE scan_run_id = @id" -Parameters @{ id = $ScanRun.Id } -AsNonQuery | Out-Null
 
                 foreach ($result in $ScanRun.ScanResults) {
                     $checkId = if ($result.Check.Id) { $result.Check.Id } else { $result.Check.id }
                     if (-not $checkId) { continue }
 
-                    Invoke-PSUSQLiteQuery -Connection $conn -Query @"
+                    Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query @"
 INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
 VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resource_name, @location)
 "@ -Parameters @{

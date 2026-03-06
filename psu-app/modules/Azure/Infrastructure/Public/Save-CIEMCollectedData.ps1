@@ -68,9 +68,9 @@ function Save-CIEMCollectedData {
         return
     }
 
+    # Clear previous collected data for this provider (leaf tables first).
+    # CASCADE handles group_memberships and role_definition_permissions automatically.
     try {
-        # Clear previous collected data for this provider (leaf tables first).
-        # CASCADE handles group_memberships and role_definition_permissions automatically.
         Remove-CIEMAzureAppRoleAssignment -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
         Remove-CIEMAzureDirectoryRoleAssignment -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
         Remove-CIEMAzureRoleAssignment -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
@@ -78,11 +78,14 @@ function Save-CIEMCollectedData {
         Remove-CIEMAzureRoleDefinition -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
         Remove-CIEMAzureResource -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
         Remove-CIEMAzureSecurityPrincipal -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
+        Remove-CIEMAzureServiceData -ProviderId $ProviderId -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to clear previous data: $($_.Exception.Message)"
+    }
 
-        # Clear azure_service_data for this provider (Defender, Monitor, Network, Policy, Vm)
-        Invoke-CIEMQuery -Query "DELETE FROM azure_service_data WHERE provider_id = @id" -Parameters @{ id = $ProviderId } -AsNonQuery | Out-Null
-
-        # --- Entra Data ---
+    # --- Entra Data ---
+    try {
         if ($EntraData) {
             # Users → azure_security_principals
             if ($EntraData.Users) {
@@ -169,7 +172,12 @@ function Save-CIEMCollectedData {
             }
         }
 
-        # --- IAM Data (keyed by subscription) ---
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist Entra data: $($_.Exception.Message)"
+    }
+
+    # --- IAM Data (keyed by subscription) ---
+    try {
         if ($IAMData) {
             foreach ($subscriptionId in $IAMData.Keys) {
                 $subData = $IAMData[$subscriptionId]
@@ -219,7 +227,12 @@ function Save-CIEMCollectedData {
             }
         }
 
-        # --- Defender Data (keyed by subscription) ---
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist IAM data: $($_.Exception.Message)"
+    }
+
+    # --- Defender Data (keyed by subscription) ---
+    try {
         if ($DefenderData) {
             foreach ($subscriptionId in $DefenderData.Keys) {
                 $sub = $DefenderData[$subscriptionId]
@@ -274,7 +287,12 @@ function Save-CIEMCollectedData {
             }
         }
 
-        # --- Monitor Data (keyed by subscription) ---
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist Defender data: $($_.Exception.Message)"
+    }
+
+    # --- Monitor Data (keyed by subscription) ---
+    try {
         if ($MonitorData) {
             foreach ($subscriptionId in $MonitorData.Keys) {
                 $sub = $MonitorData[$subscriptionId]
@@ -300,7 +318,12 @@ function Save-CIEMCollectedData {
             }
         }
 
-        # --- Network Data (keyed by subscription) ---
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist Monitor data: $($_.Exception.Message)"
+    }
+
+    # --- Network Data (keyed by subscription) ---
+    try {
         if ($NetworkData) {
             foreach ($subscriptionId in $NetworkData.Keys) {
                 $sub = $NetworkData[$subscriptionId]
@@ -357,7 +380,12 @@ function Save-CIEMCollectedData {
             }
         }
 
-        # --- Policy Data (keyed by subscription) ---
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist Network data: $($_.Exception.Message)"
+    }
+
+    # --- Policy Data (keyed by subscription) ---
+    try {
         if ($PolicyData) {
             foreach ($subscriptionId in $PolicyData.Keys) {
                 $sub = $PolicyData[$subscriptionId]
@@ -375,7 +403,12 @@ function Save-CIEMCollectedData {
             }
         }
 
-        # --- Vm Data (keyed by subscription) ---
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist Policy data: $($_.Exception.Message)"
+    }
+
+    # --- Vm Data (keyed by subscription) ---
+    try {
         if ($VmData) {
             foreach ($subscriptionId in $VmData.Keys) {
                 $sub = $VmData[$subscriptionId]
@@ -432,9 +465,9 @@ function Save-CIEMCollectedData {
             }
         }
 
-        Write-Verbose "Save-CIEMCollectedData: Persisted collected data for provider '$ProviderId'"
+    } catch {
+        Write-Warning "Save-CIEMCollectedData: Failed to persist Vm data: $($_.Exception.Message)"
     }
-    catch {
-        Write-Warning "Save-CIEMCollectedData: Failed to persist: $($_.Exception.Message)"
-    }
+
+    Write-Verbose "Save-CIEMCollectedData: Persisted collected data for provider '$ProviderId'"
 }

@@ -44,6 +44,8 @@ function Invoke-CIEMScan {
 
     $ErrorActionPreference = 'Stop'
 
+    Write-CIEMLog -Message "Invoke-CIEMScan called: Provider=[$($Provider -join ',')], CheckId=[$($CheckId -join ',')], Service=[$($Service -join ',')]" -Severity INFO -Component 'Scan'
+
     $providerCount = $Provider.Count
     $progressActivity = "CIEM Scan ($($Provider -join ', '))"
 
@@ -78,20 +80,103 @@ function Invoke-CIEMScan {
 
         Write-Verbose "[$providerName] Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
 
-        # Determine services for this provider
-        $thisProviderServices = @(Get-CIEMProviderService -Provider $providerName | Select-Object -ExpandProperty Name)
-        $servicesToInit = @(if ($Service) {
-            $Service | Where-Object { $_ -in $thisProviderServices }
-        } else {
-            $thisProviderServices
-        })
+        # --- Check discovery first: determine what will run before fetching any data ---
+        # Filesystem-first: scripts on disk are the authority for which checks exist.
+        # DB provides metadata (title, severity, description, remediation, permissions).
+        $providerModuleRoot = switch ($providerName) {
+            'Azure' { Join-Path $script:ModuleRoot 'modules/Azure' }
+            'AWS'   { Join-Path $script:ModuleRoot 'modules/AWS' }
+            default { $null }
+        }
+        $checkScriptsPath = if ($providerModuleRoot) { Join-Path $providerModuleRoot 'Checks' } else { $null }
+        $checkScripts     = Get-ChildItem -Path "$checkScriptsPath/*.ps1" -ErrorAction SilentlyContinue
 
-        if ($servicesToInit.Count -eq 0) {
-            Write-Verbose "[$providerName] No matching services for the requested filter; skipping provider."
+        if (-not $checkScripts -or $checkScripts.Count -eq 0) {
+            Write-Warning "[$providerName] No check scripts found in $checkScriptsPath — skipping provider."
             continue
         }
 
-        # Initialize services for this provider
+        # Dot-source all check scripts (loads function definitions — fast, no API calls)
+        foreach ($scriptFile in $checkScripts) { . $scriptFile.FullName }
+
+        # Load DB metadata and build lookup by script filename
+        $dbChecks = @(Get-CIEMCheck -Provider $providerName)
+        $dbChecksByScript = @{}
+        foreach ($dbCheck in $dbChecks) {
+            if ($dbCheck.CheckScript) {
+                $dbChecksByScript[$dbCheck.CheckScript] = $dbCheck
+            }
+        }
+
+        # Build execution list from filesystem scripts, enriched with DB metadata
+        $checks = [System.Collections.Generic.List[object]]::new()
+        foreach ($scriptFile in $checkScripts) {
+            $fileName     = $scriptFile.Name                          # e.g. Test-EntraSecurityDefaults.ps1
+            $functionName = $fileName -replace '\.ps1$', ''           # e.g. Test-EntraSecurityDefaults
+
+            # Look up DB metadata by filename
+            $dbCheck = $dbChecksByScript[$fileName]
+
+            if ($dbCheck) {
+                # DB entry exists — use it (includes id, service, severity, title, etc.)
+                $check = $dbCheck
+            } else {
+                # No DB entry — derive minimal metadata from filename conventions
+                $derivedId = ($functionName -creplace '([a-z])([A-Z])', '$1_$2' -creplace '([A-Z]+)([A-Z][a-z])', '$1_$2').ToLower() -replace '-', '_'
+                $derivedTitle = ($functionName -replace '^Test-', '') -creplace '([a-z])([A-Z])', '$1 $2' -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
+                $derivedService = if ($functionName -match '^Test-([A-Z][a-z]+)') { $Matches[1] } else { 'Unknown' }
+
+                $check = [CIEMCheck]@{
+                    Id          = $derivedId
+                    Provider    = $providerName
+                    Service     = $derivedService
+                    Title       = $derivedTitle
+                    Severity    = [CIEMCheckSeverity]::medium
+                    CheckScript = $fileName
+                    Disabled    = $false
+                }
+                Write-Verbose "[$providerName] No DB metadata for $fileName — using derived defaults (service=$derivedService)"
+                # Persist derived check to DB so scan_results FK constraint is satisfied
+                Save-CIEMCheck -InputObject $check
+            }
+
+            # Apply filters
+            if ($CheckId) {
+                if ($CheckId -notcontains $check.Id) { continue }
+            }
+            if ($Service) {
+                if ($Service -notcontains $check.Service.ToString()) { continue }
+            }
+            if ($check.Disabled) {
+                Write-Verbose "[$providerName] Skipping disabled check: $($check.Id)"
+                continue
+            }
+
+            # Verify the function actually loaded
+            if (-not (Get-Command -Name $functionName -ErrorAction SilentlyContinue)) {
+                Write-Warning "[$providerName] Script $fileName dot-sourced but function $functionName not found — skipping"
+                continue
+            }
+
+            $checks.Add($check)
+        }
+
+        if ($checks.Count -eq 0) {
+            Write-Verbose "[$providerName] No checks to execute after filtering; skipping provider."
+            continue
+        }
+
+        Write-Verbose "[$providerName] Checks to execute: $($checks.Count) (from $($checkScripts.Count) scripts, $($dbChecks.Count) DB entries)"
+
+        # Derive required services from the checks that will actually run (+ their DependsOn)
+        $servicesToInit = @(
+            @($checks | ForEach-Object { $_.Service.ToString() }) +
+            @($checks | Where-Object { $_.DependsOn } | ForEach-Object { $_.DependsOn }) |
+            Select-Object -Unique
+        )
+        Write-Verbose "[$providerName] Services to initialize (derived from checks): $($servicesToInit -join ', ')"
+
+        # Initialize only the services needed by the filtered checks
         $providerObj        = Get-CIEMProvider -Name $providerName
         $serviceCacheLookup = @{}
         $statusText         = "Scanning $providerName... ($providerIdx of $providerCount providers)"
@@ -142,7 +227,6 @@ function Invoke-CIEMScan {
                 }
             }
             'AWS' {
-                # AWS has no Services/*.ps1 beyond stubs — stub pattern retained until AWS service functions exist
                 $sw = [Diagnostics.Stopwatch]::new()
                 foreach ($svcName in $servicesToInit) {
                     $sw.Restart()
@@ -198,14 +282,12 @@ function Invoke-CIEMScan {
             }
         }
 
-        # Build identity-to-resource relationship graph (if Graph module is available)
-        if (Get-Module -ListAvailable -Name 'Devolutions.CIEM.Identities' -ErrorAction SilentlyContinue) {
+        # Build identity-to-resource relationship graph (only if Entra/IAM checks need it)
+        if (Get-Command -Name 'New-CIEMGraph' -ErrorAction SilentlyContinue) {
             try {
-                Import-Module Devolutions.CIEM.Identities -ErrorAction Stop
-
-                if ($entraCache -and $entraCache.Success) {
-                    $graphEntraData = $entraCache.CacheData
-                    $graphIAMData = if ($iamCache -and $iamCache.Success) { $iamCache.CacheData } else { @{} }
+                if ($serviceCacheLookup.ContainsKey('Entra') -and $serviceCacheLookup['Entra'].Success) {
+                    $graphEntraData = $serviceCacheLookup['Entra'].CacheData
+                    $graphIAMData = if ($serviceCacheLookup.ContainsKey('IAM') -and $serviceCacheLookup['IAM'].Success) { $serviceCacheLookup['IAM'].CacheData } else { @{} }
 
                     Write-Verbose "[$providerName] Building identity relationship graph..."
                     $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -232,86 +314,6 @@ function Invoke-CIEMScan {
                 Write-Warning "[$providerName] Graph build failed (non-fatal): $($_.Exception.Message)"
             }
         }
-
-        # Filesystem-first check discovery: scripts on disk are the authority for which checks exist.
-        # DB provides metadata (title, severity, description, remediation, permissions).
-        $providerModuleRoot = switch ($providerName) {
-            'Azure' { Join-Path $script:ModuleRoot 'modules/Azure' }
-            'AWS'   { Join-Path $script:ModuleRoot 'modules/AWS' }
-            default { $null }
-        }
-        $checkScriptsPath = if ($providerModuleRoot) { Join-Path $providerModuleRoot 'Checks' } else { $null }
-        $checkScripts     = Get-ChildItem -Path "$checkScriptsPath/*.ps1" -ErrorAction SilentlyContinue
-
-        if (-not $checkScripts -or $checkScripts.Count -eq 0) {
-            Write-Warning "[$providerName] No check scripts found in $checkScriptsPath — skipping provider."
-            continue
-        }
-
-        # Dot-source all check scripts
-        foreach ($scriptFile in $checkScripts) { . $scriptFile.FullName }
-
-        # Load DB metadata and build lookup by script filename
-        $dbChecks = @(Get-CIEMCheck -Provider $providerName)
-        $dbChecksByScript = @{}
-        foreach ($dbCheck in $dbChecks) {
-            if ($dbCheck.CheckScript) {
-                $dbChecksByScript[$dbCheck.CheckScript] = $dbCheck
-            }
-        }
-
-        # Build execution list from filesystem scripts, enriched with DB metadata
-        $checks = [System.Collections.Generic.List[CIEMCheck]]::new()
-        foreach ($scriptFile in $checkScripts) {
-            $fileName     = $scriptFile.Name                          # e.g. Test-EntraSecurityDefaults.ps1
-            $functionName = $fileName -replace '\.ps1$', ''           # e.g. Test-EntraSecurityDefaults
-
-            # Look up DB metadata by filename
-            $dbCheck = $dbChecksByScript[$fileName]
-
-            if ($dbCheck) {
-                # DB entry exists — use it (includes id, service, severity, title, etc.)
-                $check = $dbCheck
-            } else {
-                # No DB entry — derive minimal metadata from filename conventions
-                $derivedId = ($functionName -creplace '([a-z])([A-Z])', '$1_$2' -creplace '([A-Z]+)([A-Z][a-z])', '$1_$2').ToLower() -replace '-', '_'
-                $derivedTitle = ($functionName -replace '^Test-', '') -creplace '([a-z])([A-Z])', '$1 $2' -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
-                $derivedService = if ($functionName -match '^Test-([A-Z][a-z]+)') { $Matches[1] } else { 'Unknown' }
-
-                $check = [CIEMCheck]@{
-                    Id          = $derivedId
-                    Provider    = $providerName
-                    Service     = $derivedService
-                    Title       = $derivedTitle
-                    Severity    = [CIEMCheckSeverity]::medium
-                    CheckScript = $fileName
-                    Disabled    = $false
-                }
-                Write-Verbose "[$providerName] No DB metadata for $fileName — using derived defaults (service=$derivedService)"
-            }
-
-            # Apply filters
-            if ($CheckId) {
-                if ($CheckId -notcontains $check.Id) { continue }
-            }
-            if ($Service) {
-                if ($Service -notcontains $check.Service.ToString()) { continue }
-            }
-            if ($check.Disabled) {
-                Write-Verbose "[$providerName] Skipping disabled check: $($check.Id)"
-                continue
-            }
-
-            # Verify the function actually loaded
-            if (-not (Get-Command -Name $functionName -ErrorAction SilentlyContinue)) {
-                Write-Warning "[$providerName] Script $fileName dot-sourced but function $functionName not found — skipping"
-                continue
-            }
-
-            $checks.Add($check)
-        }
-
-        Write-Verbose "[$providerName] Checks to execute: $($checks.Count) (from $($checkScripts.Count) scripts, $($dbChecks.Count) DB entries)"
 
         # Execute checks and emit findings to pipeline
         $checkIndex  = 0

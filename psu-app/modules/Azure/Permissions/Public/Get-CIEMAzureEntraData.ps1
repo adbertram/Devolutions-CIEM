@@ -6,8 +6,6 @@ function Get-CIEMAzureEntraData {
         Fetches comprehensive Entra ID data including users, groups, service principals,
         applications, directory roles, conditional access policies, and more.
         This function is tenant-scoped and does not require subscription IDs.
-    .PARAMETER Api
-        Optional CIEMAzureProviderApi object for future API routing. Currently unused.
     .OUTPUTS
         [hashtable] - Contains Users, Groups, ServicePrincipals, Applications, DirectoryRoles,
         DirectoryRoleMembers, GroupMembers, GroupOwners, ConditionalAccessPolicies, etc.
@@ -16,18 +14,13 @@ function Get-CIEMAzureEntraData {
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
-    param(
-        [Parameter()]
-        [CIEMAzureProviderApi]$Api
-    )
+    param()
 
     $ErrorActionPreference = 'Stop'
 
     # Comprehensive Graph API error patterns for catch blocks
     $graphPermissionErrors = 'Access denied|missing permissions|403|Forbidden|Authorization_RequestDenied|Insufficient privileges|InvalidAuthenticationToken|Authentication_MissingOrMalformed|Unauthorized'
     $graphLicenseErrors = 'RequestFromNonPremiumTenantOrB2CTenant|premium license|premium subscription'
-
-    $graphApiBase = (Get-CIEMProvider -Name 'Azure').Endpoints.graphApi
 
     # Initialize service hashtable
     $data = @{
@@ -50,9 +43,8 @@ function Get-CIEMAzureEntraData {
 
     # Load paginated resources
     Write-CIEMLog -Severity DEBUG -Message "Loading users..."
-    $usersUri = "$graphApiBase/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType,department,jobTitle&`$expand=manager(`$select=id)"
     try {
-        $data.Users = @(Invoke-AzureApi -Uri $usersUri -ResourceName "Users")
+        $data.Users = @(Invoke-AzureApi -Api Graph -Path "users?`$select=id,displayName,userPrincipalName,accountEnabled,userType,department,jobTitle&`$expand=manager(`$select=id)" -ResourceName "Users")
     }
     catch {
         if ($_.Exception.Message -match $graphPermissionErrors) {
@@ -66,9 +58,8 @@ function Get-CIEMAzureEntraData {
 
     # Load user MFA status - requires Azure AD Premium P1/P2 license
     Write-CIEMLog -Severity DEBUG -Message "Loading user MFA status..."
-    $mfaUri = "$graphApiBase/reports/authenticationMethods/userRegistrationDetails"
     try {
-        $data.UserMFAStatus = @(Invoke-AzureApi -Uri $mfaUri -ResourceName "UserMFAStatus")
+        $data.UserMFAStatus = @(Invoke-AzureApi -Api Graph -Path "reports/authenticationMethods/userRegistrationDetails" -ResourceName "UserMFAStatus")
     }
     catch {
         if ($_.Exception.Message -match "$graphLicenseErrors|$graphPermissionErrors") {
@@ -93,7 +84,8 @@ function Get-CIEMAzureEntraData {
 
     foreach ($endpoint in $apiEndpoints.GetEnumerator()) {
         $params = @{
-            Uri          = "$graphApiBase/$($endpoint.Value.Path)"
+            Api          = 'Graph'
+            Path         = $endpoint.Value.Path
             ResourceName = $endpoint.Key
         }
         try {
@@ -119,29 +111,24 @@ function Get-CIEMAzureEntraData {
     if ($data.DirectoryRoles) {
         foreach ($role in $data.DirectoryRoles) {
             $params = @{
-                Uri          = "$graphApiBase/directoryRoles/$($role.id)/members"
+                Api          = 'Graph'
+                Path         = "directoryRoles/$($role.id)/members"
                 ResourceName = "DirectoryRole Members ($($role.displayName))"
             }
             try {
                 $data.DirectoryRoleMembers[$role.id] = Invoke-AzureApi @params
             }
             catch {
-                if ($_.Exception.Message -match $graphPermissionErrors) {
-                    Write-CIEMLog -Severity WARNING -Message "DirectoryRole Members ($($role.displayName)) unavailable - missing permissions. Role member checks may be incomplete."
-                    $data.DirectoryRoleMembers[$role.id] = $null
-                }
-                else {
-                    throw
-                }
+                Write-CIEMLog -Severity WARNING -Message "DirectoryRole Members ($($role.displayName)) unavailable - $($_.Exception.Message)"
+                $data.DirectoryRoleMembers[$role.id] = $null
             }
         }
     }
 
     # Load groups
     Write-CIEMLog -Severity DEBUG -Message "Loading groups..."
-    $groupsUri = "$graphApiBase/groups?`$select=id,displayName,securityEnabled,isAssignableToRole,groupTypes,visibility"
     try {
-        $data.Groups = @(Invoke-AzureApi -Uri $groupsUri -ResourceName "Groups")
+        $data.Groups = @(Invoke-AzureApi -Api Graph -Path "groups?`$select=id,displayName,securityEnabled,isAssignableToRole,groupTypes,visibility" -ResourceName "Groups")
     }
     catch {
         if ($_.Exception.Message -match $graphPermissionErrors) {
@@ -163,14 +150,11 @@ function Get-CIEMAzureEntraData {
                 Write-CIEMLog -Severity DEBUG -Message "Loading group members: $groupIdx of $groupCount..."
             }
             try {
-                $data.GroupMembers[$group.id] = @(Invoke-AzureApi -Uri "$graphApiBase/groups/$($group.id)/members?`$select=id,displayName,userPrincipalName,`@odata.type" -ResourceName "Group Members ($($group.displayName))")
+                $data.GroupMembers[$group.id] = @(Invoke-AzureApi -Api Graph -Path "groups/$($group.id)/members" -ResourceName "Group Members ($($group.displayName))")
             }
             catch {
-                if ($_.Exception.Message -match $graphPermissionErrors) {
-                    Write-CIEMLog -Severity WARNING -Message "Group Members ($($group.displayName)) unavailable - missing permissions."
-                    $data.GroupMembers[$group.id] = $null
-                }
-                else { throw }
+                Write-CIEMLog -Severity WARNING -Message "Group Members ($($group.displayName)) unavailable - $($_.Exception.Message)"
+                $data.GroupMembers[$group.id] = $null
             }
         }
     }
@@ -187,23 +171,19 @@ function Get-CIEMAzureEntraData {
                 Write-CIEMLog -Severity DEBUG -Message "Loading group owners: $groupIdx of $groupCount..."
             }
             try {
-                $data.GroupOwners[$group.id] = @(Invoke-AzureApi -Uri "$graphApiBase/groups/$($group.id)/owners?`$select=id,displayName,userPrincipalName,`@odata.type" -ResourceName "Group Owners ($($group.displayName))")
+                $data.GroupOwners[$group.id] = @(Invoke-AzureApi -Api Graph -Path "groups/$($group.id)/owners" -ResourceName "Group Owners ($($group.displayName))")
             }
             catch {
-                if ($_.Exception.Message -match $graphPermissionErrors) {
-                    Write-CIEMLog -Severity WARNING -Message "Group Owners ($($group.displayName)) unavailable - missing permissions."
-                    $data.GroupOwners[$group.id] = $null
-                }
-                else { throw }
+                Write-CIEMLog -Severity WARNING -Message "Group Owners ($($group.displayName)) unavailable - $($_.Exception.Message)"
+                $data.GroupOwners[$group.id] = $null
             }
         }
     }
 
     # Load service principals
     Write-CIEMLog -Severity DEBUG -Message "Loading service principals..."
-    $spUri = "$graphApiBase/servicePrincipals?`$select=id,appId,displayName,servicePrincipalType,accountEnabled,signInAudience,tags"
     try {
-        $data.ServicePrincipals = @(Invoke-AzureApi -Uri $spUri -ResourceName "ServicePrincipals")
+        $data.ServicePrincipals = @(Invoke-AzureApi -Api Graph -Path "servicePrincipals?`$select=id,appId,displayName,servicePrincipalType,accountEnabled,signInAudience,tags" -ResourceName "ServicePrincipals")
     }
     catch {
         if ($_.Exception.Message -match $graphPermissionErrors) {
@@ -215,9 +195,8 @@ function Get-CIEMAzureEntraData {
 
     # Load applications
     Write-CIEMLog -Severity DEBUG -Message "Loading applications..."
-    $appsUri = "$graphApiBase/applications?`$select=id,appId,displayName,publisherDomain,signInAudience"
     try {
-        $data.Applications = @(Invoke-AzureApi -Uri $appsUri -ResourceName "Applications")
+        $data.Applications = @(Invoke-AzureApi -Api Graph -Path "applications?`$select=id,appId,displayName,publisherDomain,signInAudience" -ResourceName "Applications")
     }
     catch {
         if ($_.Exception.Message -match $graphPermissionErrors) {
@@ -239,17 +218,14 @@ function Get-CIEMAzureEntraData {
                 Write-CIEMLog -Severity DEBUG -Message "Loading app role assignments: $spIdx of $spCount..."
             }
             try {
-                $assignments = @(Invoke-AzureApi -Uri "$graphApiBase/servicePrincipals/$($sp.id)/appRoleAssignedTo" -ResourceName "AppRoleAssignments ($($sp.displayName))")
+                $assignments = @(Invoke-AzureApi -Api Graph -Path "servicePrincipals/$($sp.id)/appRoleAssignedTo" -ResourceName "AppRoleAssignments ($($sp.displayName))")
                 if ($assignments.Count -gt 0) {
                     $data.AppRoleAssignments[$sp.id] = $assignments
                 }
             }
             catch {
-                if ($_.Exception.Message -match $graphPermissionErrors) {
-                    Write-CIEMLog -Severity WARNING -Message "AppRoleAssignments ($($sp.displayName)) unavailable - missing permissions."
-                    $data.AppRoleAssignments[$sp.id] = $null
-                }
-                else { throw }
+                Write-CIEMLog -Severity WARNING -Message "AppRoleAssignments ($($sp.displayName)) unavailable - $($_.Exception.Message)"
+                $data.AppRoleAssignments[$sp.id] = $null
             }
         }
     }

@@ -9,9 +9,6 @@ function Get-CIEMAzurePolicyData {
         hashtable keyed by subscription ID, where each value contains a nested
         hashtable of PolicyAssignments indexed by assignment name.
 
-    .PARAMETER Api
-        Reserved for future use. Accepted but not used by this function.
-
     .OUTPUTS
         [hashtable]
         A hashtable keyed by subscription ID. Each entry contains:
@@ -23,26 +20,23 @@ function Get-CIEMAzurePolicyData {
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
-    param(
-        [Parameter()]
-        [CIEMAzureProviderApi]$Api
-    )
+    param()
 
     $ErrorActionPreference = 'Stop'
 
-    Invoke-CIEMAzurePerSubscription -ServiceName 'Policy' -ScriptBlock {
-        param($subscriptionId, $armApiBase)
+    $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
+    $data = @{}
+
+    foreach ($subscriptionId in $subscriptionIds) {
+        Write-CIEMLog -Severity DEBUG -Message "Loading Policy resources for subscription: $subscriptionId"
 
         $subData = @{
             PolicyAssignments = @{}
         }
 
         # --- Policy Assignments ---
-        $params = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Authorization/policyAssignments?api-version=2022-06-01"
-            ResourceName = "Policy Assignments ($subscriptionId)"
-        }
-        $assignments = Invoke-AzureApi @params
+        $assignments = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Authorization/policyAssignments?api-version=2022-06-01" -SubscriptionId $subscriptionId -ResourceName "Policy Assignments"
+        $assignments = $assignments[$subscriptionId]
 
         if ($assignments) {
             foreach ($assignment in $assignments) {
@@ -64,6 +58,8 @@ function Get-CIEMAzurePolicyData {
             Write-CIEMLog -Severity DEBUG -Message "No Policy Assignments found in subscription $subscriptionId"
         }
 
-        $subData
+        $data[$subscriptionId] = $subData
     }
+
+    $data
 }

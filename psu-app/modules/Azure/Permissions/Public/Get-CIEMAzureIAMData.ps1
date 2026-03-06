@@ -6,8 +6,6 @@ function Get-CIEMAzureIAMData {
         Fetches role definitions, custom roles, and role assignments for all subscriptions
         in the current authentication context. Subscription IDs are derived from
         Get-CIEMAzureAuthContext.
-    .PARAMETER Api
-        Optional CIEMAzureProviderApi object for future API routing. Currently unused.
     .OUTPUTS
         [hashtable] - Keyed by subscription ID, each containing RoleDefinitions,
         CustomRoles, and RoleAssignments.
@@ -16,10 +14,7 @@ function Get-CIEMAzureIAMData {
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
-    param(
-        [Parameter()]
-        [CIEMAzureProviderApi]$Api
-    )
+    param()
 
     $ErrorActionPreference = 'Stop'
 
@@ -34,8 +29,6 @@ function Get-CIEMAzureIAMData {
         return $data
     }
 
-    $armApiBase = (Get-CIEMProvider -Name 'Azure').Endpoints.armApi
-
     foreach ($subscriptionId in $subscriptionIds) {
         Write-CIEMLog -Severity DEBUG -Message "Loading IAM resources for subscription: $subscriptionId"
 
@@ -46,18 +39,14 @@ function Get-CIEMAzureIAMData {
         }
 
         # Define ARM API endpoints for this subscription
-        $subBase = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Authorization"
         $apiEndpoints = @{
-            RoleDefinitions = "$subBase/roleDefinitions?api-version=2022-04-01"
-            RoleAssignments = "$subBase/roleAssignments?api-version=2022-04-01"
+            RoleDefinitions = "providers/Microsoft.Authorization/roleDefinitions?api-version=2022-04-01"
+            RoleAssignments = "providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01"
         }
 
         foreach ($endpoint in $apiEndpoints.GetEnumerator()) {
-            $params = @{
-                Uri          = $endpoint.Value
-                ResourceName = "$($endpoint.Key) ($subscriptionId)"
-            }
-            $data[$subscriptionId][$endpoint.Key] = Invoke-AzureApi @params
+            $result = Invoke-AzureApi -Api ARM -Path $endpoint.Value -SubscriptionId $subscriptionId -ResourceName $endpoint.Key
+            $data[$subscriptionId][$endpoint.Key] = $result[$subscriptionId]
         }
 
         # Filter custom roles from role definitions

@@ -12,11 +12,6 @@ function Get-CIEMAzureNetworkData {
         with keys: NetworkSecurityGroups, PublicIpAddresses, BastionHosts,
         NetworkWatchers, and FlowLogs.
 
-    .PARAMETER Api
-        The CIEMAzureProviderApi context object. Accepted for pipeline/parameter
-        consistency but not used internally; subscription IDs are derived from the
-        active CIEM runtime auth context.
-
     .OUTPUTS
         [hashtable]
         A hashtable keyed by subscription ID. Each entry contains:
@@ -32,15 +27,15 @@ function Get-CIEMAzureNetworkData {
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
-    param(
-        [Parameter()]
-        [CIEMAzureProviderApi]$Api
-    )
+    param()
 
     $ErrorActionPreference = 'Stop'
 
-    Invoke-CIEMAzurePerSubscription -ServiceName 'Network' -ScriptBlock {
-        param($subscriptionId, $armApiBase)
+    $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
+    $data = @{}
+
+    foreach ($subscriptionId in $subscriptionIds) {
+        Write-CIEMLog -Severity DEBUG -Message "Loading Network resources for subscription: $subscriptionId"
 
         $subData = @{
             NetworkSecurityGroups = @()
@@ -51,57 +46,40 @@ function Get-CIEMAzureNetworkData {
         }
 
         # Load Network Security Groups (includes security rules in response)
-        $nsgParams = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Network/networkSecurityGroups?api-version=2023-09-01"
-            ResourceName = "NetworkSecurityGroups ($subscriptionId)"
-        }
-        $nsgs = Invoke-AzureApi @nsgParams
+        $nsgs = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Network/networkSecurityGroups?api-version=2023-09-01" -SubscriptionId $subscriptionId -ResourceName "NetworkSecurityGroups"
+        $nsgs = $nsgs[$subscriptionId]
 
         if ($nsgs) {
             $subData.NetworkSecurityGroups = $nsgs
         }
 
         # Load Public IP Addresses
-        $pipParams = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Network/publicIPAddresses?api-version=2023-09-01"
-            ResourceName = "PublicIpAddresses ($subscriptionId)"
-        }
-        $publicIps = Invoke-AzureApi @pipParams
+        $publicIps = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Network/publicIPAddresses?api-version=2023-09-01" -SubscriptionId $subscriptionId -ResourceName "PublicIpAddresses"
+        $publicIps = $publicIps[$subscriptionId]
 
         if ($publicIps) {
             $subData.PublicIpAddresses = $publicIps
         }
 
         # Load Bastion Hosts
-        $bastionParams = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Network/bastionHosts?api-version=2023-09-01"
-            ResourceName = "BastionHosts ($subscriptionId)"
-        }
-        $bastionHosts = Invoke-AzureApi @bastionParams
+        $bastionHosts = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Network/bastionHosts?api-version=2023-09-01" -SubscriptionId $subscriptionId -ResourceName "BastionHosts"
+        $bastionHosts = $bastionHosts[$subscriptionId]
 
         if ($bastionHosts) {
             $subData.BastionHosts = $bastionHosts
         }
 
         # Load Network Watchers
-        $watcherParams = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Network/networkWatchers?api-version=2023-09-01"
-            ResourceName = "NetworkWatchers ($subscriptionId)"
-        }
-        $watchers = Invoke-AzureApi @watcherParams
+        $watchers = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Network/networkWatchers?api-version=2023-09-01" -SubscriptionId $subscriptionId -ResourceName "NetworkWatchers"
+        $watchers = $watchers[$subscriptionId]
 
         if ($watchers) {
             $subData.NetworkWatchers = $watchers
 
-            # Load Flow Logs per network watcher
+            # Load Flow Logs per network watcher (uses full URI since path includes watcher resource ID)
             foreach ($watcher in $watchers) {
                 $watcherName = $watcher.name
-
-                $flowLogParams = @{
-                    Uri          = "$armApiBase$($watcher.id)/flowLogs?api-version=2023-09-01"
-                    ResourceName = "FlowLogs ($watcherName)"
-                }
-                $flowLogs = Invoke-AzureApi @flowLogParams
+                $flowLogs = Invoke-AzureApi -Uri "https://management.azure.com$($watcher.id)/flowLogs?api-version=2023-09-01" -ResourceName "FlowLogs ($watcherName)"
 
                 if ($flowLogs) {
                     $subData.FlowLogs[$watcherName] = $flowLogs
@@ -115,6 +93,8 @@ function Get-CIEMAzureNetworkData {
         $watcherCount = @($subData.NetworkWatchers).Count
         Write-CIEMLog -Severity DEBUG -Message "Network loaded for $subscriptionId : $nsgCount NSGs, $pipCount public IPs, $bastionCount bastion hosts, $watcherCount network watchers"
 
-        $subData
+        $data[$subscriptionId] = $subData
     }
+
+    $data
 }

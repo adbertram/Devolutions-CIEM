@@ -19,7 +19,7 @@ function Save-CIEMScanResult {
                 $cScanRunId = if ($ForScanRunId) { $ForScanRunId } else { throw "ForScanRunId is required with InputObject" }
                 $cCheckId = if ($item.Check.Id) { $item.Check.Id } else { $item.Check.id }
                 Invoke-CIEMQuery -Query @"
-INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
+INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
 VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resource_name, @location)
 "@ -Parameters @{
                     scan_run_id = $cScanRunId; check_id = $cCheckId; status = [string]$item.Status
@@ -29,7 +29,7 @@ VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resou
             }
         } else {
             Invoke-CIEMQuery -Query @"
-INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
+INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
 VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resource_name, @location)
 "@ -Parameters @{
                 scan_run_id = $ScanRunId; check_id = $CheckId; status = $Status

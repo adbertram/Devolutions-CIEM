@@ -9,12 +9,6 @@ function Get-CIEMAzureMonitorData {
         authentication context. Returns a hashtable keyed by subscription ID, each value
         containing AlertRules and DiagnosticSettings arrays.
 
-    .PARAMETER Api
-        An optional CIEMAzureProviderApi instance passed by the CIEM scan engine. The
-        parameter is accepted for pipeline compatibility but is not used internally; all
-        API calls use the module-level Invoke-AzureApi helper and the provider endpoint
-        configuration retrieved via Get-CIEMProvider.
-
     .OUTPUTS
         [hashtable]
         A hashtable keyed by subscription ID. Each entry is a nested hashtable with:
@@ -23,26 +17,18 @@ function Get-CIEMAzureMonitorData {
 
     .EXAMPLE
         $monitorData = Get-CIEMAzureMonitorData
-
-        Returns Monitor data for all subscriptions in the authenticated context.
-
-    .EXAMPLE
-        $monitorData = Get-CIEMAzureMonitorData -Api $api
-
-        Invoked by the CIEM scan engine with the provider API object; behaves identically
-        to the parameterless call.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
-    param(
-        [Parameter()]
-        [CIEMAzureProviderApi]$Api
-    )
+    param()
 
     $ErrorActionPreference = 'Stop'
 
-    Invoke-CIEMAzurePerSubscription -ServiceName 'Monitor' -ScriptBlock {
-        param($subscriptionId, $armApiBase)
+    $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
+    $data = @{}
+
+    foreach ($subscriptionId in $subscriptionIds) {
+        Write-CIEMLog -Severity DEBUG -Message "Loading Monitor resources for subscription: $subscriptionId"
 
         $subData = @{
             AlertRules         = @()
@@ -50,22 +36,16 @@ function Get-CIEMAzureMonitorData {
         }
 
         # Load Activity Log Alert Rules
-        $alertParams = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Insights/activityLogAlerts?api-version=2020-10-01"
-            ResourceName = "ActivityLogAlerts ($subscriptionId)"
-        }
-        $alertRules = Invoke-AzureApi @alertParams
+        $alertRules = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Insights/activityLogAlerts?api-version=2020-10-01" -SubscriptionId $subscriptionId -ResourceName "ActivityLogAlerts"
+        $alertRules = $alertRules[$subscriptionId]
 
         if ($alertRules) {
             $subData.AlertRules = $alertRules
         }
 
         # Load Subscription-Level Diagnostic Settings
-        $diagParams = @{
-            Uri          = "$armApiBase/subscriptions/$subscriptionId/providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview"
-            ResourceName = "DiagnosticSettings ($subscriptionId)"
-        }
-        $diagSettings = Invoke-AzureApi @diagParams
+        $diagSettings = Invoke-AzureApi -Api ARM -Path "providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview" -SubscriptionId $subscriptionId -ResourceName "DiagnosticSettings"
+        $diagSettings = $diagSettings[$subscriptionId]
 
         if ($diagSettings) {
             $subData.DiagnosticSettings = $diagSettings
@@ -77,6 +57,8 @@ function Get-CIEMAzureMonitorData {
 
         Write-CIEMLog -Severity DEBUG -Message "Monitor loaded for $subscriptionId : $alertCount alert rules, $diagCount diagnostic settings"
 
-        $subData
+        $data[$subscriptionId] = $subData
     }
+
+    $data
 }
