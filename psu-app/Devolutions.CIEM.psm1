@@ -96,10 +96,14 @@ $script:Config = $null
 $script:AuthContext = @{}
 $script:PSUEnvironment = $null
 $script:DatabasePath = $null
-$script:ProviderTypes = @{}
 # Azure
 $script:AzureAuthContext = $null  # [CIEMAzureAuthContext] — set by Connect-CIEMAzure
 $script:AzureAuthProfilesCacheKey = 'CIEM:AuthProfiles:Azure'
+$script:AWSAuthProfileCacheKey    = 'CIEM:AuthProfile:AWS'
+$script:CIEMConfigCacheKey        = 'CIEM:Config'
+$script:ScanConfigCacheKey        = 'CIEM:ScanConfig'
+$script:GraphLatestCacheKey       = 'CIEM:Graph:Latest'
+$script:GraphAzureCacheKey        = 'CIEM:Graph:Azure'
 # AWS
 $script:AWSAuthContext = $null
 # PSU
@@ -144,12 +148,6 @@ foreach ($schema in @(
         Write-CIEMLog -Message "$($schema.Label) schema failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
     }
 }
-
-# --- Register provider types ---
-Write-CIEMLog -Message "Registering provider types..." -Component 'ModuleInit'
-Register-CIEMAzureProviderType
-Register-CIEMAWSProviderType
-Write-CIEMLog -Message "Provider types registered: $($script:ProviderTypes.Keys -join ', ')" -Component 'ModuleInit'
 
 # --- Argument completers ---
 Register-CIEMArgumentCompleters

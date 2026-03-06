@@ -31,15 +31,9 @@ function ConvertTo-CIEMProvider {
         $provider.Enabled = [bool]$InputObject.Enabled
         $provider.IsDefault = [bool]$InputObject.IsDefault
         $provider.ResourceFilter = @($InputObject.ResourceFilter)
-        $provider.Authentication = $null
 
-        # Endpoints from InputObject or registered defaults
-        $reg = $script:ProviderTypes[$InputObject.Name]
         if ($InputObject.Endpoints) {
             $provider.Endpoints = $InputObject.Endpoints
-        }
-        elseif ($reg -and $reg.DefaultEndpoints) {
-            $provider.Endpoints = $reg.DefaultEndpoints
         }
         else {
             $provider.Endpoints = [PSCustomObject]@{}

@@ -35,12 +35,12 @@ function Get-CIEMConfig {
 
     if ($psuCacheAvailable) {
         try {
-            $config = Get-PSUCache -Key 'CIEM:Config' -Integrated -ErrorAction Stop
+            $config = Get-PSUCache -Key $script:CIEMConfigCacheKey -Integrated -ErrorAction Stop
 
             if (-not $config) {
                 # First run - initialize with defaults
                 $config = Get-CIEMDefaultConfig
-                Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -Integrated -ErrorAction Stop
+                Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
                 Write-Verbose "Initialized CIEM:Config in PSU cache with defaults"
             }
             else {
@@ -55,7 +55,7 @@ function Get-CIEMConfig {
                     }
                 }
                 if ($needsUpdate) {
-                    Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -Integrated -ErrorAction Stop
+                    Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
                     Write-Verbose "Updated CIEM:Config in PSU cache with backfilled keys"
                 }
             }

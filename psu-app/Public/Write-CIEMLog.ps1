@@ -43,13 +43,15 @@ function Write-CIEMLog {
     $logEntry = "[$timestamp] [$Severity] [$Component] $Message"
 
     # Append to log file (thread-safe with mutex for PSU concurrent access)
-    $mutex = New-Object System.Threading.Mutex($false, 'CIEMLogMutex')
+    if (-not $script:_LogMutex) {
+        $script:_LogMutex = New-Object System.Threading.Mutex($false, 'CIEMLogMutex')
+    }
     try {
-        $mutex.WaitOne() | Out-Null
+        $script:_LogMutex.WaitOne() | Out-Null
         Add-Content -Path $logPath -Value $logEntry -Encoding UTF8
     }
     finally {
-        $mutex.ReleaseMutex()
+        $script:_LogMutex.ReleaseMutex()
     }
 
     # Also write to verbose stream for debugging

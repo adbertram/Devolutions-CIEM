@@ -47,7 +47,10 @@ function Invoke-CIEMQuery {
     if ($Connection) {
         $invokeParams.Connection = $Connection
     } else {
-        $invokeParams.Database = $script:DatabasePath
+        # Open a connection with foreign keys enabled (PRAGMAs are per-connection in SQLite)
+        $ownConn = Open-PSUSQLiteConnection -Database $script:DatabasePath
+        Invoke-PSUSQLiteQuery -Connection $ownConn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
+        $invokeParams.Connection = $ownConn
     }
 
     if ($Parameters) {
@@ -58,5 +61,10 @@ function Invoke-CIEMQuery {
         $invokeParams.AsNonQuery = $true
     }
 
-    Invoke-PSUSQLiteQuery @invokeParams
+    try {
+        Invoke-PSUSQLiteQuery @invokeParams
+    }
+    finally {
+        if ($ownConn) { $ownConn.Dispose() }
+    }
 }

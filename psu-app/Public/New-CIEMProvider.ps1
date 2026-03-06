@@ -71,6 +71,7 @@ function New-CIEMProvider {
     # Use transaction for atomicity
     $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
     try {
+        Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
         $tx = $conn.BeginTransaction()
 
         # Clear IsDefault on others if this will be default
@@ -80,8 +81,8 @@ function New-CIEMProvider {
 
         # Insert provider
         Invoke-PSUSQLiteQuery -Connection $conn -Query @"
-INSERT INTO providers (id, name, type, enabled, is_default, auth_profile_id, created_at, updated_at)
-VALUES (@id, @name, @type, @enabled, @is_default, NULL, @now, @now)
+INSERT INTO providers (id, name, type, enabled, is_default, created_at, updated_at)
+VALUES (@id, @name, @type, @enabled, @is_default, @now, @now)
 "@ -Parameters @{
             id         = $providerId
             name       = $Name

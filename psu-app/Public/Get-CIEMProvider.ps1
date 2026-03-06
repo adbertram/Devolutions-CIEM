@@ -52,17 +52,7 @@ function Get-CIEMProvider {
         $provider.Name = $row.name
         $provider.Enabled = [bool]$row.enabled
         $provider.IsDefault = [bool]$row.is_default
-        $provider.Authentication = $null
-
-        # Endpoints from registered defaults or empty
-        $reg = $script:ProviderTypes[$row.type]
-        if ($reg -and $reg.DefaultEndpoints) {
-            $provider.Endpoints = $reg.DefaultEndpoints
-        }
-        else {
-            $provider.Endpoints = [PSCustomObject]@{}
-        }
-
+        $provider.Endpoints = [PSCustomObject]@{}
         $provider.ResourceFilter = @()
 
         $provider
@@ -70,17 +60,8 @@ function Get-CIEMProvider {
 
     # Add computed CheckCount to each provider
     foreach ($p in $providers) {
-        $checksDir = $null
-        $checksModule = Get-Module -Name 'Devolutions.CIEM.Checks' -ErrorAction SilentlyContinue
-        if ($checksModule) {
-            $checksDir = Join-Path $checksModule.ModuleBase "Checks/$($p.Name)"
-        }
-        if (-not $checksDir -or -not (Test-Path $checksDir)) {
-            # Fall back to sibling Checks module directory (dev layout)
-            $projectRoot = Split-Path $script:ModuleRoot -Parent
-            $checksDir = Join-Path $projectRoot "Devolutions.CIEM.Checks/Checks/$($p.Name)"
-        }
-        $checkCount = if (Test-Path $checksDir) { @(Get-ChildItem -Path "$checksDir/*.ps1").Count } else { 0 }
+        $checksDir = Join-Path $script:ModuleRoot "modules/$($p.Name)/Checks"
+        $checkCount = if (Test-Path $checksDir) { @(Get-ChildItem -Path "$checksDir/*.ps1" -ErrorAction SilentlyContinue).Count } else { 0 }
         $p | Add-Member -NotePropertyName 'CheckCount' -NotePropertyValue $checkCount -Force
     }
 

@@ -69,7 +69,7 @@ function Connect-CIEM {
             $defaultProvider = ($allProviders | Where-Object Enabled | Select-Object -First 1).Name
         }
         if (-not $defaultProvider) {
-            throw "No providers configured. Import a provider module (e.g., Devolutions.CIEM.Azure) and run Register-CIEMProviderType first."
+            throw "No providers configured. Ensure the database has been initialized with provider rows."
         }
         $Provider = @($defaultProvider)
         Write-CIEMLog -Message "No provider specified, using default: $defaultProvider" -Severity DEBUG -Component 'Connect-CIEM'

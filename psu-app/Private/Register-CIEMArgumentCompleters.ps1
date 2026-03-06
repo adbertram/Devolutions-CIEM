@@ -20,10 +20,7 @@ function Register-CIEMArgumentCompleters {
             $providers = @(Get-CIEMProvider)
         }
         catch {
-            # Fallback to registered provider type names
-            $providers = @($script:ProviderTypes.Keys | ForEach-Object {
-                [PSCustomObject]@{ Name = $_ }
-            })
+            $providers = @()
         }
 
         $providers | Where-Object { $_.Name -like "$wordToComplete*" } | ForEach-Object {

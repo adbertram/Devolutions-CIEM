@@ -67,7 +67,7 @@ function Set-CIEMConfig {
         $config = $null
         if ($psuCacheAvailable) {
             try {
-                $config = Get-PSUCache -Key 'CIEM:Config' -Integrated -ErrorAction Stop
+                $config = Get-PSUCache -Key $script:CIEMConfigCacheKey -Integrated -ErrorAction Stop
                 $psuCacheConnected = $true
             }
             catch {
@@ -89,11 +89,11 @@ function Set-CIEMConfig {
             Resolve-NestedPropertyPath -Object $config -Path $key -Value $value
         }
 
-        if ($PSCmdlet.ShouldProcess('CIEM:Config', 'Update configuration in PSU cache')) {
+        if ($PSCmdlet.ShouldProcess($script:CIEMConfigCacheKey, 'Update configuration in PSU cache')) {
             # Write to PSU cache if available and connected
             if ($psuCacheConnected) {
                 try {
-                    Set-PSUCache -Key 'CIEM:Config' -Value $config -Persist -Integrated -ErrorAction Stop
+                    Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
                     Write-Verbose "Configuration saved to PSU cache"
                 }
                 catch {
