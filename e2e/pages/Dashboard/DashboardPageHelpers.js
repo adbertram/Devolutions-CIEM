@@ -1,0 +1,145 @@
+const BasePage = require('../../_utils/BasePage');
+const { testConfig } = require('../../_utils/test-config');
+
+class DashboardPageHelpers extends BasePage {
+  constructor(page) {
+    super(page);
+    this.selectors = {
+      pageTitle: "h4:has-text('Devolutions CIEM Dashboard')",
+      subtitle: "text=Cloud Infrastructure Entitlement Management",
+      scanRunSelector: '#scanRunSelector',
+      scanRunSelectorCombobox: '[role="combobox"][aria-labelledby="scanRunSelectorlabel"]',
+      runNewScanBtn: "button:has-text('Run New Scan')",
+      // Summary cards
+      summaryCards: '.MuiGrid-container .MuiCard-root',
+      totalResultsCard: ".MuiCard-root:has-text('Total Results')",
+      failedChecksCard: ".MuiCard-root:has-text('Failed Checks')",
+      passedChecksCard: ".MuiCard-root:has-text('Passed Checks')",
+      criticalIssuesCard: ".MuiCard-root:has-text('Critical Issues')",
+      // Charts
+      severityChartCard: ".MuiCard-root:has-text('Results by Severity')",
+      serviceChartCard: ".MuiCard-root:has-text('Results by Service')",
+      // Critical & High Results
+      critHighCard: ".MuiCard-root:has-text('Critical & High Results')",
+      viewAllResultsBtn: "button:has-text('View All Results')",
+      critHighTable: ".MuiCard-root:has-text('Critical & High Results') table",
+      noCritHighMessage: "text=No critical or high severity results",
+      // Empty state
+      emptyStateCard: ".MuiCard-root:has-text('No Scan Data Available')",
+      emptyStateIcon: '.MuiCard-root svg',
+      runFirstScanBtn: "button:has-text('Run Your First Scan')",
+      // Dynamic content
+      dashboardContent: '#dashboardContent'
+    };
+  }
+
+  async navigateToDashboard() {
+    await this.goto(testConfig.pages.dashboard);
+    // Wait for dynamic content to load
+    await this.page.waitForTimeout(3000);
+  }
+
+  async getPageTitle() {
+    return await this.getText(this.selectors.pageTitle);
+  }
+
+  async isSubtitleVisible() {
+    return await this.isElementVisible(this.selectors.subtitle);
+  }
+
+  async isScanRunSelectorVisible() {
+    return await this.isElementVisible(this.selectors.scanRunSelectorCombobox);
+  }
+
+  async isRunNewScanButtonVisible() {
+    return await this.isElementVisible(this.selectors.runNewScanBtn);
+  }
+
+  async getCardValue(cardSelector) {
+    await this.waitForSelector(cardSelector);
+    const card = this.page.locator(cardSelector);
+    const h3 = card.locator('h3');
+    return (await h3.textContent()).trim();
+  }
+
+  async getTotalResultsCount() {
+    return parseInt(await this.getCardValue(this.selectors.totalResultsCard));
+  }
+
+  async getFailedChecksCount() {
+    return parseInt(await this.getCardValue(this.selectors.failedChecksCard));
+  }
+
+  async getPassedChecksCount() {
+    return parseInt(await this.getCardValue(this.selectors.passedChecksCard));
+  }
+
+  async getCriticalIssuesCount() {
+    return parseInt(await this.getCardValue(this.selectors.criticalIssuesCard));
+  }
+
+  async clickRunNewScan() {
+    await this.click(this.selectors.runNewScanBtn);
+    // PSU Invoke-UDRedirect is async — wait for URL change
+    await this.page.waitForURL('**/ciem/scan', { timeout: 15000 });
+  }
+
+  async changeScanRunSelector() {
+    // Click the combobox to open
+    const combobox = this.page.locator(this.selectors.scanRunSelectorCombobox);
+    await combobox.click();
+    // Select the second option (older scan run)
+    const options = this.page.locator('[role="option"]');
+    const count = await options.count();
+    if (count > 1) {
+      await options.nth(1).click();
+      // Wait for Sync-UDElement refresh
+      await this.page.waitForTimeout(3000);
+      return true;
+    }
+    return false;
+  }
+
+  async isSeverityChartVisible() {
+    return await this.isElementVisible(this.selectors.severityChartCard);
+  }
+
+  async isServiceChartVisible() {
+    return await this.isElementVisible(this.selectors.serviceChartCard);
+  }
+
+  async isCritHighCardVisible() {
+    return await this.isElementVisible(this.selectors.critHighCard);
+  }
+
+  async hasCritHighTable() {
+    return await this.isElementVisible(this.selectors.critHighTable);
+  }
+
+  async hasNoCritHighMessage() {
+    return await this.isElementVisible(this.selectors.noCritHighMessage);
+  }
+
+  async clickViewAllResults() {
+    await this.click(this.selectors.viewAllResultsBtn);
+    await this.page.waitForURL('**/ciem/history', { timeout: 15000 });
+  }
+
+  // Empty state helpers
+  async isEmptyStateVisible() {
+    return await this.isElementVisible(this.selectors.emptyStateCard);
+  }
+
+  async clickRunFirstScan() {
+    await this.click(this.selectors.runFirstScanBtn);
+    await this.page.waitForURL('**/ciem/scan', { timeout: 15000 });
+  }
+
+  async hasScanData() {
+    // Check if we have scan selector (data exists) or empty state (no data)
+    const selectorVisible = await this.isElementVisible(this.selectors.scanRunSelectorCombobox);
+    return selectorVisible;
+  }
+}
+
+module.exports = DashboardPageHelpers;
