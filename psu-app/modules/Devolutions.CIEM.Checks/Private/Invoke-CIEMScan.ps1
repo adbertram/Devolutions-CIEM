@@ -282,39 +282,6 @@ function Invoke-CIEMScan {
             }
         }
 
-        # Build identity-to-resource relationship graph (only if Entra/IAM checks need it)
-        if (Get-Command -Name 'New-CIEMGraph' -ErrorAction SilentlyContinue) {
-            try {
-                if ($serviceCacheLookup.ContainsKey('Entra') -and $serviceCacheLookup['Entra'].Success) {
-                    $graphEntraData = $serviceCacheLookup['Entra'].CacheData
-                    $graphIAMData = if ($serviceCacheLookup.ContainsKey('IAM') -and $serviceCacheLookup['IAM'].Success) { $serviceCacheLookup['IAM'].CacheData } else { @{} }
-
-                    Write-Verbose "[$providerName] Building identity relationship graph..."
-                    $sw = [Diagnostics.Stopwatch]::StartNew()
-                    $ciemGraph = New-CIEMGraph -EntraData $graphEntraData -IAMData $graphIAMData -TenantId $authContext.TenantId
-                    $sw.Stop()
-                    Write-Verbose "[$providerName] Graph built in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s: $($ciemGraph.Nodes.Count) nodes, $($ciemGraph.Edges.Count) edges"
-
-                    # Inject as synthetic service cache entry
-                    $graphCache = [CIEMServiceCache]::new()
-                    $graphCache.ServiceName = 'Graph'
-                    $graphCache.Success = $true
-                    $graphCache.Duration = $sw.Elapsed
-                    $graphCache.Errors = @()
-                    $graphCache.Warnings = @()
-                    $graphCache.Output = @()
-                    $graphCache.CacheData = @{ Graph = $ciemGraph }
-                    $serviceCacheLookup['Graph'] = $graphCache
-                }
-                else {
-                    Write-Verbose "[$providerName] Skipping graph build — Entra service cache unavailable"
-                }
-            }
-            catch {
-                Write-Warning "[$providerName] Graph build failed (non-fatal): $($_.Exception.Message)"
-            }
-        }
-
         # Execute checks and emit findings to pipeline
         $checkIndex  = 0
         $totalChecks = $checks.Count

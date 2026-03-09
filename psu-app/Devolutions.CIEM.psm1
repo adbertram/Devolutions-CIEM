@@ -53,7 +53,7 @@ foreach ($className in @('CIEMServiceCache', 'CIEMProviderService', 'CIEMCheck',
 
 # Identity classes (explicit order: node -> derived -> edge -> container)
 _BootLog "Loading Identity classes..."
-foreach ($classFile in @('CIEMGraphNode.ps1', 'CIEMIdentityNodes.ps1', 'CIEMRBACNodes.ps1', 'CIEMGraphEdge.ps1', 'CIEMGraph.ps1')) {
+foreach ($classFile in @('CIEMGraphNode.ps1', 'CIEMIdentityNodes.ps1', 'CIEMRBACNodes.ps1', 'CIEMGraphEdge.ps1', 'CIEMGraph.ps1', 'CIEMIdentityResourceAccess.ps1')) {
     $path = Join-Path $script:IdentitiesRoot "Classes/$classFile"
     if (Test-Path $path) { try { . $path } catch { _BootLog "FAILED to load class $classFile : $_" 'ERROR' } }
 }
@@ -127,7 +127,6 @@ catch {
 # Apply provider-specific schemas
 foreach ($schema in @(
     @{ Path = Join-Path $script:AzureRoot 'Data/azure_schema.sql';                          Label = 'Azure' }
-    @{ Path = Join-Path $script:AzurePermissionsRoot 'Data/azure_permissions_schema.sql';    Label = 'Azure Permissions' }
 )) {
     try {
         $dbPath = Get-CIEMDatabasePath
@@ -157,11 +156,20 @@ $exportDirs = @("$PSScriptRoot/Public")
 foreach ($root in $subModuleRoots) {
     $exportDirs += Join-Path $root 'Public'
 }
-$exportDirs += "$script:PSURoot/Pages"
 
 $exportFunctions = @()
 foreach ($dir in $exportDirs) {
     $exportFunctions += (Get-ChildItem "$dir/*.ps1" -ErrorAction SilentlyContinue).BaseName
+}
+
+# Page files may define multiple functions per file — extract all function names
+# (required because [scriptblock]::Create() in PSU tab/onClick only sees exported functions)
+foreach ($pageFile in (Get-ChildItem "$script:PSURoot/Pages/*.ps1" -ErrorAction SilentlyContinue)) {
+    $content = Get-Content $pageFile.FullName -Raw
+    $fnMatches = [regex]::Matches($content, '(?m)^function\s+([\w-]+)')
+    foreach ($m in $fnMatches) {
+        $exportFunctions += $m.Groups[1].Value
+    }
 }
 
 Write-CIEMLog -Message "Exporting $($exportFunctions.Count) functions" -Component 'ModuleInit'

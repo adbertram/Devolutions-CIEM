@@ -3,11 +3,8 @@ function Test-CIEMCollectedDataExists {
     .SYNOPSIS
         Tests whether collected data exists for an Azure provider.
     .DESCRIPTION
-        Checks the azure_security_principals table for any rows matching
+        Checks the azure_service_data table for any Entra rows matching
         the given provider ID. Returns $true if data exists, $false otherwise.
-
-        This is the provider module's implementation of the standard interface
-        that PSU uses to discover which providers have graph data available.
     .PARAMETER ProviderName
         The provider name (e.g., 'Azure').
     .OUTPUTS
@@ -22,6 +19,6 @@ function Test-CIEMCollectedDataExists {
         [string]$ProviderName
     )
 
-    $result = Invoke-CIEMQuery -Query "SELECT COUNT(*) AS cnt FROM azure_security_principals WHERE provider_id = @pid" -Parameters @{ pid = $ProviderName.ToLower() }
+    $result = Invoke-CIEMQuery -Query "SELECT COUNT(*) AS cnt FROM azure_service_data WHERE provider_id = @pid AND service_name = 'Entra'" -Parameters @{ pid = $ProviderName.ToLower() }
     [bool]($result -and $result.cnt -gt 0)
 }

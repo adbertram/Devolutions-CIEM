@@ -39,6 +39,7 @@ class CIEMScanResult {
 
 class CIEMScanRun {
     [string]$Id
+    [string]$Type = 'checks'
     [CIEMScanRunStatus]$Status
     [string[]]$Providers
     [PSCustomObject[]]$ProviderSummaries

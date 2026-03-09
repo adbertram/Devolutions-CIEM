@@ -28,10 +28,14 @@ Every write function (New/Update/Save/Remove) must have two parameter sets:
 - Azure module tables: `Verb-CIEMAzure<Entity>` (e.g., `New-CIEMAzureSecurityPrincipal`)
 - AWS module tables: `Verb-CIEMAWS<Entity>` (future)
 
+## Exception: Generic blob tables
+
+Tables like `azure_service_data` that store arbitrary JSON blobs use only **Save/Get/Remove** (no New/Update). The Save (upsert) pattern is the correct fit — New (insert-fail-if-exists) and Update (partial field update) don't apply to generic blob storage.
+
 ## When adding a new table
 
 1. Add schema to the appropriate `Data/*.sql` file
 2. Create the class in `Classes/`
-3. Create all 5 CRUD functions in `Public/`
+3. Create all 5 CRUD functions in `Public/` (or Save/Get/Remove for blob tables)
 4. Add functions to the module's `.psd1` `FunctionsToExport`
 5. If the table is provider-specific collected data, integrate with the provider's `Save/Get-CIEMCollectedData`

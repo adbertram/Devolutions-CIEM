@@ -50,6 +50,7 @@ function Get-CIEMScanRun {
 
         $obj = [PSCustomObject]@{
             Id                = $row.id
+            Type              = if ($row.scan_type) { $row.scan_type } else { 'checks' }
             Status            = $row.status
             Providers         = $providers
             ProviderSummaries = @()

@@ -511,8 +511,65 @@ function New-CIEMGraphPage {
     )
 
     New-UDPage -Name 'Identity Graph' -Url '/ciem/graph' -Content {
-        New-UDTypography -Text 'Identity Graph' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
-        New-UDTypography -Text 'Explore identity-to-resource relationships and permissions' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
+        New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; justifyContent = 'space-between'; alignItems = 'center'; marginBottom = '10px'; marginTop = '10px' } } -Content {
+            New-UDElement -Tag 'div' -Content {
+                New-UDTypography -Text 'Identity Graph' -Variant 'h4'
+                New-UDTypography -Text 'Explore identity-to-resource relationships and permissions' -Variant 'subtitle1' -Style @{ color = '#666' }
+            }
+            New-UDDynamic -Id 'graphRefreshBtn' -Content {
+                New-UDButton -Text 'Refresh Data' -Variant 'outlined' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -ShowLoading -OnClick {
+                    $Session:GraphState = @{}
+
+                    # Show progress UI
+                    Set-UDElement -Id 'graphRefreshBtn' -Content {
+                        New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                            New-UDProgress -Circular -Size 'small'
+                            New-UDTypography -Id 'refreshGraphStatus' -Text 'Starting...' -Variant 'body2'
+                        }
+                    }
+
+                    try {
+                        $job = Invoke-PSUScript -Name 'Devolutions.CIEM\Invoke-CIEMIdentityGraphBuild' -Integrated
+
+                        $pollInterval = 2
+                        $maxPollSeconds = 1800
+                        $elapsed = 0
+
+                        while ($elapsed -lt $maxPollSeconds) {
+                            Start-Sleep -Seconds $pollInterval
+                            $elapsed += $pollInterval
+
+                            $job = Get-PSUJob -Id $job.Id -Integrated
+
+                            $progressParts = @()
+                            if ($job.StatusDescription) { $progressParts += $job.StatusDescription }
+                            elseif ($job.Activity) { $progressParts += $job.Activity }
+                            else { $progressParts += 'Building identity graph...' }
+                            if ($job.PercentComplete -gt 0) { $progressParts += "($($job.PercentComplete)%)" }
+                            if ($job.CurrentOperation) { $progressParts += "- $($job.CurrentOperation)" }
+                            Set-UDElement -Id 'refreshGraphStatus' -Properties @{ children = ($progressParts -join ' ') }
+
+                            $status = "$($job.Status)"
+                            if ($status -notin @('Running', 'Queued', 'WaitingOnFeedback', 'Active')) { break }
+                        }
+
+                        $status = "$($job.Status)"
+                        if ($status -eq 'Completed') {
+                            Invoke-UDRedirect '/ciem/graph'
+                        } else {
+                            $errorMsg = if ($job.ErrorOutput) { $job.ErrorOutput | Select-Object -First 1 } else { "Job ended with status: $status" }
+                            throw $errorMsg
+                        }
+                    }
+                    catch {
+                        Set-UDElement -Id 'graphRefreshBtn' -Content {
+                            New-UDTypography -Text "Refresh failed: $($_.Exception.Message)" -Style @{ color = '#f44336'; marginBottom = '8px' }
+                            New-UDButton -Text 'Retry' -Variant 'outlined' -Color 'primary' -Icon (New-UDIcon -Icon 'Sync') -OnClick ([scriptblock]::Create("Invoke-UDRedirect '/ciem/graph'"))
+                        }
+                    }
+                }
+            }
+        }
 
         # Discover which providers have collected data by calling each provider module's
         # Test-CIEMCollectedDataExists function (standard provider module interface)
@@ -532,9 +589,57 @@ function New-CIEMGraphPage {
                 New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
                     New-UDIcon -Icon 'ProjectDiagram' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
                     New-UDTypography -Text 'No Identity Graph Available' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                    New-UDTypography -Text 'Run a security scan to build the identity relationship graph.' -Variant 'body1' -Style @{ color = '#666'; marginBottom = '24px' }
-                    New-UDButton -Text 'Run a Scan' -Variant 'contained' -Color 'primary' -Size 'large' -OnClick {
-                        Invoke-UDRedirect '/ciem/scan'
+                    New-UDTypography -Text 'Collect identity data from Azure to build the identity relationship graph.' -Variant 'body1' -Style @{ color = '#666'; marginBottom = '24px' }
+                    New-UDDynamic -Id 'buildGraphDynamic' -Content {
+                        New-UDButton -Text 'Build Identity Graph' -Variant 'contained' -Color 'primary' -Size 'large' -ShowLoading -OnClick {
+                            # Show progress UI
+                            Set-UDElement -Id 'buildGraphDynamic' -Content {
+                                New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 2 -Content {
+                                    New-UDProgress -Circular
+                                    New-UDTypography -Id 'buildGraphStatus' -Text 'Starting identity graph build...' -Variant 'body2' -Style @{ color = '#666' }
+                                }
+                            }
+
+                            try {
+                                $job = Invoke-PSUScript -Name 'Devolutions.CIEM\Invoke-CIEMIdentityGraphBuild' -Integrated
+
+                                $pollInterval = 2
+                                $maxPollSeconds = 1800
+                                $elapsed = 0
+
+                                while ($elapsed -lt $maxPollSeconds) {
+                                    Start-Sleep -Seconds $pollInterval
+                                    $elapsed += $pollInterval
+
+                                    $job = Get-PSUJob -Id $job.Id -Integrated
+
+                                    $progressParts = @()
+                                    if ($job.StatusDescription) { $progressParts += $job.StatusDescription }
+                                    elseif ($job.Activity) { $progressParts += $job.Activity }
+                                    else { $progressParts += 'Building identity graph...' }
+                                    if ($job.PercentComplete -gt 0) { $progressParts += "($($job.PercentComplete)%)" }
+                                    if ($job.CurrentOperation) { $progressParts += "- $($job.CurrentOperation)" }
+                                    Set-UDElement -Id 'buildGraphStatus' -Properties @{ children = ($progressParts -join ' ') }
+
+                                    $status = "$($job.Status)"
+                                    if ($status -notin @('Running', 'Queued', 'WaitingOnFeedback', 'Active')) { break }
+                                }
+
+                                $status = "$($job.Status)"
+                                if ($status -eq 'Completed') {
+                                    Invoke-UDRedirect '/ciem/graph'
+                                } else {
+                                    $errorMsg = if ($job.ErrorOutput) { $job.ErrorOutput | Select-Object -First 1 } else { "Job ended with status: $status" }
+                                    throw $errorMsg
+                                }
+                            }
+                            catch {
+                                Set-UDElement -Id 'buildGraphDynamic' -Content {
+                                    New-UDTypography -Text "Error: $($_.Exception.Message)" -Style @{ color = '#f44336'; marginBottom = '16px' }
+                                    New-UDButton -Text 'Retry' -Variant 'contained' -Color 'primary' -OnClick ([scriptblock]::Create("Invoke-UDRedirect '/ciem/graph'"))
+                                }
+                            }
+                        }
                     }
                 }
             }

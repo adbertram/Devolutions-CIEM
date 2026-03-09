@@ -2,7 +2,7 @@
 -- SQLite with WAL mode for concurrent read support
 -- All tables use IF NOT EXISTS for idempotent creation
 -- Azure-specific tables are in Azure/Infrastructure/Data/azure_schema.sql
--- Azure permissions tables are in Azure/Permissions/Data/azure_permissions_schema.sql
+-- All Azure service data (identity + infrastructure) is stored in azure_service_data (see azure_schema.sql)
 
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
@@ -49,6 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_checks_severity ON checks(severity);
 CREATE TABLE IF NOT EXISTS scan_runs (
     id TEXT PRIMARY KEY,
     provider_id TEXT NOT NULL,
+    scan_type TEXT NOT NULL DEFAULT 'checks',
     status TEXT NOT NULL,
     resource_filter TEXT,
     resource_providers TEXT,
@@ -145,6 +146,42 @@ CREATE TABLE IF NOT EXISTS permission_relationships (
 CREATE INDEX IF NOT EXISTS idx_perm_rel_target ON permission_relationships(target_type);
 CREATE INDEX IF NOT EXISTS idx_perm_rel_relationship ON permission_relationships(relationship);
 CREATE INDEX IF NOT EXISTS idx_perm_rel_target_rel ON permission_relationships(target_type, relationship);
+
+-- =============================================================================
+-- Identity-Resource Access (computed junction: identity → resource instance)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS identity_resource_access (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id TEXT NOT NULL,
+    identity_id TEXT NOT NULL,
+    identity_name TEXT,
+    identity_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    resource_name TEXT,
+    resource_type TEXT NOT NULL,
+    relationship TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    is_inherited INTEGER NOT NULL DEFAULT 0,
+    effective_identity_id TEXT,
+    effective_identity_name TEXT,
+    role_name TEXT,
+    computed_at TEXT NOT NULL,
+    FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ira_provider ON identity_resource_access(provider_id);
+CREATE INDEX IF NOT EXISTS idx_ira_identity ON identity_resource_access(identity_id);
+CREATE INDEX IF NOT EXISTS idx_ira_resource ON identity_resource_access(resource_id);
+CREATE INDEX IF NOT EXISTS idx_ira_relationship ON identity_resource_access(relationship);
+CREATE INDEX IF NOT EXISTS idx_ira_identity_resource ON identity_resource_access(identity_id, resource_type, relationship);
+
+-- =============================================================================
+-- Migrations (ALTER TABLE — safe for re-runs via error handling in New-CIEMDatabase)
+-- =============================================================================
+
+ALTER TABLE scan_runs ADD COLUMN scan_type TEXT NOT NULL DEFAULT 'checks';
+CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
 
 -- =============================================================================
 -- Seed Data: Reference Tables (INSERT OR IGNORE — safe for re-runs)

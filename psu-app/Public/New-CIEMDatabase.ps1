@@ -68,7 +68,19 @@ function New-CIEMDatabase {
     $conn = Open-PSUSQLiteConnection -Database $Path
     try {
         foreach ($statement in ($schemaSql -split ';\s*\n' | Where-Object { $_.Trim() })) {
-            Invoke-PSUSQLiteQuery -Connection $conn -Query $statement.Trim() -AsNonQuery | Out-Null
+            $trimmed = $statement.Trim()
+            try {
+                Invoke-PSUSQLiteQuery -Connection $conn -Query $trimmed -AsNonQuery | Out-Null
+            }
+            catch {
+                # ALTER TABLE ADD COLUMN fails with "duplicate column name" on re-runs — safe to ignore
+                if ($trimmed -match 'ALTER\s+TABLE' -and $_.Exception.Message -match 'duplicate column') {
+                    Write-Verbose "CIEM DB: Column already exists, skipping: $trimmed"
+                }
+                else {
+                    throw
+                }
+            }
         }
     } finally {
         $conn.Dispose()
