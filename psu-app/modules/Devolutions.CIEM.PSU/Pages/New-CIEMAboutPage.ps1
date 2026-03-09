@@ -35,7 +35,8 @@ function New-CIEMAboutPage {
             }
 
             New-UDTypography -Text 'Version Information:' -Variant 'h6' -Style @{ marginTop = '20px' }
-            $moduleVersion = (Get-Module Devolutions.CIEM | Select-Object -First 1).Version.ToString()
+            $module = Get-Module Devolutions.CIEM | Select-Object -First 1
+            $moduleVersion = if ($module) { $module.Version.ToString() } else { 'Unknown' }
             New-UDTable -Data @(
                 @{ Property = 'Module Version'; Value = $moduleVersion }
                 @{ Property = 'PowerShell Universal'; Value = '5.5+' }
