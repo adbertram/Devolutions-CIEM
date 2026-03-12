@@ -14,7 +14,7 @@ paths: ["psu-app/**"]
 3. **Get-CIEM[Azure]<Entity>** — SELECT with optional filter parameters. Returns `[ClassName[]]`.
 4. **Update-CIEM[Azure]<Entity>** — UPDATE partial fields via `$PSBoundParameters.ContainsKey`. Supports `-PassThru`.
 5. **Save-CIEM[Azure]<Entity>** — INSERT OR REPLACE (upsert). Fire-and-forget for bulk operations.
-6. **Remove-CIEM[Azure]<Entity>** — DELETE with `SupportsShouldProcess`. Supports `-Id`, `-ProviderId` (bulk), and `-InputObject`.
+6. **Remove-CIEM[Azure]<Entity>** — DELETE with `SupportsShouldProcess`. Supports `-Id`, `-InputObject`, and a scope-appropriate bulk parameter (e.g., `-ProviderId`, `-Type`). Choose the bulk parameter that matches the table's natural grouping key.
 
 ## Parameter set pattern
 
@@ -24,9 +24,14 @@ Every write function (New/Update/Save/Remove) must have two parameter sets:
 
 ## Naming
 
+**Public functions** use standard `Verb-Noun` with dash:
 - Base module tables: `Verb-CIEM<Entity>` (e.g., `New-CIEMCheck`)
-- Azure module tables: `Verb-CIEMAzure<Entity>` (e.g., `New-CIEMAzureSecurityPrincipal`)
+- Azure module tables: `Verb-CIEMAzure<Entity>` (e.g., `New-CIEMAzureArmResource`)
 - AWS module tables: `Verb-CIEMAWS<Entity>` (future)
+
+**Private/helper functions** use `VerbNoun` WITHOUT a dash (PascalCase, no hyphen):
+- e.g., `InvokeCIEMResourceGraphQuery`, `GetCIEMBuiltInRoleDefinitions`, `ResolveCIEMArmNetworkRelationship`
+- This visually distinguishes private helpers from public API functions at a glance
 
 ## Exception: Generic blob tables
 

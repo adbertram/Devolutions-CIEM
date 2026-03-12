@@ -18,16 +18,8 @@ Development-only functions for managing CIEM checks, syncing Prowler checks, and
 | `Compare-ProwlerCheck` | Diff upstream Prowler checks vs local CIEM checks |
 | `Convert-ProwlerCheck` | Convert a Prowler check directory to CIEM format |
 
-## Azure Infrastructure Provisioning
-
-| Function | Purpose |
-|----------|---------|
-| `New-CIEMAzureManagedIdentity` | Configure Azure managed identity with CIEM permissions |
-| `New-PSUAzureServicePrincipal` | Create Azure service principal for PSU |
-
 ## When to Use
 
 - **Adding/removing/syncing checks:** `Sync-ProwlerCheck`, `Enable-CIEMCheck`, `Disable-CIEMCheck`
 - **Querying check metadata:** `Get-CIEMCheck -Provider Azure -Service Entra`
 - **Checking required permissions:** `Get-CIEMRequiredPermission -Service KeyVault`
-- **Provisioning Azure resources:** `New-CIEMAzureManagedIdentity`, `New-PSUAzureServicePrincipal`
