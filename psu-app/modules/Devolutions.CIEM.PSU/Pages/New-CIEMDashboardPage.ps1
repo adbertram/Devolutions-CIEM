@@ -15,6 +15,24 @@ function New-CIEMDashboardPage {
         New-UDTypography -Text 'Devolutions CIEM Dashboard' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
+        # Last Discovery status card
+        New-UDDynamic -Content {
+            $lastRun = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
+            if ($lastRun.Count -gt 0) {
+                $run = $lastRun[0]
+                $resourceCount = $run.ArmRowCount + $run.EntraRowCount
+                New-UDCard -Title 'Last Discovery' -Style @{ marginBottom = '20px' } -Content {
+                    New-UDTypography -Text "Completed: $($run.CompletedAt)" -Variant body2
+                    New-UDTypography -Text "Resources: $resourceCount ($($run.ArmRowCount) ARM, $($run.EntraRowCount) Entra)" -Variant body2
+                    New-UDTypography -Text "Types: $($run.ArmTypeCount) ARM, $($run.EntraTypeCount) Entra" -Variant body2
+                }
+            } else {
+                New-UDCard -Title 'Discovery' -Style @{ marginBottom = '20px' } -Content {
+                    New-UDTypography -Text 'No discovery runs completed yet. Run Start-CIEMAzureDiscovery to populate resource data.' -Variant body2
+                }
+            }
+        }
+
         # Load available scan runs for the selector (only those with results)
         $scanRuns = @(Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
 

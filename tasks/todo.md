@@ -1,52 +1,23 @@
-# Split Devolutions.CIEM → Devolutions.CIEM.Checks + Devolutions.CIEM.PSU
+# Data Model Architecture — Review Fixes
 
-## Step 1: Prep Base module
-- [x] Export `Invoke-CIEMQuery` from Base (moved to Public, added to psd1)
-- [x] Remove `Sync-CIEMChecksToDatabase` from Base (DB ships pre-populated)
-- [x] Update `New-CIEMDatabase` to not call `Sync-CIEMChecksToDatabase`
-- [x] Add `Get-CIEMRuntimeAuth` — exposes `$script:AuthContext` for Checks module
-- [x] Add `Get-CIEMDatabasePath` — exposes `$script:DatabasePath` for Checks module
-- [x] Export `Invoke-AzureApi`, `Invoke-AWSAPI`, `Get-AllGraphPage` (moved to Public)
-- [x] Move scan-specific classes out of Base (CIEMServiceCache, CIEMProviderService, CIEMIdentity, CIEMResourceType)
-- [x] Move `Initialize-CIEMServiceCache` to Checks
+## Blocking Issues
 
-## Step 2: Update Graph module
-- [x] Change `RequiredModules` from `Devolutions.CIEM` to `Devolutions.CIEM.Base`
+- [x] 1. Replace `az graph query` with Resource Graph REST API via `Invoke-AzureApi` — updated Data Sources, New Dependencies, discovery flow
+- [x] 2. Keep `azure_provider_apis` table — moved to Tables to Keep, removed from Tables to Drop
+- [x] 3. Rate limiting is Phase 1 — added to Implementation Constraints, removed from Known Gaps
+- [x] 4. Atomic clear-then-insert — discovery flow split into Phase 1 (collect to memory) + Phase 2 (single transaction)
+- [x] 5. Transaction wrapping — documented in Implementation Constraints
+- [x] 6. Replace Identities module entirely — added to Code to Delete, new data model supersedes it
 
-## Step 3: Create Devolutions.CIEM.Checks
-- [x] Create directory structure and module files (psm1, psd1)
-- [x] Copy classes: CIEMCheck, CIEMScanResult + moved: CIEMServiceCache, CIEMProviderService, CIEMIdentity, CIEMResourceType
-- [x] Copy public functions: Invoke-CIEMScan, Get-CIEMCheck, Get-CIEMScanRun, Get-CIEMScanResult, Get-CIEMProviderService, Get-CIEMRequiredPermission, Get-CIEMIdentity, Get-CIEMResourceType
-- [x] Copy private functions: New/Save/Update-CIEMScanRun, Test-EntraAuthorizationPolicyBooleanSetting, Initialize-CIEMServiceCache
-- [x] Copy Checks/ (648 scripts), Services/ (7 scripts), Data/ (2 JSON files)
-- [x] Fix `Invoke-CIEMScan`: replace `$script:Config` → `Get-CIEMConfig`, `$script:AuthContext` → `Get-CIEMRuntimeAuth`, fix check scripts path
-- [x] Fix `Save-CIEMScanRun`: `$script:DatabasePath` → `Get-CIEMDatabasePath`
-- [x] Fix `Get-CIEMProviderService`: read from DB instead of ciem_checks.json (fixed column name too)
-- [x] Fix `Initialize-CIEMServiceCache`: `[CIEMProvider]` → untyped param (cross-module class boundary)
-- [x] Fix AWS check script: `$script:AuthContext` → `Get-CIEMRuntimeAuth`
+## Should Address
 
-## Step 4: Create Devolutions.CIEM.PSU
-- [x] Create directory structure and module files (psm1, psd1)
-- [x] Copy .universal/dashboards.ps1 (updated module reference)
-- [x] Copy Pages/ (7 page files)
-- [x] Copy Public: New-DevolutionsCIEMApp, New-CIEMUIContent, Get-PSUInstalledEnvironment, Get-CIEMRelationshipColor
-- [x] Update 20 `Import-Module Devolutions.CIEM` references → `Devolutions.CIEM.PSU` across 6 page files
-
-## Step 5: Update Invoke-TestCommand.ps1
-- [x] Updated module imports to load Base + Graph + Checks
-
-## Step 6: Delete Devolutions.CIEM
-- [x] Remove entire Devolutions.CIEM/ directory
-- [x] Fix CheckCount in Get-CIEMProvider (pointed to old module path)
-- [x] Update Manager module path reference and Get-CIEMCheck to use DB
-- [x] Update Graph module description text
-- [x] Fix remaining old module name references
-
-## Step 7: Update CLAUDE.md and memory
-- [x] Update memory notes
-
-## Step 8: Verify
-- [x] All modules import without errors
-- [x] No duplicate functions across modules (39 total, 0 duplicates)
-- [x] Get-CIEMProvider, Get-CIEMCheck, Get-CIEMProviderService all work
-- [x] All 17 key functions available via Get-Command
+- [x] 7. CIEM prefix on all private functions — updated all private function names
+- [x] 8. `azure_resource_types` CRUD mostly private — only `Get-` is public, rest moved to private section
+- [x] 9. `-All` switch on Remove functions — added to all 5 Remove function signatures
+- [x] 10. Renamed `Invoke-CIEMAzureResourceDiscovery` → `Start-CIEMAzureDiscovery`
+- [x] 11. Added `partial` status + `WarningCount` to `CIEMAzureDiscoveryRun` class
+- [x] 12. Module folder → `Azure/Discovery` (consistent with `Azure/Infrastructure`)
+- [x] 13. Drop `CIEMProvider.IsDefault` — noted in providers table description + Phase 1 rollout
+- [x] 14. Phase 2 projection classes marked as "illustrative, final shape TBD"
+- [x] 15. `signInActivity` on SPs requires Graph beta — noted in Entra endpoints table
+- [x] 16. Schema migration strategy — new section added with 5-step migration in `New-CIEMDatabase`

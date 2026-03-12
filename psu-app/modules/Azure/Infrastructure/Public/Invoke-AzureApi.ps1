@@ -302,6 +302,45 @@ function Invoke-AzureApi {
                 Write-Warning $msg
                 $currentResponse = $null
             }
+            429 {
+                # Rate limited — parse Retry-After header and retry with backoff
+                $maxRetries = 5
+                $retryCount = 0
+                $retryDelay = 1
+                $retried = $false
+
+                while ($retryCount -lt $maxRetries) {
+                    $retryCount++
+                    $retryAfter = $retryDelay
+
+                    # Try to parse Retry-After from response content
+                    try {
+                        if ($currentResponse.Content) {
+                            $errorContent = $currentResponse.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
+                            if ($errorContent.retryAfter) {
+                                $retryAfter = [int]$errorContent.retryAfter
+                            }
+                        }
+                    } catch {}
+
+                    Write-Verbose "[$ResourceName] Rate limited (429). Retry $retryCount of $maxRetries after ${retryAfter}s..."
+                    Start-Sleep -Seconds $retryAfter
+                    $retryDelay = $retryDelay * 2  # exponential backoff
+
+                    $currentResponse = Invoke-SafeRestMethod -Uri $Uri -Headers $headers -Method $Method -JsonBody $jsonBody
+                    if ($currentResponse.StatusCode -ne 429) {
+                        $retried = $true
+                        break
+                    }
+                }
+
+                if (-not $retried) {
+                    $msg = "Rate limit exceeded for $ResourceName after $maxRetries retries."
+                    if ($shouldThrow) { throw $msg }
+                    Write-Warning $msg
+                    $currentResponse = $null
+                }
+            }
             default {
                 $detail = if ($currentResponse.Content) { " - $($currentResponse.Content)" } else { '' }
                 $msg = "Failed to load $ResourceName - Status: $($currentResponse.StatusCode)$detail"

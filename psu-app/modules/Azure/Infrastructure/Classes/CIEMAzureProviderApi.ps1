@@ -3,6 +3,10 @@ class CIEMAzureProviderApi {
     [string]$Name
     [string]$BaseUrl
     [string]$Version
+    [string]$Service
+    [string]$Path
+    [hashtable]$Permissions
+    [bool]$Disabled
 
     CIEMAzureProviderApi() {
     }

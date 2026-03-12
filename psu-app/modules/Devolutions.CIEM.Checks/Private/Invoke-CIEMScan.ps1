@@ -186,43 +186,41 @@ function Invoke-CIEMScan {
             'Azure' {
                 $sw = [Diagnostics.Stopwatch]::new()
 
-                # Tenant-scoped services (no subscription required)
-                if ('Entra' -in $servicesToInit) {
-                    $sw.Restart()
-                    try {
-                        $svcData = Get-CIEMAzureEntraData
-                        $serviceCacheLookup['Entra'] = [CIEMServiceCache]@{
-                            ServiceName = 'Entra'; Success = $true; Duration = $sw.Elapsed
-                            CacheData = $svcData; Errors = @(); Warnings = @(); Output = @()
-                        }
-                        Write-Verbose "[$providerName] Initialized Entra in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
-                    } catch {
-                        $serviceCacheLookup['Entra'] = [CIEMServiceCache]@{
-                            ServiceName = 'Entra'; Success = $false; Duration = $sw.Elapsed
-                            CacheData = @{}; Errors = @($_.Exception.Message); Warnings = @(); Output = @()
-                        }
-                        Write-Warning "[$providerName] Failed to initialize Entra: $($_.Exception.Message)"
-                    }
+                # Check if discovery data is available
+                $latestRun = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
+                $hasDiscoveryData = $latestRun.Count -gt 0
+
+                if (-not $hasDiscoveryData) {
+                    Write-Warning "[$providerName] No completed discovery run found. Services requiring discovery data will be SKIPPED. Run Start-CIEMAzureDiscovery first."
                 }
 
-                # Subscription-scoped services
-                foreach ($svcName in @('IAM', 'Defender', 'Monitor', 'Network', 'Policy', 'Vm')) {
-                    if ($svcName -notin $servicesToInit) { continue }
+                foreach ($svcName in $servicesToInit) {
                     $sw.Restart()
-                    $getFn = "Get-CIEMAzure${svcName}Data"
+                    if (-not $hasDiscoveryData) {
+                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
+                            ServiceName = $svcName; Success = $false; Duration = $sw.Elapsed
+                            CacheData = @{}; Errors = @("No discovery data available — run Start-CIEMAzureDiscovery first")
+                            Warnings = @(); Output = @()
+                        }
+                        continue
+                    }
                     try {
-                        $svcData = & $getFn
+                        $svcData = switch ($svcName) {
+                            'Entra' { @{ EntraResources = @(Get-CIEMAzureEntraResource) } }
+                            'IAM'   { @{ ArmResources = @(Get-CIEMAzureArmResource -Type 'microsoft.authorization/roleassignments') + @(Get-CIEMAzureArmResource -Type 'microsoft.authorization/roledefinitions') } }
+                            default { @{} }
+                        }
                         $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
                             ServiceName = $svcName; Success = $true; Duration = $sw.Elapsed
                             CacheData = $svcData; Errors = @(); Warnings = @(); Output = @()
                         }
-                        Write-Verbose "[$providerName] Initialized $svcName in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
+                        Write-Verbose "[$providerName] Loaded $svcName from discovery data in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
                     } catch {
                         $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
                             ServiceName = $svcName; Success = $false; Duration = $sw.Elapsed
                             CacheData = @{}; Errors = @($_.Exception.Message); Warnings = @(); Output = @()
                         }
-                        Write-Warning "[$providerName] Failed to initialize ${svcName}: $($_.Exception.Message)"
+                        Write-Warning "[$providerName] Failed to load $svcName from discovery data: $($_.Exception.Message)"
                     }
                 }
             }
@@ -250,35 +248,6 @@ function Invoke-CIEMScan {
                         Write-Verbose "[$providerName] No service function for $svcName — checks will run as stubs"
                     }
                 }
-            }
-        }
-
-        # Persist collected service data to SQLite normalized tables
-        $saveParams = @{ ProviderId = $providerName.ToLower() }
-        $serviceMap = @{
-            EntraData    = 'Entra'
-            IAMData      = 'IAM'
-            DefenderData = 'Defender'
-            MonitorData  = 'Monitor'
-            NetworkData  = 'Network'
-            PolicyData   = 'Policy'
-            VmData       = 'Vm'
-        }
-        foreach ($param in $serviceMap.Keys) {
-            $svc = $serviceMap[$param]
-            if ($serviceCacheLookup.ContainsKey($svc) -and $serviceCacheLookup[$svc].Success) {
-                $saveParams[$param] = $serviceCacheLookup[$svc].CacheData
-            }
-        }
-        if ($authContext.PSObject.Properties['TenantId']) { $saveParams.TenantId = $authContext.TenantId }
-
-        if ($saveParams.Count -gt 2) {  # more than ProviderId + TenantId
-            try {
-                Save-CIEMCollectedData @saveParams
-                Write-Verbose "[$providerName] Collected data persisted to SQLite"
-            }
-            catch {
-                Write-Warning "[$providerName] Failed to persist collected data: $($_.Exception.Message)"
             }
         }
 

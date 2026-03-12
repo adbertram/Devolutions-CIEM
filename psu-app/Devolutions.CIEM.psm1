@@ -10,20 +10,18 @@ function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
 _BootLog "Module loading from: $PSScriptRoot"
 
 # --- Sub-module directory roots (for runtime file discovery) ---
-$script:AzureRoot  = Join-Path $PSScriptRoot 'modules/Azure/Infrastructure'
-$script:AWSRoot    = Join-Path $PSScriptRoot 'modules/AWS/Infrastructure'
-$script:ChecksRoot = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Checks'
-$script:IdentitiesRoot = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Identities'
-$script:AzurePermissionsRoot = Join-Path $PSScriptRoot 'modules/Azure/Permissions'
-$script:PSURoot    = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.PSU'
+$script:AzureRoot           = Join-Path $PSScriptRoot 'modules/Azure/Infrastructure'
+$script:AzureDiscoveryRoot  = Join-Path $PSScriptRoot 'modules/Azure/Discovery'
+$script:AWSRoot             = Join-Path $PSScriptRoot 'modules/AWS/Infrastructure'
+$script:ChecksRoot          = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Checks'
+$script:PSURoot             = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.PSU'
 
 # All sub-module roots in load order
 $subModuleRoots = @(
     $script:AzureRoot
-    $script:AzurePermissionsRoot
+    $script:AzureDiscoveryRoot
     $script:AWSRoot
     $script:ChecksRoot
-    $script:IdentitiesRoot
     $script:PSURoot
 )
 
@@ -39,7 +37,7 @@ _BootLog "PSUSQLite imported"
 
 # Base classes (must load first - other classes depend on these)
 _BootLog "Loading base classes..."
-foreach ($className in @('CIEMAuthenticationContext', 'CIEMProvider', 'CIEMIdentity', 'CIEMResourceType')) {
+foreach ($className in @('CIEMAuthenticationContext', 'CIEMProvider')) {
     $classPath = Join-Path $PSScriptRoot "Classes/$className.ps1"
     try { . $classPath } catch { _BootLog "FAILED to load class $className : $_" 'ERROR' }
 }
@@ -51,16 +49,9 @@ foreach ($className in @('CIEMServiceCache', 'CIEMProviderService', 'CIEMCheck',
     if (Test-Path $classFile) { try { . $classFile } catch { _BootLog "FAILED to load class $className : $_" 'ERROR' } }
 }
 
-# Identity classes (explicit order: node -> derived -> edge -> container)
-_BootLog "Loading Identity classes..."
-foreach ($classFile in @('CIEMGraphNode.ps1', 'CIEMIdentityNodes.ps1', 'CIEMRBACNodes.ps1', 'CIEMGraphEdge.ps1', 'CIEMGraph.ps1', 'CIEMIdentityResourceAccess.ps1')) {
-    $path = Join-Path $script:IdentitiesRoot "Classes/$classFile"
-    if (Test-Path $path) { try { . $path } catch { _BootLog "FAILED to load class $classFile : $_" 'ERROR' } }
-}
-
-# Unordered classes (Azure, Azure Permissions, AWS - no interdependencies)
+# Unordered classes (Azure, Azure Discovery, AWS - no interdependencies)
 _BootLog "Loading provider classes..."
-foreach ($root in @($script:AzureRoot, $script:AzurePermissionsRoot, $script:AWSRoot)) {
+foreach ($root in @($script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot)) {
     foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction SilentlyContinue)) {
         try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR' }
     }
@@ -102,8 +93,6 @@ $script:AzureAuthProfilesCacheKey = 'CIEM:AuthProfiles:Azure'
 $script:AWSAuthProfileCacheKey    = 'CIEM:AuthProfile:AWS'
 $script:CIEMConfigCacheKey        = 'CIEM:Config'
 $script:ScanConfigCacheKey        = 'CIEM:ScanConfig'
-$script:GraphLatestCacheKey       = 'CIEM:Graph:Latest'
-$script:GraphAzureCacheKey        = 'CIEM:Graph:Azure'
 # AWS
 $script:AWSAuthContext = $null
 # PSU
@@ -126,7 +115,8 @@ catch {
 
 # Apply provider-specific schemas
 foreach ($schema in @(
-    @{ Path = Join-Path $script:AzureRoot 'Data/azure_schema.sql';                          Label = 'Azure' }
+    @{ Path = Join-Path $script:AzureRoot          'Data/azure_schema.sql';         Label = 'Azure' }
+    @{ Path = Join-Path $script:AzureDiscoveryRoot 'Data/discovery_schema.sql';     Label = 'AzureDiscovery' }
 )) {
     try {
         $dbPath = Get-CIEMDatabasePath
@@ -159,7 +149,8 @@ foreach ($root in $subModuleRoots) {
 
 $exportFunctions = @()
 foreach ($dir in $exportDirs) {
-    $exportFunctions += (Get-ChildItem "$dir/*.ps1" -ErrorAction SilentlyContinue).BaseName
+    $files = Get-ChildItem "$dir/*.ps1" -ErrorAction SilentlyContinue
+    if ($files) { $exportFunctions += $files.BaseName }
 }
 
 # Page files may define multiple functions per file — extract all function names
