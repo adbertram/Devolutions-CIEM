@@ -20,7 +20,7 @@ function Save-CIEMAzureResourceRelationship {
         [Parameter(Mandatory, ParameterSetName = 'ByProperties')]
         [string]$CollectedAt,
 
-        [Parameter(ParameterSetName = 'ByProperties')]
+        [Parameter()]
         $Connection,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]

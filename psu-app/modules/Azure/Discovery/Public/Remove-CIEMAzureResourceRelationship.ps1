@@ -17,34 +17,48 @@ function Remove-CIEMAzureResourceRelationship {
         [switch]$All,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
-        [PSObject[]]$InputObject
+        [PSObject[]]$InputObject,
+
+        [Parameter()]
+        [object]$Connection
     )
 
     process {
         switch ($PSCmdlet.ParameterSetName) {
             'ById' {
                 if ($PSCmdlet.ShouldProcess("Id $Id", 'Remove Azure resource relationship')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_resource_relationships WHERE id = @id" -Parameters @{ id = $Id } -AsNonQuery | Out-Null
+                    $q = "DELETE FROM azure_resource_relationships WHERE id = @id"
+                    $p = @{ id = $Id }
+                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                    else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
                 }
             }
             'ByCombo' {
                 if ($PSCmdlet.ShouldProcess("$SourceId -> $TargetId ($Relationship)", 'Remove Azure resource relationship')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_resource_relationships WHERE source_id = @source_id AND target_id = @target_id AND relationship = @relationship" -Parameters @{
+                    $q = "DELETE FROM azure_resource_relationships WHERE source_id = @source_id AND target_id = @target_id AND relationship = @relationship"
+                    $p = @{
                         source_id    = $SourceId
                         target_id    = $TargetId
                         relationship = $Relationship
-                    } -AsNonQuery | Out-Null
+                    }
+                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                    else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
                 }
             }
             'All' {
                 if ($PSCmdlet.ShouldProcess('all rows', 'Remove Azure resource relationships')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_resource_relationships" -AsNonQuery | Out-Null
+                    $q = "DELETE FROM azure_resource_relationships"
+                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -AsNonQuery | Out-Null }
+                    else { Invoke-CIEMQuery -Query $q -AsNonQuery | Out-Null }
                 }
             }
             'InputObject' {
                 foreach ($obj in $InputObject) {
                     if ($PSCmdlet.ShouldProcess("Id $($obj.Id)", 'Remove Azure resource relationship')) {
-                        Invoke-CIEMQuery -Query "DELETE FROM azure_resource_relationships WHERE id = @id" -Parameters @{ id = $obj.Id } -AsNonQuery | Out-Null
+                        $q = "DELETE FROM azure_resource_relationships WHERE id = @id"
+                        $p = @{ id = $obj.Id }
+                        if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                        else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
                     }
                 }
             }

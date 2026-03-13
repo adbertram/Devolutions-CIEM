@@ -8,30 +8,44 @@ function Remove-CIEMAzureEntraResource {
         [Parameter(Mandatory, ParameterSetName = 'All')]
         [switch]$All,
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
-        [PSObject[]]$InputObject
+        [PSObject[]]$InputObject,
+
+        [Parameter()]
+        [object]$Connection
     )
     process {
         switch ($PSCmdlet.ParameterSetName) {
             'InputObject' {
                 foreach ($item in $InputObject) {
                     if ($PSCmdlet.ShouldProcess($item.Id, 'Remove Azure Entra resource')) {
-                        Invoke-CIEMQuery -Query "DELETE FROM azure_entra_resources WHERE id = @id" -Parameters @{ id = $item.Id } -AsNonQuery | Out-Null
+                        $q = "DELETE FROM azure_entra_resources WHERE id = @id"
+                        $p = @{ id = $item.Id }
+                        if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                        else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
                     }
                 }
             }
             'ByType' {
                 if ($PSCmdlet.ShouldProcess("type '$Type'", 'Remove all Azure Entra resources')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_entra_resources WHERE type = @type" -Parameters @{ type = $Type } -AsNonQuery | Out-Null
+                    $q = "DELETE FROM azure_entra_resources WHERE type = @type"
+                    $p = @{ type = $Type }
+                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                    else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
                 }
             }
             'All' {
                 if ($PSCmdlet.ShouldProcess('all records', 'Remove all Azure Entra resources')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_entra_resources" -AsNonQuery | Out-Null
+                    $q = "DELETE FROM azure_entra_resources"
+                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -AsNonQuery | Out-Null }
+                    else { Invoke-CIEMQuery -Query $q -AsNonQuery | Out-Null }
                 }
             }
             default {
                 if ($PSCmdlet.ShouldProcess($Id, 'Remove Azure Entra resource')) {
-                    Invoke-CIEMQuery -Query "DELETE FROM azure_entra_resources WHERE id = @id" -Parameters @{ id = $Id } -AsNonQuery | Out-Null
+                    $q = "DELETE FROM azure_entra_resources WHERE id = @id"
+                    $p = @{ id = $Id }
+                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                    else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
                 }
             }
         }
