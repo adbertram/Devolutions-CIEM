@@ -142,7 +142,7 @@ function Get-CIEMRequiredPermission {
     # Determine required Azure RBAC roles based on check permissions + endpoint permissions
     $azureRoles = @()
     if ($graphPermissions.Count -gt 0 -or $armPermissions.Count -gt 0 -or $kvPermissions.Count -gt 0 -or $endpointAzureRoles.Count -gt 0) {
-        # Subscription Reader is always required for subscription discovery (Get-AzSubscription)
+        # Subscription Reader is always required for subscription discovery (ARM REST API)
         $azureRoles = @('Reader')
 
         # ARM permissions: Reader role covers all */read actions

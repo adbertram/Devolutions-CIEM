@@ -8,7 +8,7 @@ function Set-CIEMAzureAuthenticationProfileActive {
     )
 
     if ($PSCmdlet.ParameterSetName -eq 'ById') {
-        $Profile = @(Get-CIEMAzureAuthenticationProfile -Id $Id) | Select-Object -First 1
+        $Profile = Get-CIEMAzureAuthenticationProfile -Id $Id | Select-Object -First 1
         if (-not $Profile) { throw "Azure authentication profile '$Id' not found." }
     }
 

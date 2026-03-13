@@ -29,7 +29,6 @@ function ConvertTo-CIEMProvider {
         $provider = [CIEMProvider]::new()
         $provider.Name = $InputObject.Name
         $provider.Enabled = [bool]$InputObject.Enabled
-        $provider.IsDefault = [bool]$InputObject.IsDefault
         $provider.ResourceFilter = @($InputObject.ResourceFilter)
 
         if ($InputObject.Endpoints) {

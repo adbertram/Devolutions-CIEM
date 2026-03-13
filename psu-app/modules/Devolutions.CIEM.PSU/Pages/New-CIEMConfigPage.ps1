@@ -20,7 +20,7 @@ function New-CIEMConfigPage {
 
         # Get available providers from database
         $providers = @(Get-CIEMProvider)
-        $currentProvider = ($providers | Where-Object IsDefault | Select-Object -First 1).Name
+        $currentProvider = ($providers | Where-Object Enabled | Select-Object -First 1).Name
         if (-not $currentProvider) { $currentProvider = 'Azure' }
 
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
@@ -92,7 +92,7 @@ function New-CIEMConfigPage {
                 # Read from UI if available (after user interaction), otherwise fall back to config
                 $uiProvider = (Get-UDElement -Id 'cloudProvider').value
                 $uiMethod = (Get-UDElement -Id 'authMethod').value
-                $defaultProvider = (Get-CIEMProvider | Where-Object IsDefault | Select-Object -First 1).Name
+                $defaultProvider = (Get-CIEMProvider | Where-Object Enabled | Select-Object -First 1).Name
                 $selectedProvider = if ($uiProvider) { $uiProvider } elseif ($defaultProvider) { $defaultProvider } else { 'Azure' }
 
                 # Read auth method from profile for Azure, default for others

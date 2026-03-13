@@ -5,8 +5,8 @@ function Get-CIEMProvider {
 
     .DESCRIPTION
         Returns provider objects from the CIEM SQLite database. Each provider
-        includes Name, Enabled, IsDefault, Endpoints, ResourceFilter,
-        and a computed CheckCount property.
+        includes Name, Enabled, Endpoints, ResourceFilter, and a computed
+        CheckCount property.
 
     .PARAMETER Name
         Optional. Return a single provider by name (case-insensitive).
@@ -35,7 +35,7 @@ function Get-CIEMProvider {
 
     $ErrorActionPreference = 'Stop'
 
-    $query = "SELECT p.id, p.name, p.type, p.enabled, p.is_default, p.created_at, p.updated_at FROM providers p"
+    $query = "SELECT p.id, p.name, p.type, p.enabled, p.created_at, p.updated_at FROM providers p"
 
     if ($Name) {
         $query += "`nWHERE p.name = @name COLLATE NOCASE"
@@ -51,7 +51,6 @@ function Get-CIEMProvider {
         $provider = [CIEMProvider]::new()
         $provider.Name = $row.name
         $provider.Enabled = [bool]$row.enabled
-        $provider.IsDefault = [bool]$row.is_default
         $provider.Endpoints = [PSCustomObject]@{}
         $provider.ResourceFilter = @()
 

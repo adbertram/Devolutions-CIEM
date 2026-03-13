@@ -16,9 +16,6 @@ function Update-CIEMProvider {
     .PARAMETER Enabled
         Whether the provider is enabled.
 
-    .PARAMETER IsDefault
-        Set this provider as the default. Clears IsDefault on all others.
-
     .PARAMETER PassThru
         Returns the updated provider object. By default, this function produces no output.
 
@@ -27,9 +24,6 @@ function Update-CIEMProvider {
 
     .EXAMPLE
         Update-CIEMProvider -Name 'GCP' -Enabled $true
-
-    .EXAMPLE
-        Update-CIEMProvider -Name 'Azure' -IsDefault
     #>
     [CmdletBinding()]
     [OutputType('CIEMProvider')]
@@ -39,9 +33,6 @@ function Update-CIEMProvider {
 
         [Parameter()]
         [bool]$Enabled,
-
-        [Parameter()]
-        [switch]$IsDefault,
 
         [Parameter()]
         [switch]$PassThru
@@ -58,35 +49,11 @@ function Update-CIEMProvider {
         throw "Provider '$Name' not found. Use New-CIEMProvider to create it."
     }
 
-    $providerType = $existing.type
-
-    $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
-    try {
-        $tx = $conn.BeginTransaction()
-
-        # Update enabled flag
-        if ($PSBoundParameters.ContainsKey('Enabled')) {
-            Invoke-PSUSQLiteQuery -Connection $conn -Query "UPDATE providers SET enabled = @enabled, updated_at = @now WHERE id = @id" -Parameters @{
-                id = $providerId; enabled = if ($Enabled) { 1 } else { 0 }; now = $now
-            } -AsNonQuery | Out-Null
-        }
-
-        # Update IsDefault
-        if ($IsDefault.IsPresent) {
-            Invoke-PSUSQLiteQuery -Connection $conn -Query "UPDATE providers SET is_default = 0 WHERE is_default = 1" -AsNonQuery | Out-Null
-            Invoke-PSUSQLiteQuery -Connection $conn -Query "UPDATE providers SET is_default = 1, updated_at = @now WHERE id = @id" -Parameters @{
-                id = $providerId; now = $now
-            } -AsNonQuery | Out-Null
-        }
-
-        $tx.Commit()
-    }
-    catch {
-        if ($tx) { $tx.Rollback() }
-        throw
-    }
-    finally {
-        $conn.Dispose()
+    # Update enabled flag
+    if ($PSBoundParameters.ContainsKey('Enabled')) {
+        Invoke-CIEMQuery -Query "UPDATE providers SET enabled = @enabled, updated_at = @now WHERE id = @id" -Parameters @{
+            id = $providerId; enabled = if ($Enabled) { 1 } else { 0 }; now = $now
+        } -AsNonQuery | Out-Null
     }
 
     if ($PassThru) {

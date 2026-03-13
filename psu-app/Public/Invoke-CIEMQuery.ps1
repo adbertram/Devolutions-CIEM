@@ -20,7 +20,7 @@ function Invoke-CIEMQuery {
     .EXAMPLE
         Invoke-CIEMQuery -Query "SELECT * FROM providers"
     .EXAMPLE
-        Invoke-CIEMQuery -Query "INSERT INTO providers (id, name, type, enabled, is_default, created_at, updated_at) VALUES (@id, @name, @type, @enabled, @is_default, @now, @now)" -Parameters @{ id = 'azure'; name = 'Azure'; type = 'Azure'; enabled = 1; is_default = 1; now = (Get-Date).ToString('o') } -AsNonQuery
+        Invoke-CIEMQuery -Query "INSERT INTO providers (id, name, type, enabled, created_at, updated_at) VALUES (@id, @name, @type, @enabled, @now, @now)" -Parameters @{ id = 'azure'; name = 'Azure'; type = 'Azure'; enabled = 1; now = (Get-Date).ToString('o') } -AsNonQuery
     #>
     [CmdletBinding()]
     param(

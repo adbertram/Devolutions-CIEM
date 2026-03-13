@@ -1,19 +1,15 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    if (Test-Path $azureSchema) {
-        Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-    }
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql'
-    if (Test-Path $discoverySchema) {
-        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-    }
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
@@ -34,7 +30,7 @@ Describe 'Resource Type' {
 
         It 'Returns all resource types when no filter' {
             $results = Get-CIEMAzureResourceType
-            $results.Count | Should -Be 3
+            $results | Should -HaveCount 3
         }
 
         It 'Returns CIEMAzureResourceType typed objects (.GetType().Name -eq CIEMAzureResourceType)' {
@@ -50,7 +46,7 @@ Describe 'Resource Type' {
 
         It 'Filters by -ApiSource' {
             $results = Get-CIEMAzureResourceType -ApiSource 'ARM'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Returns empty array when no match' {
@@ -91,7 +87,7 @@ Describe 'Resource Type' {
             $result.ResourceCount | Should -Be 200
             # Only 1 row
             $all = Get-CIEMAzureResourceType
-            $all.Count | Should -Be 1
+            $all | Should -HaveCount 1
         }
 
         It 'RemoveCIEMAzureResourceType removes by -Type' {

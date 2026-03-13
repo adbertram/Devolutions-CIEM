@@ -10,6 +10,10 @@ function Connect-CIEMAzure {
 
         Supported methods: ServicePrincipalSecret, ServicePrincipalCertificate, ManagedIdentity.
 
+    .PARAMETER AuthenticationProfile
+        Optional. A pre-resolved CIEMAzureAuthenticationProfile object (with secrets).
+        If not provided, the active profile is looked up automatically.
+
     .OUTPUTS
         [PSCustomObject] Auth context with TenantId, SubscriptionIds, AccountId, AccountType, ConnectedAt.
 
@@ -19,16 +23,17 @@ function Connect-CIEMAzure {
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
-    param()
+    param(
+        [Parameter()]
+        [CIEMAzureAuthenticationProfile]$AuthenticationProfile = (
+            @(Get-CIEMAzureAuthenticationProfile -IsActive $true -ResolveSecrets) | Select-Object -First 1
+        )
+    )
 
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue'
 
     Write-CIEMLog -Message "Connect-CIEMAzure started" -Severity INFO -Component 'Connect-CIEMAzure'
-
-    # Clear any existing Az context to ensure clean authentication
-    Write-CIEMLog -Message "Clearing existing Az context..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-    Clear-AzContext -Force -ErrorAction SilentlyContinue | Out-Null
 
     # 1. Get provider for ResourceFilter/Endpoints
     $azureProvider = Get-CIEMProvider -Name 'Azure'
@@ -36,8 +41,8 @@ function Connect-CIEMAzure {
         throw "Azure provider not configured. Use New-CIEMProvider -Name 'Azure' to create it."
     }
 
-    # 2. Get the active authentication profile with resolved secrets
-    $profile = @(Get-CIEMAzureAuthenticationProfile -IsActive $true -ResolveSecrets) | Select-Object -First 1
+    # 2. Validate the authentication profile
+    $profile = $AuthenticationProfile
     if (-not $profile) {
         throw "No active Azure authentication profile found. Configure one on the Configuration page."
     }
@@ -129,11 +134,6 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $ctx.KeyVaultToken = $keyVaultTokenResponse.access_token
             Write-CIEMLog -Message "Tokens stored on auth context" -Severity INFO -Component 'Connect-CIEMAzure'
 
-            # Inject ARM token into Az context
-            Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Connect-AzAccount -AccessToken $armTokenResponse.access_token -AccountId $profile.ClientId -TenantId $profile.TenantId -ErrorAction Stop | Out-Null
-            Write-CIEMLog -Message "Az context established successfully" -Severity INFO -Component 'Connect-CIEMAzure'
-
             $ctx.AccountId = $profile.ClientId
             $ctx.AccountType = 'ServicePrincipal'
         }
@@ -151,26 +151,72 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Configuration page."
             }
 
-            # Use MSAL directly with X509Certificate2 (Connect-AzAccount -CertificatePath has EntryPointNotFoundException in PSU)
-            Write-CIEMLog -Message "Acquiring tokens via MSAL with certificate (thumbprint: $($profile.Certificate.Thumbprint))..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $msalApp = [Microsoft.Identity.Client.ConfidentialClientApplicationBuilder]::Create($profile.ClientId).WithCertificate($profile.Certificate).WithAuthority("https://login.microsoftonline.com/$($profile.TenantId)").Build()
+            # Build client assertion JWT signed with certificate (replaces MSAL dependency)
+            Write-CIEMLog -Message "Building client assertion JWT with certificate (thumbprint: $($profile.Certificate.Thumbprint))..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $cert = $profile.Certificate
+            $tokenUrl = "https://login.microsoftonline.com/$($profile.TenantId)/oauth2/v2.0/token"
 
-            $armResult = $msalApp.AcquireTokenForClient([string[]]@('https://management.azure.com/.default')).ExecuteAsync().GetAwaiter().GetResult()
-            $ctx.ARMToken = $armResult.AccessToken
-            Write-CIEMLog -Message "ARM token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
+            # JWT header with x5t (base64url-encoded SHA-1 thumbprint)
+            $thumbprintBytes = [byte[]]::new($cert.Thumbprint.Length / 2)
+            for ($i = 0; $i -lt $thumbprintBytes.Length; $i++) {
+                $thumbprintBytes[$i] = [Convert]::ToByte($cert.Thumbprint.Substring($i * 2, 2), 16)
+            }
+            $x5t = [Convert]::ToBase64String($thumbprintBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+            $jwtHeader = @{ alg = 'RS256'; typ = 'JWT'; x5t = $x5t } | ConvertTo-Json -Compress
+            $now = [DateTimeOffset]::UtcNow
+            $jwtPayload = @{
+                aud = $tokenUrl
+                iss = $profile.ClientId
+                sub = $profile.ClientId
+                jti = [guid]::NewGuid().ToString()
+                nbf = $now.ToUnixTimeSeconds()
+                exp = $now.AddMinutes(10).ToUnixTimeSeconds()
+            } | ConvertTo-Json -Compress
 
-            $graphResult = $msalApp.AcquireTokenForClient([string[]]@('https://graph.microsoft.com/.default')).ExecuteAsync().GetAwaiter().GetResult()
-            $ctx.GraphToken = $graphResult.AccessToken
-            Write-CIEMLog -Message "Graph token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Base64url encode header and payload
+            $toBase64Url = { param([string]$s) [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s)).TrimEnd('=').Replace('+', '-').Replace('/', '_') }
+            $headerB64 = & $toBase64Url $jwtHeader
+            $payloadB64 = & $toBase64Url $jwtPayload
 
-            $kvResult = $msalApp.AcquireTokenForClient([string[]]@('https://vault.azure.net/.default')).ExecuteAsync().GetAwaiter().GetResult()
-            $ctx.KeyVaultToken = $kvResult.AccessToken
-            Write-CIEMLog -Message "KeyVault token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Sign with RSA-SHA256 (use extension method via static call — PowerShell can't call extension methods directly)
+            $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+            $sigBytes = $rsa.SignData([Text.Encoding]::UTF8.GetBytes("$headerB64.$payloadB64"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            $sigB64 = [Convert]::ToBase64String($sigBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+            $clientAssertion = "$headerB64.$payloadB64.$sigB64"
 
-            # Inject ARM token into Az context so downstream Get-AzContext / Get-AzSubscription work
-            Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Connect-AzAccount -AccessToken $armResult.AccessToken -AccountId $profile.ClientId -TenantId $profile.TenantId -ErrorAction Stop | Out-Null
-            Write-CIEMLog -Message "Certificate authentication completed successfully via MSAL" -Severity INFO -Component 'Connect-CIEMAzure'
+            # Acquire tokens via REST using client_assertion
+            $getTokenWithCert = {
+                param([string]$Scope)
+                $body = @{
+                    client_id             = $profile.ClientId
+                    scope                 = $Scope
+                    client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+                    client_assertion      = $clientAssertion
+                    grant_type            = 'client_credentials'
+                }
+                Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
+            }
+
+            $armTokenResponse = & $getTokenWithCert -Scope 'https://management.azure.com/.default'
+            $ctx.ARMToken = $armTokenResponse.access_token
+            Write-CIEMLog -Message "ARM token acquired via certificate assertion" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            $graphTokenResponse = & $getTokenWithCert -Scope 'https://graph.microsoft.com/.default'
+            $ctx.GraphToken = $graphTokenResponse.access_token
+            Write-CIEMLog -Message "Graph token acquired via certificate assertion" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            $kvTokenResponse = & $getTokenWithCert -Scope 'https://vault.azure.net/.default'
+            $ctx.KeyVaultToken = $kvTokenResponse.access_token
+            Write-CIEMLog -Message "KeyVault token acquired via certificate assertion" -Severity INFO -Component 'Connect-CIEMAzure'
+
+            # Compute token expiry (earliest among the three)
+            $expiresInSeconds = @($armTokenResponse.expires_in, $graphTokenResponse.expires_in, $kvTokenResponse.expires_in) |
+                Where-Object { $_ } | Sort-Object | Select-Object -First 1
+            if ($expiresInSeconds) {
+                $ctx.TokenExpiresAt = (Get-Date).AddSeconds([int]$expiresInSeconds)
+            }
+
+            Write-CIEMLog -Message "Certificate authentication completed successfully via REST" -Severity INFO -Component 'Connect-CIEMAzure'
 
             $ctx.AccountId = $profile.ClientId
             $ctx.AccountType = 'ServicePrincipal'
@@ -247,10 +293,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $ctx.AccountType = 'ManagedIdentity'
             Write-CIEMLog -Message "Extracted from token - TenantId: $($ctx.TenantId), ObjectId: $($ctx.AccountId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
-            # Inject ARM token into Az context
-            Write-CIEMLog -Message "Injecting ARM token into Az context via Connect-AzAccount -AccessToken..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Connect-AzAccount -AccessToken $armTokenResponse.access_token -AccountId $ctx.AccountId -TenantId $ctx.TenantId -ErrorAction Stop | Out-Null
-            Write-CIEMLog -Message "Az context established successfully via Managed Identity" -Severity INFO -Component 'Connect-CIEMAzure'
+            Write-CIEMLog -Message "Managed Identity authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         default {
             $ctx.LastError = "Unknown authentication method: $($profile.Method)"
@@ -258,44 +301,21 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         }
     }
 
-    # Get Azure context with retry logic for PSU runspace stability
-    Write-CIEMLog -Message "Getting Azure context..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-    $context = $null
-    $retryCount = 0
-    $maxRetries = 2
-
-    while (-not $context -and $retryCount -lt $maxRetries) {
-        try {
-            $context = Get-AzContext -ErrorAction Stop
-            if (-not $context -or -not $context.Account) {
-                throw "Az context is empty or invalid"
-            }
-        }
-        catch {
-            $retryCount++
-            Write-CIEMLog -Message "Get-AzContext attempt $retryCount failed: $($_.Exception.Message)" -Severity WARNING -Component 'Connect-CIEMAzure'
-            if ($retryCount -lt $maxRetries) {
-                Clear-AzContext -Force -ErrorAction SilentlyContinue | Out-Null
-                Start-Sleep -Milliseconds 500
-            }
-            else {
-                $ctx.LastError = "Failed to get valid Az context after $maxRetries attempts"
-                throw "Failed to get valid Az context after $maxRetries attempts: $($_.Exception.Message)"
-            }
-        }
-    }
-    Write-CIEMLog -Message "Azure context obtained: Account=$($context.Account.Id), Tenant=$($context.Tenant.Id)" -Severity INFO -Component 'Connect-CIEMAzure'
-
-    # Get all accessible subscriptions with error handling
-    Write-CIEMLog -Message "Getting accessible subscriptions..." -Severity DEBUG -Component 'Connect-CIEMAzure'
+    # List accessible subscriptions via ARM REST API
+    Write-CIEMLog -Message "Getting accessible subscriptions via ARM REST API..." -Severity DEBUG -Component 'Connect-CIEMAzure'
     try {
-        $subscriptions = @(Get-AzSubscription -TenantId $context.Tenant.Id -ErrorAction Stop)
+        $subHeaders = @{ Authorization = "Bearer $($ctx.ARMToken)" }
+        $subResponse = Invoke-RestMethod -Uri 'https://management.azure.com/subscriptions?api-version=2022-12-01' `
+            -Headers $subHeaders -Method Get -ErrorAction Stop
+        $subscriptions = @($subResponse.value | Where-Object { $_.state -eq 'Enabled' } | ForEach-Object {
+            [PSCustomObject]@{ Id = $_.subscriptionId }
+        })
     }
     catch {
-        Write-CIEMLog -Message "Get-AzSubscription failed: $($_.Exception.Message). Continuing with empty subscription list." -Severity WARNING -Component 'Connect-CIEMAzure'
+        Write-CIEMLog -Message "ARM subscription listing failed: $($_.Exception.Message). Continuing with empty subscription list." -Severity WARNING -Component 'Connect-CIEMAzure'
         $subscriptions = @()
     }
-    Write-CIEMLog -Message "Found $($subscriptions.Count) subscriptions" -Severity DEBUG -Component 'Connect-CIEMAzure'
+    Write-CIEMLog -Message "Found $($subscriptions.Count) enabled subscriptions" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
     # Filter to configured subscriptions if specified
     $subscriptionFilter = @($azureProvider.ResourceFilter)
@@ -307,8 +327,8 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
     $subscriptionIds = @($subscriptions | Select-Object -ExpandProperty Id)
 
     if ($subscriptionIds.Count -eq 0) {
-        Write-CIEMLog -Message "No accessible subscriptions found in tenant $($context.Tenant.Id)" -Severity WARNING -Component 'Connect-CIEMAzure'
-        Write-Warning "No accessible subscriptions found in tenant $($context.Tenant.Id)"
+        Write-CIEMLog -Message "No accessible subscriptions found in tenant $($ctx.TenantId)" -Severity WARNING -Component 'Connect-CIEMAzure'
+        Write-Warning "No accessible subscriptions found in tenant $($ctx.TenantId)"
     }
     else {
         Write-CIEMLog -Message "Accessible subscriptions: $($subscriptionIds.Count)" -Severity INFO -Component 'Connect-CIEMAzure'
@@ -316,20 +336,9 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
 
     # Finalize auth context
     $ctx.SubscriptionIds = $subscriptionIds
-    if (-not $ctx.TenantId) { $ctx.TenantId = $context.Tenant.Id }
     $ctx.ConnectedAt = Get-Date
     $ctx.IsConnected = $true
     $ctx.LastError = $null
-
-    # Determine account type from Az context if not already set
-    if (-not $ctx.AccountType) {
-        $ctx.AccountType = switch ($context.Account.Type) {
-            'User' { 'User' }
-            'ServicePrincipal' { 'ServicePrincipal' }
-            'ManagedService' { 'ManagedIdentity' }
-            default { $context.Account.Type }
-        }
-    }
 
     Write-CIEMLog -Message "Connect-CIEMAzure completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
 

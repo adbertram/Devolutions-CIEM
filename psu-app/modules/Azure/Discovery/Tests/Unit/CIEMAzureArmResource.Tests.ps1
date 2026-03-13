@@ -1,19 +1,15 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    if (Test-Path $azureSchema) {
-        Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-    }
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql'
-    if (Test-Path $discoverySchema) {
-        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-    }
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
@@ -78,7 +74,7 @@ Describe 'ARM Resource CRUD' {
 
         It 'Returns all resources when no filter' {
             $results = Get-CIEMAzureArmResource
-            $results.Count | Should -Be 3
+            $results | Should -HaveCount 3
         }
 
         It 'Returns CIEMAzureArmResource typed objects (.GetType().Name -eq CIEMAzureArmResource)' {
@@ -94,7 +90,7 @@ Describe 'ARM Resource CRUD' {
 
         It 'Filters by -Type' {
             $results = Get-CIEMAzureArmResource -Type 'microsoft.compute/virtualmachines'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Filters by -Name' {
@@ -105,13 +101,13 @@ Describe 'ARM Resource CRUD' {
 
         It 'Filters by -SubscriptionId' {
             $results = Get-CIEMAzureArmResource -SubscriptionId 'sub2'
-            $results.Count | Should -Be 1
+            $results | Should -HaveCount 1
             $results[0].Name | Should -Be 'get-vm2'
         }
 
         It 'Filters by -ResourceGroup' {
             $results = Get-CIEMAzureArmResource -ResourceGroup 'rg1'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Returns empty array when no match' {
@@ -181,7 +177,7 @@ Describe 'ARM Resource CRUD' {
             $result.Name | Should -Be 'vm-updated'
             # Only 1 row, not 2
             $all = Get-CIEMAzureArmResource
-            $all.Count | Should -Be 1
+            $all | Should -HaveCount 1
         }
 
         It 'Accepts -InputObject via pipeline' {
@@ -213,7 +209,7 @@ Describe 'ARM Resource CRUD' {
             $result = Get-CIEMAzureArmResource -Id '/subscriptions/sub1/rg/vm-rm1'
             $result | Should -BeNullOrEmpty
             # Other resources still exist
-            (Get-CIEMAzureArmResource).Count | Should -Be 2
+            Get-CIEMAzureArmResource | Should -HaveCount 2
         }
 
         It 'Removes all by -Type (bulk delete)' {
@@ -222,7 +218,7 @@ Describe 'ARM Resource CRUD' {
             $vms | Should -BeNullOrEmpty
             # NSG still exists
             $nsgs = Get-CIEMAzureArmResource -Type 'microsoft.network/networksecuritygroups'
-            $nsgs.Count | Should -Be 1
+            $nsgs | Should -HaveCount 1
         }
 
         It 'Removes all records with -All switch' {

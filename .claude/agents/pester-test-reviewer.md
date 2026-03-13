@@ -39,10 +39,70 @@ If the user provides `file1.ps1 file2.ps1 file3.ps1`, you review exactly those 3
 - **`$script:ModuleRoot`**: Points to `psu-app/` — the package root
 - **`$script:DatabasePath`**: Points to `psu-app/data/ciem.db`
 
-### Test File Locations
+### Test Directory Structure
+Tests are organized into `Unit/` and `E2E/` subdirectories:
+
 ```
-psu-app/modules/Azure/Discovery/Tests/   # Discovery-related tests
-psu-app/Tests/                            # Module-level tests
+psu-app/Tests/
+├── Unit/                                 # Module-level unit tests
+│   ├── Psm1Structure.Tests.ps1           # Source assertions on psm1 (no module import)
+│   ├── PSUIntegration.Tests.ps1          # Class/structure validation via InModuleScope
+│   └── ModuleLoad.Tests.ps1              # Export validation via Get-Command
+├── E2E/                                  # (Pester E2E — future, currently empty)
+psu-app/modules/Azure/Discovery/Tests/
+├── Unit/                                 # Discovery unit tests
+│   ├── CIEMAzureArmResource.Tests.ps1    # CRUD tests ($TestDrive DB)
+│   ├── CIEMAzureEntraResource.Tests.ps1
+│   ├── CIEMAzureDiscoveryRun.Tests.ps1
+│   ├── CIEMAzureResourceType.Tests.ps1
+│   ├── CIEMAzureResourceRelationship.Tests.ps1
+│   ├── SchemaCleanup.Tests.ps1           # Schema validation ($TestDrive DB)
+│   ├── DiscoveryClasses.Tests.ps1        # Class property checks via InModuleScope
+│   ├── StartCIEMAzureDiscovery.Tests.ps1 # Command structure + concurrency
+│   ├── InvokeAzureApi429.Tests.ps1       # Source assertions (no module import)
+│   └── InvokeCIEMScanRefactor.Tests.ps1  # Source assertions (no module import)
+├── E2E/                                  # (future)
+psu-app/modules/Azure/Infrastructure/Tests/
+├── Unit/                                 # Infrastructure unit tests
+│   └── ConnectCIEMAzure.Tests.ps1        # Source assertions + command structure
+├── E2E/                                  # (future)
+e2e/                                      # Playwright E2E tests (separate framework)
+└── pages/**/*.test.js                    # 128 tests across 7 page modules
+```
+
+### Unit vs E2E Classification
+
+**Unit tests** (`Tests/Unit/`):
+- Run with `Invoke-Pester` — no external services, no PSU server required
+- Use `$TestDrive` for DB isolation, mocks for external dependencies
+- Three sub-types:
+  1. **Source assertion tests** — Read source files with `Get-Content -Raw`, check patterns with `Should -Match`. Do NOT import the module (no `Import-Module`).
+  2. **Command/class structure tests** — Import module, use `Get-Command` or `InModuleScope` to validate exports, parameters, class properties. Mock `Write-CIEMLog` to prevent log file writes.
+  3. **CRUD tests** — Import module, redirect `$script:DatabasePath` to `$TestDrive/ciem.db`, test full CRUD lifecycle against isolated SQLite. Mock `Write-CIEMLog`.
+
+**E2E tests** (`Tests/E2E/` for Pester, `e2e/` for Playwright):
+- Require a running PSU instance (local or Azure)
+- Hit real Azure APIs, real databases, real UI
+- Pester E2E: `Invoke-TestCommand -ScriptBlock { ... }` pattern
+- Playwright E2E: `cd e2e && npx playwright test`
+
+### Unit Test Isolation Rules
+
+Unit tests MUST NOT:
+- Read or write real filesystem paths (`ciem.log`, `ciem.db`) — use `$TestDrive` or mocks
+- Make network calls to Azure, Graph, or any external API
+- Depend on PSU being running (`Get-PSUCache`, `Set-PSUCache`)
+- Use `-ErrorAction SilentlyContinue` in `It` blocks (errors must surface)
+
+Unit tests that only read source files (source assertion pattern) MUST NOT import the module — `Import-Module` triggers side effects (DB creation, log writes).
+
+Unit tests that DO import the module SHOULD mock `Write-CIEMLog` after import:
+```powershell
+BeforeAll {
+    Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+    Import-Module (Join-Path $PSScriptRoot '..path..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
+}
 ```
 
 ### Module Import Pattern
@@ -291,14 +351,47 @@ It 'Exports Get-CIEMAzureArmResource' {
 ```
 
 ### Rule 11: No Error Silencing
-**Rule**: Never use `-ErrorAction SilentlyContinue` or `2>$null` in tests. Errors should surface.
+**Rule**: Never use `-ErrorAction SilentlyContinue` or `2>$null` in `It` blocks. Errors should surface.
 
 ```powershell
 # BAD
-$result = Get-CIEMAzureArmResource -Id 'missing' -ErrorAction SilentlyContinue
+Get-Command -Name X -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
 
-# GOOD — Let errors propagate; test error behavior with Should -Throw
+# GOOD — Let errors propagate
+Get-Command -Name X -ErrorAction Stop | Should -Not -BeNullOrEmpty
+
+# GOOD — Test error behavior explicitly
 { Get-CIEMAzureArmResource -Id 'missing' -ErrorAction Stop } | Should -Throw
+```
+
+### Rule 16: No Unnecessary Module Import
+**Rule**: Source assertion tests (tests that ONLY use `Get-Content -Raw` and `Should -Match/-Not -Match`) MUST NOT import the module. `Import-Module` triggers side effects (DB creation, log writes) and is wasteful when only reading source files.
+
+```powershell
+# BAD — Imports module but only reads source
+BeforeAll {
+    Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+    Import-Module (Join-Path $PSScriptRoot '..path..' 'Devolutions.CIEM.psd1')
+    $script:Source = Get-Content (Join-Path $PSScriptRoot '..path..' 'SomeFile.ps1') -Raw
+}
+It 'Contains pattern X' { $script:Source | Should -Match 'X' }
+
+# GOOD — No module import for pure source assertions
+BeforeAll {
+    $script:Source = Get-Content (Join-Path $PSScriptRoot '..path..' 'SomeFile.ps1') -Raw
+}
+It 'Contains pattern X' { $script:Source | Should -Match 'X' }
+```
+
+### Rule 17: Mock Write-CIEMLog in Unit Tests
+**Rule**: Unit tests that import the module SHOULD mock `Write-CIEMLog` after import to prevent real log file writes during test execution.
+
+```powershell
+BeforeAll {
+    Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+    Import-Module (Join-Path $PSScriptRoot '..path..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
+}
 ```
 
 ### Rule 12: Filesystem Existence Tests
@@ -360,11 +453,19 @@ It 'Accepts InputObject via pipeline' {
 
 ## Review Process
 
+### Step 0: Unit vs E2E Classification
+- Verify the test is in the correct directory (`Unit/` or `E2E/`)
+- If in `Unit/`, verify it does NOT touch real environment (no real ciem.log reads, no real ciem.db writes, no network calls)
+- Determine test sub-type: source assertion (no import), command/class structure (import + mock), or CRUD (import + $TestDrive + mock)
+
 ### Step 1: Structure Analysis
-- Verify `BeforeAll` imports module from correct relative path to `Devolutions.CIEM.psd1`
+- Source assertion tests: verify NO `Import-Module` (Rule 16)
+- Other tests: verify `BeforeAll` imports module from correct relative path to `Devolutions.CIEM.psd1`
+- Other tests: verify `Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}` after import (Rule 17)
 - Check `InModuleScope` uses `Devolutions.CIEM` (not sub-folder names)
 - Verify `Describe` / `Context` / `It` hierarchy is well-organized
 - Confirm database isolation via `$TestDrive` for CRUD tests
+- Verify no `if (Test-Path)` guards around required schema applications
 
 ### Step 2: Assertion Quality
 - Ensure assertions are ONLY inside `It` blocks
@@ -400,9 +501,12 @@ It 'Accepts InputObject via pipeline' {
 4. **Assertions in setup blocks**: `Should` in `BeforeAll`/`BeforeEach`/`run_before`
 5. **Object creation in assertion blocks**: Creating objects inside `It`/`assertion` instead of setup
 6. **Conditional logic in It blocks**: `if/else`, `try/catch`, `switch` around assertions
-7. **Error silencing**: `-ErrorAction SilentlyContinue` in test code (exception: `run_after` cleanup only)
+7. **Error silencing**: `-ErrorAction SilentlyContinue` in `It` blocks (exception: `run_after` cleanup only)
 8. **`Import-Module -Force`**: Breaks PowerShell classes — must use `Remove-Module -Force` then `Import-Module` without `-Force`
 9. **Missing schema application**: CRUD tests that only call `New-CIEMDatabase` without applying provider-specific schemas
+10. **Unnecessary `Import-Module` in source-only tests**: Tests that only use `Get-Content` and `Should -Match` must NOT import the module (Rule 16)
+11. **Reading real filesystem in unit tests**: Unit tests must not read `ciem.log`, write to `ciem.db`, or depend on real environment state. Use `$TestDrive` or mocks.
+12. **Conditional `Test-Path` guards in BeforeAll**: `if (Test-Path $schema) { ... }` silently skips required schema application. Remove guards — let missing files fail loudly.
 
 ### Moderate Issues
 10. **Structure/existence tests**: "Has Id property", "Function exists" — rewrite as behavioral tests
@@ -465,9 +569,13 @@ BLOCKING ISSUES:
 - Rule 3: Block purity violation (assertions in setup, object creation in assertions)
 - Rule 4: Conditional logic in assertions
 - Rule 5: PowerShell operators with `Should -Be $true/$false` instead of native Should
-- Rule 11: Error silencing in test code
+- Rule 11: Error silencing (`-ErrorAction SilentlyContinue`) in `It` blocks
+- Rule 16: Unnecessary `Import-Module` in source-assertion-only tests
+- Rule 17: Missing `Mock Write-CIEMLog` in unit tests that import the module
 - `Import-Module -Force` used (breaks classes)
 - Missing provider schema application for CRUD tests
+- Reading real environment files (`ciem.log`, `ciem.db`) in unit tests
+- Conditional `if (Test-Path)` guards silently skipping required schema application
 
 **Non-blocking observations (can still APPROVE):**
 - Minor style inconsistencies

@@ -1,19 +1,15 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    if (Test-Path $azureSchema) {
-        Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-    }
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql'
-    if (Test-Path $discoverySchema) {
-        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-    }
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
@@ -69,7 +65,7 @@ Describe 'Entra Resource CRUD' {
 
         It 'Returns all resources when no filter' {
             $results = Get-CIEMAzureEntraResource
-            $results.Count | Should -Be 4
+            $results | Should -HaveCount 4
         }
 
         It 'Returns CIEMAzureEntraResource typed objects (.GetType().Name -eq CIEMAzureEntraResource)' {
@@ -86,18 +82,18 @@ Describe 'Entra Resource CRUD' {
 
         It 'Filters by -Type' {
             $results = Get-CIEMAzureEntraResource -Type 'User'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Filters by -ParentId' {
             $results = Get-CIEMAzureEntraResource -ParentId 'tenant-root'
-            $results.Count | Should -Be 1
+            $results | Should -HaveCount 1
             $results[0].DisplayName | Should -Be 'Engineering'
         }
 
         It 'Filters by -DisplayName' {
             $results = Get-CIEMAzureEntraResource -DisplayName 'Alice'
-            $results.Count | Should -Be 2  # User Alice + SP Alice
+            $results | Should -HaveCount 2  # User Alice + SP Alice
         }
 
         It 'Returns empty array when no match' {
@@ -167,7 +163,7 @@ Describe 'Entra Resource CRUD' {
             $result.DisplayName | Should -Be 'Updated'
             # Only 1 row, not 2
             $all = Get-CIEMAzureEntraResource
-            $all.Count | Should -Be 1
+            $all | Should -HaveCount 1
         }
 
         It 'Accepts -InputObject via pipeline' {
@@ -199,7 +195,7 @@ Describe 'Entra Resource CRUD' {
             $result = Get-CIEMAzureEntraResource -Id 'entra-rm1'
             $result | Should -BeNullOrEmpty
             # Other resources still exist
-            (Get-CIEMAzureEntraResource).Count | Should -Be 2
+            Get-CIEMAzureEntraResource | Should -HaveCount 2
         }
 
         It 'Bulk removes by -Type' {
@@ -208,7 +204,7 @@ Describe 'Entra Resource CRUD' {
             $users | Should -BeNullOrEmpty
             # Group still exists
             $groups = Get-CIEMAzureEntraResource -Type 'Group'
-            $groups.Count | Should -Be 1
+            $groups | Should -HaveCount 1
         }
 
         It 'Removes all records with -All switch' {

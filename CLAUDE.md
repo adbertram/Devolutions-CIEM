@@ -111,6 +111,41 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 
 ---
 
+## Test-Driven Development (CRITICAL)
+
+**EVERY code change MUST have a corresponding test. No exceptions.** Tests are the cornerstone of all development. Changes without tests will be rejected.
+
+### TDD Workflow (MANDATORY)
+
+1. **Write/update tests FIRST** — before implementing the feature or fix
+2. **Run tests to confirm they fail** — validates the test actually tests what you think
+3. **Implement the change** — make the failing tests pass
+4. **Run full test suite** — ensure no regressions
+
+### Two Test Layers
+
+| Layer | Framework | Location | Scope | Run Command |
+|-------|-----------|----------|-------|-------------|
+| **Pester** (unit/integration) | Pester v5 | `psu-app/**/Tests/*.Tests.ps1` | PowerShell functions, CRUD, classes, module structure | `Invoke-Pester <path> -Output Detailed` |
+| **Playwright** (E2E) | Playwright | `e2e/pages/**/*.test.js` | PSU UI pages, navigation, user workflows | `cd e2e && npx playwright test` |
+
+### What Requires Tests
+
+- **New function** → Pester tests for all parameter sets, edge cases, and return types
+- **New CRUD table** → Full CRUD test file (New/Get/Update/Save/Remove) per `.claude/rules/crud-convention.md`
+- **Bug fix** → Test that reproduces the bug BEFORE the fix, passes AFTER
+- **UI page change** → Playwright test covering the changed behavior
+- **Refactor** → Existing tests must still pass; add tests if coverage gaps exist
+
+### Test Quality Rules
+
+- **Use `pester-test-reviewer` agent** to validate Pester test structure before committing
+- **Never skip failing tests** — fix the implementation, not the test
+- **Tests document expected behavior** — only update tests when requirements change
+- **0 failures, 0 errors** = passing. ERROR is a failure, not a skip.
+
+---
+
 ## Testing Commands
 
 Use `Invoke-TestCommand` (from the `Devolutions.CIEM.Admin` module) to run PowerShell commands against the CIEM module. It handles PSU connection and credential loading automatically.
@@ -129,6 +164,8 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Invoke-TestCom
 | `azure` | `Connect-PSU` then `Invoke-PSUCommand` | Testing against production PSU |
 
 **Always test before publishing.** Use `local` (default) for development, `azure` to validate in production. Run `Invoke-TestCommand -ScriptBlock { ... }` to validate changes work inside PSU before publishing a new version. Do not use publish-debug-publish cycles.
+
+**Note:** TDD rules and per-layer test conventions are in `.claude/rules/tdd-enforcement.md` (auto-loaded for `psu-app/` and `e2e/` paths).
 
 ---
 

@@ -1,19 +1,15 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    if (Test-Path $azureSchema) {
-        Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-    }
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql'
-    if (Test-Path $discoverySchema) {
-        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-    }
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
@@ -169,7 +165,7 @@ Describe 'Schema Cleanup' {
 
     Context 'Discovery schema SQL file exists' {
         It 'psu-app/modules/Azure/Discovery/Data/discovery_schema.sql exists on disk' {
-            Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql' | Should -Exist
+            Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql' | Should -Exist
         }
     }
 }

@@ -1,9 +1,9 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Read the source file for structural assertions
-    $script:ApiSource = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Public' 'Invoke-AzureApi.ps1') -Raw
+    $script:ApiSource = Get-Content (Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Public' 'Invoke-AzureApi.ps1') -Raw
 }
 
 Describe 'Invoke-AzureApi 429 Retry' {

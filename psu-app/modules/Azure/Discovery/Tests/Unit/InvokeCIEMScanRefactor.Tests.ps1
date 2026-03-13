@@ -1,9 +1,9 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Read the Invoke-CIEMScan source for structural assertions
-    $script:ScanSource = Get-Content (Join-Path $PSScriptRoot '..' '..' '..' 'Devolutions.CIEM.Checks' 'Private' 'Invoke-CIEMScan.ps1') -Raw
+    $script:ScanSource = Get-Content (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.Checks' 'Private' 'Invoke-CIEMScan.ps1') -Raw
 }
 
 Describe 'Invoke-CIEMScan Refactor' {

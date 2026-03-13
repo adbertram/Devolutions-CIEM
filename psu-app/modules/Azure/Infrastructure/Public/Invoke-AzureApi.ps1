@@ -91,7 +91,7 @@ function Invoke-AzureApi {
 
         [Parameter(ParameterSetName = 'ByUri')]
         [Parameter(Mandatory, ParameterSetName = 'ByPath')]
-        [ValidateSet('ARM', 'Graph', 'KeyVault')]
+        [ValidateSet('ARM', 'Graph', 'GraphBeta', 'KeyVault')]
         [string]$Api,
 
         [Parameter(ParameterSetName = 'ByPath')]
@@ -150,7 +150,9 @@ function Invoke-AzureApi {
 
     # Auto-detect API from URI if not specified
     if (-not $Api) {
-        $Api = if ($Uri -match 'graph\.microsoft\.com') {
+        $Api = if ($Uri -match 'graph\.microsoft\.com/beta') {
+            'GraphBeta'
+        } elseif ($Uri -match 'graph\.microsoft\.com') {
             'Graph'
         } elseif ($Uri -match '\.vault\.azure\.net') {
             'KeyVault'
@@ -214,9 +216,10 @@ function Invoke-AzureApi {
 
     # Resolve token for the target API directly from auth context
     $token = switch ($Api) {
-        'Graph'    { $script:AzureAuthContext.GraphToken }
-        'ARM'      { $script:AzureAuthContext.ARMToken }
-        'KeyVault' { $script:AzureAuthContext.KeyVaultToken }
+        'Graph'     { $script:AzureAuthContext.GraphToken }
+        'GraphBeta' { $script:AzureAuthContext.GraphToken }
+        'ARM'       { $script:AzureAuthContext.ARMToken }
+        'KeyVault'  { $script:AzureAuthContext.KeyVaultToken }
     }
 
     if (-not $token) {
@@ -271,6 +274,13 @@ function Invoke-AzureApi {
 
                 if ($nextLink) {
                     $currentResponse = Invoke-SafeRestMethod -Uri $nextLink -Headers $headers -Method 'GET' -JsonBody $null
+                }
+                elseif ($content.PSObject.Properties.Name -contains '$skipToken' -and $content.'$skipToken' -and $Method -eq 'POST') {
+                    # Resource Graph POST pagination: inject $skipToken back into the request body
+                    $nextBody = if ($Body) { $Body.Clone() } else { @{} }
+                    $nextBody['$skipToken'] = $content.'$skipToken'
+                    $skipJsonBody = $nextBody | ConvertTo-Json -Depth 20 -Compress
+                    $currentResponse = Invoke-SafeRestMethod -Uri $Uri -Headers $headers -Method $Method -JsonBody $skipJsonBody
                 }
                 else {
                     $currentResponse = $null

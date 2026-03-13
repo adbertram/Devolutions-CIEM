@@ -8,8 +8,11 @@ function Get-CIEMAzureAuthProfileCache {
     param()
 
     $profiles = [System.Collections.Generic.List[object]]::new()
-    foreach ($p in @(Get-PSUCache -Key $script:AzureAuthProfilesCacheKey -Integrated -ErrorAction SilentlyContinue)) {
-        $profiles.Add($p)
+    $json = Get-PSUCache -Key $script:AzureAuthProfilesCacheKey -Integrated -ErrorAction SilentlyContinue
+    if ($json -and $json -is [string] -and $json.Length -gt 0) {
+        foreach ($p in @(ConvertFrom-Json $json)) {
+            $profiles.Add($p)
+        }
     }
     , $profiles
 }

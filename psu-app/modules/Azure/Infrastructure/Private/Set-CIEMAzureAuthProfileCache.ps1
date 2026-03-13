@@ -9,5 +9,6 @@ function Set-CIEMAzureAuthProfileCache {
         [object[]]$Profiles
     )
 
-    Set-PSUCache -Key $script:AzureAuthProfilesCacheKey -Value @($Profiles) -Persist -Integrated
+    $json = ConvertTo-Json -InputObject @($Profiles) -Depth 10 -Compress
+    Set-PSUCache -Key $script:AzureAuthProfilesCacheKey -Value $json -Persist -Integrated
 }

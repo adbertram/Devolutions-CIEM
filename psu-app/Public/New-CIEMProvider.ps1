@@ -14,9 +14,6 @@ function New-CIEMProvider {
     .PARAMETER Enabled
         Whether the provider is enabled. Defaults to $true.
 
-    .PARAMETER IsDefault
-        Set this provider as the default. Clears IsDefault on all others.
-
     .PARAMETER Endpoints
         Optional PSCustomObject with provider-specific API endpoints.
 
@@ -30,7 +27,7 @@ function New-CIEMProvider {
         New-CIEMProvider -Name 'GCP'
 
     .EXAMPLE
-        New-CIEMProvider -Name 'Azure' -Enabled $true -IsDefault
+        New-CIEMProvider -Name 'Azure' -Enabled $true
     #>
     [CmdletBinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Creates a configuration object in database, not a system resource')]
@@ -41,9 +38,6 @@ function New-CIEMProvider {
 
         [Parameter()]
         [bool]$Enabled = $true,
-
-        [Parameter()]
-        [switch]$IsDefault,
 
         [Parameter()]
         [PSCustomObject]$Endpoints,
@@ -64,43 +58,17 @@ function New-CIEMProvider {
         throw "Provider '$Name' already exists. Use Update-CIEMProvider to modify it."
     }
 
-    # Check if this should be default (first provider or explicit)
-    $existingCount = Invoke-CIEMQuery -Query "SELECT COUNT(*) AS cnt FROM providers" | Select-Object -ExpandProperty cnt
-    $makeDefault = $IsDefault.IsPresent -or $existingCount -eq 0
-
-    # Use transaction for atomicity
-    $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
-    try {
-        Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
-        $tx = $conn.BeginTransaction()
-
-        # Clear IsDefault on others if this will be default
-        if ($makeDefault) {
-            Invoke-PSUSQLiteQuery -Connection $conn -Query "UPDATE providers SET is_default = 0 WHERE is_default = 1" -AsNonQuery | Out-Null
-        }
-
-        # Insert provider
-        Invoke-PSUSQLiteQuery -Connection $conn -Query @"
-INSERT INTO providers (id, name, type, enabled, is_default, created_at, updated_at)
-VALUES (@id, @name, @type, @enabled, @is_default, @now, @now)
+    # Insert provider
+    Invoke-CIEMQuery -Query @"
+INSERT INTO providers (id, name, type, enabled, created_at, updated_at)
+VALUES (@id, @name, @type, @enabled, @now, @now)
 "@ -Parameters @{
-            id         = $providerId
-            name       = $Name
-            type       = $providerType
-            enabled    = if ($Enabled) { 1 } else { 0 }
-            is_default = if ($makeDefault) { 1 } else { 0 }
-            now        = $now
-        } -AsNonQuery | Out-Null
-
-        $tx.Commit()
-    }
-    catch {
-        if ($tx) { $tx.Rollback() }
-        throw
-    }
-    finally {
-        $conn.Dispose()
-    }
+        id      = $providerId
+        name    = $Name
+        type    = $providerType
+        enabled = if ($Enabled) { 1 } else { 0 }
+        now     = $now
+    } -AsNonQuery | Out-Null
 
     # Return the newly created provider
     Get-CIEMProvider -Name $Name

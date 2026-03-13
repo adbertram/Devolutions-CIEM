@@ -44,3 +44,7 @@ INSERT OR IGNORE INTO azure_provider_apis (name, base_url, version, service, pat
 ('Graph/directoryRoleMembers',    'https://graph.microsoft.com/v1.0', NULL, 'Entra',         '/directoryRoles/{id}/members',                   '{"Graph":["Directory.Read.All"]}'),
 ('ARM/resourceGraph',             'https://management.azure.com',     NULL, 'ResourceGraph', '/providers/Microsoft.ResourceGraph/resources',    '{"AzureRoles":["Reader"]}'),
 ('ARM/roleDefinitions',           'https://management.azure.com',     NULL, 'IAM',           '/providers/Microsoft.Authorization/roleDefinitions', '{"AzureRoles":["Reader"]}');
+
+-- GraphBeta base API row (for SP signInActivity which requires /beta endpoint)
+INSERT OR IGNORE INTO azure_provider_apis (name, base_url, version) VALUES
+('GraphBeta', 'https://graph.microsoft.com/beta', NULL);

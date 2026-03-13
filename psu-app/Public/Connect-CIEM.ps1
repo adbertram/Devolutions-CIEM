@@ -17,6 +17,11 @@ function Connect-CIEM {
         Optional. Connect only to specific provider(s). If not specified, connects
         to the default provider defined in the database.
 
+    .PARAMETER AuthenticationProfile
+        Optional. A pre-resolved authentication profile object to pass to the
+        provider connector (e.g., CIEMAzureAuthenticationProfile). If not
+        provided, the connector looks up the active profile automatically.
+
     .PARAMETER Force
         Force re-authentication even if already connected.
 
@@ -46,6 +51,9 @@ function Connect-CIEM {
         [string[]]$Provider,
 
         [Parameter()]
+        $AuthenticationProfile,
+
+        [Parameter()]
         [switch]$Force
     )
 
@@ -63,11 +71,7 @@ function Connect-CIEM {
     # Determine which providers to connect
     if (-not $Provider) {
         $allProviders = Get-CIEMProvider
-        $defaultProvider = ($allProviders | Where-Object IsDefault | Select-Object -First 1).Name
-        if (-not $defaultProvider) {
-            # No default set: use first enabled provider
-            $defaultProvider = ($allProviders | Where-Object Enabled | Select-Object -First 1).Name
-        }
+        $defaultProvider = ($allProviders | Where-Object Enabled | Select-Object -First 1).Name
         if (-not $defaultProvider) {
             throw "No providers configured. Ensure the database has been initialized with provider rows."
         }
@@ -113,7 +117,9 @@ function Connect-CIEM {
             }
 
             Write-CIEMLog -Message "Calling $connectorName..." -Severity INFO -Component 'Connect-CIEM'
-            $authContext = & $connectorCmd
+            $connectorParams = @{}
+            if ($AuthenticationProfile) { $connectorParams.AuthenticationProfile = $AuthenticationProfile }
+            $authContext = & $connectorCmd @connectorParams
             $script:AuthContext[$providerKey] = $authContext
 
             # Build result based on what the auth context provides

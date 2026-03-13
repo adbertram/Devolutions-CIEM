@@ -187,8 +187,9 @@ function Invoke-CIEMScan {
                 $sw = [Diagnostics.Stopwatch]::new()
 
                 # Check if discovery data is available
-                $latestRun = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
-                $hasDiscoveryData = $latestRun.Count -gt 0
+                $latestCompleted = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
+                $latestPartial   = @(Get-CIEMAzureDiscoveryRun -Status 'Partial' -Last 1)
+                $hasDiscoveryData = ($latestCompleted.Count -gt 0) -or ($latestPartial.Count -gt 0)
 
                 if (-not $hasDiscoveryData) {
                     Write-Warning "[$providerName] No completed discovery run found. Services requiring discovery data will be SKIPPED. Run Start-CIEMAzureDiscovery first."

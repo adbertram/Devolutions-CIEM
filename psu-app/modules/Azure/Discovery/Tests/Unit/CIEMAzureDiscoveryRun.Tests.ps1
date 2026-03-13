@@ -1,19 +1,15 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    if (Test-Path $azureSchema) {
-        Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-    }
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql'
-    if (Test-Path $discoverySchema) {
-        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-    }
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
@@ -93,12 +89,12 @@ Describe 'Discovery Run CRUD' {
 
         It 'Filters by -Status' {
             $results = Get-CIEMAzureDiscoveryRun -Status 'Completed'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Returns last N runs with -Last parameter' {
             $results = Get-CIEMAzureDiscoveryRun -Last 2
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It '-Last returns newest first (ORDER BY started_at DESC)' {
@@ -161,7 +157,7 @@ Describe 'Discovery Run CRUD' {
             }
             Save-CIEMAzureDiscoveryRun -InputObject $obj
             $results = Get-CIEMAzureDiscoveryRun
-            $results.Count | Should -Be 1
+            $results | Should -HaveCount 1
         }
 
         It 'Updates existing run when Id > 0' {
@@ -182,7 +178,7 @@ Describe 'Discovery Run CRUD' {
             }
             $obj | Save-CIEMAzureDiscoveryRun
             $results = Get-CIEMAzureDiscoveryRun
-            $results.Count | Should -Be 1
+            $results | Should -HaveCount 1
         }
     }
 

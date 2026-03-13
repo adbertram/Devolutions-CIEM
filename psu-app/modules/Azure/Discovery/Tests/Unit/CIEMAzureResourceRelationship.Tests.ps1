@@ -1,19 +1,15 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    if (Test-Path $azureSchema) {
-        Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-    }
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' 'Data' 'discovery_schema.sql'
-    if (Test-Path $discoverySchema) {
-        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-    }
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
@@ -86,7 +82,7 @@ Describe 'Resource Relationship CRUD' {
 
         It 'Returns all when no filter' {
             $results = Get-CIEMAzureResourceRelationship
-            $results.Count | Should -Be 4
+            $results | Should -HaveCount 4
         }
 
         It 'Returns CIEMAzureResourceRelationship typed objects (.GetType().Name -eq CIEMAzureResourceRelationship)' {
@@ -96,22 +92,22 @@ Describe 'Resource Relationship CRUD' {
 
         It 'Filters by -SourceId' {
             $results = Get-CIEMAzureResourceRelationship -SourceId 'user-1'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Filters by -TargetId' {
             $results = Get-CIEMAzureResourceRelationship -TargetId 'group-1'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Filters by -Relationship' {
             $results = Get-CIEMAzureResourceRelationship -Relationship 'MemberOf'
-            $results.Count | Should -Be 2
+            $results | Should -HaveCount 2
         }
 
         It 'Filters by -SourceType and -TargetType' {
             $results = Get-CIEMAzureResourceRelationship -SourceType 'User' -TargetType 'DirectoryRole'
-            $results.Count | Should -Be 1
+            $results | Should -HaveCount 1
             $results[0].Relationship | Should -Be 'HasRole'
         }
     }
@@ -171,7 +167,7 @@ Describe 'Resource Relationship CRUD' {
             Save-CIEMAzureResourceRelationship -SourceId 'save-s' -SourceType 'UserV2' -TargetId 'save-t' -TargetType 'GroupV2' -Relationship 'MemberOf' -CollectedAt $ts
             # UNIQUE(source_id, target_id, relationship) — should be 1 row, not 2
             $results = Get-CIEMAzureResourceRelationship
-            $results.Count | Should -Be 1
+            $results | Should -HaveCount 1
             $results[0].SourceType | Should -Be 'UserV2'
         }
 
@@ -205,7 +201,7 @@ Describe 'Resource Relationship CRUD' {
             Remove-CIEMAzureResourceRelationship -Id $script:rmRel1.Id -Confirm:$false
             $result = Get-CIEMAzureResourceRelationship -SourceId 'rm-s1'
             $result | Should -BeNullOrEmpty
-            (Get-CIEMAzureResourceRelationship).Count | Should -Be 2
+            Get-CIEMAzureResourceRelationship | Should -HaveCount 2
         }
 
         It 'Removes by combo: -SourceId + -TargetId + -Relationship' {
