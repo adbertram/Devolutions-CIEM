@@ -1,7 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' 'Devolutions.CIEM.psd1')
-    $script:ModuleRoot = Join-Path $PSScriptRoot '..'
+    Import-Module (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psd1')
+    $script:ModuleRoot = Join-Path $PSScriptRoot '..' '..'
 }
 
 Describe 'PSU Integration Changes' {

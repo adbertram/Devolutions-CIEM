@@ -1,5 +1,5 @@
 BeforeAll {
-    $script:Psm1Content = Get-Content (Join-Path $PSScriptRoot '..' 'Devolutions.CIEM.psm1') -Raw
+    $script:Psm1Content = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psm1') -Raw
 }
 
 Describe 'Devolutions.CIEM.psm1 Structure' {

@@ -1,7 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' 'Devolutions.CIEM.psd1')
-    $script:ModuleRoot = Join-Path $PSScriptRoot '..'
+    Import-Module (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psd1')
+    $script:ModuleRoot = Join-Path $PSScriptRoot '..' '..'
 }
 
 Describe 'Module Load — Post-Discovery-Schema' {
@@ -17,100 +17,99 @@ Describe 'Module Load — Post-Discovery-Schema' {
             $content = Get-Content $logPath -Tail 50
             # Find the last "Module loading from:" line — that's the start of the most recent import
             $lastLoadIdx = ($content.Count - 1)..0 | Where-Object { $content[$_] -match 'Module loading from:' } | Select-Object -First 1
-            if ($null -ne $lastLoadIdx) {
-                $recentLines = $content[$lastLoadIdx..($content.Count - 1)]
-                $recentLines | Where-Object { $_ -cmatch '\[ERROR\].*\bFAILED\b' } | Should -BeNullOrEmpty
-            }
+            $lastLoadIdx | Should -Not -BeNullOrEmpty
+            $recentLines = $content[$lastLoadIdx..($content.Count - 1)]
+            $recentLines | Where-Object { $_ -cmatch '\[ERROR\].*\bFAILED\b' } | Should -BeNullOrEmpty
         }
     }
 
     Context 'New Discovery functions are exported' {
         It 'Get-CIEMAzureArmResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureArmResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureArmResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'New-CIEMAzureArmResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureArmResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureArmResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Update-CIEMAzureArmResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureArmResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureArmResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Save-CIEMAzureArmResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureArmResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureArmResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Remove-CIEMAzureArmResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureArmResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureArmResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Get-CIEMAzureEntraResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureEntraResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureEntraResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'New-CIEMAzureEntraResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureEntraResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureEntraResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Update-CIEMAzureEntraResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureEntraResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureEntraResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Save-CIEMAzureEntraResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureEntraResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureEntraResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Remove-CIEMAzureEntraResource is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureEntraResource -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureEntraResource -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Get-CIEMAzureDiscoveryRun is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureDiscoveryRun -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureDiscoveryRun -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'New-CIEMAzureDiscoveryRun is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureDiscoveryRun -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureDiscoveryRun -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Update-CIEMAzureDiscoveryRun is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureDiscoveryRun -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureDiscoveryRun -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Save-CIEMAzureDiscoveryRun is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureDiscoveryRun -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureDiscoveryRun -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Remove-CIEMAzureDiscoveryRun is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureDiscoveryRun -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureDiscoveryRun -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Get-CIEMAzureResourceType is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceType -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceType -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Get-CIEMAzureResourceRelationship is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceRelationship -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceRelationship -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'New-CIEMAzureResourceRelationship is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureResourceRelationship -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name New-CIEMAzureResourceRelationship -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Update-CIEMAzureResourceRelationship is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureResourceRelationship -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Update-CIEMAzureResourceRelationship -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Save-CIEMAzureResourceRelationship is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureResourceRelationship -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureResourceRelationship -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Remove-CIEMAzureResourceRelationship is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureResourceRelationship -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureResourceRelationship -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
 
         It 'Start-CIEMAzureDiscovery is available as a public command' {
-            Get-Command -Module Devolutions.CIEM -Name Start-CIEMAzureDiscovery -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+            Get-Command -Module Devolutions.CIEM -Name Start-CIEMAzureDiscovery -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
     }
 
