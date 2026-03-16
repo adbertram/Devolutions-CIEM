@@ -45,11 +45,11 @@ Invoke-Pester psu-app/ -Output Detailed
 Invoke-Pester psu-app/modules/Azure/Discovery/Tests/ -Output Detailed
 ```
 
-## Playwright Test Requirements (e2e/)
+## Playwright Test Requirements (psu-app/ui/e2e/)
 
 ### New UI Page
-- Test file: `e2e/pages/PageName/PageName.test.js`
-- Helper class: `e2e/pages/PageName/PageHelpers.js` extending `BasePage`
+- Test file: `psu-app/ui/e2e/pages/PageName/PageName.test.js`
+- Helper class: `psu-app/ui/e2e/pages/PageName/PageHelpers.js` extending `BasePage`
 - Must cover: page loads, key elements visible, primary user interactions
 
 ### UI Behavior Change
@@ -59,13 +59,13 @@ Invoke-Pester psu-app/modules/Azure/Discovery/Tests/ -Output Detailed
 ### Run Commands
 ```bash
 # All E2E tests
-cd e2e && npx playwright test
+cd psu-app/ui/e2e && npx playwright test
 
 # Single page
-cd e2e && npx playwright test pages/Scan/
+cd psu-app/ui/e2e && npx playwright test pages/Scan/
 
 # With UI (debug)
-cd e2e && npx playwright test --headed
+cd psu-app/ui/e2e && npx playwright test --headed
 ```
 
 ## Commit Gate

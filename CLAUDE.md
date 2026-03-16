@@ -127,7 +127,7 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 | Layer | Framework | Location | Scope | Run Command |
 |-------|-----------|----------|-------|-------------|
 | **Pester** (unit/integration) | Pester v5 | `psu-app/**/Tests/*.Tests.ps1` | PowerShell functions, CRUD, classes, module structure | `Invoke-Pester <path> -Output Detailed` |
-| **Playwright** (E2E) | Playwright | `e2e/pages/**/*.test.js` | PSU UI pages, navigation, user workflows | `cd e2e && npx playwright test` |
+| **Playwright** (E2E) | Playwright | `psu-app/ui/e2e/pages/**/*.test.js` | PSU UI pages, navigation, user workflows | `cd psu-app/ui/e2e && npx playwright test` |
 
 ### What Requires Tests
 

@@ -44,7 +44,7 @@ pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Tag 'CRUD' -Output Detailed"
 pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Infrastructure/Tests/E2E/ -Output Detailed"
 
 # Playwright E2E
-cd e2e && npx playwright test
+cd psu-app/ui/e2e && npx playwright test
 ```
 
 ## Interpreting Results

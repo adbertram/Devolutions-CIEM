@@ -1,6 +1,6 @@
 ---
 description: E2E Playwright testing conventions for PSU CIEM app
-paths: ["e2e/**"]
+paths: ["psu-app/ui/e2e/**"]
 ---
 
 # E2E Playwright Testing Rules
@@ -9,7 +9,7 @@ paths: ["e2e/**"]
 
 - The local PSU instance (`http://localhost:5001`) has real Azure credentials configured (ServicePrincipalCertificate auth profile)
 - Tests SHOULD exercise real functionality (scans, auth testing) — do not skip assuming missing credentials
-- The `e2e/_utils/cleanup.js` seeds test data with `_E2E_TEST_` prefix and cleans up in global teardown
+- The `psu-app/ui/e2e/_utils/cleanup.js` seeds test data with `_E2E_TEST_` prefix and cleans up in global teardown
 
 ## Tool Boundary (CRITICAL)
 
