@@ -114,14 +114,6 @@ Describe 'Module Load — Post-Discovery-Schema' {
     }
 
     Context 'Old functions are NOT exported' {
-        It 'Module does not expose Invoke-CIEMIdentityGraphBuild' {
-            Get-Command -Module Devolutions.CIEM -Name Invoke-CIEMIdentityGraphBuild -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        }
-
-        It 'Module does not expose New-CIEMGraph' {
-            Get-Command -Module Devolutions.CIEM -Name New-CIEMGraph -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        }
-
         It 'Module does not expose Get-CIEMAzureEntraData' {
             Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureEntraData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }

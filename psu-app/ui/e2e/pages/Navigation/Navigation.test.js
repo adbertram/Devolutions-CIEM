@@ -15,13 +15,12 @@ test.describe('Navigation', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display all 6 navigation items', async () => {
+    test('should display all 5 navigation items', async () => {
       const labels = await navPage.getNavItemLabels();
-      expect(labels).toHaveLength(6);
+      expect(labels).toHaveLength(5);
       expect(labels).toContain('Dashboard');
       expect(labels).toContain('Scan');
       expect(labels).toContain('Scan History');
-      expect(labels).toContain('Identity Graph');
       expect(labels).toContain('Configuration');
       expect(labels).toContain('About');
     });
@@ -39,11 +38,6 @@ test.describe('Navigation', () => {
     test('should have correct href for Scan History link', async () => {
       const href = await navPage.getNavItemHref('Scan History');
       expect(href).toContain('/ciem/history');
-    });
-
-    test('should have correct href for Identity Graph link', async () => {
-      const href = await navPage.getNavItemHref('Identity Graph');
-      expect(href).toContain('/ciem/graph');
     });
 
     test('should have correct href for Configuration link', async () => {

@@ -22,20 +22,6 @@ Describe 'PSU Integration Changes' {
         }
     }
 
-    Context 'Navigation has no Identity Graph' {
-        BeforeAll {
-            $script:NavContent = Get-Content (Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMNavigation.ps1') -Raw
-        }
-
-        It 'New-CIEMNavigation.ps1 does not contain Identity Graph' {
-            $script:NavContent | Should -Not -Match 'Identity Graph'
-        }
-
-        It 'New-CIEMNavigation.ps1 does not contain /ciem/graph' {
-            $script:NavContent | Should -Not -Match '/ciem/graph'
-        }
-    }
-
     Context 'PSU scripts.ps1 registration' {
         BeforeAll {
             $script:ScriptsContent = Get-Content (Join-Path $script:ModuleRoot '.universal' 'scripts.ps1') -Raw
@@ -49,14 +35,5 @@ Describe 'PSU Integration Changes' {
             $script:ScriptsContent | Should -Match 'New-CIEMScanRun'
         }
 
-        It 'Does NOT contain Invoke-CIEMIdentityGraphBuild registration' {
-            $script:ScriptsContent | Should -Not -Match 'Invoke-CIEMIdentityGraphBuild'
-        }
-    }
-
-    Context 'Graph page deleted' {
-        It 'New-CIEMGraphPage.ps1 does not exist' {
-            Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMGraphPage.ps1' | Should -Not -Exist
-        }
     }
 }

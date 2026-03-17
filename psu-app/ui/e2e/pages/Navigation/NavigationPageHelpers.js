@@ -15,7 +15,6 @@ class NavigationPageHelpers extends BasePage {
       { label: 'Dashboard', href: '/ciem' },
       { label: 'Scan', href: '/ciem/scan' },
       { label: 'Scan History', href: '/ciem/history' },
-      { label: 'Identity Graph', href: '/ciem/graph' },
       { label: 'Configuration', href: '/ciem/config' },
       { label: 'About', href: '/ciem/about' }
     ];
