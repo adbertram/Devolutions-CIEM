@@ -29,11 +29,9 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:Psm1Content | Should -Not -Match "'CIEMResourceType'"
         }
 
-        It 'Does NOT contain Identity classes loading block (CIEMGraphNode, etc.)' {
-            $script:Psm1Content | Should -Not -Match 'CIEMGraphNode'
+        It 'Does NOT contain Identity classes loading block' {
             $script:Psm1Content | Should -Not -Match 'CIEMIdentityNodes'
             $script:Psm1Content | Should -Not -Match 'CIEMRBACNodes'
-            $script:Psm1Content | Should -Not -Match 'CIEMGraphEdge'
             $script:Psm1Content | Should -Not -Match 'CIEMIdentityResourceAccess'
         }
     }

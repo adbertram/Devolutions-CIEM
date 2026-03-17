@@ -154,10 +154,6 @@ Describe 'Module Load — Post-Discovery-Schema' {
             Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureServiceData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
 
-        It 'Module does not expose Get-CIEMGraphSummary' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMGraphSummary -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
-        }
-
         It 'Module does not expose Get-CIEMAzureResourceTypeEntity' {
             Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceTypeEntity -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
