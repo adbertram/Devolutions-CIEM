@@ -97,10 +97,11 @@ $script:ScanConfigCacheKey        = 'CIEM:ScanConfig'
 $script:AWSAuthContext = $null
 # PSU
 $script:RelationshipColors = @{
-    'CAN_MANAGE' = '#f44336'
-    'CAN_WRITE'  = '#ff9800'
-    'CAN_READ'   = '#4caf50'
-    'HAS_ROLE'   = '#1976d2'
+    'CONTAINS'             = '#1976d2'   # ARM hierarchy containment (blue)
+    'member_of'            = '#9c27b0'   # Group membership (purple)
+    'owner_of'             = '#f44336'   # Ownership (red)
+    'has_role_member'      = '#ff9800'   # Role membership (orange)
+    'transitive_member_of' = '#4caf50'   # Transitive membership (green)
 }
 
 # --- Initialize database (base + provider schemas) ---

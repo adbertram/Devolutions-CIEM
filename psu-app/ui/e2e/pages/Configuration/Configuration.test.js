@@ -9,6 +9,23 @@ test.describe('Configuration Page', () => {
     await configPage.navigateToConfigPage();
   });
 
+  test.describe('when the page loads', () => {
+    test('should display page title', async () => {
+      const title = await configPage.getPageTitle();
+      expect(title).toContain('Configuration');
+    });
+
+    test('should display subtitle with configuration description', async () => {
+      const subtitle = await configPage.getSubtitleText();
+      expect(subtitle).toContain('Configure cloud provider authentication');
+    });
+
+    test('should display Cloud Provider Authentication card', async () => {
+      const visible = await configPage.isAuthCardVisible();
+      expect(visible).toBe(true);
+    });
+  });
+
   test.describe('when running on a local on-premises PSU instance', () => {
     test('should display On-Premises environment chip with green color', async () => {
       const chipText = await configPage.getEnvironmentChipText();
@@ -62,6 +79,11 @@ test.describe('Configuration Page', () => {
         const value = await configPage.page.locator('#azSpClientId').inputValue();
         expect(value).toBe(testGuid);
       });
+
+      test('should display auth method help text about selecting authentication', async () => {
+        const visible = await configPage.isAuthMethodHelpTextVisible();
+        expect(visible).toBe(true);
+      });
     });
 
     test.describe('when Service Principal Certificate is the authentication method', () => {
@@ -92,6 +114,14 @@ test.describe('Configuration Page', () => {
       test('should not display Client Secret field', async () => {
         const visible = await configPage.isFieldVisible('azSpClientSecret');
         expect(visible).toBe(false);
+      });
+
+      test('should display certificate upload guidance text', async () => {
+        const guidanceText = await configPage.getCertUploadGuidanceText();
+        expect(guidanceText).toBeTruthy();
+        // Should mention either uploading a PFX file or that a certificate is stored
+        const mentionsCert = guidanceText.includes('PFX') || guidanceText.includes('certificate') || guidanceText.includes('Certificate');
+        expect(mentionsCert).toBe(true);
       });
     });
 
@@ -138,6 +168,13 @@ test.describe('Configuration Page', () => {
         const alertVisible = await configPage.isElementVisible(configPage.selectors.awsCliAlert);
         expect(alertVisible).toBe(true);
       });
+
+      test('should not display Access Key ID or Secret Access Key fields', async () => {
+        const accessKeyVisible = await configPage.isFieldVisible('awsAccessKeyId');
+        const secretKeyVisible = await configPage.isFieldVisible('awsSecretAccessKey');
+        expect(accessKeyVisible).toBe(false);
+        expect(secretKeyVisible).toBe(false);
+      });
     });
 
     test.describe('when AccessKey is the authentication method', () => {
@@ -159,6 +196,45 @@ test.describe('Configuration Page', () => {
         const visible = await configPage.isFieldVisible('awsRegion');
         expect(visible).toBe(true);
       });
+
+      test('should not display AWS Profile field', async () => {
+        const profileVisible = await configPage.isFieldVisible('awsProfile');
+        expect(profileVisible).toBe(false);
+      });
+    });
+  });
+
+  test.describe('when the user switches between cloud providers', () => {
+    test('should update auth method options when switching from Azure to AWS', async () => {
+      // Start on Azure (default) — get Azure auth method options
+      const azureOptions = await configPage.getAuthMethodOptions();
+      expect(azureOptions.length).toBeGreaterThan(0);
+
+      // Switch to AWS — auth method options should change
+      await configPage.selectProvider('AWS');
+      const awsOptions = await configPage.getAuthMethodOptions();
+      expect(awsOptions.length).toBeGreaterThan(0);
+
+      // AWS and Azure should have different auth method sets
+      const azureJoined = azureOptions.sort().join(',');
+      const awsJoined = awsOptions.sort().join(',');
+      expect(azureJoined).not.toBe(awsJoined);
+    });
+
+    test('should update auth method options when switching from AWS to Azure', async () => {
+      // Switch to AWS first
+      await configPage.selectProvider('AWS');
+      const awsOptions = await configPage.getAuthMethodOptions();
+      expect(awsOptions.length).toBeGreaterThan(0);
+
+      // Switch back to Azure — auth method options should revert
+      await configPage.selectProvider('Azure');
+      const azureOptions = await configPage.getAuthMethodOptions();
+      expect(azureOptions.length).toBeGreaterThan(0);
+
+      // Azure should have Service Principal options
+      const hasSpOption = azureOptions.some(opt => opt.includes('Service Principal'));
+      expect(hasSpOption).toBe(true);
     });
   });
 
@@ -186,6 +262,25 @@ test.describe('Configuration Page', () => {
       expect(await configPage.isPermissionsModalVisible()).toBe(true);
       await configPage.closePermissionsModal();
       expect(await configPage.isPermissionsModalVisible()).toBe(false);
+    });
+
+    test('should display check count in modal description text', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      // Modal body should mention the number of checks, e.g. "all 42 Azure security checks"
+      const hasCheckCount = /\d+.*check/i.test(bodyText);
+      expect(hasCheckCount).toBe(true);
+    });
+
+    test('should display AWS permissions modal with AWS in title when AWS provider is selected', async () => {
+      await configPage.selectProvider('AWS');
+      await configPage.clickGetPermissions();
+      const title = await configPage.getPermissionsModalTitle();
+      expect(title).toContain('AWS');
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      // Modal body should reference AWS security checks (even if 0 checks registered)
+      expect(bodyText).toContain('AWS');
+      expect(bodyText).toContain('check');
     });
   });
 
@@ -250,6 +345,17 @@ test.describe('Configuration Page', () => {
       const toast = configPage.page.locator('.iziToast');
       await toast.first().waitFor({ state: 'visible', timeout: 30000 });
       expect(await toast.first().isVisible()).toBe(true);
+    });
+
+    test('should display success toast when saving valid Azure SP Secret configuration', async () => {
+      await configPage.selectAuthMethod('ServicePrincipalSecret');
+      // Fill in valid-looking values (these will save to profile even if auth won't work)
+      await configPage.fillTenantId('e2e-test-tenant-id');
+      await configPage.fill('#azSpClientId', 'e2e-test-client-id');
+      await configPage.clickSave();
+      // Wait for success toast
+      const toast = await configPage.waitForToastMessage('Configuration saved successfully');
+      expect(toast).toBeTruthy();
     });
   });
 });

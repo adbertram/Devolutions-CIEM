@@ -93,9 +93,32 @@ ALTER TABLE scan_runs ADD COLUMN scan_type TEXT NOT NULL DEFAULT 'checks';
 CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
 
 -- =============================================================================
+-- Provider Authentication Methods
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS provider_auth_methods (
+    provider TEXT NOT NULL,
+    method TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (provider, method)
+);
+
+-- =============================================================================
 -- Seed Data: Providers (INSERT OR IGNORE — safe for re-runs)
 -- =============================================================================
 
 INSERT OR IGNORE INTO providers (id, name, type, enabled, created_at, updated_at) VALUES
 ('azure', 'Azure', 'Azure', 1, datetime('now'), datetime('now')),
 ('aws', 'AWS', 'AWS', 0, datetime('now'), datetime('now'));
+
+-- =============================================================================
+-- Seed Data: Provider Authentication Methods (INSERT OR IGNORE — safe for re-runs)
+-- =============================================================================
+
+INSERT OR IGNORE INTO provider_auth_methods (provider, method, display_name, sort_order) VALUES
+('Azure', 'ServicePrincipalSecret', 'Service Principal (Secret)', 1),
+('Azure', 'ServicePrincipalCertificate', 'Service Principal (Certificate)', 2),
+('Azure', 'ManagedIdentity', 'Managed Identity', 3),
+('AWS', 'CurrentProfile', 'Current Profile', 1),
+('AWS', 'AccessKey', 'Access Key', 2);

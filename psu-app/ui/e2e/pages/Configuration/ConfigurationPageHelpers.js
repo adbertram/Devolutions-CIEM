@@ -6,11 +6,15 @@ class ConfigurationPageHelpers extends BasePage {
     super(page);
     this.selectors = {
       pageTitle: "h4:has-text('Configuration')",
+      subtitle: "text=Configure cloud provider authentication for CIEM security scans",
+      authCard: ".MuiCard-root:has-text('Cloud Provider Authentication')",
       // Provider and auth dropdowns (MUI renders hidden input + visible combobox)
       cloudProvider: '#cloudProvider',
       cloudProviderCombobox: '[role="combobox"][aria-labelledby="cloudProviderlabel"]',
       authMethod: '#authMethod',
       authMethodCombobox: '[role="combobox"][aria-labelledby="authMethodlabel"]',
+      // Auth method help text (caption below dropdown)
+      authMethodHelpText: "text=Select the authentication method that matches your environment",
       // Azure SP Secret fields
       azTenantId: '#azTenantId',
       azSpClientId: '#azSpClientId',
@@ -19,6 +23,9 @@ class ConfigurationPageHelpers extends BasePage {
       azCertClientId: '#azCertClientId',
       azCertPassword: '#azCertPassword',
       uploadCertButton: "button:has-text('Upload Certificate')",
+      // Certificate guidance text (shows upload instructions or stored status)
+      certUploadGuidance: "text=Upload a PFX certificate file",
+      certStoredGuidance: "text=Certificate file is stored",
       // AWS CurrentProfile fields
       awsProfile: '#awsProfile',
       awsRegion: '#awsRegion',
@@ -37,6 +44,7 @@ class ConfigurationPageHelpers extends BasePage {
       // Modal
       permissionsModal: '.MuiDialog-root',
       permissionsModalTitle: '.MuiDialog-root h6',
+      permissionsModalBody: '[role="dialog"] .MuiDialogContent-root',
       permissionsModalCloseBtn: ".MuiDialog-root button:has-text('Close')",
       // AWS info alert
       awsCliAlert: ".MuiAlert-root:has-text('AWS CLI')"
@@ -153,6 +161,56 @@ class ConfigurationPageHelpers extends BasePage {
 
   async waitForToastMessage(text) {
     return await this.waitForToast(text);
+  }
+
+  async getPageTitle() {
+    return await this.getText(this.selectors.pageTitle);
+  }
+
+  async getSubtitleText() {
+    await this.waitForSelector(this.selectors.subtitle);
+    return await this.page.locator(this.selectors.subtitle).textContent();
+  }
+
+  async isAuthCardVisible() {
+    return await this.isElementVisible(this.selectors.authCard);
+  }
+
+  async isAuthMethodHelpTextVisible() {
+    return await this.isElementVisible(this.selectors.authMethodHelpText);
+  }
+
+  async getCertUploadGuidanceText() {
+    // Certificate guidance can be either "Upload a PFX..." or "Certificate file is stored..."
+    const uploadGuidance = await this.isElementVisible(this.selectors.certUploadGuidance);
+    if (uploadGuidance) {
+      return await this.page.locator(this.selectors.certUploadGuidance).textContent();
+    }
+    const storedGuidance = await this.isElementVisible(this.selectors.certStoredGuidance);
+    if (storedGuidance) {
+      return await this.page.locator(this.selectors.certStoredGuidance).textContent();
+    }
+    return null;
+  }
+
+  async getPermissionsModalBodyText() {
+    await this.waitForSelector(this.selectors.permissionsModalBody);
+    return await this.page.locator(this.selectors.permissionsModalBody).textContent();
+  }
+
+  async getAuthMethodOptions() {
+    // Open the auth method dropdown and collect available option texts
+    const combobox = this.page.locator(this.selectors.authMethodCombobox);
+    await combobox.click();
+    const options = this.page.locator('[role="option"]');
+    const count = await options.count();
+    const optionTexts = [];
+    for (let i = 0; i < count; i++) {
+      optionTexts.push(await options.nth(i).textContent());
+    }
+    // Close the dropdown by pressing Escape
+    await this.page.keyboard.press('Escape');
+    return optionTexts;
   }
 }
 

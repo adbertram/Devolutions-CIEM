@@ -1,6 +1,6 @@
 const path = require('path');
 
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
 const testConfig = {
   urls: {
@@ -11,14 +11,15 @@ const testConfig = {
     scan: '/ciem/ciem/scan',
     history: '/ciem/ciem/history',
     graph: '/ciem/ciem/graph',
+    environment: '/ciem/ciem/environment',
     config: '/ciem/ciem/config',
     about: '/ciem/ciem/about'
   },
   database: {
-    path: path.resolve(__dirname, '../../psu-app/data/ciem.db')
+    path: path.resolve(__dirname, '../../../data/ciem.db')
   },
   psu: {
-    setupScript: path.resolve(__dirname, '../../scripts/setup-local-psu.sh'),
+    setupScript: path.resolve(__dirname, '../../../../scripts/setup-local-psu.sh'),
     healthEndpoint: '/api/v1/alive'
   },
   timeouts: {

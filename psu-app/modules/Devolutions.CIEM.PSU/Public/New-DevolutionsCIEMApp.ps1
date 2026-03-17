@@ -25,6 +25,7 @@ function New-DevolutionsCIEMApp {
             New-CIEMScanPage -Navigation $Navigation
             New-CIEMScanHistoryPage -Navigation $Navigation
             New-CIEMGraphPage -Navigation $Navigation
+            New-CIEMEnvironmentPage -Navigation $Navigation
             New-CIEMConfigPage -Navigation $Navigation
             New-CIEMAboutPage -Navigation $Navigation
         ) -DefaultTheme 'Light'
