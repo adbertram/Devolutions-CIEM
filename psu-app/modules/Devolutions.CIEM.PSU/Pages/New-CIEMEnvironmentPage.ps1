@@ -45,6 +45,56 @@ function New-CIEMEnvironmentPage {
                         $Session:SelectedEnvOrient = $EventData
                     }
                 }
+                New-UDButton -Id 'startDiscoveryBtn' -Text 'Start Discovery' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
+                    try {
+                        $provider = $Session:SelectedEnvProvider
+                        if (-not $provider) { $provider = 'Azure' }
+
+                        Write-CIEMLog -Message "Starting discovery from Environment page for provider: $provider" -Severity INFO -Component 'PSU-EnvironmentPage'
+
+                        if ($provider -ne 'Azure') {
+                            Show-UDToast -Message "Provider '$provider' is not yet supported for discovery." -Duration 5000 -BackgroundColor '#ff9800'
+                            return
+                        }
+
+                        Show-UDToast -Message 'Starting Azure discovery...' -Duration 5000 -BackgroundColor '#2196f3'
+
+                        $run = Invoke-CIEMJobWithProgress `
+                            -ScriptName 'Devolutions.CIEM\Start-CIEMAzureDiscovery' `
+                            -ProgressElementId 'envChartArea' `
+                            -DisableElementIds @('startDiscoveryBtn', 'loadEnvBtn') `
+                            -MaxPollSeconds 600
+
+                        $status = $run.Status
+                        $armCount = $run.ArmRowCount
+                        $entraCount = $run.EntraRowCount
+
+                        if ($status -eq 'Completed') {
+                            Set-UDElement -Id 'envChartArea' -Content {
+                                New-CIEMSuccessContent -Text "Discovery completed: $armCount ARM resources, $entraCount Entra resources" -Details 'Click "Load Environment" to visualize the hierarchy.'
+                            }
+                            Show-UDToast -Message "Discovery completed: $armCount ARM resources, $entraCount Entra resources" -Duration 8000 -BackgroundColor '#4caf50'
+                        } elseif ($status -eq 'Partial') {
+                            Set-UDElement -Id 'envChartArea' -Content {
+                                New-CIEMInfoContent -Text "Discovery partially completed: $armCount ARM, $entraCount Entra (some warnings)" -Details 'Click "Load Environment" to visualize available data.'
+                            }
+                            Show-UDToast -Message "Discovery partially completed: $armCount ARM, $entraCount Entra (some warnings)" -Duration 8000 -BackgroundColor '#ff9800'
+                        } else {
+                            Set-UDElement -Id 'envChartArea' -Content {
+                                New-CIEMErrorContent -Text "Discovery finished with status: $status" -Details 'No resources were collected. Check authentication and try again.'
+                            }
+                            Show-UDToast -Message "Discovery finished with status: $status" -Duration 8000 -BackgroundColor '#ff9800'
+                        }
+                    }
+                    catch {
+                        $errorMsg = $_.Exception.Message
+                        Write-CIEMLog -Message "Discovery from Environment page failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
+                        Set-UDElement -Id 'envChartArea' -Content {
+                            New-CIEMErrorContent -Text 'Discovery Failed' -Details $errorMsg
+                        }
+                        Show-UDToast -Message "Discovery failed: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
+                    }
+                }
                 New-UDButton -Id 'loadEnvBtn' -Text 'Load Environment' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
                     try {
                         $provider = $Session:SelectedEnvProvider

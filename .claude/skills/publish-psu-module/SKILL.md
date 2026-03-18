@@ -33,6 +33,15 @@ Use AskUserQuestion with options:
 - **Azure** - Publish to PSGallery and import to Azure PSU (production)
 </step>
 
+<step name="preflight-local" condition="target is local">
+Before publishing, verify local PSU is accessible:
+```bash
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/api/v1/alive
+```
+If this returns 401, the `.env` LOCAL_PSU_TOKEN may be invalid (e.g., after a PSU reset). Inform the user they need to create a new App Token in PSU admin UI.
+If connection refused, PSU is not running. Do NOT run `setup-local-psu.sh reset` — ask the user what state PSU is in.
+</step>
+
 <step name="publish-local" condition="target is local">
 ```bash
 pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUModule -ModulePath ./psu-app -LocalOnly"

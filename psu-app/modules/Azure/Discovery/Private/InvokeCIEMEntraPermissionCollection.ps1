@@ -5,9 +5,13 @@ function InvokeCIEMEntraPermissionCollection {
     )
 
     $now = (Get-Date).ToString('o')
+    $totalSPs = $ServicePrincipals.Count
 
     # --- App Role Assignments (per SP) ---
+    $spIndex = 0
     foreach ($sp in $ServicePrincipals) {
+        $spIndex++
+        Write-Progress -Activity 'Azure Discovery' -Status "Collecting app role assignments ($spIndex/$totalSPs)" -PercentComplete (70 + [math]::Floor(8 * $spIndex / $totalSPs)) -CurrentOperation $sp.DisplayName
         $assignments = @(Invoke-AzureApi -Api Graph -Path "/servicePrincipals/$($sp.Id)/appRoleAssignments" -ResourceName "AppRoleAssignments/$($sp.Id)")
         foreach ($a in $assignments) {
             $r = [CIEMAzureEntraResource]::new()
@@ -23,6 +27,7 @@ function InvokeCIEMEntraPermissionCollection {
     }
 
     # --- OAuth2 Permission Grants (single paginated call) ---
+    Write-Progress -Activity 'Azure Discovery' -Status 'Collecting OAuth2 permission grants' -PercentComplete 78 -CurrentOperation 'Delegated permissions'
     $grants = @(Invoke-AzureApi -Api Graph -Path '/oauth2PermissionGrants' -ResourceName 'OAuth2PermissionGrants')
     foreach ($g in $grants) {
         $r = [CIEMAzureEntraResource]::new()

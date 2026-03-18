@@ -11,6 +11,7 @@ function cleanupTestData() {
 
     db.prepare(`DELETE FROM scan_results WHERE scan_run_id LIKE '${TEST_PREFIX}%'`).run();
     db.prepare(`DELETE FROM scan_runs WHERE id LIKE '${TEST_PREFIX}%'`).run();
+    db.prepare(`DELETE FROM azure_arm_resources WHERE id LIKE '${TEST_PREFIX}%'`).run();
 
     console.log('[cleanup] Test data cleaned up.');
   } finally {
@@ -106,4 +107,145 @@ function seedTestData() {
   }
 }
 
-module.exports = { cleanupTestData, seedTestData, TEST_PREFIX };
+function seedEnvironmentData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+
+    const now = new Date().toISOString();
+    const tenantId = `${TEST_PREFIX}tenant-0000-0000-0000-000000000001`;
+    const sub1Id = `${TEST_PREFIX}sub-0000-0000-0000-000000000001`;
+    const sub2Id = `${TEST_PREFIX}sub-0000-0000-0000-000000000002`;
+
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, collected_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // 2 subscriptions, 2 resource groups, 4 resources — enough to exercise the hierarchy tree
+    const rows = [
+      [`${TEST_PREFIX}rg1-vnet`,   'microsoft.network/virtualnetworks', 'e2e-vnet-1',     'eastus',  'e2e-rg-1', sub1Id, tenantId, now],
+      [`${TEST_PREFIX}rg1-nsg`,    'microsoft.network/networksecuritygroups', 'e2e-nsg-1', 'eastus',  'e2e-rg-1', sub1Id, tenantId, now],
+      [`${TEST_PREFIX}rg1-sa`,     'microsoft.storage/storageaccounts', 'e2esa1',          'eastus',  'e2e-rg-1', sub1Id, tenantId, now],
+      [`${TEST_PREFIX}rg2-kv`,     'microsoft.keyvault/vaults',         'e2e-kv-1',        'westus2', 'e2e-rg-2', sub2Id, tenantId, now],
+    ];
+
+    const insertMany = db.transaction((items) => {
+      for (const row of items) {
+        insert.run(...row);
+      }
+    });
+    insertMany(rows);
+
+    // Force WAL checkpoint so PSU's Microsoft.Data.Sqlite sees the data immediately
+    db.pragma('wal_checkpoint(TRUNCATE)');
+
+    console.log(`[seed] Seeded ${rows.length} ARM resources for Environment page tests.`);
+  } finally {
+    if (db) db.close();
+  }
+}
+
+function cleanupEnvironmentData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.prepare(`DELETE FROM azure_arm_resources WHERE id LIKE '${TEST_PREFIX}%'`).run();
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[cleanup] Environment test data cleaned up.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Returns the count of ARM resources in the PSU database.
+ */
+function getArmResourceCount() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: true });
+    const row = db.prepare('SELECT COUNT(*) as count FROM azure_arm_resources').get();
+    return row.count;
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Returns the count of test-prefixed ARM resources in the PSU database.
+ */
+function getTestArmResourceCount() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: true });
+    const row = db.prepare(`SELECT COUNT(*) as count FROM azure_arm_resources WHERE id LIKE '${TEST_PREFIX}%'`).get();
+    return row.count;
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Back up all non-test ARM resources and delete them.
+ * Returns the backed-up rows for later restoration.
+ */
+function backupAndClearAllArmResources() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    const rows = db.prepare(`SELECT * FROM azure_arm_resources WHERE id NOT LIKE '${TEST_PREFIX}%'`).all();
+    db.prepare('DELETE FROM azure_arm_resources').run();
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log(`[setup] Backed up ${rows.length} ARM resources and cleared table.`);
+    return rows;
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Restore previously backed-up ARM resources.
+ */
+function restoreArmResources(rows) {
+  if (!rows || rows.length === 0) return;
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at)
+      VALUES (@id, @type, @name, @location, @resource_group, @subscription_id, @tenant_id, @kind, @sku, @identity, @managed_by, @plan, @zones, @tags, @properties, @collected_at)
+    `);
+    const insertMany = db.transaction((items) => {
+      for (const row of items) { insert.run(row); }
+    });
+    insertMany(rows);
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log(`[teardown] Restored ${rows.length} ARM resources.`);
+  } finally {
+    if (db) db.close();
+  }
+}
+
+function clearStaleDiscoveryRuns() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    const result = db.prepare("UPDATE azure_discovery_runs SET status = 'Failed', completed_at = datetime('now') WHERE status = 'Running'").run();
+    if (result.changes > 0) {
+      console.log(`[cleanup] Cleared ${result.changes} stale Running discovery runs.`);
+    }
+  } finally {
+    if (db) db.close();
+  }
+}
+
+module.exports = {
+  cleanupTestData, seedTestData,
+  seedEnvironmentData, cleanupEnvironmentData,
+  getArmResourceCount, getTestArmResourceCount,
+  backupAndClearAllArmResources, restoreArmResources,
+  clearStaleDiscoveryRuns,
+  TEST_PREFIX
+};

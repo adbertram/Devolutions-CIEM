@@ -183,6 +183,15 @@ grep -i "error\|exception\|fail" psu-app/data/ciem.log
 
 The log captures issues that PSU's own logs miss (module initialization, provider registration, schema application). If `ciem.log` doesn't explain the problem, then check PSU logs via `./scripts/download-psu-logs.sh --local`.
 
+### Local PSU Recovery Escalation (MANDATORY ORDER)
+
+1. `Restart-PSUApp -Name 'Devolutions CIEM'` — restart just the CIEM app
+2. `./scripts/setup-local-psu.sh stop && ./scripts/setup-local-psu.sh start` — restart PSU server
+3. **STOP and ask the user** before proceeding to more destructive options
+4. **NEVER run `setup-local-psu.sh reset` without explicit user approval** — it destroys all local PSU state (license, tokens, app registrations, dev mode settings) and requires full manual re-setup
+
+After bulk code changes, if the CIEM app shows "App is not running," investigate whether the changes broke module initialization before restarting anything. Always suppress `Connect-PSU` output when chaining commands: `$null = Connect-PSU -Local; <next command>`
+
 ---
 
 ## PowerShell Universal (PSU) Servers

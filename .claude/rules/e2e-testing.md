@@ -56,6 +56,9 @@ PSU app has a double-path prefix: `/ciem/ciem/[page]` (first `/ciem` is the PSU 
 
 - Each page gets a `PageHelpers.js` class extending `BasePage`
 - Test files import from `../../_utils/BaseTestSetup` and use `ciemPage` fixture
-- Use `testInfo.skip()` for data-dependent conditional tests (e.g., empty state vs populated state)
-- Group tests with `test.describe()` using BDD-style names ("when X happens")
+- Tests MUST control their own preconditions via `beforeAll` state setup — never use `testInfo.skip()` to avoid testing ambient state
+- `testInfo.skip()` is ONLY acceptable when `beforeAll` attempted to establish state and verified it cannot (e.g., PSU command failed)
+- Group tests with `test.describe()` using BDD-style names representing STATE CONDITIONS ("when no active auth profile exists")
+- Before fixing ANY test failure, read the PSU page source in `psu-app/modules/Devolutions.CIEM.PSU/Pages/` — diagnose from implementation, not error messages
+- E2E helpers (`psu-helpers.js`, `cleanup.js`) are a transport layer — they return raw results, NEVER assert or throw on expected failures
 - Wait for PSU dynamic content: `waitForTimeout(3000)` after navigation, `waitForTimeout(2000)` after `Sync-UDElement` refreshes

@@ -30,6 +30,10 @@ Always read the FULL Python source before writing any PowerShell. Understand the
 All generated PowerShell must survive `Set-StrictMode -Version Latest`. Use `$obj.PSObject.Properties['name']` for property existence checks, never raw dot-access on potentially missing properties.
 </principle>
 
+<principle name="error-action-stop">
+Every generated function MUST include `$ErrorActionPreference = 'Stop'` as the first statement after the `param()` block. Use `throw` for validation failures, never `Write-Error`. This is non-negotiable — all converted functions must fail explicitly on errors.
+</principle>
+
 <principle name="review-after-convert">
 After conversion, delegate to the `powershell-expert` agent (via Task tool with `subagent_type: "powershell-expert"`) for review. Fix any issues it raises before presenting final code.
 </principle>

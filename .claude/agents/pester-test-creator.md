@@ -82,6 +82,7 @@ You receive a function name, file path, or module area via $ARGUMENTS. If none p
 
 | Category | What to test |
 |----------|-------------|
+| ErrorActionPreference | `$ErrorActionPreference = 'Stop'` present after param() |
 | Command structure | Exported, parameters match, OutputType correct |
 | Happy path | Standard usage with valid inputs |
 | Parameter filtering | Each filter returns correct subset |

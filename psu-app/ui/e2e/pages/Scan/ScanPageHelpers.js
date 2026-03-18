@@ -31,7 +31,8 @@ class ScanPageHelpers extends BasePage {
 
       // Scan progress
       scanProgressArea: '#scanProgressArea',
-      scanStatusText: '#scanStatusText',
+      scanProgressBar: '#scanProgressArea .MuiLinearProgress-root',
+      scanProgressText: '#scanProgressArea .MuiTypography-body2',
       scanCompleteIcon: "#scanProgressArea .MuiCard-root:has-text('Scan Complete!')",
 
       // Info modal
@@ -229,7 +230,13 @@ class ScanPageHelpers extends BasePage {
   }
 
   async getScanProgressText() {
-    return await this.getText(this.selectors.scanStatusText);
+    const textEl = this.page.locator(this.selectors.scanProgressText).first();
+    try {
+      await textEl.waitFor({ state: 'visible', timeout: 10000 });
+      return (await textEl.textContent()).trim();
+    } catch {
+      return '';
+    }
   }
 
   // --- Pagination ---
@@ -249,8 +256,11 @@ class ScanPageHelpers extends BasePage {
   }
 
   async waitForScanProgress(timeout = 15000) {
-    // Wait for the progress card to appear (circular progress indicator)
-    await this.page.locator(`${this.selectors.scanProgressArea} .MuiCircularProgress-root`).waitFor({ state: 'visible', timeout });
+    // Wait for either circular progress (initial render) or linear progress bar (after first poll)
+    const circularOrLinear = this.page.locator(
+      `${this.selectors.scanProgressArea} .MuiCircularProgress-root, ${this.selectors.scanProgressBar}`
+    );
+    await circularOrLinear.first().waitFor({ state: 'visible', timeout });
   }
 
   async waitForScanComplete(timeout = 300000) {
