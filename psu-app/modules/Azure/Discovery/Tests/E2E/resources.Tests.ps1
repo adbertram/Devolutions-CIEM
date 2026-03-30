@@ -1,48 +1,7 @@
 BeforeAll {
     $projectRoot = Resolve-Path (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' '..')
-    Import-Module (Join-Path $projectRoot 'Devolutions.CIEM.Admin' 'Devolutions.CIEM.Admin.psd1') -Force
-
-    # Helper: run a command on PSU, wrap output in JSON, and parse the result.
-    function script:Run-OnPSU {
-        param(
-            [Parameter(Mandatory)][string]$Command,
-            [int]$TimeoutSeconds = 60
-        )
-
-        $wrappedCommand = @"
-`$ErrorActionPreference = 'Continue'
-`$__result = & { $Command }
-if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
-"@
-        $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -TimeoutSeconds $TimeoutSeconds)
-        $jobResult = $allOutput | Where-Object { $_.PSObject.Properties.Name -contains 'JobId' } | Select-Object -Last 1
-
-        if (-not $jobResult) { throw "PSU command returned no job result." }
-        if ($jobResult.Status -eq 'Failed') {
-            $errMsgs = @($jobResult.Output) | Where-Object { $_.type -eq 4 } | ForEach-Object { $_.message }
-            throw "PSU command failed: $($errMsgs -join '; ')"
-        }
-        if ($jobResult.Status -notin @('Completed', 'Warning')) {
-            throw "PSU job $($jobResult.JobId) did not complete. Status: $($jobResult.Status)"
-        }
-
-        $pipelineItems = @($jobResult.PipelineOutput)
-        if ($pipelineItems.Count -eq 0) { return $null }
-
-        $lastItem = $pipelineItems[-1]
-        $jsonDataStr = $lastItem.jsonData
-        if (-not $jsonDataStr) { return $null }
-
-        $jsonEntries = $jsonDataStr | ConvertFrom-Json
-        $rawValue = ($jsonEntries | Select-Object -Last 1).value
-
-        if ($rawValue -eq '___NULL___') { return $null }
-
-        try { $rawValue | ConvertFrom-Json }
-        catch { $rawValue }
-    }
-
-    Connect-PSU -Local | Out-Null
+    . (Join-Path $projectRoot 'psu-app' 'Tests' 'E2E' 'PesterE2EHelper.ps1')
+    Initialize-PesterE2E -ProjectRoot $projectRoot
 
     # Verify PSU is reachable and discovery data exists
     $script:dataCounts = Run-OnPSU @'

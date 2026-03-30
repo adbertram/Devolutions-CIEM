@@ -1,6 +1,7 @@
 BeforeAll {
     $projectRoot = Resolve-Path (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' '..' '..' '..')
-    Import-Module (Join-Path $projectRoot 'Devolutions.CIEM.Admin' 'Devolutions.CIEM.Admin.psd1') -Force
+    . (Join-Path $projectRoot 'psu-app' 'Tests' 'E2E' 'PesterE2EHelper.ps1')
+    Initialize-PesterE2E -ProjectRoot $projectRoot
 
     # Test data constants — all prefixed for cleanup
     $script:TestPrefix = '_E2E_TEST_'
@@ -8,46 +9,6 @@ BeforeAll {
     $script:ProfileId2 = "_E2E_TEST_sp2_$(Get-Random -Maximum 99999)"
     $script:FakeTenantId = '00000000-0000-0000-0000-000000000000'
     $script:FakeClientId = '11111111-1111-1111-1111-111111111111'
-
-    # Helper: run a command on PSU, wrap output in JSON, and parse the result.
-    # Each Run-OnPSU call is an isolated PSU job (separate runspace).
-    function script:Run-OnPSU {
-        param(
-            [Parameter(Mandatory)][string]$Command,
-            [int]$TimeoutSeconds = 60
-        )
-
-        $wrappedCommand = @"
-`$ErrorActionPreference = 'Continue'
-`$__result = & { $Command }
-if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
-"@
-        $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -TimeoutSeconds $TimeoutSeconds)
-        $jobResult = $allOutput | Where-Object { $_.PSObject.Properties.Name -contains 'JobId' } | Select-Object -Last 1
-
-        if (-not $jobResult) { throw "PSU command returned no job result." }
-        if ($jobResult.Status -eq 'Failed') {
-            $errMsgs = @($jobResult.Output) | Where-Object { $_.type -eq 4 } | ForEach-Object { $_.message }
-            throw "PSU command failed: $($errMsgs -join '; ')"
-        }
-
-        $pipelineItems = @($jobResult.PipelineOutput)
-        if ($pipelineItems.Count -eq 0) { return $null }
-
-        $lastItem = $pipelineItems[-1]
-        $jsonDataStr = $lastItem.jsonData
-        if (-not $jsonDataStr) { return $null }
-
-        $jsonEntries = $jsonDataStr | ConvertFrom-Json
-        $rawValue = ($jsonEntries | Select-Object -Last 1).value
-
-        if ($rawValue -eq '___NULL___') { return $null }
-
-        try { $rawValue | ConvertFrom-Json }
-        catch { $rawValue }
-    }
-
-    Connect-PSU -Local | Out-Null
 
     # Verify PSU is reachable and CIEM module is loaded
     $script:psuPing = Run-OnPSU 'Get-Command Get-CIEMAzureAuthenticationProfile -ErrorAction Stop | Select-Object -ExpandProperty Name'
