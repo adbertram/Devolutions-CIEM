@@ -183,3 +183,7 @@ _temp/
 # CIEM runtime database and logs (single DB lives in local-psu/data/)
 psu-app/data/ciem.db*
 psu-app/data/ciem.log
+
+# Agent workspaces and test results (runtime artifacts)
+agent_workspaces/
+test-results/
