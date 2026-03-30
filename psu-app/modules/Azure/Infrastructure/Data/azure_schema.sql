@@ -7,17 +7,12 @@ CREATE TABLE IF NOT EXISTS azure_provider_apis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     base_url TEXT NOT NULL,
-    version TEXT
+    version TEXT,
+    service TEXT,
+    path TEXT,
+    permissions TEXT,
+    disabled INTEGER NOT NULL DEFAULT 0
 );
-
--- =============================================================================
--- Azure Provider APIs — Schema Evolution (ALTER TABLE safe for existing DBs)
--- =============================================================================
-
-ALTER TABLE azure_provider_apis ADD COLUMN service TEXT;
-ALTER TABLE azure_provider_apis ADD COLUMN path TEXT;
-ALTER TABLE azure_provider_apis ADD COLUMN permissions TEXT;
-ALTER TABLE azure_provider_apis ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0;
 
 -- =============================================================================
 -- Seed Data: Azure Provider APIs (INSERT OR IGNORE — safe for re-runs)
