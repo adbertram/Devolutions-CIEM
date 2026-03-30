@@ -32,9 +32,8 @@ function Write-CIEMLog {
         [string]$Component = 'CIEM'
     )
 
-    # Log file path - always write to data/ciem.log under the module root.
-    # This matches the bootstrap logger (_BootLog) path so all logs go to one file.
-    $logPath = Join-Path -Path $script:ModuleRoot -ChildPath 'data/ciem.log'
+    # Log file path - uses $script:DataRoot (resolved in psm1 to survive module upgrades).
+    $logPath = Join-Path -Path $script:DataRoot -ChildPath 'ciem.log'
 
     # Format timestamp
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'

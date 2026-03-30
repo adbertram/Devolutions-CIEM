@@ -180,6 +180,6 @@ plans/
 
 _temp/
 
-# CIEM runtime database and logs (always recreated from schema.sql at module load)
-psu-app/data/ciem.db
+# CIEM runtime database and logs (single DB lives in local-psu/data/)
+psu-app/data/ciem.db*
 psu-app/data/ciem.log

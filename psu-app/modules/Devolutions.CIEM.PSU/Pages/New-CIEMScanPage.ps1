@@ -188,154 +188,73 @@ function New-CIEMScanPage {
                         $selectedServices = @($selectedChecks | Select-Object -ExpandProperty Service -Unique)
                         Write-CIEMLog -Message "Scan config: Checks=$($selectedCheckIds.Count), Providers=$($selectedProviders -join ','), Services=$($selectedServices -join ',')" -Severity INFO -Component 'PSU-ScanPage'
 
-                        # Show progress area
-                        Set-UDElement -Id 'scanProgressArea' -Content {
-                            New-UDCard -Style @{ backgroundColor = '#f5f5f5'; marginTop = '16px'; marginBottom = '16px' } -Content {
-                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                    New-UDProgress -Circular -Size 'small'
-                                    New-UDTypography -Id 'scanStatusText' -Text 'Initializing scan...' -Variant 'body1'
-                                }
-                            }
-                        }
-
-                        # Disable scan button
-                        Set-UDElement -Id 'startScanBtn' -Properties @{ disabled = $true }
-
-                        # Update status
-                        Set-UDElement -Id 'scanStatusText' -Properties @{ children = "Scanning $($selectedCheckIds.Count) checks across $($selectedProviders -join ', ')..." }
                         Show-UDToast -Message "Starting CIEM scan: $($selectedCheckIds.Count) checks across $($selectedServices -join ', ')" -Duration 3000
 
-                        # Launch scan as a PSU job (runs asynchronously with progress tracking)
+                        # PSU doesn't pass -Parameters to module command scripts, so use cache
+                        $scanConfig = @{
+                            Provider      = $selectedProviders
+                            Service       = $selectedServices
+                            CheckId       = $selectedCheckIds
+                            IncludePassed = $true
+                        }
+                        Set-PSUCache -Key $script:ScanConfigCacheKey -Value $scanConfig -Integrated
+
                         Write-CIEMLog -Message "Launching CIEM Scan job for providers: $($selectedProviders -join ', ')..." -Severity INFO -Component 'PSU-ScanPage'
-                        try {
-                            # PSU doesn't pass -Parameters to module command scripts, so use cache
-                            $scanConfig = @{
-                                Provider      = $selectedProviders
-                                Service       = $selectedServices
-                                CheckId       = $selectedCheckIds
-                                IncludePassed = $true
-                            }
-                            Set-PSUCache -Key $script:ScanConfigCacheKey -Value $scanConfig -Integrated
 
-                            $job = Invoke-PSUScript -Name 'Devolutions.CIEM\New-CIEMScanRun' -Integrated
-                            $Session:CurrentScanJobId = $job.Id
-                            Write-CIEMLog -Message "CIEM Scan job launched (JobId: $($job.Id))" -Severity INFO -Component 'PSU-ScanPage'
+                        $scanRun = Invoke-CIEMJobWithProgress `
+                            -ScriptName 'Devolutions.CIEM\New-CIEMScanRun' `
+                            -ProgressElementId 'scanProgressArea' `
+                            -DisableElementIds @('startScanBtn') `
+                            -MaxPollSeconds 1800
 
-                            # Poll for job completion, updating progress UI
-                            $pollInterval = 3
-                            $maxPollSeconds = 1800  # 30 minutes
-                            $elapsed = 0
-
-                            while ($elapsed -lt $maxPollSeconds) {
-                                Start-Sleep -Seconds $pollInterval
-                                $elapsed += $pollInterval
-
-                                $job = Get-PSUJob -Id $Session:CurrentScanJobId -Integrated
-
-                                # Build progress text from Write-Progress data on the job object
-                                $progressParts = @()
-                                if ($job.StatusDescription) { $progressParts += $job.StatusDescription }
-                                elseif ($job.Activity) { $progressParts += $job.Activity }
-                                else { $progressParts += 'Running scan...' }
-                                if ($job.PercentComplete -gt 0) { $progressParts += "($($job.PercentComplete)%)" }
-                                if ($job.CurrentOperation) { $progressParts += "- $($job.CurrentOperation)" }
-                                Set-UDElement -Id 'scanStatusText' -Properties @{ children = ($progressParts -join ' ') }
-
-                                # Break on any terminal status
-                                $status = "$($job.Status)"
-                                if ($status -notin @('Running', 'Queued', 'WaitingOnFeedback', 'Active')) {
-                                    break
-                                }
-                            }
-
-                            # Handle terminal states
-                            $status = "$($job.Status)"
-                            if ($status -eq 'Completed') {
-                                # Retrieve the CIEMScanRun object from pipeline output
-                                $scanRun = Get-PSUJobPipelineOutput -JobId $job.Id -Integrated | Select-Object -First 1
-                                if (-not $scanRun) {
-                                    throw "Scan job completed but returned no pipeline output."
-                                }
-
-                                $allResults = @($scanRun.ScanResults)
-                                $failedCount = $scanRun.FailedResults
-                                $passedCount = $scanRun.PassedResults
-                                $manualCount = $scanRun.ManualResults
-                                $skippedCount = $scanRun.SkippedResults
-                                $totalCount = $scanRun.TotalResults
-                                $durationStr = $scanRun.Duration
-
-                                Write-CIEMLog -Message "Scan complete. Results: $($allResults.Count), Duration: $durationStr" -Severity INFO -Component 'PSU-ScanPage'
-
-                                # Store in session for quick page access
-                                $Session:CIEMScanResults = $allResults
-                                $Session:CIEMScanTimestamp = $scanRun.EndTime
-                                $Session:CIEMIncludePassed = $true
-
-                                Write-CIEMLog -Message "Persisted $($allResults.Count) scan results (ScanRunId: $($scanRun.Id))" -Severity INFO -Component 'PSU-ScanPage'
-
-                                # Update progress area with results summary
-                                Set-UDElement -Id 'scanProgressArea' -Content {
-                                    New-UDCard -Style @{ backgroundColor = '#e8f5e9'; marginTop = '16px'; marginBottom = '16px' } -Content {
-                                        New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                            New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }
-                                            New-UDElement -Tag 'div' -Content {
-                                                New-UDTypography -Text 'Scan Complete!' -Variant 'body1' -Style @{ fontWeight = 'bold'; color = '#2e7d32' }
-                                                $summaryParts = @("Duration: $durationStr", "Total: $totalCount", "Failed: $failedCount", "Passed: $passedCount")
-                                                if ($manualCount -gt 0) { $summaryParts += "Manual: $manualCount" }
-                                                if ($skippedCount -gt 0) { $summaryParts += "Skipped: $skippedCount" }
-                                                New-UDTypography -Text ($summaryParts -join ' | ') -Variant 'body2' -Style @{ color = '#666' }
-                                                New-UDTypography -Text 'View detailed results on the Scan History page.' -Variant 'caption' -Style @{ color = '#666'; marginTop = '4px' }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                # Toast notifications
-                                $toastParts = @("Scan complete!")
-                                if ($failedCount -gt 0) { $toastParts += "$failedCount failed" }
-                                if ($passedCount -gt 0) { $toastParts += "$passedCount passed" }
-                                if ($manualCount -gt 0) { $toastParts += "$manualCount manual review" }
-                                Show-UDToast -Message ($toastParts -join ' | ') -Duration 5000 -BackgroundColor '#4caf50'
-                                Show-UDToast -Message 'View detailed results on the Scan History page.' -Duration 5000
-                            }
-                            elseif ($status -eq 'Failed' -or $status -eq 'Error') {
-                                $errorOutput = Get-PSUJobOutput -Job $job -Integrated | Where-Object { $_ } | Select-Object -First 5
-                                $errorMsg = if ($errorOutput) { ($errorOutput -join "`n") } else { "Scan job failed (status: $status)" }
-                                throw $errorMsg
-                            }
-                            elseif ($status -eq 'TimedOut') {
-                                throw "Scan job timed out after 30 minutes."
-                            }
-                            elseif ($status -eq 'Canceled' -or $status -eq 'Canceling') {
-                                throw "Scan job was cancelled."
-                            }
-                            elseif ($elapsed -ge $maxPollSeconds) {
-                                throw "Scan job polling timed out after $($maxPollSeconds / 60) minutes."
-                            }
-                            else {
-                                throw "Scan job ended with unexpected status: $status"
-                            }
+                        if (-not $scanRun) {
+                            throw "Scan job completed but returned no pipeline output."
                         }
-                        catch {
-                            Write-CIEMLog -Message "Scan failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
-                            Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ScanPage'
 
-                            Set-UDElement -Id 'scanProgressArea' -Content {
-                                New-CIEMErrorContent -Text 'Scan Failed' -Details $_.Exception.Message
-                            }
+                        $allResults = @($scanRun.ScanResults)
+                        $failedCount = $scanRun.FailedResults
+                        $passedCount = $scanRun.PassedResults
+                        $manualCount = $scanRun.ManualResults
+                        $skippedCount = $scanRun.SkippedResults
+                        $totalCount = $scanRun.TotalResults
+                        $durationStr = $scanRun.Duration
 
-                            Show-UDToast -Message "Scan failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
+                        Write-CIEMLog -Message "Scan complete. Results: $($allResults.Count), Duration: $durationStr" -Severity INFO -Component 'PSU-ScanPage'
+
+                        # Store in session for quick page access
+                        $Session:CIEMScanResults = $allResults
+                        $Session:CIEMScanTimestamp = $scanRun.EndTime
+                        $Session:CIEMIncludePassed = $true
+
+                        Write-CIEMLog -Message "Persisted $($allResults.Count) scan results (ScanRunId: $($scanRun.Id))" -Severity INFO -Component 'PSU-ScanPage'
+
+                        # Update progress area with results summary
+                        $summaryParts = @("Duration: $durationStr", "Total: $totalCount", "Failed: $failedCount", "Passed: $passedCount")
+                        if ($manualCount -gt 0) { $summaryParts += "Manual: $manualCount" }
+                        if ($skippedCount -gt 0) { $summaryParts += "Skipped: $skippedCount" }
+                        $summaryText = $summaryParts -join ' | '
+
+                        Set-UDElement -Id 'scanProgressArea' -Content {
+                            New-CIEMSuccessContent -Text 'Scan Complete!' -Details "$summaryText`nView detailed results on the Scan History page."
                         }
-                        finally {
-                            # Re-enable scan button
-                            Set-UDElement -Id 'startScanBtn' -Properties @{ disabled = $false }
-                        }
+
+                        # Toast notifications
+                        $toastParts = @("Scan complete!")
+                        if ($failedCount -gt 0) { $toastParts += "$failedCount failed" }
+                        if ($passedCount -gt 0) { $toastParts += "$passedCount passed" }
+                        if ($manualCount -gt 0) { $toastParts += "$manualCount manual review" }
+                        Show-UDToast -Message ($toastParts -join ' | ') -Duration 5000 -BackgroundColor '#4caf50'
+                        Show-UDToast -Message 'View detailed results on the Scan History page.' -Duration 5000
                     }
                     catch {
-                        Write-CIEMLog -Message "Scan button handler error: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
-                        Show-UDToast -Message "Error: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
-                        Set-UDElement -Id 'startScanBtn' -Properties @{ disabled = $false }
+                        Write-CIEMLog -Message "Scan failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ScanPage'
+                        Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ScanPage'
+
+                        Set-UDElement -Id 'scanProgressArea' -Content {
+                            New-CIEMErrorContent -Text 'Scan Failed' -Details $_.Exception.Message
+                        }
+
+                        Show-UDToast -Message "Scan failed: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'
                     }
                 }
             }

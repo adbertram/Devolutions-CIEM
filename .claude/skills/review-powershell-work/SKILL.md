@@ -44,6 +44,8 @@ After gathering inputs:
      [list files]
 
      Check for:
+     - **$ErrorActionPreference = 'Stop'** — EVERY function (public AND private) MUST have this as the first statement after param(). Flag missing as CRITICAL.
+     - **throw over Write-Error** — Functions must throw exceptions, never Write-Error
      - Module structure (functions in Public/Private, not PSM1)
      - Function naming (Verb-Noun with approved verbs)
      - Parameter declarations and validation

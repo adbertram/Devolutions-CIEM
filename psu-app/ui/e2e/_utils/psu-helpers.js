@@ -1,4 +1,6 @@
 const { execSync } = require('child_process');
+const path = require('path');
+const Database = require('better-sqlite3');
 const { testConfig } = require('./test-config');
 
 async function isPSUReady() {
@@ -37,4 +39,192 @@ async function waitForPSU(timeoutMs = testConfig.timeouts.serverStart) {
   throw new Error(`PSU server did not become ready within ${timeoutMs / 1000}s`);
 }
 
-module.exports = { isPSUReady, startPSU, waitForPSU };
+/**
+ * Get the local PSU app token from the local-psu database.
+ */
+function getPSUToken() {
+  const dbPath = path.resolve(__dirname, '../../../../local-psu/database.db');
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    const row = db.prepare('SELECT Token FROM AppToken LIMIT 1').get();
+    return row ? row.Token : null;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Get PSU API headers with auth token.
+ */
+function getPSUHeaders() {
+  const token = getPSUToken();
+  if (!token) throw new Error('No PSU token found in local-psu/database.db');
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  };
+}
+
+/**
+ * Cancel all running and queued PSU jobs.
+ * Returns { cancelled: number, running: number, queued: number }.
+ */
+async function cancelRunningPSUJobs() {
+  const baseUrl = testConfig.urls.psu;
+  const headers = getPSUHeaders();
+
+  // PSU job API returns paginated { page: [...], total: N } — filter by status
+  const runningRes = await fetch(`${baseUrl}/api/v1/job?status=1&take=100`, { headers });
+  const runningData = await runningRes.json().catch(() => ({ page: [] }));
+  const running = runningData.page || [];
+  const queuedRes = await fetch(`${baseUrl}/api/v1/job?status=0&take=100`, { headers });
+  const queuedData = await queuedRes.json().catch(() => ({ page: [] }));
+  const queued = queuedData.page || [];
+
+  const toCancel = [...running, ...queued];
+  let cancelled = 0;
+  for (const job of toCancel) {
+    await fetch(`${baseUrl}/api/v1/job/${job.id}/cancel`, { method: 'POST', headers }).catch(() => {});
+    cancelled++;
+  }
+
+  return { cancelled, running: running.length, queued: queued.length };
+}
+
+const PSU_STATUS = { Queued: 0, Running: 1, Completed: 2, Failed: 3, Canceled: 5, TimedOut: 9, Warning: 10, WarningOutput: 11 };
+const PSU_STATUS_NAMES = Object.fromEntries(Object.entries(PSU_STATUS).map(([k, v]) => [v, k]));
+const PSU_TERMINAL_STATUSES = [PSU_STATUS.Completed, PSU_STATUS.Failed, PSU_STATUS.Canceled, PSU_STATUS.TimedOut, PSU_STATUS.Warning, PSU_STATUS.WarningOutput];
+
+/**
+ * Run a PowerShell command inside PSU via the CIEMExecutor script.
+ * Returns a result object with job metadata and output — caller is responsible for assertions.
+ *
+ * @returns {{ jobId: number, status: string, statusCode: number, startTime: string, endTime: string, output: object[], pipelineOutput: any }}
+ */
+async function runPSUCommand(command, timeoutMs = 30000) {
+  const baseUrl = testConfig.urls.psu;
+  const headers = getPSUHeaders();
+
+  // Find or create the executor script
+  const scriptsRes = await fetch(`${baseUrl}/api/v1/script`, { headers });
+  const scripts = await scriptsRes.json();
+  let executor = scripts.find(s => s.name === 'CIEMExecutor.ps1');
+
+  if (!executor) {
+    const createRes = await fetch(`${baseUrl}/api/v1/script`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        name: 'CIEMExecutor.ps1',
+        fullPath: 'CIEMExecutor.ps1',
+        content: 'param([string]$ScriptContent)\n& ([scriptblock]::Create($ScriptContent))',
+        description: 'Persistent executor for E2E tests',
+        maxHistory: 100
+      })
+    });
+    executor = await createRes.json();
+  }
+
+  // Invoke the command
+  const encoded = encodeURIComponent(command);
+  const invokeRes = await fetch(`${baseUrl}/api/v1/script/${executor.id}?ScriptContent=${encoded}`, {
+    method: 'POST', headers, body: '{}'
+  });
+  if (!invokeRes.ok) {
+    return { jobId: null, status: 'InvocationFailed', statusCode: -1, httpStatus: invokeRes.status, error: invokeRes.statusText };
+  }
+  const jobResponse = await invokeRes.json();
+  const jobId = typeof jobResponse === 'number' ? jobResponse : jobResponse.id;
+
+  // Poll for terminal status
+  const start = Date.now();
+  let job = null;
+  while (Date.now() - start < timeoutMs) {
+    const jobRes = await fetch(`${baseUrl}/api/v1/job/${jobId}`, { headers });
+    job = await jobRes.json();
+    if (PSU_TERMINAL_STATUSES.includes(job.status)) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  if (!job || !PSU_TERMINAL_STATUSES.includes(job.status)) {
+    return { jobId, status: 'TimedOut', statusCode: -1, elapsedMs: Date.now() - start };
+  }
+
+  // Fetch output and pipeline output
+  const outputRes = await fetch(`${baseUrl}/api/v1/job/${jobId}/output`, { headers });
+  const output = await outputRes.json().catch(() => []);
+
+  const pipelineRes = await fetch(`${baseUrl}/api/v1/job/${jobId}/pipelineOutput`, { headers });
+  const pipeline = await pipelineRes.json().catch(() => null);
+  let pipelineOutput = null;
+  if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {
+    pipelineOutput = JSON.parse(pipeline[0].jsonData);
+  }
+
+  return {
+    jobId,
+    status: PSU_STATUS_NAMES[job.status] || `Unknown(${job.status})`,
+    statusCode: job.status,
+    startTime: job.startTime,
+    endTime: job.endTime,
+    output,
+    pipelineOutput
+  };
+}
+
+/**
+ * Deactivate any active Azure auth profile. Returns the previously active profile ID (or null).
+ * Caller should assert the result in the test.
+ */
+async function deactivateAzureAuthProfile() {
+  const result = await runPSUCommand(`
+    $profiles = @(Get-CIEMAzureAuthenticationProfile)
+    $activeProfile = $profiles | Where-Object { [bool]$_.IsActive } | Select-Object -First 1
+    if ($activeProfile) {
+      $activeId = $activeProfile.Id
+      $now = (Get-Date).ToString('o')
+      $cacheProfiles = @(Get-PSUCache -Key 'CIEM:AuthProfiles:Azure' -ErrorAction SilentlyContinue)
+      foreach ($p in $cacheProfiles) { $p.IsActive = $false; $p.UpdatedAt = $now }
+      Set-PSUCache -Key 'CIEM:AuthProfiles:Azure' -Value $cacheProfiles -Persist
+      $activeId
+    } else {
+      'none'
+    }
+  `);
+  const data = result.pipelineOutput;
+  if (data && data.length > 0) {
+    const val = data[0].value;
+    return { previousActiveId: val === 'none' ? null : val, result };
+  }
+  return { previousActiveId: null, result };
+}
+
+/**
+ * Reactivate an Azure auth profile by ID.
+ */
+async function activateAzureAuthProfile(profileId) {
+  return await runPSUCommand(`Set-CIEMAzureAuthenticationProfileActive -Id '${profileId}'`);
+}
+
+/**
+ * Returns the count of active Azure auth profiles (0 or 1+).
+ */
+async function getActiveAzureAuthProfileCount() {
+  const result = await runPSUCommand(`
+    $profiles = @(Get-PSUCache -Key 'CIEM:AuthProfiles:Azure' -ErrorAction SilentlyContinue)
+    @($profiles | Where-Object { [bool]$_.IsActive }).Count
+  `);
+  if (result.statusCode === -1) return { count: -1, result };
+  const data = result.pipelineOutput;
+  if (data && data.length > 0) {
+    return { count: parseInt(data[0].value) || 0, result };
+  }
+  return { count: 0, result };
+}
+
+module.exports = {
+  isPSUReady, startPSU, waitForPSU,
+  runPSUCommand, cancelRunningPSUJobs, PSU_STATUS, PSU_STATUS_NAMES,
+  deactivateAzureAuthProfile, activateAzureAuthProfile,
+  getActiveAzureAuthProfileCount
+};

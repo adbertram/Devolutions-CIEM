@@ -254,6 +254,10 @@ function Invoke-AzureApi {
                 if ($content.PSObject.Properties.Name -contains 'value') {
                     $content.value
                 }
+                elseif ($content.PSObject.Properties.Name -contains 'data') {
+                    # Resource Graph POST responses use 'data' instead of 'value'
+                    $content.data
+                }
                 else {
                     # Single resource endpoint - no pagination possible
                     $content

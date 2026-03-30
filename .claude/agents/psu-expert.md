@@ -34,6 +34,13 @@ grep -i "authentication" psu-logs-*.log
 
 - **`FunctionsToExport = @('*')`** is the preferred pattern for this project. The psm1 handles explicit exports via `Export-ModuleMember`. Do NOT flag this as a best practice violation or suggest changing it to an explicit list.
 
+## CIEM App Management
+
+- To create the CIEM app on a fresh/reset PSU instance: `New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem' -Module 'Devolutions.CIEM' -Command 'New-DevolutionsCIEMApp'`
+- NEVER use `-Authenticated` when creating for local dev — it blocks E2E tests
+- After `setup-local-psu.sh reset`, the user must complete browser-based setup (admin account, license) and create a new App Token for `.env` before any API calls will work
+- Always suppress Connect-PSU output when chaining: `$null = Connect-PSU -Local; <next command>`
+
 ## Documentation Reference
 
 PSU v5 documentation is available at: `docs/psu-docs/`

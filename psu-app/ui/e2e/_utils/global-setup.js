@@ -1,7 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const { isPSUReady, startPSU, waitForPSU } = require('./psu-helpers');
+const { isPSUReady, startPSU, waitForPSU, cancelRunningPSUJobs } = require('./psu-helpers');
 const { cleanupTestData, seedTestData } = require('./cleanup');
 const { testConfig } = require('./test-config');
 
@@ -30,7 +30,17 @@ module.exports = async function globalSetup() {
     throw new Error(`Cannot reach CIEM app at ${ciemUrl}: ${error.message}`);
   }
 
-  // 3. Clean stale test data and seed fresh data
+  // 3. Cancel any zombie PSU jobs from previous killed test runs
+  try {
+    const { cancelled, running, queued } = await cancelRunningPSUJobs();
+    if (cancelled > 0) {
+      console.log(`[setup] Cancelled ${cancelled} zombie PSU jobs (${running} running, ${queued} queued).`);
+    }
+  } catch (err) {
+    console.log(`[setup] Could not check PSU jobs: ${err.message}`);
+  }
+
+  // 4. Clean stale test data and seed fresh data
   cleanupTestData();
   seedTestData();
 

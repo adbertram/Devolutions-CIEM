@@ -9,6 +9,12 @@ function Start-CIEMAzureDiscovery {
 
     $ErrorActionPreference = 'Stop'
 
+    # --- Ensure Azure auth context is established (required for PSU job runspaces) ---
+    if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
+        Write-CIEMLog "Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure..." -Severity INFO -Component 'Discovery'
+        Connect-CIEMAzure | Out-Null
+    }
+
     # --- Concurrency guard ---
     $runningRuns = @(Get-CIEMAzureDiscoveryRun -Status 'Running')
     if ($runningRuns.Count -gt 0) {
@@ -32,6 +38,7 @@ function Start-CIEMAzureDiscovery {
         # ===== PHASE 1: Collect to memory =====
 
         if ($Scope -eq 'All' -or $Scope -eq 'ARM') {
+            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting ARM resources' -PercentComplete 10 -CurrentOperation 'Querying Resource Graph tables'
             Write-CIEMLog "Collecting ARM resources (Resource Graph)..." -Component 'Discovery'
 
             foreach ($table in @('Resources', 'ResourceContainers', 'AuthorizationResources')) {
@@ -48,6 +55,7 @@ function Start-CIEMAzureDiscovery {
                 }
             }
 
+            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting built-in role definitions' -PercentComplete 40 -CurrentOperation 'Enumerating Azure RBAC roles'
             try {
                 $builtInRoles = @(GetCIEMBuiltInRoleDefinitions)
                 $armResources.AddRange($builtInRoles)
@@ -62,6 +70,7 @@ function Start-CIEMAzureDiscovery {
         }
 
         if ($Scope -eq 'All' -or $Scope -eq 'Entra') {
+            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra entities' -PercentComplete 55 -CurrentOperation 'Querying Microsoft Graph API'
             Write-CIEMLog "Collecting Entra entities (Graph API)..." -Component 'Discovery'
 
             try {
@@ -80,6 +89,7 @@ function Start-CIEMAzureDiscovery {
             $collectedSPs = @($entraResources | Where-Object { $_.Type -eq 'servicePrincipal' })
 
             if ($collectedSPs.Count -gt 0) {
+                Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra permissions' -PercentComplete 70 -CurrentOperation "Processing $($collectedSPs.Count) service principals"
                 try {
                     $permissions = @(InvokeCIEMEntraPermissionCollection -ServicePrincipals $collectedSPs)
                     $entraPermissions.AddRange($permissions)
@@ -98,6 +108,7 @@ function Start-CIEMAzureDiscovery {
             $collectedUsers  = @($entraResources | Where-Object { $_.Type -eq 'user' })
 
             if ($collectedGroups.Count -gt 0 -or $collectedRoles.Count -gt 0 -or $collectedUsers.Count -gt 0) {
+                Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra relationships' -PercentComplete 80 -CurrentOperation "$($collectedGroups.Count) groups, $($collectedRoles.Count) roles, $($collectedUsers.Count) users"
                 try {
                     $rels = @(InvokeCIEMEntraRelationshipCollection `
                         -Groups         $collectedGroups `
@@ -116,6 +127,7 @@ function Start-CIEMAzureDiscovery {
         }
 
         # ===== PHASE 2: Atomic DB write =====
+        Write-Progress -Activity 'Azure Discovery' -Status 'Writing to database' -PercentComplete 90 -CurrentOperation 'Atomic transaction'
         Write-CIEMLog "Writing $($armResources.Count) ARM + $($entraResources.Count + $entraPermissions.Count) Entra + $($relationships.Count) relationships to DB..." -Component 'Discovery'
 
         InvokeCIEMTransaction {
@@ -192,6 +204,7 @@ function Start-CIEMAzureDiscovery {
             -PassThru
 
         Write-CIEMLog "Discovery run #$($run.Id) finished: Status=$finalStatus, ARM=$($armResources.Count), Entra=$($entraResources.Count + $entraPermissions.Count), Relationships=$($relationships.Count), Warnings=$warningCount" -Severity INFO -Component 'Discovery'
+        Write-Progress -Activity 'Azure Discovery' -Completed
 
         $run
     }

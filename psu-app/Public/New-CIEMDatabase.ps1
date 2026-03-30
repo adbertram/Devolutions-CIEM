@@ -30,15 +30,13 @@ function New-CIEMDatabase {
 
     $config = Get-CIEMDefaultConfig
 
-    # Resolve database path — db lives at <psu-app>/data/ciem.db
+    # Resolve database path — uses $script:DataRoot (set in psm1) which is already
+    # resolved to be outside the module version directory so data survives upgrades.
     if (-not $Path) {
-        if ($script:ModuleRoot) {
-            # ModuleRoot is the psu-app package root
-            $basePath = $script:ModuleRoot
-        } else {
-            $basePath = $PWD.Path
+        if (-not $script:DataRoot) {
+            throw 'New-CIEMDatabase: $script:DataRoot is not set. Module not loaded correctly.'
         }
-        $Path = Join-Path $basePath $config.database.path
+        $Path = Join-Path $script:DataRoot 'ciem.db'
     }
 
     # Resolve schema path

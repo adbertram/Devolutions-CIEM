@@ -44,6 +44,7 @@ function Remove-CIEMProvider {
         Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
 
         # Delete provider (CASCADE handles auth profiles, collected data, etc.)
+        Write-CIEMLog -Message "DELETE providers WHERE id='$providerId' (CASCADE) (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-Provider'
         Invoke-PSUSQLiteQuery -Connection $conn -Query "DELETE FROM providers WHERE id = @id" -Parameters @{ id = $providerId } -AsNonQuery | Out-Null
 
         $tx.Commit()

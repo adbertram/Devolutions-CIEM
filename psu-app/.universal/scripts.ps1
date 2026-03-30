@@ -7,4 +7,4 @@ New-PSUScript -Module 'Devolutions.CIEM' -Command 'New-CIEMScanRun' `
 
 New-PSUScript -Module 'Devolutions.CIEM' -Command 'Start-CIEMAzureDiscovery' `
     -Description 'Discover Azure ARM and Entra resources and store in the local database' `
-    -TimeOut 60
+    -TimeOut 600

@@ -13,15 +13,18 @@ function Remove-CIEMScanResult {
             foreach ($item in $InputObject) {
                 $itemId = if ($item.Id) { $item.Id } elseif ($item.id) { $item.id } else { $item }
                 if ($PSCmdlet.ShouldProcess("scan result $itemId", 'Remove')) {
+                    Write-CIEMLog -Message "DELETE scan_results WHERE id=$itemId (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ScanResult'
                     Invoke-CIEMQuery -Query "DELETE FROM scan_results WHERE id = @id" -Parameters @{ id = $itemId } -AsNonQuery | Out-Null
                 }
             }
         } elseif ($PSCmdlet.ParameterSetName -eq 'ByScanRun') {
             if ($PSCmdlet.ShouldProcess("scan run '$ScanRunId'", 'Remove all scan results')) {
+                Write-CIEMLog -Message "DELETE scan_results WHERE scan_run_id='$ScanRunId' (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ScanResult'
                 Invoke-CIEMQuery -Query "DELETE FROM scan_results WHERE scan_run_id = @id" -Parameters @{ id = $ScanRunId } -AsNonQuery | Out-Null
             }
         } else {
             if ($PSCmdlet.ShouldProcess("scan result $Id", 'Remove')) {
+                Write-CIEMLog -Message "DELETE scan_results WHERE id=$Id (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ScanResult'
                 Invoke-CIEMQuery -Query "DELETE FROM scan_results WHERE id = @id" -Parameters @{ id = $Id } -AsNonQuery | Out-Null
             }
         }
