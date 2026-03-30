@@ -54,6 +54,8 @@ Describe 'Start-CIEMAzureDiscovery' {
     Context 'Concurrency guard' {
         BeforeEach {
             InModuleScope Devolutions.CIEM {
+                # Fake an established auth context so the function reaches the concurrency guard
+                $script:AzureAuthContext = [PSCustomObject]@{ IsConnected = $true }
                 $script:existingRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Running' -StartedAt (Get-Date).ToString('o')
             }
         }
@@ -105,6 +107,12 @@ Describe 'Start-CIEMAzureDiscovery' {
         It 'InvokeCIEMTransaction exists (private)' {
             InModuleScope Devolutions.CIEM {
                 Get-Command InvokeCIEMTransaction -ErrorAction Stop
+            } | Should -Not -BeNullOrEmpty
+        }
+
+        It 'InvokeCIEMAzureEffectiveRoleAssignmentBuild exists (private)' {
+            InModuleScope Devolutions.CIEM {
+                Get-Command InvokeCIEMAzureEffectiveRoleAssignmentBuild -ErrorAction Stop
             } | Should -Not -BeNullOrEmpty
         }
     }

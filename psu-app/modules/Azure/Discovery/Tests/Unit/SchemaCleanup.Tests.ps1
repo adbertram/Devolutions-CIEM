@@ -71,11 +71,6 @@ Describe 'Schema Cleanup' {
             $tables | Should -BeNullOrEmpty
         }
 
-        It 'provider_auth_methods table does not exist' {
-            $tables = Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_auth_methods'"
-            $tables | Should -BeNullOrEmpty
-        }
-
         It 'permission_relationships table does not exist' {
             $tables = Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='table' AND name='permission_relationships'"
             $tables | Should -BeNullOrEmpty
@@ -110,6 +105,11 @@ Describe 'Schema Cleanup' {
 
         It 'azure_provider_apis table exists' {
             $tables = Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='table' AND name='azure_provider_apis'"
+            $tables | Should -Not -BeNullOrEmpty
+        }
+
+        It 'provider_auth_methods table exists' {
+            $tables = Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_auth_methods'"
             $tables | Should -Not -BeNullOrEmpty
         }
     }

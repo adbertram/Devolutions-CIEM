@@ -85,11 +85,9 @@ CREATE INDEX IF NOT EXISTS idx_scan_results_run_status ON scan_results(scan_run_
 CREATE INDEX IF NOT EXISTS idx_scan_results_check ON scan_results(check_id);
 CREATE INDEX IF NOT EXISTS idx_scan_results_resource ON scan_results(resource_id);
 
--- =============================================================================
--- Migrations (ALTER TABLE — safe for re-runs via error handling in New-CIEMDatabase)
--- =============================================================================
-
-ALTER TABLE scan_runs ADD COLUMN scan_type TEXT NOT NULL DEFAULT 'checks';
+-- scan_type column and index are part of the CREATE TABLE definition above.
+-- The ALTER TABLE migration that was here has been removed since the column
+-- was already included in the table definition.
 CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
 
 -- =============================================================================

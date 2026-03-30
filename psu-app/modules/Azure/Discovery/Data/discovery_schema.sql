@@ -103,3 +103,29 @@ CREATE TABLE IF NOT EXISTS azure_resource_relationships (
 CREATE INDEX IF NOT EXISTS idx_resource_rel_source ON azure_resource_relationships(source_id);
 CREATE INDEX IF NOT EXISTS idx_resource_rel_target ON azure_resource_relationships(target_id);
 CREATE INDEX IF NOT EXISTS idx_resource_rel_relationship ON azure_resource_relationships(relationship);
+
+-- =============================================================================
+-- Azure Effective Role Assignments (pre-resolved identity-to-resource mappings)
+-- Scope is stored as-is from the role assignment (not expanded). Use prefix
+-- matching at query time for scope inheritance (e.g., WHERE resource_id LIKE scope || '%').
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS azure_effective_role_assignments (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    principal_id        TEXT NOT NULL,
+    principal_type      TEXT NOT NULL,
+    principal_display_name TEXT,
+    original_principal_id TEXT NOT NULL,
+    original_principal_type TEXT NOT NULL,
+    role_definition_id  TEXT NOT NULL,
+    role_name           TEXT,
+    scope               TEXT NOT NULL,
+    permissions_json    TEXT,
+    computed_at         TEXT NOT NULL,
+    UNIQUE (principal_id, role_definition_id, scope, original_principal_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_effective_ra_principal ON azure_effective_role_assignments(principal_id);
+CREATE INDEX IF NOT EXISTS idx_effective_ra_scope ON azure_effective_role_assignments(scope);
+CREATE INDEX IF NOT EXISTS idx_effective_ra_role_def ON azure_effective_role_assignments(role_definition_id);
+CREATE INDEX IF NOT EXISTS idx_effective_ra_principal_type ON azure_effective_role_assignments(principal_type);

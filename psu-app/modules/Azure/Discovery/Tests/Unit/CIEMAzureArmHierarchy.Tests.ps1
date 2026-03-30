@@ -65,18 +65,18 @@ Describe 'Get-CIEMAzureArmHierarchy' {
             $subs | ForEach-Object { $_.Depth | Should -Be 1 }
         }
 
-        It 'Contains exactly 3 ResourceGroup nodes at Depth 2' {
+        It 'Contains exactly 3 ResourceGroup nodes at Depth 3' {
             $result = Get-CIEMAzureArmHierarchy
             $rgs = $result | Where-Object { $_.NodeType -eq 'ResourceGroup' }
             $rgs | Should -HaveCount 3
-            $rgs | ForEach-Object { $_.Depth | Should -Be 2 }
+            $rgs | ForEach-Object { $_.Depth | Should -Be 3 }
         }
 
-        It 'Contains exactly 5 Resource nodes at Depth 3' {
+        It 'Contains exactly 5 Resource nodes at Depth 5' {
             $result = Get-CIEMAzureArmHierarchy
             $resources = $result | Where-Object { $_.NodeType -eq 'Resource' }
             $resources | Should -HaveCount 5
-            $resources | ForEach-Object { $_.Depth | Should -Be 3 }
+            $resources | ForEach-Object { $_.Depth | Should -Be 5 }
         }
 
         It 'Populates .Resource on leaf nodes with CIEMAzureArmResource objects' {

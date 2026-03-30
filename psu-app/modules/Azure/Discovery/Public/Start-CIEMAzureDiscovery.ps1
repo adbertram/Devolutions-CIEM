@@ -177,6 +177,17 @@ function Start-CIEMAzureDiscovery {
                     -DiscoveredAt  $discoveredAt `
                     -Connection    $conn
             }
+
+            # Populate effective role assignments (pre-resolved identity-to-resource mappings)
+            Remove-CIEMAzureEffectiveRoleAssignment -All -Confirm:$false -Connection $conn
+            $allEntra = @($entraResources) + @($entraPermissions)
+            $eraCount = InvokeCIEMAzureEffectiveRoleAssignmentBuild `
+                -ArmResources    $armResources `
+                -EntraResources  $allEntra `
+                -Relationships   $relationships `
+                -Connection      $conn `
+                -ComputedAt      (Get-Date).ToString('o')
+            Write-CIEMLog "EffectiveRoleAssignments: $eraCount rows inserted" -Component 'Discovery'
         }
 
         # ===== Determine final status =====

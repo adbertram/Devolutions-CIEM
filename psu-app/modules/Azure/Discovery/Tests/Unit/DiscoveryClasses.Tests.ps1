@@ -96,4 +96,22 @@ Describe 'Discovery Classes' {
             $props | Should -Contain 'CollectedAt'
         }
     }
+
+    Context 'CIEMAzureEffectiveRoleAssignment class' {
+        It 'CIEMAzureEffectiveRoleAssignment stores and retrieves all 11 properties' {
+            $obj = InModuleScope Devolutions.CIEM { [CIEMAzureEffectiveRoleAssignment]::new() }
+            $props = $obj.PSObject.Properties.Name
+            $props | Should -Contain 'Id'
+            $props | Should -Contain 'PrincipalId'
+            $props | Should -Contain 'PrincipalType'
+            $props | Should -Contain 'PrincipalDisplayName'
+            $props | Should -Contain 'OriginalPrincipalId'
+            $props | Should -Contain 'OriginalPrincipalType'
+            $props | Should -Contain 'RoleDefinitionId'
+            $props | Should -Contain 'RoleName'
+            $props | Should -Contain 'Scope'
+            $props | Should -Contain 'PermissionsJson'
+            $props | Should -Contain 'ComputedAt'
+        }
+    }
 }
