@@ -31,11 +31,19 @@ function Publish-PSUModule {
         Skip PowerShell Gallery publishing entirely and import the module
         directly to a local PSU instance.
 
+    .PARAMETER IncludeData
+        Include database files (*.db, *.db-shm, *.db-wal) in the local module copy.
+        By default (LocalOnly), DB files are excluded to preserve the PSU instance's
+        runtime data. Azure/PSGallery publishes always include data files.
+
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app -LocalOnly
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./psu-app -LocalOnly -IncludeData
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app -BumpVersion Minor
@@ -61,7 +69,10 @@ function Publish-PSUModule {
         [string]$EnvFilePath,
 
         [Parameter()]
-        [switch]$LocalOnly
+        [switch]$LocalOnly,
+
+        [Parameter()]
+        [switch]$IncludeData
     )
 
     $ErrorActionPreference = 'Stop'
@@ -163,6 +174,11 @@ function Publish-PSUModule {
             $targetVersionDir = Join-Path $targetModuleDir $moduleVersion
             Write-Verbose "Copying module to: $targetVersionDir"
             Copy-Item -Path $ModulePath -Destination $targetVersionDir -Recurse -Force
+            if (-not $IncludeData) {
+                # Remove database files from the copy to preserve PSU's runtime data
+                Get-ChildItem -Path $targetVersionDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal' -File | Remove-Item -Force
+                Write-Host "  [OK] Excluded *.db files (use -IncludeData to override)" -ForegroundColor Green
+            }
 
             Write-Host "  [OK] Module installed: $moduleName v$moduleVersion" -ForegroundColor Green
 
@@ -360,14 +376,25 @@ NuGet API key required. Options:
     Write-Host 'Step 5: Publishing to PowerShell Gallery...' -ForegroundColor Yellow
 
     if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerShell Gallery")) {
+        # Stage a clean copy excluding database files to avoid shipping runtime data
+        $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) "PSUPublish_$moduleName"
+        if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
+        Copy-Item -Path $ModulePath -Destination $stagingDir -Recurse -Force
+        Get-ChildItem -Path $stagingDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal' -File | Remove-Item -Force
+        Write-Host "  [OK] Staged clean copy (excluded *.db files)" -ForegroundColor Green
+
         $publishParams = @{
-            Path        = $ModulePath
+            Path        = $stagingDir
             ApiKey      = $NuGetApiKey
             Repository  = 'PSGallery'
             ErrorAction = 'Stop'
         }
 
-        Publish-PSResource @publishParams
+        try {
+            Publish-PSResource @publishParams
+        } finally {
+            Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
 
         # Step 6: Verify
         Write-Host ''

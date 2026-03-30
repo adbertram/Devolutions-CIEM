@@ -256,52 +256,37 @@ inp.click();
                 New-UDStack -Direction 'row' -Spacing 2 -Content {
                     New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
                         try {
-            
-                            $selectedProvider = (Get-UDElement -Id 'cloudProvider').value
-                            if (-not $selectedProvider) { $selectedProvider = 'Azure' }
-                            $permissions = Get-CIEMRequiredPermission -Provider $selectedProvider
+                            $rows = @(Invoke-CIEMQuery -Query "SELECT permissions FROM azure_provider_apis WHERE permissions IS NOT NULL")
+                            $graphPerms = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+                            $azureRoles = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+                            foreach ($row in $rows) {
+                                $perms = $row.permissions | ConvertFrom-Json -AsHashtable
+                                if ($perms.Graph) { foreach ($p in $perms.Graph) { $null = $graphPerms.Add($p) } }
+                                if ($perms.AzureRoles) { foreach ($r in $perms.AzureRoles) { $null = $azureRoles.Add($r) } }
+                            }
+
                             Show-UDModal -Header {
-                                New-UDTypography -Text "Required Permissions for $selectedProvider CIEM Scans" -Variant 'h6'
+                                New-UDTypography -Text 'Required Permissions for Azure Discovery' -Variant 'h6'
                             } -Content {
                                 New-UDElement -Tag 'div' -Content {
-                                    New-UDTypography -Text "The following permissions are required to run all $($permissions.CheckCount) $selectedProvider security checks:" -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                    New-UDTypography -Text "The following permissions are required for Azure discovery ($($rows.Count) endpoints):" -Variant 'body2' -Style @{ marginBottom = '16px' }
 
-                                    if ($permissions.Graph.Count -gt 0) {
+                                    if ($graphPerms.Count -gt 0) {
                                         New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
                                         New-UDTypography -Text 'Grant these in Azure Portal > App Registrations > API Permissions > Add > Microsoft Graph > Application permissions' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
                                         New-UDList -Content {
-                                            foreach ($perm in $permissions.Graph) {
+                                            foreach ($perm in ($graphPerms | Sort-Object)) {
                                                 New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Key' -Size 'sm')
                                             }
                                         }
                                     }
 
-                                    if ($permissions.ARM.Count -gt 0) {
-                                        New-UDTypography -Text 'Azure Resource Manager RBAC Actions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
-                                        New-UDTypography -Text 'Assign the Reader role at the subscription or management group level to cover these permissions.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                    if ($azureRoles.Count -gt 0) {
+                                        New-UDTypography -Text 'Azure RBAC Roles' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                        New-UDTypography -Text 'Assign these roles at the subscription or management group level.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
                                         New-UDList -Content {
-                                            foreach ($perm in $permissions.ARM) {
-                                                New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
-                                            }
-                                        }
-                                    }
-
-                                    if ($permissions.KeyVaultDataPlane.Count -gt 0) {
-                                        New-UDTypography -Text 'Key Vault Data Plane Permissions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
-                                        New-UDTypography -Text 'Configure Key Vault access policy or RBAC for data plane access.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
-                                        New-UDList -Content {
-                                            foreach ($perm in $permissions.KeyVaultDataPlane) {
-                                                New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Lock' -Size 'sm')
-                                            }
-                                        }
-                                    }
-
-                                    if ($permissions.IAM.Count -gt 0) {
-                                        New-UDTypography -Text 'AWS IAM Actions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
-                                        New-UDTypography -Text 'Attach an IAM policy to your scanning identity (user or role) that grants these actions.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
-                                        New-UDList -Content {
-                                            foreach ($perm in $permissions.IAM) {
-                                                New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'UserShield' -Size 'sm')
+                                            foreach ($role in ($azureRoles | Sort-Object)) {
+                                                New-UDListItem -Label $role -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
                                             }
                                         }
                                     }

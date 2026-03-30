@@ -75,6 +75,7 @@ VALUES (@id, @provider_id, @scan_type, @status, @resource_filter, @resource_prov
             # Insert scan results (if present)
             if ($ScanRun.ScanResults -and $ScanRun.ScanResults.Count -gt 0) {
                 # Delete existing results for this run (for upsert behavior)
+                Write-CIEMLog -Message "DELETE scan_results WHERE scan_run_id='$($ScanRun.Id)' (upsert in Save-CIEMScanRun)" -Severity WARNING -Component 'Save-ScanRun'
                 Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query "DELETE FROM scan_results WHERE scan_run_id = @id" -Parameters @{ id = $ScanRun.Id } -AsNonQuery | Out-Null
 
                 foreach ($result in $ScanRun.ScanResults) {

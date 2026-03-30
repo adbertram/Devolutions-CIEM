@@ -14,23 +14,18 @@ class EnvironmentPageHelpers extends BasePage {
       layoutSelectCombobox: '[role="combobox"][aria-labelledby="envOrientSelectlabel"]',
       // Action buttons
       startDiscoveryBtn: '#startDiscoveryBtn',
-      loadEnvBtn: '#loadEnvBtn',
-      // Summary area (populated after Load Environment)
-      summaryArea: '#envSummary',
-      summaryCard: "#envSummary .MuiCard-root",
-      // Count selectors use getSummaryCount() locator chaining — not CSS selectors
-      // Progress indicators (visible during async discovery job)
-      progressCircular: '#envChartArea .MuiCircularProgress-root',
-      progressBar: '#envChartArea .MuiLinearProgress-root',
-      progressText: '#envChartArea .MuiTypography-body2',
-      // Chart area
+      // Summary card (rendered inline in auto-load dynamic region)
+      summaryCard: "#envChartArea .MuiCard-root:has-text('Tenants')",
+      // Progress indicators (visible during async discovery job — in separate container)
+      progressCircular: '#envDiscoveryProgress .MuiCircularProgress-root',
+      progressBar: '#envDiscoveryProgress .MuiLinearProgress-root',
+      progressText: '#envDiscoveryProgress .MuiTypography-body2',
+      // Chart area (outer wrapper preserves #envChartArea for selectors)
       chartArea: '#envChartArea',
       treeContainer: '#ciemEnvTreeContainer',
-      // Empty state (initial, before Load Environment)
-      emptyStateCard: "#envChartArea .MuiCard-root:has-text('No Environment Data Loaded')",
-      emptyStateText: "text=No Environment Data Loaded",
-      emptyStateDescription: "text=Select a provider and click",
-      // No resources discovered state (after Load, but no discovery data)
+      // Loading indicator (shown by New-UDDynamic -LoadingComponent during auto-load)
+      loadingIndicator: '#envChartArea .MuiCircularProgress-root',
+      // No resources discovered state (shown by auto-load when no discovery data)
       noResourcesText: "text=No Resources Discovered",
       noResourcesDescription: "text=Run Azure discovery first"
     };
@@ -88,10 +83,6 @@ class EnvironmentPageHelpers extends BasePage {
     return await this.isElementVisible(this.selectors.startDiscoveryBtn);
   }
 
-  async isLoadEnvironmentButtonVisible() {
-    return await this.isElementVisible(this.selectors.loadEnvBtn);
-  }
-
   async clickStartDiscovery() {
     await this.click(this.selectors.startDiscoveryBtn);
   }
@@ -103,16 +94,11 @@ class EnvironmentPageHelpers extends BasePage {
     return await spinner.isVisible();
   }
 
-  async clickLoadEnvironment() {
-    await this.click(this.selectors.loadEnvBtn);
-    // Wait for PSU server-side processing (fetches hierarchy, builds tree, renders chart)
-    // -ShowLoading blocks UI during processing; 873 ARM resources takes ~10-15s
-    try {
-      await this.page.waitForSelector(this.selectors.summaryCard, { state: 'visible', timeout: 30000 });
-    } catch {
-      // Summary card may not appear if no data — fall through to hasEnvironmentData() check
-      await this.page.waitForTimeout(3000);
-    }
+  async waitForEnvironmentLoaded(timeout = 30000) {
+    // Wait for auto-load to complete — either summary card (data) or no-resources text (empty)
+    const summaryCard = this.page.locator(this.selectors.summaryCard);
+    const noResources = this.page.locator(this.selectors.noResourcesText);
+    await summaryCard.or(noResources).first().waitFor({ state: 'visible', timeout });
   }
 
   // --- Progress indicators (during async discovery) ---
@@ -140,20 +126,6 @@ class EnvironmentPageHelpers extends BasePage {
     return null;
   }
 
-  // --- Empty state (before load) ---
-
-  async isEmptyStateCardVisible() {
-    return await this.isElementVisible(this.selectors.emptyStateCard);
-  }
-
-  async isEmptyStateTextVisible() {
-    return await this.isElementVisible(this.selectors.emptyStateText);
-  }
-
-  async isEmptyStateDescriptionVisible() {
-    return await this.isElementVisible(this.selectors.emptyStateDescription);
-  }
-
   // --- No resources discovered state ---
 
   async isNoResourcesTextVisible() {
@@ -173,7 +145,7 @@ class EnvironmentPageHelpers extends BasePage {
   async getSummaryCount(label) {
     // Find the caption label, go up to parent div, then get the h6 count value.
     // This avoids :has-text() ambiguity where ancestor divs also match.
-    const caption = this.page.locator('#envSummary .MuiTypography-caption', { hasText: new RegExp(`^${label}$`) });
+    const caption = this.page.locator('#envChartArea .MuiTypography-caption', { hasText: new RegExp(`^${label}$`) });
     const countEl = caption.locator('..').locator('h6');
     return await countEl.textContent();
   }
@@ -187,8 +159,7 @@ class EnvironmentPageHelpers extends BasePage {
   // --- State detection ---
 
   async hasEnvironmentData() {
-    // After clicking Load Environment, check if summary card appeared (data loaded)
-    // vs empty state or no-resources state
+    // Check if summary card appeared (data auto-loaded) vs no-resources state
     return await this.isElementVisible(this.selectors.summaryCard);
   }
 

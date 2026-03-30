@@ -31,11 +31,22 @@ function Get-CIEMAzureArmHierarchy {
         $getParams['SubscriptionId'] = $SubscriptionId
     }
 
-    $resources = @(Get-CIEMAzureArmResource @getParams)
+    Write-CIEMLog -Message "HIERARCHY: querying ARM resources (SubscriptionId=$(if ($SubscriptionId) { $SubscriptionId } else { 'all' }), DB=$script:DatabasePath)" -Severity INFO -Component 'Discovery'
+
+    $allResources = @(Get-CIEMAzureArmResource @getParams)
+    Write-CIEMLog -Message "HIERARCHY: total ARM resources from DB: $($allResources.Count)" -Severity INFO -Component 'Discovery'
+
+    # Filter to resources that can be placed in the ARM hierarchy (must have SubscriptionId).
+    # Tenant-scoped resources like built-in role definitions have no subscription and can't
+    # form a meaningful tree — they're still useful for CIEM checks but not for visualization.
+    $resources = @($allResources | Where-Object { $_.SubscriptionId })
+    Write-CIEMLog -Message "HIERARCHY: after SubscriptionId filter: $($resources.Count) (excluded $($allResources.Count - $resources.Count) tenant-scoped)" -Severity INFO -Component 'Discovery'
 
     if (-not $resources -or $resources.Count -eq 0) {
         throw "No ARM resources found in the database. Run Azure discovery first."
     }
 
-    InvokeCIEMArmHierarchyBuild -Resources $resources
+    $nodes = InvokeCIEMArmHierarchyBuild -Resources $resources
+    Write-CIEMLog -Message "HIERARCHY: built $($nodes.Count) tree nodes" -Severity INFO -Component 'Discovery'
+    $nodes
 }

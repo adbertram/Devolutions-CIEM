@@ -239,22 +239,58 @@ test.describe('Configuration Page', () => {
   });
 
   test.describe('when the user opens the Required Permissions modal', () => {
-    test('should display modal with title containing the selected provider name', async () => {
+    test('should display modal with Azure Discovery title', async () => {
       await configPage.clickGetPermissions();
       const modalVisible = await configPage.isPermissionsModalVisible();
       expect(modalVisible).toBe(true);
       const title = await configPage.getPermissionsModalTitle();
-      expect(title).toContain('Azure');
+      expect(title).toContain('Azure Discovery');
     });
 
-    test('should display permission categories (Graph, ARM, KeyVault for Azure)', async () => {
+    test('should display endpoint count in modal description', async () => {
       await configPage.clickGetPermissions();
-      const modalText = await configPage.getText(configPage.selectors.permissionsModal);
-      const hasGraphOrArmOrKeyVault =
-        modalText.includes('Graph') ||
-        modalText.includes('ARM') ||
-        modalText.includes('Key Vault');
-      expect(hasGraphOrArmOrKeyVault).toBe(true);
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      // Modal body should mention endpoint count, e.g. "Azure discovery (13 endpoints)"
+      const hasEndpointCount = /\d+\s+endpoints/i.test(bodyText);
+      expect(hasEndpointCount).toBe(true);
+    });
+
+    test('should not mention checks or security checks', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).not.toMatch(/\bcheck/i);
+    });
+
+    test('should display Microsoft Graph API Permissions section', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).toContain('Microsoft Graph API Permissions');
+    });
+
+    test('should list AuditLog.Read.All as a required Graph permission', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).toContain('AuditLog.Read.All');
+    });
+
+    test('should list Directory.Read.All as a required Graph permission', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).toContain('Directory.Read.All');
+    });
+
+    test('should display Azure RBAC Roles section with Reader role', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).toContain('Azure RBAC Roles');
+      expect(bodyText).toContain('Reader');
+    });
+
+    test('should not display ARM actions or KeyVault sections', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).not.toContain('Resource Manager RBAC Actions');
+      expect(bodyText).not.toContain('Key Vault');
     });
 
     test('should close modal when Close button is clicked', async () => {
@@ -262,25 +298,6 @@ test.describe('Configuration Page', () => {
       expect(await configPage.isPermissionsModalVisible()).toBe(true);
       await configPage.closePermissionsModal();
       expect(await configPage.isPermissionsModalVisible()).toBe(false);
-    });
-
-    test('should display check count in modal description text', async () => {
-      await configPage.clickGetPermissions();
-      const bodyText = await configPage.getPermissionsModalBodyText();
-      // Modal body should mention the number of checks, e.g. "all 42 Azure security checks"
-      const hasCheckCount = /\d+.*check/i.test(bodyText);
-      expect(hasCheckCount).toBe(true);
-    });
-
-    test('should display AWS permissions modal with AWS in title when AWS provider is selected', async () => {
-      await configPage.selectProvider('AWS');
-      await configPage.clickGetPermissions();
-      const title = await configPage.getPermissionsModalTitle();
-      expect(title).toContain('AWS');
-      const bodyText = await configPage.getPermissionsModalBodyText();
-      // Modal body should reference AWS security checks (even if 0 checks registered)
-      expect(bodyText).toContain('AWS');
-      expect(bodyText).toContain('check');
     });
   });
 

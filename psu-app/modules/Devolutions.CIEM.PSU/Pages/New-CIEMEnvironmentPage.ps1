@@ -18,6 +18,8 @@ function New-CIEMEnvironmentPage {
 
     New-UDPage -Name 'Environment' -Url '/ciem/environment' -Content {
 
+        Write-CIEMLog -Message "Environment page Content block executing" -Severity INFO -Component 'PSU-EnvironmentPage'
+
         # Load ECharts community library from CDN
         New-UDHelmet -Tag 'script' -Attributes @{
             src  = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js'
@@ -27,7 +29,7 @@ function New-CIEMEnvironmentPage {
         New-UDTypography -Text 'Environment Explorer' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Explore your cloud infrastructure hierarchy - expand and collapse nodes to navigate resources' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
-        # Provider selector + Layout toggle + Load button
+        # Provider selector + Layout toggle + Discovery button
         New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '20px' } } -Content {
             New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                 New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '200px' } } -Content {
@@ -43,6 +45,7 @@ function New-CIEMEnvironmentPage {
                         New-UDSelectOption -Name 'Top to Bottom' -Value 'TB'
                     } -DefaultValue 'LR' -OnChange {
                         $Session:SelectedEnvOrient = $EventData
+                        Sync-UDElement -Id 'envChartDynamic'
                     }
                 }
                 New-UDButton -Id 'startDiscoveryBtn' -Text 'Start Discovery' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
@@ -50,7 +53,7 @@ function New-CIEMEnvironmentPage {
                         $provider = $Session:SelectedEnvProvider
                         if (-not $provider) { $provider = 'Azure' }
 
-                        Write-CIEMLog -Message "Starting discovery from Environment page for provider: $provider" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Write-CIEMLog -Message "DISCOVERY ONCLICK: entered handler, provider=$provider" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         if ($provider -ne 'Azure') {
                             Show-UDToast -Message "Provider '$provider' is not yet supported for discovery." -Duration 5000 -BackgroundColor '#ff9800'
@@ -61,154 +64,202 @@ function New-CIEMEnvironmentPage {
 
                         $run = Invoke-CIEMJobWithProgress `
                             -ScriptName 'Devolutions.CIEM\Start-CIEMAzureDiscovery' `
-                            -ProgressElementId 'envChartArea' `
-                            -DisableElementIds @('startDiscoveryBtn', 'loadEnvBtn') `
+                            -ProgressElementId 'envDiscoveryProgress' `
+                            -DisableElementIds @('startDiscoveryBtn') `
                             -MaxPollSeconds 600
+
+                        Write-CIEMLog -Message "DISCOVERY ONCLICK: Invoke-CIEMJobWithProgress returned, run type=$($run.GetType().Name), run=$($run | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue)" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         $status = $run.Status
                         $armCount = $run.ArmRowCount
                         $entraCount = $run.EntraRowCount
 
+                        Write-CIEMLog -Message "DISCOVERY ONCLICK: parsed results — status=$status, arm=$armCount, entra=$entraCount" -Severity INFO -Component 'PSU-EnvironmentPage'
+
+                        # Clear discovery progress and auto-reload the environment tree
+                        Set-UDElement -Id 'envDiscoveryProgress' -Content {}
+                        Write-CIEMLog -Message "DISCOVERY ONCLICK: calling Sync-UDElement envChartDynamic" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Sync-UDElement -Id 'envChartDynamic'
+                        Write-CIEMLog -Message "DISCOVERY ONCLICK: Sync-UDElement returned" -Severity INFO -Component 'PSU-EnvironmentPage'
+
                         if ($status -eq 'Completed') {
-                            Set-UDElement -Id 'envChartArea' -Content {
-                                New-CIEMSuccessContent -Text "Discovery completed: $armCount ARM resources, $entraCount Entra resources" -Details 'Click "Load Environment" to visualize the hierarchy.'
-                            }
                             Show-UDToast -Message "Discovery completed: $armCount ARM resources, $entraCount Entra resources" -Duration 8000 -BackgroundColor '#4caf50'
                         } elseif ($status -eq 'Partial') {
-                            Set-UDElement -Id 'envChartArea' -Content {
-                                New-CIEMInfoContent -Text "Discovery partially completed: $armCount ARM, $entraCount Entra (some warnings)" -Details 'Click "Load Environment" to visualize available data.'
-                            }
                             Show-UDToast -Message "Discovery partially completed: $armCount ARM, $entraCount Entra (some warnings)" -Duration 8000 -BackgroundColor '#ff9800'
                         } else {
-                            Set-UDElement -Id 'envChartArea' -Content {
-                                New-CIEMErrorContent -Text "Discovery finished with status: $status" -Details 'No resources were collected. Check authentication and try again.'
-                            }
                             Show-UDToast -Message "Discovery finished with status: $status" -Duration 8000 -BackgroundColor '#ff9800'
                         }
                     }
                     catch {
                         $errorMsg = $_.Exception.Message
                         Write-CIEMLog -Message "Discovery from Environment page failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
-                        Set-UDElement -Id 'envChartArea' -Content {
-                            New-CIEMErrorContent -Text 'Discovery Failed' -Details $errorMsg
-                        }
+                        Set-UDElement -Id 'envDiscoveryProgress' -Content {}
                         Show-UDToast -Message "Discovery failed: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
                     }
                 }
-                New-UDButton -Id 'loadEnvBtn' -Text 'Load Environment' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
-                    try {
-                        $provider = $Session:SelectedEnvProvider
-                        if (-not $provider) { $provider = 'Azure' }
-                        $orient = $Session:SelectedEnvOrient
-                        if (-not $orient) { $orient = 'LR' }
+            }
+        }
 
-                        Write-CIEMLog -Message "Loading environment tree for provider: $provider (orient: $orient)" -Severity INFO -Component 'PSU-EnvironmentPage'
+        # Discovery progress container (separate from chart area to avoid destroying New-UDDynamic)
+        New-UDElement -Tag 'div' -Id 'envDiscoveryProgress' -Content {}
 
-                        if ($provider -ne 'Azure') {
-                            Show-UDToast -Message "Provider '$provider' is not yet supported." -Duration 5000 -BackgroundColor '#ff9800'
-                            return
-                        }
+        # Chart area — outer wrapper preserves #envChartArea for E2E selectors
+        New-UDElement -Tag 'div' -Id 'envChartArea' -Content {
+            New-UDDynamic -Id 'envChartDynamic' -LoadingComponent {
+                New-UDCard -Style @{ textAlign = 'center'; padding = '40px' } -Content {
+                    New-UDProgress -Circular
+                    New-UDTypography -Text 'Loading environment data...' -Variant 'body1' -Style @{ marginTop = '16px'; color = '#666' }
+                }
+            } -Content {
+                Write-CIEMLog -Message "DYNAMIC CONTENT: envChartDynamic Content block entered" -Severity INFO -Component 'PSU-EnvironmentPage'
+                $loadedModule = Get-Module 'Devolutions.CIEM' | Select-Object -First 1
+                Write-CIEMLog -Message "ENV PAGE: Loaded module version=$($loadedModule.Version), path=$($loadedModule.ModuleBase)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                Write-CIEMLog -Message "ENV PAGE: DatabasePath=$script:DatabasePath" -Severity INFO -Component 'PSU-EnvironmentPage'
+                Write-CIEMLog -Message "ENV PAGE: ModuleRoot=$script:ModuleRoot" -Severity INFO -Component 'PSU-EnvironmentPage'
+                try {
+                    $orient = $Session:SelectedEnvOrient
+                    if (-not $orient) { $orient = 'LR' }
 
-                        # Fetch the ARM hierarchy (throws if no resources exist)
-                        $hierarchy = @(Get-CIEMAzureArmHierarchy)
+                    Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureArmHierarchy (orient: $orient)" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-                        # Summary counts
-                        $tenantCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Tenant' }).Count
-                        $subCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Subscription' }).Count
-                        $rgCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'ResourceGroup' }).Count
-                        $resCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Resource' }).Count
+                    # Fetch the ARM hierarchy (throws if no resources exist)
+                    $hierarchy = @(Get-CIEMAzureArmHierarchy)
+                    Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-                        Set-UDElement -Id 'envSummary' -Content {
-                            New-UDCard -Style @{ marginBottom = '16px'; backgroundColor = '#f5f5f5' } -Content {
-                                New-UDStack -Direction 'row' -Spacing 4 -AlignItems 'center' -Content {
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text 'Tenants' -Variant 'caption' -Style @{ color = '#666' }
-                                        New-UDTypography -Text "$tenantCount" -Variant 'h6' -Style @{ color = '#1565c0' }
-                                    }
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text 'Subscriptions' -Variant 'caption' -Style @{ color = '#666' }
-                                        New-UDTypography -Text "$subCount" -Variant 'h6' -Style @{ color = '#2e7d32' }
-                                    }
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text 'Resource Groups' -Variant 'caption' -Style @{ color = '#666' }
-                                        New-UDTypography -Text "$rgCount" -Variant 'h6' -Style @{ color = '#e65100' }
-                                    }
-                                    New-UDElement -Tag 'div' -Content {
-                                        New-UDTypography -Text 'Resources' -Variant 'caption' -Style @{ color = '#666' }
-                                        New-UDTypography -Text "$resCount" -Variant 'h6' -Style @{ color = '#546e7a' }
-                                    }
-                                }
+                    # Summary counts
+                    $tenantCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Tenant' }).Count
+                    $subCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Subscription' }).Count
+                    $rgCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'ResourceGroup' }).Count
+                    $resCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Resource' }).Count
+
+                    # Render summary card inline
+                    New-UDCard -Style @{ marginBottom = '16px'; backgroundColor = '#f5f5f5' } -Content {
+                        New-UDStack -Direction 'row' -Spacing 4 -AlignItems 'center' -Content {
+                            New-UDElement -Tag 'div' -Content {
+                                New-UDTypography -Text 'Tenants' -Variant 'caption' -Style @{ color = '#666' }
+                                New-UDTypography -Text "$tenantCount" -Variant 'h6' -Style @{ color = '#1565c0' }
+                            }
+                            New-UDElement -Tag 'div' -Content {
+                                New-UDTypography -Text 'Subscriptions' -Variant 'caption' -Style @{ color = '#666' }
+                                New-UDTypography -Text "$subCount" -Variant 'h6' -Style @{ color = '#2e7d32' }
+                            }
+                            New-UDElement -Tag 'div' -Content {
+                                New-UDTypography -Text 'Resource Groups' -Variant 'caption' -Style @{ color = '#666' }
+                                New-UDTypography -Text "$rgCount" -Variant 'h6' -Style @{ color = '#e65100' }
+                            }
+                            New-UDElement -Tag 'div' -Content {
+                                New-UDTypography -Text 'Resources' -Variant 'caption' -Style @{ color = '#666' }
+                                New-UDTypography -Text "$resCount" -Variant 'h6' -Style @{ color = '#546e7a' }
                             }
                         }
+                    }
 
-                        # --- Convert flat hierarchy to nested ECharts tree data ---
-                        $lookup = @{}
-                        foreach ($node in $hierarchy) {
-                            $nodeColor = switch ($node.NodeType) {
-                                'Tenant'        { '#1565c0' }
-                                'Subscription'  { '#2e7d32' }
-                                'ResourceGroup' { '#e65100' }
-                                'Resource'      { '#546e7a' }
-                                default         { '#757575' }
-                            }
-                            $nodeSize = switch ($node.NodeType) {
-                                'Tenant'        { 16 }
-                                'Subscription'  { 14 }
-                                'ResourceGroup' { 12 }
-                                'Resource'      { 8 }
-                                default         { 10 }
-                            }
+                    # --- Convert flat hierarchy to nested ECharts tree data ---
 
-                            $tooltipParts = @($node.NodeType)
-                            if ($node.NodeType -eq 'Resource' -and $node.Resource) {
-                                $tooltipParts += $node.Resource.Type
-                                if ($node.Resource.Location) { $tooltipParts += $node.Resource.Location }
-                            }
+                    # Resource type → icon mapping
+                    $resourceTypeIcons = @{
+                        'microsoft.compute/virtualmachines'              = [char]::ConvertFromUtf32(0x1F5A5)   # desktop computer
+                        'microsoft.compute/virtualmachines/extensions'   = [char]::ConvertFromUtf32(0x1F9E9)   # puzzle piece
+                        'microsoft.compute/disks'                        = [char]::ConvertFromUtf32(0x1F4BF)   # optical disc
+                        'microsoft.keyvault/vaults'                      = [char]::ConvertFromUtf32(0x1F511)   # key
+                        'microsoft.storage/storageaccounts'              = [char]::ConvertFromUtf32(0x1F4E6)   # package
+                        'microsoft.network/virtualnetworks'              = [char]::ConvertFromUtf32(0x1F310)   # globe with meridians
+                        'microsoft.network/networksecuritygroups'        = [char]::ConvertFromUtf32(0x1F6E1)   # shield
+                        'microsoft.network/networkinterfaces'            = [char]::ConvertFromUtf32(0x1F50C)   # electric plug
+                        'microsoft.network/publicipaddresses'            = [char]::ConvertFromUtf32(0x1F4CD)   # round pushpin
+                        'microsoft.network/networkwatchers'              = [char]::ConvertFromUtf32(0x1F441)   # eye
+                        'microsoft.web/sites'                            = [char]::ConvertFromUtf32(0x1F310)   # globe
+                        'microsoft.web/sites/slots'                      = [char]::ConvertFromUtf32(0x1F310)   # globe
+                        'microsoft.web/serverfarms'                      = [char]::ConvertFromUtf32(0x1F4CB)   # clipboard
+                        'microsoft.web/staticsites'                      = [char]::ConvertFromUtf32(0x1F4C4)   # page facing up
+                        'microsoft.web/certificates'                     = [char]::ConvertFromUtf32(0x1F4DC)   # scroll
+                        'microsoft.web/customapis'                       = [char]::ConvertFromUtf32(0x1F517)   # link
+                        'microsoft.sql/servers'                          = [char]::ConvertFromUtf32(0x1F5C4)   # file cabinet
+                        'microsoft.sql/servers/databases'                = [char]::ConvertFromUtf32(0x1F5C3)   # card file box
+                        'microsoft.sqlvirtualmachine/sqlvirtualmachines' = [char]::ConvertFromUtf32(0x1F5C4)   # file cabinet
+                        'microsoft.cognitiveservices/accounts'           = [char]::ConvertFromUtf32(0x1F9E0)   # brain
+                        'microsoft.logic/workflows'                      = [char]::ConvertFromUtf32(0x1F504)   # arrows counterclockwise
+                        'microsoft.insights/components'                  = [char]::ConvertFromUtf32(0x1F4CA)   # bar chart
+                        'microsoft.insights/actiongroups'                = [char]::ConvertFromUtf32(0x1F514)   # bell
+                        'microsoft.operationalinsights/workspaces'       = [char]::ConvertFromUtf32(0x1F4CA)   # bar chart
+                        'microsoft.alertsmanagement/smartdetectoralertrules' = [char]::ConvertFromUtf32(0x1F6A8) # rotating light
+                        'microsoft.managedidentity/userassignedidentities'   = [char]::ConvertFromUtf32(0x1F464) # bust in silhouette
+                        'microsoft.authorization/roledefinitions'        = [char]::ConvertFromUtf32(0x1F4DC)   # scroll
+                        'microsoft.authorization/roleassignments'        = [char]::ConvertFromUtf32(0x1F465)   # busts in silhouette
+                        'microsoft.portal/dashboards'                    = [char]::ConvertFromUtf32(0x1F4CA)   # bar chart
+                        'microsoft.powerplatform/accounts'               = [char]::ConvertFromUtf32(0x26A1)    # high voltage
+                        'microsoft.migrate/movecollections'              = [char]::ConvertFromUtf32(0x1F4E4)   # outbox tray
+                        'microsoft.devtestlab/schedules'                 = [char]::ConvertFromUtf32(0x1F552)   # clock
+                    }
 
-                            $lookup[$node.NodeId] = @{
-                                name       = $node.Label
-                                value      = @{
-                                    nodeType = $node.NodeType
-                                    tooltip  = ($tooltipParts -join '|')
-                                }
-                                symbolSize = $nodeSize
-                                itemStyle  = @{ color = $nodeColor; borderColor = $nodeColor }
-                                children   = [System.Collections.Generic.List[object]]::new()
-                            }
+                    # Node type styling table (color, default icon, size)
+                    $nodeStyles = @{
+                        'Tenant'        = @{ Color = '#42a5f5'; Icon = [char]::ConvertFromUtf32(0x1F3E2); Size = 32 }
+                        'Subscription'  = @{ Color = '#66bb6a'; Icon = [char]::ConvertFromUtf32(0x1F4CB); Size = 26 }
+                        'ResourceGroup' = @{ Color = '#ffa726'; Icon = [char]::ConvertFromUtf32(0x1F4C1); Size = 22 }
+                        'Category'      = @{ Color = '#ab47bc'; Icon = [char]::ConvertFromUtf32(0x1F512); Size = 22 }
+                        'Resource'      = @{ Color = '#78909c'; Icon = [char]0x2699;                       Size = 16 }
+                    }
+                    $defaultStyle = @{ Color = '#bdbdbd'; Icon = [char]0x25CF; Size = 18 }
+
+                    $lookup = @{}
+                    foreach ($node in $hierarchy) {
+                        $style = $nodeStyles[$node.NodeType] ?? $defaultStyle
+                        $nodeColor = $style.Color
+                        $nodeSize  = $style.Size
+
+                        # Resolve icon: use resource-type-specific icon for Category/Resource nodes, else default
+                        $resType = if ($node.ResourceType) { $node.ResourceType } elseif ($node.Resource) { $node.Resource.Type } else { $null }
+                        $nodeIcon = if ($resType -and $resourceTypeIcons[$resType]) { $resourceTypeIcons[$resType] } else { $style.Icon }
+
+                        $tooltipParts = @($node.NodeType)
+                        if ($node.NodeType -eq 'Resource' -and $node.Resource) {
+                            $tooltipParts += $node.Resource.Type
+                            if ($node.Resource.Location) { $tooltipParts += $node.Resource.Location }
                         }
 
-                        $roots = [System.Collections.Generic.List[object]]::new()
-                        foreach ($node in $hierarchy) {
-                            $entry = $lookup[$node.NodeId]
-                            if ($node.ParentNodeId -and $lookup.ContainsKey($node.ParentNodeId)) {
-                                $lookup[$node.ParentNodeId].children.Add($entry)
-                            } else {
-                                $roots.Add($entry)
+                        $lookup[$node.NodeId] = @{
+                            name       = "$nodeIcon $($node.Label)"
+                            value      = @{
+                                nodeType = $node.NodeType
+                                tooltip  = ($tooltipParts -join '|')
                             }
+                            symbolSize = $nodeSize
+                            itemStyle  = @{ color = $nodeColor; borderColor = $nodeColor }
+                            children   = [System.Collections.Generic.List[object]]::new()
                         }
+                    }
 
-                        $treeRoot = if ($roots.Count -eq 1) { $roots[0] } else {
-                            @{
-                                name       = 'Cloud Environment'
-                                symbolSize = 18
-                                itemStyle  = @{ color = '#37474f'; borderColor = '#37474f' }
-                                children   = $roots
-                            }
+                    $roots = [System.Collections.Generic.List[object]]::new()
+                    foreach ($node in $hierarchy) {
+                        $entry = $lookup[$node.NodeId]
+                        if ($node.ParentNodeId -and $lookup.ContainsKey($node.ParentNodeId)) {
+                            $lookup[$node.ParentNodeId].children.Add($entry)
+                        } else {
+                            $roots.Add($entry)
                         }
+                    }
 
-                        $treeJson = $treeRoot | ConvertTo-Json -Depth 20 -Compress
-
-                        # Render the chart container
-                        Set-UDElement -Id 'envChartArea' -Content {
-                            New-UDCard -Content {
-                                New-UDHtml -Markup '<div id="ciemEnvTreeContainer" style="width:100%;height:700px;"></div>'
-                            }
+                    $treeRoot = if ($roots.Count -eq 1) { $roots[0] } else {
+                        @{
+                            name       = "$([char]0x2601) Cloud Environment"
+                            symbolSize = 34
+                            itemStyle  = @{ color = '#90a4ae'; borderColor = '#90a4ae' }
+                            children   = $roots
                         }
+                    }
 
-                        # Render the ECharts tree via browser JavaScript
-                        # NOTE: @"..."@ here-string interpolates $treeJson and $orient from PowerShell;
-                        #       the JS code itself contains no $ variables so no false interpolation.
-                        $js = @"
+                    $treeJson = $treeRoot | ConvertTo-Json -Depth 20 -Compress
+
+                    # Render the chart container
+                    New-UDCard -Content {
+                        New-UDHtml -Markup '<div id="ciemEnvTreeContainer" style="width:100%;height:700px;"></div>'
+                    }
+
+                    # Render the ECharts tree via browser JavaScript
+                    # NOTE: @"..."@ here-string interpolates $treeJson and $orient from PowerShell;
+                    #       the JS code itself contains no $ variables so no false interpolation.
+                    $js = @"
 (function() {
     var attempts = 0;
     function tryRender() {
@@ -227,10 +278,11 @@ function New-CIEMEnvironmentPage {
         }
         var existing = echarts.getInstanceByDom(container);
         if (existing) existing.dispose();
-        var chart = echarts.init(container);
+        var chart = echarts.init(container, 'dark');
         var data = ${treeJson};
         var isLR = '$orient' === 'LR';
         chart.setOption({
+            backgroundColor: 'transparent',
             tooltip: {
                 trigger: 'item',
                 triggerOn: 'mousemove',
@@ -249,20 +301,26 @@ function New-CIEMEnvironmentPage {
                 type: 'tree',
                 data: [data],
                 top: isLR ? '2%' : '8%',
-                left: isLR ? '12%' : '2%',
+                left: isLR ? '18%' : '2%',
                 bottom: isLR ? '2%' : '20%',
-                right: isLR ? '25%' : '2%',
+                right: isLR ? '20%' : '2%',
                 symbolSize: function(value, params) {
                     return params.data.symbolSize || 10;
                 },
                 orient: '$orient',
                 label: {
+                    show: true,
                     position: isLR ? 'left' : 'top',
                     verticalAlign: 'middle',
                     align: isLR ? 'right' : 'center',
-                    fontSize: 12,
+                    fontSize: 16,
                     fontFamily: '"Roboto","Helvetica","Arial",sans-serif',
-                    color: '#333'
+                    color: '#e0e0e0',
+                    formatter: function(params) {
+                        var name = params.name || '';
+                        if (name.length > 35) return name.substring(0, 32) + '...';
+                        return name;
+                    }
                 },
                 leaves: {
                     label: {
@@ -272,13 +330,14 @@ function New-CIEMEnvironmentPage {
                     }
                 },
                 lineStyle: {
-                    color: '#ccc',
+                    color: '#555',
                     width: 1.5,
                     curveness: 0.5
                 },
                 emphasis: {
                     focus: 'descendant',
-                    itemStyle: { borderWidth: 2 }
+                    itemStyle: { borderWidth: 2 },
+                    label: { color: '#fff', fontSize: 17 }
                 },
                 expandAndCollapse: true,
                 initialTreeDepth: 2,
@@ -291,47 +350,25 @@ function New-CIEMEnvironmentPage {
     tryRender();
 })();
 "@
-                        Invoke-UDJavaScript -JavaScript $js
+                    Invoke-UDJavaScript -JavaScript $js
 
-                        Write-CIEMLog -Message "Environment tree rendered: $resCount resources, $subCount subs, $rgCount RGs" -Severity INFO -Component 'PSU-EnvironmentPage'
-                        Show-UDToast -Message "Loaded $resCount resources across $subCount subscriptions" -Duration 5000 -BackgroundColor '#4caf50'
-                    }
-                    catch {
-                        $errorMsg = $_.Exception.Message
-                        Write-CIEMLog -Message "Environment load failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
-
-                        if ($errorMsg -match 'No ARM resources found') {
-                            Set-UDElement -Id 'envChartArea' -Content {
-                                New-UDCard -Style @{ textAlign = 'center'; padding = '40px' } -Content {
-                                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                                        New-UDIcon -Icon 'Database' -Size '3x' -Style @{ color = '#ff9800'; marginBottom = '16px' }
-                                        New-UDTypography -Text 'No Resources Discovered' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                        New-UDTypography -Text 'Run Azure discovery first to populate resource data, then return here to explore the hierarchy.' -Variant 'body1' -Style @{ color = '#666' }
-                                    }
-                                }
-                            }
-                            Show-UDToast -Message 'No ARM resources found. Run discovery first.' -Duration 5000 -BackgroundColor '#ff9800'
-                        } else {
-                            Set-UDElement -Id 'envChartArea' -Content {
-                                New-CIEMErrorContent -Text 'Failed to Load Environment' -Details $errorMsg
-                            }
-                            Show-UDToast -Message "Error: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
-                        }
-                    }
+                    Write-CIEMLog -Message "Environment tree rendered: $resCount resources, $subCount subs, $rgCount RGs" -Severity INFO -Component 'PSU-EnvironmentPage'
                 }
-            }
-        }
+                catch {
+                    $errorMsg = $_.Exception.Message
+                    Write-CIEMLog -Message "Environment auto-load failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
 
-        # Summary area (populated after load)
-        New-UDElement -Tag 'div' -Id 'envSummary' -Content {}
-
-        # Chart area (initially shows empty state, replaced after load)
-        New-UDElement -Tag 'div' -Id 'envChartArea' -Content {
-            New-UDCard -Style @{ textAlign = 'center'; padding = '40px' } -Content {
-                New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
-                    New-UDIcon -Icon 'SiteMap' -Size '4x' -Style @{ color = '#1976d2'; marginBottom = '16px' }
-                    New-UDTypography -Text 'No Environment Data Loaded' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                    New-UDTypography -Text 'Select a provider and click "Load Environment" to visualize your cloud infrastructure hierarchy.' -Variant 'body1' -Style @{ color = '#666'; marginBottom = '24px' }
+                    if ($errorMsg -match 'No ARM resources found') {
+                        New-UDCard -Style @{ textAlign = 'center'; padding = '40px' } -Content {
+                            New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
+                                New-UDIcon -Icon 'Database' -Size '3x' -Style @{ color = '#ff9800'; marginBottom = '16px' }
+                                New-UDTypography -Text 'No Resources Discovered' -Variant 'h5' -Style @{ marginBottom = '8px' }
+                                New-UDTypography -Text 'Run Azure discovery first to populate resource data, then return here to explore the hierarchy.' -Variant 'body1' -Style @{ color = '#666' }
+                            }
+                        }
+                    } else {
+                        New-CIEMErrorContent -Text 'Failed to Load Environment' -Details $errorMsg
+                    }
                 }
             }
         }

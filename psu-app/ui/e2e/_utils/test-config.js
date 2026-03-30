@@ -5,22 +5,13 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
 /**
  * Resolves the database path used by the local PSU instance.
- * PSU loads the published module from local-psu/Repository/Modules/Devolutions.CIEM/<version>/data/ciem.db,
- * NOT the development source at psu-app/data/ciem.db.
+ * The CIEM module stores its DB OUTSIDE the module version directory so data
+ * survives module upgrades. The DB lives at local-psu/data/ciem.db (sibling of Repository/).
  */
 function resolvePsuDatabasePath() {
-  const modulesDir = path.resolve(__dirname, '../../../../local-psu/Repository/Modules/Devolutions.CIEM');
-  if (fs.existsSync(modulesDir)) {
-    const versions = fs.readdirSync(modulesDir).filter(d =>
-      fs.statSync(path.join(modulesDir, d)).isDirectory()
-    ).sort();
-    if (versions.length > 0) {
-      const latestVersion = versions[versions.length - 1];
-      const dbPath = path.join(modulesDir, latestVersion, 'data', 'ciem.db');
-      if (fs.existsSync(dbPath)) {
-        return dbPath;
-      }
-    }
+  const psuDataDb = path.resolve(__dirname, '../../../../local-psu/data/ciem.db');
+  if (fs.existsSync(psuDataDb)) {
+    return psuDataDb;
   }
   // Fallback to development DB (won't be seen by PSU but allows offline test runs)
   return path.resolve(__dirname, '../../../data/ciem.db');

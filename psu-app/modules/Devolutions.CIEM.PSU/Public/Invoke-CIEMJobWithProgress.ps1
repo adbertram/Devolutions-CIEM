@@ -40,6 +40,8 @@ function Invoke-CIEMJobWithProgress {
     }
 
     try {
+        Write-CIEMLog -Message "JOB: starting '$ScriptName', progressEl=$ProgressElementId, disableEls=$($DisableElementIds -join ',')" -Severity INFO -Component 'PSU-Progress'
+
         # Render initial indeterminate progress
         Set-UDElement -Id $ProgressElementId -Content {
             New-UDCard -Style @{ marginTop = '16px'; marginBottom = '16px' } -Content {
@@ -52,13 +54,16 @@ function Invoke-CIEMJobWithProgress {
 
         # Launch the job
         $job = Invoke-PSUScript -Name $ScriptName -Integrated
-        Write-CIEMLog -Message "Invoke-CIEMJobWithProgress: launched job $($job.Id) for script '$ScriptName'" -Severity INFO -Component 'PSU-Progress'
+        Write-CIEMLog -Message "JOB: launched job Id=$($job.Id) for script '$ScriptName'" -Severity INFO -Component 'PSU-Progress'
 
         # Poll loop
         $elapsed = 0
+        $pollCount = 0
+        $lastLoggedStatus = ''
         while ($elapsed -lt $MaxPollSeconds) {
             Start-Sleep -Seconds $PollIntervalSeconds
             $elapsed += $PollIntervalSeconds
+            $pollCount++
 
             $job = Get-PSUJob -Id $job.Id -Integrated
 
@@ -69,6 +74,13 @@ function Invoke-CIEMJobWithProgress {
             if ($job.PercentComplete -gt 0) { $progressParts += "($($job.PercentComplete)%)" }
             if ($job.CurrentOperation) { $progressParts += "- $($job.CurrentOperation)" }
             $statusText = $progressParts -join ' '
+
+            # Log status changes and every 10th poll
+            $currentStatus = "$($job.Status)"
+            if ($currentStatus -ne $lastLoggedStatus -or ($pollCount % 10 -eq 0)) {
+                Write-CIEMLog -Message "JOB: poll #$pollCount (${elapsed}s), status=$currentStatus, pct=$($job.PercentComplete), activity=$($job.Activity), op=$($job.CurrentOperation)" -Severity INFO -Component 'PSU-Progress'
+                $lastLoggedStatus = $currentStatus
+            }
 
             # Render progress UI
             $pct = $job.PercentComplete
@@ -84,8 +96,8 @@ function Invoke-CIEMJobWithProgress {
             }
 
             # Break on terminal status
-            $status = "$($job.Status)"
-            if ($status -notin @('Running', 'Queued', 'WaitingOnFeedback', 'Active')) {
+            if ($currentStatus -notin @('Running', 'Queued', 'WaitingOnFeedback', 'Active')) {
+                Write-CIEMLog -Message "JOB: terminal status reached: $currentStatus after ${elapsed}s ($pollCount polls)" -Severity INFO -Component 'PSU-Progress'
                 break
             }
         }
@@ -94,25 +106,31 @@ function Invoke-CIEMJobWithProgress {
         # 'Warning' = job completed but produced Write-Warning output (still successful)
         $status = "$($job.Status)"
         if ($status -eq 'Completed' -or $status -eq 'Warning') {
+            Write-CIEMLog -Message "JOB: retrieving pipeline output for job $($job.Id)" -Severity INFO -Component 'PSU-Progress'
             $output = Get-PSUJobPipelineOutput -JobId $job.Id -Integrated | Select-Object -First 1
-            Write-CIEMLog -Message "Invoke-CIEMJobWithProgress: job $($job.Id) completed (status: $status)" -Severity INFO -Component 'PSU-Progress'
+            Write-CIEMLog -Message "JOB: job $($job.Id) completed (status=$status), output type=$($output.GetType().Name), output=$($output | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue)" -Severity INFO -Component 'PSU-Progress'
             return $output
         }
         elseif ($status -eq 'Failed' -or $status -eq 'Error') {
             $errorOutput = Get-PSUJobOutput -Job $job -Integrated | Where-Object { $_ } | Select-Object -First 5
             $errorMsg = if ($errorOutput) { ($errorOutput -join "`n") } else { "Job failed (status: $status)" }
+            Write-CIEMLog -Message "JOB: job $($job.Id) FAILED: $errorMsg" -Severity ERROR -Component 'PSU-Progress'
             throw $errorMsg
         }
         elseif ($status -eq 'TimedOut') {
+            Write-CIEMLog -Message "JOB: job $($job.Id) timed out" -Severity ERROR -Component 'PSU-Progress'
             throw "Job timed out."
         }
         elseif ($status -eq 'Canceled' -or $status -eq 'Canceling') {
+            Write-CIEMLog -Message "JOB: job $($job.Id) cancelled" -Severity WARNING -Component 'PSU-Progress'
             throw "Job was cancelled."
         }
         elseif ($elapsed -ge $MaxPollSeconds) {
+            Write-CIEMLog -Message "JOB: poll timeout after ${elapsed}s for job $($job.Id)" -Severity ERROR -Component 'PSU-Progress'
             throw "Job polling timed out after $($MaxPollSeconds / 60) minutes."
         }
         else {
+            Write-CIEMLog -Message "JOB: job $($job.Id) unexpected status: $status" -Severity ERROR -Component 'PSU-Progress'
             throw "Job ended with unexpected status: $status"
         }
     }

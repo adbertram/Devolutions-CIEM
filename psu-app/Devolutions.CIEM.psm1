@@ -1,7 +1,17 @@
 $script:ModuleRoot = $PSScriptRoot
 
+# --- Resolve data root (outside module version dir so data survives upgrades) ---
+if ($PSScriptRoot -match '(.*[/\\])Repository[/\\]Modules[/\\]') {
+    $script:DataRoot = Join-Path $Matches[1] 'data'
+} else {
+    $script:DataRoot = Join-Path $PSScriptRoot 'data'
+}
+if (-not (Test-Path $script:DataRoot)) {
+    New-Item -Path $script:DataRoot -ItemType Directory -Force | Out-Null
+}
+
 # --- Bootstrap logger (used before Write-CIEMLog is dot-sourced) ---
-$script:_BootLogPath = Join-Path $PSScriptRoot 'data/ciem.log'
+$script:_BootLogPath = Join-Path $script:DataRoot 'ciem.log'
 function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
     $entry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')] [$Sev] [ModuleInit] $Msg"
     try { Add-Content -Path $script:_BootLogPath -Value $entry -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}
