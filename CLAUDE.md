@@ -1,5 +1,34 @@
 # Devolutions CIEM
 
+## CRITICAL: Test-Driven Development (TDD) -- MANDATORY
+
+**YOUR FIRST ACTION on ANY code change request MUST be identifying and writing tests. Do NOT read source code, do NOT explore implementation, do NOT plan changes. Go directly to test files.**
+
+- **MUST** write tests BEFORE implementation code (red-green-refactor)
+- **MUST** cover all relevant test layers (Pester for PowerShell, Playwright for UI)
+- **MUST** run all relevant tests and confirm green before marking work complete
+- **MUST NOT** begin investigating or fixing code before writing failing tests
+- **MUST NOT** submit, commit, or declare any change "done" without passing tests
+- **MUST NOT** pipe test output through filters (head, tail, grep) -- show FULL output
+
+**SEQUENCE CHECK:** If your first tool call after a code change request is Read/Bash on a source file (not a test file), you are already violating TDD. Stop and start over with tests. A PreToolUse hook (`enforce-tdd.sh`) will DENY source code edits until test files have been touched.
+
+**MANDATORY TDD workflow:**
+
+1. **Identify which tests are needed** (Pester unit tests and/or Playwright E2E)
+2. **Load the `testing-expert` skill BEFORE writing any test.** NEVER write a test file without loading it first.
+3. **Write ALL failing tests first** -- tests MUST exist and fail before ANY implementation
+4. **Then and ONLY then** begin implementation
+5. **Run ALL relevant test types** before declaring done:
+   - [ ] Pester tests (if PowerShell code changed): `pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"`
+   - [ ] Playwright tests (if UI pages changed): `cd psu-app/ui/e2e && npx playwright test`
+
+**CRITICAL FOR BUG FIXES:** Do NOT jump into the code to investigate. First, write failing tests that reproduce the bug. The tests define what "fixed" means.
+
+Detailed TDD rules, test layer conventions, and what requires tests: `.claude/rules/tdd-enforcement.md` (auto-loaded for `psu-app/` and `e2e/` paths).
+
+---
+
 ## Default PSU Instance (CRITICAL)
 
 **ALWAYS default to the LOCAL PSU instance** (`http://localhost:5001`) for all operations unless the user explicitly says "Azure" or "production". This applies to:
@@ -108,41 +137,6 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 **Why:** The PSU Gallery is the distribution mechanism. Direct uploads bypass version control, break the upgrade path for users, and don't follow the intended distribution model.
 
 **Note:** The file manager scripts (`azure_psu_file_manager.sh`, `invoke_command_in_azure_webapp.sh`) are for **troubleshooting and inspection only** - never for deploying module code.
-
----
-
-## Test-Driven Development (CRITICAL)
-
-**EVERY code change MUST have a corresponding test. No exceptions.** Tests are the cornerstone of all development. Changes without tests will be rejected.
-
-### TDD Workflow (MANDATORY)
-
-1. **Write/update tests FIRST** — before implementing the feature or fix
-2. **Run tests to confirm they fail** — validates the test actually tests what you think
-3. **Implement the change** — make the failing tests pass
-4. **Run full test suite** — ensure no regressions
-
-### Two Test Layers
-
-| Layer | Framework | Location | Scope | Run Command |
-|-------|-----------|----------|-------|-------------|
-| **Pester** (unit/integration) | Pester v5 | `psu-app/**/Tests/*.Tests.ps1` | PowerShell functions, CRUD, classes, module structure | `Invoke-Pester <path> -Output Detailed` |
-| **Playwright** (E2E) | Playwright | `psu-app/ui/e2e/pages/**/*.test.js` | PSU UI pages, navigation, user workflows | `cd psu-app/ui/e2e && npx playwright test` |
-
-### What Requires Tests
-
-- **New function** → Pester tests for all parameter sets, edge cases, and return types
-- **New CRUD table** → Full CRUD test file (New/Get/Update/Save/Remove) per `.claude/rules/crud-convention.md`
-- **Bug fix** → Test that reproduces the bug BEFORE the fix, passes AFTER
-- **UI page change** → Playwright test covering the changed behavior
-- **Refactor** → Existing tests must still pass; add tests if coverage gaps exist
-
-### Test Quality Rules
-
-- **Use `pester-test-reviewer` agent** to validate Pester test structure before committing
-- **Never skip failing tests** — fix the implementation, not the test
-- **Tests document expected behavior** — only update tests when requirements change
-- **0 failures, 0 errors** = passing. ERROR is a failure, not a skip.
 
 ---
 

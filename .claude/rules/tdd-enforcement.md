@@ -74,3 +74,11 @@ cd psu-app/ui/e2e && npx playwright test --headed
 1. `Invoke-Pester` shows 0 failures, 0 errors for affected test files
 2. If UI was changed: `npx playwright test` passes for affected page tests
 3. New test count >= number of new/changed functions
+
+## Infrastructure-Dependent Test Failures
+
+Tests that fail due to missing credentials, PSU context, or environment configuration are **still failures**. The response MUST be one of:
+1. Fix the infrastructure (configure credentials, start PSU, set up environment)
+2. Fix the test setup (add mocks, seed missing data, adjust BeforeAll)
+3. Present the user with options: (A) fix infra, (B) mock/restructure test, (C) defer with tracked issue
+Never declare them "not code bugs" and stop.

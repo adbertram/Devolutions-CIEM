@@ -11,9 +11,56 @@ function cleanupTestData() {
 
     db.prepare(`DELETE FROM scan_results WHERE scan_run_id LIKE '${TEST_PREFIX}%'`).run();
     db.prepare(`DELETE FROM scan_runs WHERE id LIKE '${TEST_PREFIX}%'`).run();
+    db.prepare(`DELETE FROM checks WHERE id LIKE '${TEST_PREFIX}%'`).run();
     db.prepare(`DELETE FROM azure_arm_resources WHERE id LIKE '${TEST_PREFIX}%'`).run();
 
     console.log('[cleanup] Test data cleaned up.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Ensures checks exist in the database for E2E tests.
+ * Checks are normally populated by running a scan, but E2E tests need them pre-seeded.
+ * Inserts test checks with varied severities and enabled/disabled states.
+ */
+function seedChecks() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+
+    const existing = db.prepare('SELECT COUNT(*) as cnt FROM checks').get();
+    if (existing.cnt > 0) return;
+
+    console.log('[seed] No checks in DB — seeding test checks...');
+
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO checks (id, provider, service, title, description, risk, severity, remediation_text, check_script, disabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const checks = [
+      [`${TEST_PREFIX}check_security_defaults`,     'Azure', 'Entra',    'Ensure Security Defaults is enabled',                'Security defaults provide secure default settings for MFA and blocking legacy authentication.', 'Without security defaults, users may not be required to use MFA, leaving accounts vulnerable.', 'CRITICAL', 'Enable Security Defaults in Azure AD Properties.', 'azure_entra_security_defaults.ps1', 0],
+      [`${TEST_PREFIX}check_mfa_enforcement`,        'Azure', 'Entra',    'Ensure Multifactor Authentication is enforced for all users', 'Multi-factor authentication adds a second layer of identity verification.',                       'Accounts without MFA are significantly more susceptible to compromise.',                        'CRITICAL', 'Enable MFA for all users via Conditional Access policies.', 'azure_entra_mfa_enforcement.ps1', 0],
+      [`${TEST_PREFIX}check_keyvault_access`,        'Azure', 'KeyVault', 'Ensure Key Vault access is properly configured',     'Key Vault should use RBAC or access policies to control access.',                                 'Misconfigured Key Vault access may expose secrets and certificates.',                           'HIGH',     'Configure RBAC-based access for Key Vault.', 'azure_keyvault_access.ps1', 0],
+      [`${TEST_PREFIX}check_storage_encryption`,     'Azure', 'Storage',  'Ensure storage account encryption is enabled',       'Azure Storage encrypts data at rest by default.',                                                 'Unencrypted storage accounts expose data to unauthorized access.',                              'MEDIUM',   'Enable encryption on all storage accounts.', 'azure_storage_encryption.ps1', 0],
+      [`${TEST_PREFIX}check_nsg_rules`,              'Azure', 'Network',  'Ensure NSG rules are properly configured',           'Network Security Groups control inbound and outbound traffic.',                                   'Overly permissive NSG rules may allow unauthorized network access.',                            'MEDIUM',   'Review and tighten NSG rules.', 'azure_network_nsg_rules.ps1', 0],
+      [`${TEST_PREFIX}check_resource_locks`,         'Azure', 'ARM',      'Ensure resource locks are applied to critical resources', 'Resource locks prevent accidental deletion or modification.',                                 'Critical resources without locks may be accidentally deleted.',                                 'LOW',      'Apply CanNotDelete locks to production resources.', 'azure_arm_resource_locks.ps1', 0],
+      [`${TEST_PREFIX}check_tags_compliance`,        'Azure', 'ARM',      'Ensure resources have required tags',                'Tags help organize and manage Azure resources.',                                                  'Missing tags make cost allocation and resource management difficult.',                          'INFO',     'Apply organization-standard tags to all resources.', 'azure_arm_tags_compliance.ps1', 0],
+      [`${TEST_PREFIX}check_disabled_legacy_auth`,   'Azure', 'Entra',    'Ensure legacy authentication is disabled',           'Legacy authentication protocols do not support MFA.',                                              'Legacy auth bypass allows attackers to skip MFA requirements.',                                 'HIGH',     'Block legacy authentication via Conditional Access.', 'azure_entra_legacy_auth.ps1', 1],
+      [`${TEST_PREFIX}check_disabled_guest_access`,  'Azure', 'Entra',    'Ensure guest user access is restricted',             'Guest users should have limited access to directory resources.',                                   'Unrestricted guest access may expose sensitive directory information.',                          'MEDIUM',   'Restrict guest user permissions in External Collaboration settings.', 'azure_entra_guest_access.ps1', 1],
+      [`${TEST_PREFIX}check_disabled_public_access`,  'Azure', 'Storage',  'Ensure public blob access is disabled',             'Public access to blob containers should be disabled.',                                            'Public blob access may expose sensitive data to the internet.',                                 'HIGH',     'Disable public access on all storage accounts.', 'azure_storage_public_access.ps1', 1],
+    ];
+
+    const insertMany = db.transaction((items) => {
+      for (const row of items) { insert.run(...row); }
+    });
+    insertMany(checks);
+    db.pragma('wal_checkpoint(TRUNCATE)');
+
+    console.log(`[seed] Seeded ${checks.length} test checks (${checks.filter(c => c[9] === 0).length} enabled, ${checks.filter(c => c[9] === 1).length} disabled).`);
   } finally {
     if (db) db.close();
   }
@@ -242,7 +289,7 @@ function clearStaleDiscoveryRuns() {
 }
 
 module.exports = {
-  cleanupTestData, seedTestData,
+  cleanupTestData, seedChecks, seedTestData,
   seedEnvironmentData, cleanupEnvironmentData,
   getArmResourceCount, getTestArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,

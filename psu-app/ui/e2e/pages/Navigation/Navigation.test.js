@@ -15,12 +15,13 @@ test.describe('Navigation', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display all 5 navigation items', async () => {
+    test('should display all 6 navigation items', async () => {
       const labels = await navPage.getNavItemLabels();
-      expect(labels).toHaveLength(5);
+      expect(labels).toHaveLength(6);
       expect(labels).toContain('Dashboard');
       expect(labels).toContain('Scan');
       expect(labels).toContain('Scan History');
+      expect(labels).toContain('Environment');
       expect(labels).toContain('Configuration');
       expect(labels).toContain('About');
     });

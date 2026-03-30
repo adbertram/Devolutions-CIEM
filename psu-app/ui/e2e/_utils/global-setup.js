@@ -2,7 +2,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const { isPSUReady, startPSU, waitForPSU, cancelRunningPSUJobs } = require('./psu-helpers');
-const { cleanupTestData, seedTestData } = require('./cleanup');
+const { cleanupTestData, seedChecks, seedTestData } = require('./cleanup');
 const { testConfig } = require('./test-config');
 
 module.exports = async function globalSetup() {
@@ -42,6 +42,7 @@ module.exports = async function globalSetup() {
 
   // 4. Clean stale test data and seed fresh data
   cleanupTestData();
+  seedChecks();
   seedTestData();
 
   // 4. Export env vars for tests
