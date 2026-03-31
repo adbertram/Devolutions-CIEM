@@ -1,11 +1,22 @@
 function Get-SeverityColor {
-    param([string]$Severity)
-    switch ($Severity) {
+    <#
+    .SYNOPSIS
+        Returns the display color hex code for a severity or risk level.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Severity
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    switch ($Severity.ToUpper()) {
         'CRITICAL' { '#9c27b0' }
-        'HIGH' { '#f44336' }
-        'MEDIUM' { '#ff9800' }
-        'LOW' { '#2196f3' }
-        'INFO' { '#4caf50' }
-        default { '#666' }
+        'HIGH'     { '#f44336' }
+        'MEDIUM'   { '#ff9800' }
+        'LOW'      { '#4caf50' }
+        'INFO'     { '#2196f3' }
+        default    { '#666' }
     }
 }

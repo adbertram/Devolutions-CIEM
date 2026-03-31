@@ -1,0 +1,17 @@
+[
+  { "name": "Owner", "category": "AzureRBAC" },
+  { "name": "Contributor", "category": "AzureRBAC" },
+  { "name": "User Access Administrator", "category": "AzureRBAC" },
+  { "name": "Global Administrator", "category": "EntraDirectory" },
+  { "name": "Privileged Role Administrator", "category": "EntraDirectory" },
+  { "name": "Privileged Authentication Administrator", "category": "EntraDirectory" },
+  { "name": "Application Administrator", "category": "EntraDirectory" },
+  { "name": "Cloud Application Administrator", "category": "EntraDirectory" },
+  { "name": "Authentication Administrator", "category": "EntraDirectory" },
+  { "name": "Exchange Administrator", "category": "EntraDirectory" },
+  { "name": "SharePoint Administrator", "category": "EntraDirectory" },
+  { "name": "Intune Administrator", "category": "EntraDirectory" },
+  { "name": "Azure AD Joined Device Local Administrator", "category": "EntraDirectory" },
+  { "name": "Helpdesk Administrator", "category": "EntraDirectory" },
+  { "name": "Password Administrator", "category": "EntraDirectory" }
+]

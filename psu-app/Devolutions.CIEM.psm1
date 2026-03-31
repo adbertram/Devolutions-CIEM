@@ -114,6 +114,11 @@ $script:RelationshipColors = @{
     'transitive_member_of' = '#4caf50'   # Transitive membership (green)
 }
 
+# Risk policy constants
+$script:DormantPermissionThresholdDays = 90
+$script:MediumEntitlementThreshold = 5
+$script:PrivilegedRoleNames = @((Get-Content (Join-Path $script:AzureDiscoveryRoot 'Data/privileged_roles.json') -Raw | ConvertFrom-Json).name)
+
 # --- Initialize database (base + provider schemas) ---
 Write-CIEMLog -Message "Initializing database..." -Component 'ModuleInit'
 try {
