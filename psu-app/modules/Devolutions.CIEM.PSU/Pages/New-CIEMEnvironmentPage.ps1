@@ -40,6 +40,15 @@ function New-CIEMEnvironmentPage {
                     }
                 }
                 New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '180px' } } -Content {
+                    New-UDSelect -Id 'envViewSelect' -Label 'View' -Option {
+                        New-UDSelectOption -Name 'Infrastructure' -Value 'Infrastructure'
+                        New-UDSelectOption -Name 'Identity' -Value 'Identity'
+                    } -DefaultValue 'Infrastructure' -OnChange {
+                        $Session:SelectedEnvView = $EventData
+                        Sync-UDElement -Id 'envChartDynamic'
+                    }
+                }
+                New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '180px' } } -Content {
                     New-UDSelect -Id 'envOrientSelect' -Label 'Layout' -Option {
                         New-UDSelectOption -Name 'Left to Right' -Value 'LR'
                         New-UDSelectOption -Name 'Top to Bottom' -Value 'TB'
@@ -119,37 +128,90 @@ function New-CIEMEnvironmentPage {
                 try {
                     $orient = $Session:SelectedEnvOrient
                     if (-not $orient) { $orient = 'LR' }
+                    $viewMode = $Session:SelectedEnvView
+                    if (-not $viewMode) { $viewMode = 'Infrastructure' }
 
-                    Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureArmHierarchy (orient: $orient)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                    Write-CIEMLog -Message "DYNAMIC CONTENT: view=$viewMode, orient=$orient" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-                    # Fetch the ARM hierarchy (throws if no resources exist)
-                    $hierarchy = @(Get-CIEMAzureArmHierarchy)
-                    Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
+                    if ($viewMode -eq 'Identity') {
+                        # --- Identity View ---
+                        $assignmentMode = $Session:SelectedEnvAssignmentMode
+                        if (-not $assignmentMode) { $assignmentMode = 'Effective' }
 
-                    # Summary counts
-                    $tenantCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Tenant' }).Count
-                    $subCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Subscription' }).Count
-                    $rgCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'ResourceGroup' }).Count
-                    $resCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Resource' }).Count
-
-                    # Render summary card inline
-                    New-UDCard -Style @{ marginBottom = '16px'; backgroundColor = '#f5f5f5' } -Content {
-                        New-UDStack -Direction 'row' -Spacing 4 -AlignItems 'center' -Content {
-                            New-UDElement -Tag 'div' -Content {
-                                New-UDTypography -Text 'Tenants' -Variant 'caption' -Style @{ color = '#666' }
-                                New-UDTypography -Text "$tenantCount" -Variant 'h6' -Style @{ color = '#1565c0' }
+                        # Assignment mode sub-toggle
+                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '12px' } } -Content {
+                            New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '250px'; maxWidth = '300px' } } -Content {
+                                New-UDSelect -Id 'envAssignmentModeSelect' -Label 'Assignment Mode' -Option {
+                                    New-UDSelectOption -Name 'Effective (Group Expanded)' -Value 'Effective'
+                                    New-UDSelectOption -Name 'Direct Only' -Value 'Direct'
+                                } -DefaultValue $assignmentMode -OnChange {
+                                    $Session:SelectedEnvAssignmentMode = $EventData
+                                    Sync-UDElement -Id 'envChartDynamic'
+                                }
                             }
-                            New-UDElement -Tag 'div' -Content {
-                                New-UDTypography -Text 'Subscriptions' -Variant 'caption' -Style @{ color = '#666' }
-                                New-UDTypography -Text "$subCount" -Variant 'h6' -Style @{ color = '#2e7d32' }
+                        }
+
+                        Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureIdentityHierarchy (mode: $assignmentMode)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        $hierarchy = @(Get-CIEMAzureIdentityHierarchy -Mode $assignmentMode)
+                        Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) identity hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
+
+                        # Identity-specific summary counts
+                        $identityCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Identity' }).Count
+                        $roleCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'Role' }).Count
+                        $scopeCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Scope' }).Count
+                        $typeCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'IdentityType' }).Count
+
+                        New-UDCard -Style @{ marginBottom = '16px'; backgroundColor = '#f5f5f5' } -Content {
+                            New-UDStack -Direction 'row' -Spacing 4 -AlignItems 'center' -Content {
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Identity Types' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$typeCount" -Variant 'h6' -Style @{ color = '#7b1fa2' }
+                                }
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Identities' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$identityCount" -Variant 'h6' -Style @{ color = '#1565c0' }
+                                }
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Roles' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$roleCount" -Variant 'h6' -Style @{ color = '#00838f' }
+                                }
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Scopes' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$scopeCount" -Variant 'h6' -Style @{ color = '#558b2f' }
+                                }
                             }
-                            New-UDElement -Tag 'div' -Content {
-                                New-UDTypography -Text 'Resource Groups' -Variant 'caption' -Style @{ color = '#666' }
-                                New-UDTypography -Text "$rgCount" -Variant 'h6' -Style @{ color = '#e65100' }
-                            }
-                            New-UDElement -Tag 'div' -Content {
-                                New-UDTypography -Text 'Resources' -Variant 'caption' -Style @{ color = '#666' }
-                                New-UDTypography -Text "$resCount" -Variant 'h6' -Style @{ color = '#546e7a' }
+                        }
+                    } else {
+                        # --- Infrastructure View ---
+                        Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureArmHierarchy (orient: $orient)" -Severity INFO -Component 'PSU-EnvironmentPage'
+
+                        $hierarchy = @(Get-CIEMAzureArmHierarchy)
+                        Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
+
+                        # Summary counts
+                        $tenantCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Tenant' }).Count
+                        $subCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Subscription' }).Count
+                        $rgCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'ResourceGroup' }).Count
+                        $resCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Resource' }).Count
+
+                        New-UDCard -Style @{ marginBottom = '16px'; backgroundColor = '#f5f5f5' } -Content {
+                            New-UDStack -Direction 'row' -Spacing 4 -AlignItems 'center' -Content {
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Tenants' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$tenantCount" -Variant 'h6' -Style @{ color = '#1565c0' }
+                                }
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Subscriptions' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$subCount" -Variant 'h6' -Style @{ color = '#2e7d32' }
+                                }
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Resource Groups' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$rgCount" -Variant 'h6' -Style @{ color = '#e65100' }
+                                }
+                                New-UDElement -Tag 'div' -Content {
+                                    New-UDTypography -Text 'Resources' -Variant 'caption' -Style @{ color = '#666' }
+                                    New-UDTypography -Text "$resCount" -Variant 'h6' -Style @{ color = '#546e7a' }
+                                }
                             }
                         }
                     }
@@ -200,6 +262,12 @@ function New-CIEMEnvironmentPage {
                         'Category'      = @{ Color = '#ab47bc'; Icon = [char]::ConvertFromUtf32(0x1F512); Size = 22 }
                         'Resource'      = @{ Color = '#78909c'; Icon = [char]0x2699;                       Size = 16 }
                     }
+                    # Identity view node types
+                    $nodeStyles['IdentityType']    = @{ Color = '#7b1fa2'; Icon = [char]::ConvertFromUtf32(0x1F465); Size = 26 }  # busts in silhouette
+                    $nodeStyles['Identity']        = @{ Color = '#1565c0'; Icon = [char]::ConvertFromUtf32(0x1F464); Size = 22 }  # bust in silhouette
+                    $nodeStyles['Role']            = @{ Color = '#00838f'; Icon = [char]::ConvertFromUtf32(0x1F511); Size = 20 }  # key
+                    $nodeStyles['Scope']           = @{ Color = '#558b2f'; Icon = [char]::ConvertFromUtf32(0x1F3AF); Size = 16 }  # target/bullseye
+
                     $defaultStyle = @{ Color = '#bdbdbd'; Icon = [char]0x25CF; Size = 18 }
 
                     $lookup = @{}
@@ -358,12 +426,12 @@ function New-CIEMEnvironmentPage {
                     $errorMsg = $_.Exception.Message
                     Write-CIEMLog -Message "Environment auto-load failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
 
-                    if ($errorMsg -match 'No ARM resources found') {
+                    if ($errorMsg -match 'No ARM resources found' -or $errorMsg -match 'No effective role assignments' -or $errorMsg -match 'No role assignment resources' -or $errorMsg -match 'No valid role assignment') {
                         New-UDCard -Style @{ textAlign = 'center'; padding = '40px' } -Content {
                             New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 3 -Content {
                                 New-UDIcon -Icon 'Database' -Size '3x' -Style @{ color = '#ff9800'; marginBottom = '16px' }
-                                New-UDTypography -Text 'No Resources Discovered' -Variant 'h5' -Style @{ marginBottom = '8px' }
-                                New-UDTypography -Text 'Run Azure discovery first to populate resource data, then return here to explore the hierarchy.' -Variant 'body1' -Style @{ color = '#666' }
+                                New-UDTypography -Text 'No Data Discovered' -Variant 'h5' -Style @{ marginBottom = '8px' }
+                                New-UDTypography -Text 'Run Azure discovery first to populate resource and identity data, then return here to explore.' -Variant 'body1' -Style @{ color = '#666' }
                             }
                         }
                     } else {

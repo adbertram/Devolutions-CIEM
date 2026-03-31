@@ -12,10 +12,17 @@ class EnvironmentPageHelpers extends BasePage {
       providerSelectCombobox: '[role="combobox"][aria-labelledby="envProviderSelectlabel"]',
       layoutSelect: '#envOrientSelect',
       layoutSelectCombobox: '[role="combobox"][aria-labelledby="envOrientSelectlabel"]',
+      // View select
+      viewSelect: '#envViewSelect',
+      viewSelectCombobox: '[role="combobox"][aria-labelledby="envViewSelectlabel"]',
+      // Assignment mode select (only visible in Identity view)
+      assignmentModeSelect: '#envAssignmentModeSelect',
+      assignmentModeSelectCombobox: '[role="combobox"][aria-labelledby="envAssignmentModeSelectlabel"]',
       // Action buttons
       startDiscoveryBtn: '#startDiscoveryBtn',
-      // Summary card (rendered inline in auto-load dynamic region)
+      // Summary cards (rendered inline in auto-load dynamic region)
       summaryCard: "#envChartArea .MuiCard-root:has-text('Tenants')",
+      identitySummaryCard: "#envChartArea .MuiCard-root:has-text('Identities')",
       // Progress indicators (visible during async discovery job — in separate container)
       progressCircular: '#envDiscoveryProgress .MuiCircularProgress-root',
       progressBar: '#envDiscoveryProgress .MuiLinearProgress-root',
@@ -96,9 +103,10 @@ class EnvironmentPageHelpers extends BasePage {
 
   async waitForEnvironmentLoaded(timeout = 30000) {
     // Wait for auto-load to complete — either summary card (data) or no-resources text (empty)
-    const summaryCard = this.page.locator(this.selectors.summaryCard);
+    const infraSummary = this.page.locator(this.selectors.summaryCard);
+    const identitySummary = this.page.locator(this.selectors.identitySummaryCard);
     const noResources = this.page.locator(this.selectors.noResourcesText);
-    await summaryCard.or(noResources).first().waitFor({ state: 'visible', timeout });
+    await infraSummary.or(identitySummary).or(noResources).first().waitFor({ state: 'visible', timeout });
   }
 
   // --- Progress indicators (during async discovery) ---
@@ -156,11 +164,49 @@ class EnvironmentPageHelpers extends BasePage {
     return await this.isElementVisible(this.selectors.treeContainer);
   }
 
+  // --- View select ---
+
+  async isViewSelectVisible() {
+    return await this.isElementVisible(this.selectors.viewSelectCombobox);
+  }
+
+  async getSelectedView() {
+    return await this.getMUISelectValue('envViewSelect');
+  }
+
+  async selectView(value) {
+    await this.selectMUIOption('envViewSelect', value);
+    await this.page.waitForTimeout(2000);
+  }
+
+  // --- Assignment mode select (Identity view only) ---
+
+  async isAssignmentModeSelectVisible() {
+    return await this.isElementVisible(this.selectors.assignmentModeSelectCombobox);
+  }
+
+  async getSelectedAssignmentMode() {
+    return await this.getMUISelectValue('envAssignmentModeSelect');
+  }
+
+  async selectAssignmentMode(value) {
+    await this.selectMUIOption('envAssignmentModeSelect', value);
+    await this.page.waitForTimeout(2000);
+  }
+
+  // --- Identity summary card ---
+
+  async isIdentitySummaryCardVisible() {
+    return await this.isElementVisible(this.selectors.identitySummaryCard);
+  }
+
   // --- State detection ---
 
   async hasEnvironmentData() {
     // Check if summary card appeared (data auto-loaded) vs no-resources state
-    return await this.isElementVisible(this.selectors.summaryCard);
+    const infraVisible = await this.isElementVisible(this.selectors.summaryCard);
+    const identityVisible = await this.isElementVisible(this.selectors.identitySummaryCard);
+    return infraVisible || identityVisible;
   }
 
   async waitForToastMessage(text) {

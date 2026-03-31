@@ -288,11 +288,110 @@ function clearStaleDiscoveryRuns() {
   }
 }
 
+/**
+ * Seed effective role assignment data for Identity View E2E tests.
+ * Creates 2 users, 1 group, 1 SP with various role assignments.
+ */
+function seedIdentityViewData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+
+    const now = new Date().toISOString();
+
+    // Seed Entra resources (identities) for display name resolution
+    const insertEntra = db.prepare(`
+      INSERT OR REPLACE INTO azure_entra_resources (id, type, display_name, properties, collected_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    insertEntra.run(`${TEST_PREFIX}user-1`, 'user', 'E2E Test User', '{}', now);
+    insertEntra.run(`${TEST_PREFIX}sp-1`, 'servicePrincipal', 'E2E Test SP', '{}', now);
+    insertEntra.run(`${TEST_PREFIX}group-1`, 'group', 'E2E Test Group', '{}', now);
+
+    // Seed subscription for scope label resolution
+    const insertArm = db.prepare(`
+      INSERT OR REPLACE INTO azure_arm_resources (id, type, name, subscription_id, tenant_id, collected_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    insertArm.run(`/subscriptions/${TEST_PREFIX}sub-1`, 'microsoft.resources/subscriptions',
+      'E2E Test Subscription', `${TEST_PREFIX}sub-1`, `${TEST_PREFIX}tenant-1`, now);
+
+    // Seed effective role assignments
+    const insertEra = db.prepare(`
+      INSERT OR REPLACE INTO azure_effective_role_assignments
+        (principal_id, principal_type, principal_display_name, original_principal_id, original_principal_type,
+         role_definition_id, role_name, scope, computed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // User1: direct Contributor on RG
+    insertEra.run(`${TEST_PREFIX}user-1`, 'User', 'E2E Test User',
+      `${TEST_PREFIX}user-1`, 'User',
+      `${TEST_PREFIX}roledef-contrib`, 'Contributor',
+      `/subscriptions/${TEST_PREFIX}sub-1/resourceGroups/e2e-rg-1`, now);
+
+    // User1: inherited Owner via group
+    insertEra.run(`${TEST_PREFIX}user-1`, 'User', 'E2E Test User',
+      `${TEST_PREFIX}group-1`, 'Group',
+      `${TEST_PREFIX}roledef-owner`, 'Owner',
+      `/subscriptions/${TEST_PREFIX}sub-1`, now);
+
+    // SP: direct Reader on subscription
+    insertEra.run(`${TEST_PREFIX}sp-1`, 'ServicePrincipal', 'E2E Test SP',
+      `${TEST_PREFIX}sp-1`, 'ServicePrincipal',
+      `${TEST_PREFIX}roledef-reader`, 'Reader',
+      `/subscriptions/${TEST_PREFIX}sub-1`, now);
+
+    // Group: direct Owner on subscription
+    insertEra.run(`${TEST_PREFIX}group-1`, 'Group', 'E2E Test Group',
+      `${TEST_PREFIX}group-1`, 'Group',
+      `${TEST_PREFIX}roledef-owner`, 'Owner',
+      `/subscriptions/${TEST_PREFIX}sub-1`, now);
+
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[seed] Seeded 4 effective role assignments for Identity View tests.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Clean up Identity View E2E test data.
+ */
+function cleanupIdentityViewData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.prepare(`DELETE FROM azure_effective_role_assignments WHERE principal_id LIKE '${TEST_PREFIX}%'`).run();
+    db.prepare(`DELETE FROM azure_entra_resources WHERE id LIKE '${TEST_PREFIX}%'`).run();
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[cleanup] Identity View test data cleaned up.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Returns the count of test-prefixed effective role assignments.
+ */
+function getTestEffectiveRoleAssignmentCount() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: true });
+    const row = db.prepare(`SELECT COUNT(*) as count FROM azure_effective_role_assignments WHERE principal_id LIKE '${TEST_PREFIX}%'`).get();
+    return row.count;
+  } finally {
+    if (db) db.close();
+  }
+}
+
 module.exports = {
   cleanupTestData, seedChecks, seedTestData,
   seedEnvironmentData, cleanupEnvironmentData,
   getArmResourceCount, getTestArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns,
+  seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
   TEST_PREFIX
 };

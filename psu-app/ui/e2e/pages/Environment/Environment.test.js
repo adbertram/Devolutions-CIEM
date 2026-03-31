@@ -4,7 +4,8 @@ const {
   seedEnvironmentData, cleanupEnvironmentData,
   getTestArmResourceCount, getArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
-  clearStaleDiscoveryRuns
+  clearStaleDiscoveryRuns,
+  seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount
 } = require('../../_utils/cleanup');
 const {
   deactivateAzureAuthProfile, activateAzureAuthProfile,
@@ -269,6 +270,81 @@ test.describe('Environment Page', () => {
     test('should display description about running discovery first', async () => {
       const descVisible = await envPage.isNoResourcesDescriptionVisible();
       expect(descVisible).toBe(true);
+    });
+  });
+
+  // --- View toggle ---
+
+  test.describe('when the page loads with view toggle', () => {
+    test('should display View select with Infrastructure default', async () => {
+      const visible = await envPage.isViewSelectVisible();
+      expect(visible).toBe(true);
+      const value = await envPage.getSelectedView();
+      expect(value).toBe('Infrastructure');
+    });
+
+    test('should NOT display assignment mode select in Infrastructure view', async () => {
+      const visible = await envPage.isAssignmentModeSelectVisible();
+      expect(visible).toBe(false);
+    });
+  });
+
+  // --- Identity view with seeded data ---
+
+  test.describe('when identity data exists and Identity view is selected', () => {
+    test.beforeAll(() => {
+      seedEnvironmentData(); // Need ARM resources for subscription name resolution
+      seedIdentityViewData();
+      // Assert: verify seeded rows
+      const eraCount = getTestEffectiveRoleAssignmentCount();
+      if (eraCount < 4) {
+        throw new Error(`Expected >= 4 seeded effective role assignments, got ${eraCount}`);
+      }
+      console.log(`[setup] Verified ${eraCount} test effective role assignments seeded.`);
+    });
+
+    test.afterAll(() => {
+      cleanupIdentityViewData();
+      cleanupEnvironmentData();
+    });
+
+    test('should switch to Identity view and display identity summary card', async () => {
+      await envPage.selectView('Identity');
+      await envPage.waitForEnvironmentLoaded();
+      const identitySummary = await envPage.isIdentitySummaryCardVisible();
+      expect(identitySummary).toBe(true);
+    });
+
+    test('should display identity-specific summary counts', async () => {
+      await envPage.selectView('Identity');
+      await envPage.waitForEnvironmentLoaded();
+      const identityCount = await envPage.getSummaryCount('Identities');
+      expect(parseInt(identityCount)).toBeGreaterThanOrEqual(1);
+      const roleCount = await envPage.getSummaryCount('Roles');
+      expect(parseInt(roleCount)).toBeGreaterThanOrEqual(1);
+    });
+
+    test('should render tree container in Identity view', async () => {
+      await envPage.selectView('Identity');
+      await envPage.waitForEnvironmentLoaded();
+      const treeVisible = await envPage.isTreeContainerVisible();
+      expect(treeVisible).toBe(true);
+    });
+
+    test('should display assignment mode select in Identity view', async () => {
+      await envPage.selectView('Identity');
+      await envPage.waitForEnvironmentLoaded();
+      const visible = await envPage.isAssignmentModeSelectVisible();
+      expect(visible).toBe(true);
+    });
+
+    test('should switch back to Infrastructure view', async () => {
+      await envPage.selectView('Identity');
+      await envPage.waitForEnvironmentLoaded();
+      await envPage.selectView('Infrastructure');
+      await envPage.waitForEnvironmentLoaded();
+      const infraSummary = await envPage.isSummaryCardVisible();
+      expect(infraSummary).toBe(true);
     });
   });
 });
