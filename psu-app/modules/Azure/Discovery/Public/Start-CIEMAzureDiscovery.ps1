@@ -188,6 +188,34 @@ function Start-CIEMAzureDiscovery {
                 -Connection      $conn `
                 -ComputedAt      (Get-Date).ToString('o')
             Write-CIEMLog "EffectiveRoleAssignments: $eraCount rows inserted" -Component 'Discovery'
+
+            # Build security graph (nodes + edges for attack path analysis)
+            Remove-CIEMGraphEdge -All -Confirm:$false -Connection $conn
+            Remove-CIEMGraphNode -All -Confirm:$false -Connection $conn
+
+            $graphCollectedAt = (Get-Date).ToString('o')
+            $allEntraForGraph = @($entraResources) + @($entraPermissions)
+
+            $nodeCount = InvokeCIEMGraphNodeBuild `
+                -ArmResources   $armResources `
+                -EntraResources $allEntraForGraph `
+                -Connection     $conn `
+                -CollectedAt    $graphCollectedAt
+            Write-CIEMLog "GraphNodes: $nodeCount nodes created" -Component 'Discovery'
+
+            $collectedEdgeCount = InvokeCIEMGraphEdgeBuild `
+                -Relationships $relationships `
+                -Connection    $conn `
+                -CollectedAt   $graphCollectedAt
+            Write-CIEMLog "GraphEdges: $collectedEdgeCount collected edges created" -Component 'Discovery'
+
+            $computedEdgeCount = InvokeCIEMGraphComputedEdgeBuild `
+                -ArmResources   $armResources `
+                -EntraResources $allEntraForGraph `
+                -Relationships  $relationships `
+                -Connection     $conn `
+                -CollectedAt    $graphCollectedAt
+            Write-CIEMLog "GraphEdges: $computedEdgeCount computed edges created" -Component 'Discovery'
         }
 
         # ===== Determine final status =====

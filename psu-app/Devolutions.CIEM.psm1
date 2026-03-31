@@ -133,6 +133,7 @@ catch {
 foreach ($schema in @(
     @{ Path = Join-Path $script:AzureRoot          'Data/azure_schema.sql';         Label = 'Azure' }
     @{ Path = Join-Path $script:AzureDiscoveryRoot 'Data/discovery_schema.sql';     Label = 'AzureDiscovery' }
+    @{ Path = Join-Path $script:AzureDiscoveryRoot 'Data/graph_schema.sql';         Label = 'Graph' }
 )) {
     try {
         $dbPath = Get-CIEMDatabasePath

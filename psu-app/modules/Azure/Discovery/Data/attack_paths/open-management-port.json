@@ -1,0 +1,12 @@
+{
+  "id": "open-management-port",
+  "name": "Management port open to the internet",
+  "severity": "high",
+  "category": "network-exposure",
+  "description": "A network security group allows inbound traffic from the internet on a management port (RDP, SSH, WinRM). This exposes attached resources to brute-force and credential-based attacks.",
+  "steps": [
+    { "kind": "Internet" },
+    { "edge": "AllowsInbound", "direction": "outbound", "filter": { "property": "open_ports", "op": "contains_port", "value": [22, 3389, 5985, 5986] } },
+    { "kind": "AzureNSG" }
+  ]
+}

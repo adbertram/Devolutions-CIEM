@@ -1,0 +1,17 @@
+{
+  "id": "internet-exposed-privileged-mi",
+  "name": "Internet-exposed VM with privileged managed identity",
+  "severity": "critical",
+  "category": "identity-network-compound",
+  "description": "A VM reachable from the internet via an open NSG has a managed identity with a privileged role at subscription scope. An attacker exploiting this VM could use IMDS to obtain tokens and escalate to subscription-level control.",
+  "steps": [
+    { "kind": "Internet" },
+    { "edge": "AllowsInbound", "direction": "outbound" },
+    { "kind": "AzureNSG" },
+    { "edge": "AttachedTo", "direction": "outbound" },
+    { "kind": "AzureVM" },
+    { "edge": "HasManagedIdentity", "direction": "outbound" },
+    { "kind": "EntraManagedIdentity" },
+    { "edge": "HasRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } }
+  ]
+}

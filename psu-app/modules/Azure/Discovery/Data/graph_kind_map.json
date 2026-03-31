@@ -1,0 +1,34 @@
+{
+  "arm_type_to_kind": {
+    "microsoft.compute/virtualmachines": "AzureVM",
+    "microsoft.compute/virtualmachinescalesets": "AzureVMSS",
+    "microsoft.network/publicipaddresses": "AzurePublicIP",
+    "microsoft.network/networksecuritygroups": "AzureNSG",
+    "microsoft.network/networkinterfaces": "AzureNIC",
+    "microsoft.network/virtualnetworks": "AzureVNet",
+    "microsoft.network/loadbalancers": "AzureLoadBalancer",
+    "microsoft.network/applicationgateways": "AzureAppGateway",
+    "microsoft.storage/storageaccounts": "AzureStorageAccount",
+    "microsoft.keyvault/vaults": "AzureKeyVault",
+    "microsoft.web/sites": "AzureAppService",
+    "microsoft.sql/servers": "AzureSQLServer",
+    "microsoft.sql/servers/databases": "AzureSQLDatabase",
+    "microsoft.containerservice/managedclusters": "AzureAKS",
+    "microsoft.containerregistry/registries": "AzureContainerRegistry",
+    "microsoft.authorization/roledefinitions": "AzureRoleDefinition",
+    "microsoft.authorization/roleassignments": "AzureRoleAssignment",
+    "microsoft.resources/subscriptions": "AzureSubscription",
+    "microsoft.managementgroups/managementgroups": "AzureManagementGroup"
+  },
+  "entra_type_to_kind": {
+    "user": "EntraUser",
+    "servicePrincipal": "EntraServicePrincipal",
+    "group": "EntraGroup",
+    "directoryRole": "EntraDirectoryRole",
+    "application": "EntraApplication",
+    "appRoleAssignment": "EntraAppRoleAssignment",
+    "oauth2PermissionGrant": "EntraOAuth2Grant"
+  },
+  "default_arm_kind": "AzureResource",
+  "managed_identity_kind": "EntraManagedIdentity"
+}

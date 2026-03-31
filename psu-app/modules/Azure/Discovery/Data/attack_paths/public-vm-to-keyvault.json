@@ -1,0 +1,18 @@
+{
+  "id": "public-vm-to-keyvault",
+  "name": "Internet-exposed VM with managed identity accessing Key Vault",
+  "severity": "critical",
+  "category": "identity-network-compound",
+  "description": "A VM exposed to the internet has a managed identity with a role that grants access to an Azure Key Vault. An attacker could exploit the VM to steal secrets, keys, and certificates from the vault.",
+  "steps": [
+    { "kind": "Internet" },
+    { "edge": "AllowsInbound", "direction": "outbound" },
+    { "kind": "AzureNSG" },
+    { "edge": "AttachedTo", "direction": "outbound" },
+    { "kind": "AzureVM" },
+    { "edge": "HasManagedIdentity", "direction": "outbound" },
+    { "kind": "EntraManagedIdentity" },
+    { "edge": "HasRole", "direction": "outbound" },
+    { "kind": "AzureKeyVault" }
+  ]
+}

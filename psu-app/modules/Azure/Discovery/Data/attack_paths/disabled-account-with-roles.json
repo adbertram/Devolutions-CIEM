@@ -1,0 +1,11 @@
+{
+  "id": "disabled-account-with-roles",
+  "name": "Disabled account still holding active role assignments",
+  "severity": "high",
+  "category": "identity-hygiene",
+  "description": "A disabled Entra account still has active Azure RBAC role assignments. If the account is re-enabled or its credentials are compromised, the attacker inherits all assigned roles.",
+  "steps": [
+    { "kind": ["EntraUser", "EntraServicePrincipal"], "node_filter": { "property": "accountEnabled", "op": "eq", "value": false } },
+    { "edge": "HasRole", "direction": "outbound" }
+  ]
+}
