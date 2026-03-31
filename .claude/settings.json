@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "_name": "enforce-tdd",
+        "_description": "Block source code edits until test files have been written first (TDD enforcement)",
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/.claude/hooks/scripts/enforce-tdd.sh"
+          }
+        ]
+      },
+      {
+        "_name": "block-test-pipe",
+        "_description": "Block test commands that pipe output to filters (grep, head, tail, etc.)",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/.claude/hooks/scripts/block-test-pipe.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
