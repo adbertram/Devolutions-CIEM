@@ -62,6 +62,8 @@ Key context from discussions with Marc-André Moreau:
 
 Per Marc-André's demo review: the initial implementation was CSPM (CIS best-practice checks), not true CIEM. The project must focus on **CIEM-specific features** that differentiate from free tools:
 
+- **Identity-first data model (CRITICAL)** — The entire system is modeled around **identities**, not resources. Graph/control relationships are the right representation, but the primary axis is identity → entitlements. This is how real CIEMs work.
+- **Identity drill-down view** — Users must be able to drill down from an identity to all entitlements it holds, surfacing compound risk (e.g., "this VM has a managed identity with Owner role on the subscription, a public IP, and RDP open on the network")
 - **Dormant permission detection** — Users/service principals with unused privileged roles (via sign-in logs)
 - **Role right-sizing** — Propose least-privilege custom roles to replace overly broad assignments
 - **Control relationship discovery** — Map identity-to-resource relationships and surface attack paths
@@ -290,6 +292,7 @@ The architecture planning document is at `docs/devolutions-ciem-app-architecture
 |--------|----------|
 | Runtime | Pure PowerShell (no Python) |
 | V1 Providers | Azure, AWS |
+| Data Model Axis | Identity-first (drill identity → entitlements), not resource-first |
 | Core Focus | CIEM: dormant permissions, role right-sizing, control relationships |
 | CSPM Checks | Retained as secondary layer (Prowler-ported) |
 | Compliance Mapping | Not in v1 |
