@@ -62,12 +62,32 @@ function InvokeCIEMGraphComputedEdgeBuild {
     if ($Connection) { $baseSplat.Connection = $Connection }
 
     # ===== Helper: check if node exists in graph =====
+    # Must use same $Connection to see uncommitted nodes within a transaction
     function NodeExists([string]$nodeId) {
         if (-not $nodeId) { return $false }
         if ($nodeExistsCache.ContainsKey($nodeId)) { return $nodeExistsCache[$nodeId] }
-        $exists = (@(Invoke-CIEMQuery -Query "SELECT 1 FROM graph_nodes WHERE id = @id" -Parameters @{ id = $nodeId }).Count -gt 0)
+        $fkParams = @{ Query = "SELECT 1 FROM graph_nodes WHERE id = @id"; Parameters = @{ id = $nodeId } }
+        if ($Connection) { $fkParams.Connection = $Connection }
+        $exists = (@(Invoke-CIEMQuery @fkParams).Count -gt 0)
         $nodeExistsCache[$nodeId] = $exists
         $exists
+    }
+
+    # ===== Helper: save edge with FK-safe error handling =====
+    # Role assignment scopes may reference resources with case mismatches vs graph_nodes IDs.
+    # Log and skip FK failures rather than crashing the entire discovery run.
+    function SaveEdgeSafe([hashtable]$splat) {
+        try {
+            Save-CIEMGraphEdge @splat
+            return $true
+        }
+        catch {
+            if ($_.Exception.Message -match 'FOREIGN KEY' -or ($_.Exception.InnerException -and $_.Exception.InnerException.Message -match 'FOREIGN KEY')) {
+                Write-CIEMLog "FK constraint: skipping edge $($splat.Kind) $($splat.SourceId) -> $($splat.TargetId)" -Severity WARNING -Component 'GraphBuilder'
+                return $false
+            }
+            throw
+        }
     }
 
     # ===== 1. Build lookups from ARM resources =====
@@ -142,8 +162,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
             $splat.TargetId   = $scope
             $splat.Kind       = 'HasRole'
             $splat.Properties = $edgePropsJson
-            Save-CIEMGraphEdge @splat
-            $edgeCount++
+            if (SaveEdgeSafe $splat) { $edgeCount++ }
         }
 
         # InheritedRole: expand group memberships
@@ -168,8 +187,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $splat.TargetId   = $scope
                         $splat.Kind       = 'InheritedRole'
                         $splat.Properties = $inheritedPropsJson
-                        Save-CIEMGraphEdge @splat
-                        $edgeCount++
+                        if (SaveEdgeSafe $splat) { $edgeCount++ }
                     }
                 }
             }
@@ -187,8 +205,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.SourceId = $r.Id
                 $splat.TargetId = $principalId
                 $splat.Kind     = 'HasManagedIdentity'
-                Save-CIEMGraphEdge @splat
-                $edgeCount++
+                if (SaveEdgeSafe $splat) { $edgeCount++ }
             }
         } catch { }
     }
@@ -199,6 +216,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
         try { $nicProps = $nic.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
 
         # AttachedTo: NIC -> VM
+        $vmId = $null
         if ($nicProps.virtualMachine -and $nicProps.virtualMachine.id) {
             $vmId = $nicProps.virtualMachine.id
             if ((NodeExists $nic.Id) -and (NodeExists $vmId)) {
@@ -206,8 +224,19 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.SourceId = $nic.Id
                 $splat.TargetId = $vmId
                 $splat.Kind     = 'AttachedTo'
-                Save-CIEMGraphEdge @splat
-                $edgeCount++
+                if (SaveEdgeSafe $splat) { $edgeCount++ }
+            }
+        }
+
+        # AttachedTo: NSG -> VM (derived from NIC having both NSG and VM references)
+        if ($vmId -and $nicProps.networkSecurityGroup -and $nicProps.networkSecurityGroup.id) {
+            $nsgId = $nicProps.networkSecurityGroup.id
+            if ((NodeExists $nsgId) -and (NodeExists $vmId)) {
+                $splat = $baseSplat.Clone()
+                $splat.SourceId = $nsgId
+                $splat.TargetId = $vmId
+                $splat.Kind     = 'AttachedTo'
+                if (SaveEdgeSafe $splat) { $edgeCount++ }
             }
         }
 
@@ -224,8 +253,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $splat.SourceId = $nic.Id
                         $splat.TargetId = $pipId
                         $splat.Kind     = 'HasPublicIP'
-                        Save-CIEMGraphEdge @splat
-                        $edgeCount++
+                        if (SaveEdgeSafe $splat) { $edgeCount++ }
                     }
                 }
 
@@ -240,8 +268,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $splat.TargetId   = $vnetId
                         $splat.Kind       = 'InSubnet'
                         $splat.Properties = @{ subnet_id = $subnetId } | ConvertTo-Json -Compress
-                        Save-CIEMGraphEdge @splat
-                        $edgeCount++
+                        if (SaveEdgeSafe $splat) { $edgeCount++ }
                     }
                 }
             }
@@ -262,11 +289,21 @@ function InvokeCIEMGraphComputedEdgeBuild {
         foreach ($rule in $allRules) {
             $ruleProps = if ($rule.properties) { $rule.properties } else { $rule }
             if ($ruleProps.direction -eq 'Inbound' -and $ruleProps.access -eq 'Allow' -and $ruleProps.sourceAddressPrefix -in @('*', '0.0.0.0/0', 'Internet')) {
-                $openPorts.Add(@{
-                    port     = $ruleProps.destinationPortRange
-                    protocol = $ruleProps.protocol
-                    rule_name = $rule.name
-                })
+                # Azure uses destinationPortRange (singular) for single-port rules and
+                # destinationPortRanges (plural array) for multi-port rules (singular is '' when plural is used)
+                $portEntries = @()
+                if ($ruleProps.destinationPortRanges -and $ruleProps.destinationPortRanges.Count -gt 0) {
+                    $portEntries = $ruleProps.destinationPortRanges
+                } elseif ($ruleProps.destinationPortRange) {
+                    $portEntries = @($ruleProps.destinationPortRange)
+                }
+                foreach ($portEntry in $portEntries) {
+                    $openPorts.Add(@{
+                        port      = $portEntry
+                        protocol  = $ruleProps.protocol
+                        rule_name = $rule.name
+                    })
+                }
             }
         }
 
@@ -277,8 +314,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
             $splat.TargetId   = $nsg.Id
             $splat.Kind       = 'AllowsInbound'
             $splat.Properties = $edgePropsJson
-            Save-CIEMGraphEdge @splat
-            $edgeCount++
+            if (SaveEdgeSafe $splat) { $edgeCount++ }
         }
     }
 
@@ -304,8 +340,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
             $splat.SourceId = $r.Id
             $splat.TargetId = $subNodeId
             $splat.Kind     = 'ContainedIn'
-            Save-CIEMGraphEdge @splat
-            $edgeCount++
+            if (SaveEdgeSafe $splat) { $edgeCount++ }
         }
     }
 

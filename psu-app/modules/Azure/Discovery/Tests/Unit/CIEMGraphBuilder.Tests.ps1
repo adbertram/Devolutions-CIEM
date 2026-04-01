@@ -12,7 +12,7 @@ BeforeAll {
     $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
     Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
-    $graphSchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'graph_schema.sql'
+    $graphSchema = Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.Graph' 'Data' 'graph_schema.sql'
     Invoke-CIEMQuery -Query (Get-Content $graphSchema -Raw)
 
     InModuleScope Devolutions.CIEM {
@@ -404,7 +404,7 @@ Describe 'Graph Builder Functions' {
             }
         }
 
-        It 'Stores Entra Properties as-is (already JSON)' {
+        It 'Stores Entra Properties as-is when no signInActivity present' {
             InModuleScope Devolutions.CIEM {
                 $ts = '2026-03-31T00:00:00Z'
                 $armResources = @(
@@ -433,6 +433,153 @@ Describe 'Graph Builder Functions' {
 
                 $node = Get-CIEMGraphNode -Id 'user-props-test'
                 $node.Properties | Should -Be '{"accountEnabled":true,"userPrincipalName":"props@example.com","jobTitle":"Engineer"}'
+            }
+        }
+
+        It 'Enriches Entra user properties with daysSinceSignIn from signInActivity' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                # signInActivity with lastSignInDateTime 30 days before the CollectedAt date
+                $signInDate = ([datetime]::Parse($ts)).AddDays(-30).ToString('o')
+                $propsJson = @{
+                    accountEnabled = $true
+                    signInActivity = @{
+                        lastSignInDateTime = $signInDate
+                        lastNonInteractiveSignInDateTime = $null
+                    }
+                } | ConvertTo-Json -Depth 3 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = '/subscriptions/sub1'; Type = 'microsoft.resources/subscriptions'
+                        Name = 'sub1'; Location = $null; ResourceGroup = $null
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null; Properties = $null
+                        CollectedAt = $ts
+                    }
+                )
+                $entraResources = @(
+                    [PSCustomObject]@{
+                        Id = 'user-signin-test'
+                        Type = 'user'
+                        DisplayName = 'SignIn User'
+                        ParentId = $null
+                        Properties = $propsJson
+                        CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphNodeBuild -ArmResources $armResources -EntraResources $entraResources -Connection $null -CollectedAt $ts
+
+                $node = Get-CIEMGraphNode -Id 'user-signin-test'
+                $enrichedProps = $node.Properties | ConvertFrom-Json
+                $enrichedProps.daysSinceSignIn | Should -Be 30
+            }
+        }
+
+        It 'Uses most recent sign-in date between interactive and non-interactive' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                $interactiveDate = ([datetime]::Parse($ts)).AddDays(-60).ToString('o')
+                $nonInteractiveDate = ([datetime]::Parse($ts)).AddDays(-10).ToString('o')
+                $propsJson = @{
+                    accountEnabled = $true
+                    signInActivity = @{
+                        lastSignInDateTime = $interactiveDate
+                        lastNonInteractiveSignInDateTime = $nonInteractiveDate
+                    }
+                } | ConvertTo-Json -Depth 3 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = '/subscriptions/sub1'; Type = 'microsoft.resources/subscriptions'
+                        Name = 'sub1'; Location = $null; ResourceGroup = $null
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null; Properties = $null
+                        CollectedAt = $ts
+                    }
+                )
+                $entraResources = @(
+                    [PSCustomObject]@{
+                        Id = 'user-both-signin'
+                        Type = 'user'
+                        DisplayName = 'Both SignIn User'
+                        ParentId = $null
+                        Properties = $propsJson
+                        CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphNodeBuild -ArmResources $armResources -EntraResources $entraResources -Connection $null -CollectedAt $ts
+
+                $node = Get-CIEMGraphNode -Id 'user-both-signin'
+                $enrichedProps = $node.Properties | ConvertFrom-Json
+                # Should use the more recent non-interactive date (10 days)
+                $enrichedProps.daysSinceSignIn | Should -Be 10
+            }
+        }
+
+        It 'Does not add daysSinceSignIn when signInActivity has no timestamps' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                $propsJson = @{
+                    accountEnabled = $true
+                    signInActivity = @{
+                        lastSignInDateTime = $null
+                        lastNonInteractiveSignInDateTime = $null
+                    }
+                } | ConvertTo-Json -Depth 3 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = '/subscriptions/sub1'; Type = 'microsoft.resources/subscriptions'
+                        Name = 'sub1'; Location = $null; ResourceGroup = $null
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null; Properties = $null
+                        CollectedAt = $ts
+                    }
+                )
+                $entraResources = @(
+                    [PSCustomObject]@{
+                        Id = 'user-no-dates'
+                        Type = 'user'
+                        DisplayName = 'No Dates User'
+                        ParentId = $null
+                        Properties = $propsJson
+                        CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphNodeBuild -ArmResources $armResources -EntraResources $entraResources -Connection $null -CollectedAt $ts
+
+                $node = Get-CIEMGraphNode -Id 'user-no-dates'
+                $enrichedProps = $node.Properties | ConvertFrom-Json
+                $enrichedProps.PSObject.Properties.Name | Should -Not -Contain 'daysSinceSignIn'
+            }
+        }
+
+        It 'Clamps daysSinceSignIn to 0 when sign-in date is in the future relative to CollectedAt' {
+            InModuleScope Devolutions.CIEM {
+                Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+                $ts = '2026-01-15T00:00:00Z'
+                # Sign-in date 5 days AFTER collection date (clock skew or data anomaly)
+                $futureSignIn = ([datetime]::Parse($ts)).AddDays(5).ToString('o')
+                $entraResources = @([PSCustomObject]@{
+                    Id          = 'user-future-signin'
+                    Type        = 'user'
+                    DisplayName = 'Future User'
+                    Properties  = @{ signInActivity = @{ lastSignInDateTime = $futureSignIn } } | ConvertTo-Json -Depth 3 -Compress
+                })
+
+                InvokeCIEMGraphNodeBuild -ArmResources @() -EntraResources $entraResources -Connection $null -CollectedAt $ts
+
+                $node = Get-CIEMGraphNode -Id 'user-future-signin'
+                $enrichedProps = $node.Properties | ConvertFrom-Json
+                $enrichedProps.daysSinceSignIn | Should -Be 0
             }
         }
     }
@@ -874,6 +1021,48 @@ Describe 'Graph Builder Functions' {
             }
         }
 
+        It 'Creates AttachedTo edges from NSG to VM via NIC networkSecurityGroup reference' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+
+                $vmId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm-nsg'
+                $nicId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkInterfaces/nic-nsg'
+                $nsgId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg-test'
+
+                Save-CIEMGraphNode -Id $vmId -Kind 'AzureVM' -DisplayName 'vm-nsg' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+                Save-CIEMGraphNode -Id $nicId -Kind 'AzureNIC' -DisplayName 'nic-nsg' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+                Save-CIEMGraphNode -Id $nsgId -Kind 'AzureNSG' -DisplayName 'nsg-test' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+
+                $nicProps = @{
+                    virtualMachine = @{ id = $vmId }
+                    networkSecurityGroup = @{ id = $nsgId }
+                    ipConfigurations = @(
+                        @{ properties = @{} }
+                    )
+                } | ConvertTo-Json -Depth 10 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = $nicId
+                        Type = 'microsoft.network/networkinterfaces'
+                        Name = 'nic-nsg'; Location = 'eastus'; ResourceGroup = 'rg1'
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = $nicProps
+                        CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphComputedEdgeBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $null -CollectedAt $ts
+
+                # Should create both NIC->VM and NSG->VM AttachedTo edges
+                $edges = @(Get-CIEMGraphEdge -Kind 'AttachedTo')
+                $nsgToVm = $edges | Where-Object { $_.SourceId -eq $nsgId -and $_.TargetId -eq $vmId }
+                $nsgToVm | Should -Not -BeNullOrEmpty -Because 'NSG->VM AttachedTo edge should be derived from NIC properties'
+            }
+        }
+
         It 'Creates HasPublicIP edges from NIC to PublicIP' {
             InModuleScope Devolutions.CIEM {
                 $ts = '2026-03-31T00:00:00Z'
@@ -975,6 +1164,61 @@ Describe 'Graph Builder Functions' {
                 $edgeProps.open_ports | Should -HaveCount 2
                 $edgeProps.open_ports[0].port | Should -Be '3389'
                 $edgeProps.open_ports[1].port | Should -Be '22'
+            }
+        }
+
+        It 'Creates AllowsInbound edge with destinationPortRanges (plural array) ports' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+                Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+                $nsgId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg-plural'
+
+                Save-CIEMGraphNode -Id '__internet__' -Kind 'Internet' -DisplayName 'Internet' -Provider 'global'
+                Save-CIEMGraphNode -Id $nsgId -Kind 'AzureNSG' -DisplayName 'nsg-plural' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+
+                # Azure uses destinationPortRanges (plural) when multiple ports, setting singular to ''
+                $nsgProps = @{
+                    securityRules = @(
+                        @{
+                            name = 'AllowMulti'
+                            properties = @{
+                                direction = 'Inbound'
+                                access = 'Allow'
+                                protocol = 'TCP'
+                                destinationPortRange = ''
+                                destinationPortRanges = @('22', '3389', '5985-5986')
+                                sourceAddressPrefix = '*'
+                            }
+                        }
+                    )
+                } | ConvertTo-Json -Depth 10 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = $nsgId
+                        Type = 'microsoft.network/networksecuritygroups'
+                        Name = 'nsg-plural'; Location = 'eastus'; ResourceGroup = 'rg1'
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = $nsgProps
+                        CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphComputedEdgeBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $null -CollectedAt $ts
+
+                $edges = Get-CIEMGraphEdge -Kind 'AllowsInbound'
+                $edges | Should -HaveCount 1
+
+                $edgeProps = $edges[0].Properties | ConvertFrom-Json
+                # Should have 3 port entries from the plural array
+                $edgeProps.open_ports | Should -HaveCount 3
+                ($edgeProps.open_ports | Where-Object { $_.port -eq '22' }) | Should -Not -BeNullOrEmpty
+                ($edgeProps.open_ports | Where-Object { $_.port -eq '3389' }) | Should -Not -BeNullOrEmpty
+                ($edgeProps.open_ports | Where-Object { $_.port -eq '5985-5986' }) | Should -Not -BeNullOrEmpty
             }
         }
 
@@ -1306,6 +1550,225 @@ Describe 'Graph Builder Functions' {
                 $ts = '2026-03-31T00:00:00Z'
                 $count = InvokeCIEMGraphComputedEdgeBuild -ArmResources @() -EntraResources @() -Relationships @() -Connection $null -CollectedAt $ts
                 $count | Should -Be 0
+            }
+        }
+
+        It 'Does NOT create NSG->VM edge when NIC has NSG but no virtualMachine reference' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+                Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+                $nicId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkInterfaces/nic-no-vm'
+                $nsgId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg-no-vm'
+
+                Save-CIEMGraphNode -Id $nicId -Kind 'AzureNIC' -DisplayName 'nic-no-vm' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+                Save-CIEMGraphNode -Id $nsgId -Kind 'AzureNSG' -DisplayName 'nsg-no-vm' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+
+                # NIC has NSG but no virtualMachine property
+                $nicProps = @{
+                    networkSecurityGroup = @{ id = $nsgId }
+                } | ConvertTo-Json -Depth 5 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = $nicId; Type = 'microsoft.network/networkinterfaces'
+                        Name = 'nic-no-vm'; Location = 'eastus'; ResourceGroup = 'rg1'
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = $nicProps; CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphComputedEdgeBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $null -CollectedAt $ts
+
+                # No NSG->VM AttachedTo edge since no VM reference exists
+                $edges = Get-CIEMGraphEdge -Kind 'AttachedTo' -SourceId $nsgId
+                $edges | Should -BeNullOrEmpty
+            }
+        }
+
+        It 'Skips NSG->VM edge when NSG node does not exist in graph_nodes' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+                Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+                $nicId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkInterfaces/nic-missing-nsg'
+                $vmId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm-missing-nsg'
+                $nsgId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg-not-seeded'
+
+                Save-CIEMGraphNode -Id $nicId -Kind 'AzureNIC' -DisplayName 'nic' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+                Save-CIEMGraphNode -Id $vmId -Kind 'AzureVM' -DisplayName 'vm' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+                # Deliberately NOT creating the NSG node
+
+                $nicProps = @{
+                    virtualMachine = @{ id = $vmId }
+                    networkSecurityGroup = @{ id = $nsgId }
+                } | ConvertTo-Json -Depth 5 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = $nicId; Type = 'microsoft.network/networkinterfaces'
+                        Name = 'nic'; Location = 'eastus'; ResourceGroup = 'rg1'
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = $nicProps; CollectedAt = $ts
+                    }
+                )
+
+                InvokeCIEMGraphComputedEdgeBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $null -CollectedAt $ts
+
+                # NSG node doesn't exist so no AttachedTo edge
+                $edges = Get-CIEMGraphEdge -Kind 'AttachedTo' -SourceId $nsgId
+                $edges | Should -BeNullOrEmpty
+            }
+        }
+    }
+
+    # =========================================================================
+    # Transaction-context edge building (reproduces discovery pipeline bug)
+    # When nodes are inserted within a transaction, edge builders must use the
+    # same connection for FK existence checks, otherwise they see empty tables.
+    # =========================================================================
+
+    Context 'InvokeCIEMGraphEdgeBuild with transaction connection' {
+
+        BeforeEach {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+        }
+
+        It 'Creates edges when nodes exist only on the transaction connection' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+
+                # Open a transaction connection (same as InvokeCIEMTransaction)
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
+                Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
+                Invoke-PSUSQLiteQuery -Connection $conn -Query "BEGIN TRANSACTION" -AsNonQuery | Out-Null
+
+                try {
+                    # Insert nodes on the transaction connection (NOT committed yet)
+                    Save-CIEMGraphNode -Id 'txn-user-1' -Kind 'EntraUser' -DisplayName 'TxnUser' -Provider 'azure' -Connection $conn
+                    Save-CIEMGraphNode -Id 'txn-group-1' -Kind 'EntraGroup' -DisplayName 'TxnGroup' -Provider 'azure' -Connection $conn
+
+                    $relationships = @(
+                        [PSCustomObject]@{
+                            SourceId = 'txn-user-1'; SourceType = 'user'
+                            TargetId = 'txn-group-1'; TargetType = 'group'
+                            Relationship = 'member_of'; CollectedAt = $ts
+                        }
+                    )
+
+                    # Edge builder must find the uncommitted nodes via $conn
+                    $count = InvokeCIEMGraphEdgeBuild -Relationships $relationships -Connection $conn -CollectedAt $ts
+                    $count | Should -Be 1
+
+                    Invoke-PSUSQLiteQuery -Connection $conn -Query "COMMIT" -AsNonQuery | Out-Null
+                }
+                catch {
+                    Invoke-PSUSQLiteQuery -Connection $conn -Query "ROLLBACK" -AsNonQuery | Out-Null
+                    throw
+                }
+                finally {
+                    $conn.Dispose()
+                }
+
+                # Verify edge persisted after commit
+                $edges = Get-CIEMGraphEdge -SourceId 'txn-user-1' -Kind 'MemberOf'
+                $edges | Should -HaveCount 1
+                $edges[0].TargetId | Should -Be 'txn-group-1'
+            }
+        }
+    }
+
+    Context 'InvokeCIEMGraphComputedEdgeBuild with transaction connection' {
+
+        BeforeEach {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+        }
+
+        It 'Creates HasRole edges when nodes exist only on the transaction connection' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
+                Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
+                Invoke-PSUSQLiteQuery -Connection $conn -Query "BEGIN TRANSACTION" -AsNonQuery | Out-Null
+
+                try {
+                    # Insert nodes on the transaction connection (NOT committed yet)
+                    Save-CIEMGraphNode -Id '/subscriptions/txn-sub1' -Kind 'AzureSubscription' -DisplayName 'TxnSub' -Provider 'azure' -SubscriptionId 'txn-sub1' -Connection $conn
+                    Save-CIEMGraphNode -Id 'txn-principal-1' -Kind 'EntraUser' -DisplayName 'TxnUser' -Provider 'azure' -Connection $conn
+
+                    $raProps = @{
+                        principalId      = 'txn-principal-1'
+                        principalType    = 'User'
+                        roleDefinitionId = '/providers/Microsoft.Authorization/roleDefinitions/txn-roledef-1'
+                        scope            = '/subscriptions/txn-sub1'
+                    } | ConvertTo-Json -Compress
+
+                    $roleDefProps = @{
+                        roleName    = 'Contributor'
+                        permissions = @(@{ actions = @('*'); notActions = @() })
+                    } | ConvertTo-Json -Depth 5 -Compress
+
+                    $armResources = @(
+                        [PSCustomObject]@{
+                            Id = '/subscriptions/txn-sub1'; Type = 'microsoft.resources/subscriptions'
+                            Name = 'TxnSub'; Location = ''; ResourceGroup = ''
+                            SubscriptionId = 'txn-sub1'; TenantId = 'tenant1'
+                            Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                            Plan = $null; Zones = $null; Tags = $null
+                            Properties = $null; CollectedAt = $ts
+                        },
+                        [PSCustomObject]@{
+                            Id = '/providers/Microsoft.Authorization/roleDefinitions/txn-roledef-1'
+                            Type = 'microsoft.authorization/roledefinitions'
+                            Name = 'Contributor'; Location = ''; ResourceGroup = ''
+                            SubscriptionId = 'txn-sub1'; TenantId = 'tenant1'
+                            Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                            Plan = $null; Zones = $null; Tags = $null
+                            Properties = $roleDefProps; CollectedAt = $ts
+                        },
+                        [PSCustomObject]@{
+                            Id = '/subscriptions/txn-sub1/providers/Microsoft.Authorization/roleAssignments/txn-ra-1'
+                            Type = 'microsoft.authorization/roleassignments'
+                            Name = 'txn-ra-1'; Location = ''; ResourceGroup = ''
+                            SubscriptionId = 'txn-sub1'; TenantId = 'tenant1'
+                            Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                            Plan = $null; Zones = $null; Tags = $null
+                            Properties = $raProps; CollectedAt = $ts
+                        }
+                    )
+
+                    # Computed edge builder must find the uncommitted nodes via $conn
+                    $count = InvokeCIEMGraphComputedEdgeBuild `
+                        -ArmResources $armResources `
+                        -EntraResources @() `
+                        -Relationships @() `
+                        -Connection $conn `
+                        -CollectedAt $ts
+                    $count | Should -BeGreaterThan 0
+
+                    Invoke-PSUSQLiteQuery -Connection $conn -Query "COMMIT" -AsNonQuery | Out-Null
+                }
+                catch {
+                    Invoke-PSUSQLiteQuery -Connection $conn -Query "ROLLBACK" -AsNonQuery | Out-Null
+                    throw
+                }
+                finally {
+                    $conn.Dispose()
+                }
+
+                # Verify HasRole edge persisted after commit
+                $edges = Get-CIEMGraphEdge -SourceId 'txn-principal-1' -Kind 'HasRole'
+                $edges | Should -HaveCount 1
+                $edges[0].TargetId | Should -Be '/subscriptions/txn-sub1'
             }
         }
     }

@@ -1,4 +1,49 @@
 function Start-CIEMAzureDiscovery {
+    <#
+    .SYNOPSIS
+        Runs a full Azure discovery scan collecting ARM resources, Entra entities, permissions, and relationships.
+
+    .DESCRIPTION
+        Orchestrates the Azure discovery pipeline in two phases:
+
+        Phase 1 — Collects data into memory from Azure Resource Graph (ARM resources, role definitions)
+        and Microsoft Graph API (Entra users, groups, service principals, directory roles, permissions,
+        and membership/ownership relationships).
+
+        Phase 2 — Writes all collected data to the CIEM database in a single atomic transaction, including
+        resource type metadata, effective role assignments, and security graph nodes/edges for attack path
+        analysis.
+
+        A concurrency guard prevents multiple discovery runs from executing simultaneously. The function
+        creates a CIEMAzureDiscoveryRun record to track progress and final status (Completed, Partial,
+        or Failed). Individual collection failures are caught and accumulated as warnings, allowing the
+        run to complete partially rather than aborting entirely.
+
+    .PARAMETER Scope
+        Which data sources to collect. 'All' collects both ARM and Entra data. 'ARM' collects only
+        Azure Resource Graph data (resources, containers, authorization, built-in roles). 'Entra'
+        collects only Microsoft Graph data (identities, permissions, relationships). Defaults to 'All'.
+
+    .OUTPUTS
+        CIEMAzureDiscoveryRun
+        The completed discovery run record with status, counts, and any error messages.
+
+    .EXAMPLE
+        Start-CIEMAzureDiscovery
+
+        Runs a full discovery collecting all ARM and Entra data.
+
+    .EXAMPLE
+        Start-CIEMAzureDiscovery -Scope Entra
+
+        Runs discovery collecting only Entra identity data from Microsoft Graph.
+
+    .EXAMPLE
+        $run = Start-CIEMAzureDiscovery -Scope ARM
+        $run.ArmRowCount
+
+        Runs ARM-only discovery and inspects how many resources were collected.
+    #>
     [CmdletBinding()]
     [OutputType('CIEMAzureDiscoveryRun')]
     param(

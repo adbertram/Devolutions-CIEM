@@ -81,12 +81,38 @@ function InvokeCIEMGraphNodeBuild {
     foreach ($e in $EntraResources) {
         $kind = ResolveCIEMNodeKind -Type $e.Type -Source 'Entra' -PropertiesJson $e.Properties
 
+        # Enrich properties with computed daysSinceSignIn from signInActivity
+        $enrichedProperties = $e.Properties
+        if ($e.Properties -match '"signInActivity"') {
+            try {
+                $parsed = $e.Properties | ConvertFrom-Json -ErrorAction Stop
+                if ($parsed.signInActivity) {
+                    $dates = @()
+                    if ($parsed.signInActivity.lastSignInDateTime) {
+                        $dates += [datetime]$parsed.signInActivity.lastSignInDateTime
+                    }
+                    if ($parsed.signInActivity.lastNonInteractiveSignInDateTime) {
+                        $dates += [datetime]$parsed.signInActivity.lastNonInteractiveSignInDateTime
+                    }
+                    if ($dates.Count -gt 0) {
+                        $mostRecent = ($dates | Sort-Object -Descending)[0]
+                        $refDate = [datetime]::Parse($CollectedAt)
+                        $daysSince = [math]::Max(0, [math]::Floor(($refDate - $mostRecent).TotalDays))
+                        $parsed | Add-Member -NotePropertyName 'daysSinceSignIn' -NotePropertyValue $daysSince -Force
+                        $enrichedProperties = $parsed | ConvertTo-Json -Depth 10 -Compress
+                    }
+                }
+            } catch {
+                Write-CIEMLog -Message "signInActivity enrichment failed for $($e.Id): $($_.Exception.Message)" -Severity WARNING -Component 'GraphBuilder'
+            }
+        }
+
         $splat = $baseSplat.Clone()
         $splat.Id          = $e.Id
         $splat.Kind        = $kind
         $splat.DisplayName = $e.DisplayName
         $splat.Provider    = 'azure'
-        $splat.Properties  = $e.Properties
+        $splat.Properties  = $enrichedProperties
 
         Save-CIEMGraphNode @splat
         $nodeCount++

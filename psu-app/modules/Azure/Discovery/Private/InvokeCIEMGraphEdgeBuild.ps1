@@ -51,8 +51,14 @@ function InvokeCIEMGraphEdgeBuild {
         }
 
         # Only create edge if both source and target nodes exist (FK constraint)
-        $sourceExists = @(Invoke-CIEMQuery -Query "SELECT 1 FROM graph_nodes WHERE id = @id" -Parameters @{ id = $rel.SourceId })
-        $targetExists = @(Invoke-CIEMQuery -Query "SELECT 1 FROM graph_nodes WHERE id = @id" -Parameters @{ id = $rel.TargetId })
+        # Must use same $Connection to see uncommitted nodes within a transaction
+        $fkParams = @{ Query = "SELECT 1 FROM graph_nodes WHERE id = @id" }
+        if ($Connection) { $fkParams.Connection = $Connection }
+
+        $fkParams.Parameters = @{ id = $rel.SourceId }
+        $sourceExists = @(Invoke-CIEMQuery @fkParams)
+        $fkParams.Parameters = @{ id = $rel.TargetId }
+        $targetExists = @(Invoke-CIEMQuery @fkParams)
         if ($sourceExists.Count -eq 0 -or $targetExists.Count -eq 0) { continue }
 
         $splat = @{
