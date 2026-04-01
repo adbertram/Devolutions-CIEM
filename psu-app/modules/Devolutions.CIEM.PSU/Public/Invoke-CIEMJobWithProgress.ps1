@@ -71,6 +71,7 @@ function Invoke-CIEMJobWithProgress {
             $progressParts = @()
             if ($job.Activity) { $progressParts += $job.Activity }
             else { $progressParts += 'Running...' }
+            if ($job.StatusDescription) { $progressParts += "— $($job.StatusDescription)" }
             if ($job.PercentComplete -gt 0) { $progressParts += "($($job.PercentComplete)%)" }
             if ($job.CurrentOperation) { $progressParts += "- $($job.CurrentOperation)" }
             $statusText = $progressParts -join ' '
@@ -78,7 +79,7 @@ function Invoke-CIEMJobWithProgress {
             # Log status changes and every 10th poll
             $currentStatus = "$($job.Status)"
             if ($currentStatus -ne $lastLoggedStatus -or ($pollCount % 10 -eq 0)) {
-                Write-CIEMLog -Message "JOB: poll #$pollCount (${elapsed}s), status=$currentStatus, pct=$($job.PercentComplete), activity=$($job.Activity), op=$($job.CurrentOperation)" -Severity INFO -Component 'PSU-Progress'
+                Write-CIEMLog -Message "JOB: poll #$pollCount (${elapsed}s), status=$currentStatus, pct=$($job.PercentComplete), activity=$($job.Activity), statusDesc=$($job.StatusDescription), op=$($job.CurrentOperation)" -Severity INFO -Component 'PSU-Progress'
                 $lastLoggedStatus = $currentStatus
             }
 

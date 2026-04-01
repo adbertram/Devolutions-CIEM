@@ -11,6 +11,8 @@ function New-CIEMIdentityRiskPage {
         [object[]]$Navigation
     )
 
+    $ErrorActionPreference = 'Stop'
+
     New-UDPage -Name 'Identities' -Url '/ciem/identities' -Content {
         New-UDTypography -Text 'Identities' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Drill down from identity towards entitlements and risk signals' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; opacity = 0.7 }
@@ -19,12 +21,12 @@ function New-CIEMIdentityRiskPage {
             New-UDDynamic -Id 'identityRiskPanel' -Content {
 
                 try {
-                    $hasData = (Invoke-CIEMQuery -Query 'SELECT COUNT(*) as c FROM azure_entra_resources').c -gt 0
+                    $hasData = (Invoke-CIEMQuery -Query 'SELECT COUNT(*) as c FROM graph_nodes WHERE kind IN (''EntraUser'',''EntraServicePrincipal'',''EntraManagedIdentity'',''EntraGroup'')').c -gt 0
 
                     if ($hasData) {
                         New-UDDataGrid -LoadRows {
 
-                            $data = @(Get-CIEMAzureIdentityRiskSummary)
+                            $data = @(Get-CIEMIdentityRiskSummary)
                             $gridData = $data | ForEach-Object {
                                 @{
                                     id               = $_.Id
@@ -70,7 +72,7 @@ function New-CIEMIdentityRiskPage {
                             $principalId = $EventData.row.id
 
                             try {
-                                $details = Get-CIEMAzureIdentityRiskSignals -PrincipalId $principalId
+                                $details = Get-CIEMIdentityRiskSignals -PrincipalId $principalId
 
                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '8px 16px' } } -Content {
 
@@ -152,6 +154,45 @@ function New-CIEMIdentityRiskPage {
                                             New-UDIcon -Icon 'CheckCircle' -Style @{ color = '#4caf50' }
                                             New-UDTypography -Text 'No risk signals detected.' -Variant 'body2' -Style @{ color = '#4caf50' }
                                         }
+                                    }
+
+                                    # Attack Paths section
+                                    New-UDDivider
+                                    New-UDTypography -Text 'Attack Paths' -Variant 'h6' -Style @{ marginTop = '8px'; marginBottom = '4px' }
+
+                                    New-UDDynamic -Content {
+                                      try {
+                                        $attackPaths = @(Get-CIEMAttackPath -PrincipalId $principalId)
+                                        if ($attackPaths.Count -gt 0) {
+                                            foreach ($ap in $attackPaths) {
+                                                $apSevColor = Get-SeverityColor -Severity $ap.Severity
+                                                $chainLabels = @($ap.Path | ForEach-Object {
+                                                    $label = if ($_.display_name) { $_.display_name } else { $_.kind }
+                                                    "$label ($($_.kind))"
+                                                })
+                                                $chainText = $chainLabels -join ' → '
+
+                                                New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '8px' } } -Content {
+                                                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                                        New-UDChip -Label $ap.Severity -Size 'small' -Style @{ backgroundColor = $apSevColor; color = 'white' }
+                                                        New-UDTypography -Text $ap.PatternName -Variant 'body1'
+                                                    }
+                                                    New-UDElement -Tag 'div' -Attributes @{ style = @{ paddingLeft = '40px'; marginTop = '2px' } } -Content {
+                                                        New-UDTypography -Text $chainText -Variant 'body2' -Style @{ opacity = 0.7; fontFamily = 'monospace' }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                                New-UDIcon -Icon 'CheckCircle' -Style @{ color = '#4caf50' }
+                                                New-UDTypography -Text 'No attack paths detected.' -Variant 'body2' -Style @{ color = '#4caf50' }
+                                            }
+                                        }
+                                      } catch {
+                                        New-UDTypography -Text "Unable to load attack paths: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#f44336' }
+                                      }
+                                    } -LoadingComponent {
+                                        New-UDProgress -Circular -Size 'small'
                                     }
                                 }
                             }

@@ -1,6 +1,6 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const IdentityRiskPageHelpers = require('./IdentityRiskPageHelpers');
-const { seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount } = require('../../_utils/cleanup');
+const { seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount, seedIdentityAttackPathData, cleanupIdentityAttackPathData } = require('../../_utils/cleanup');
 
 test.describe('Identity Risk Page', () => {
   let riskPage;
@@ -89,7 +89,7 @@ test.describe('Identity Risk Page', () => {
       cleanupIdentityViewData();
     });
 
-    test('should show detail panel with Entitlements and Risk Signals sections', async () => {
+    test('should show detail panel with Entitlements, Risk Signals, and Attack Paths sections', async () => {
       const hasData = await riskPage.hasIdentityData();
       if (!hasData) {
         test.skip(true, 'No identity data to expand');
@@ -100,6 +100,37 @@ test.describe('Identity Risk Page', () => {
       expect(detailVisible).toBe(true);
       const sectionsVisible = await riskPage.areDetailSectionsVisible();
       expect(sectionsVisible).toBe(true);
+      const attackPathsVisible = await riskPage.isAttackPathsSectionVisible();
+      expect(attackPathsVisible).toBe(true);
+    });
+  });
+
+  test.describe('when identity and attack path graph data exist', () => {
+    test.beforeAll(async () => {
+      seedIdentityViewData();
+      seedIdentityAttackPathData();
+      const count = getTestEffectiveRoleAssignmentCount();
+      if (count < 1) {
+        throw new Error(`Expected seeded identity data, got ${count} rows`);
+      }
+      console.log(`[setup:attack-paths] Seeded identity + graph data (${count} role assignments)`);
+    });
+
+    test.afterAll(async () => {
+      cleanupIdentityAttackPathData();
+      cleanupIdentityViewData();
+      console.log('[teardown:attack-paths] Cleaned up identity + graph data');
+    });
+
+    test('should show attack path findings in the drill-down panel', async () => {
+      const hasData = await riskPage.hasIdentityData();
+      if (!hasData) {
+        test.skip(true, 'No identity data to expand');
+        return;
+      }
+      await riskPage.expandRow(0);
+      const attackPathsVisible = await riskPage.isAttackPathsSectionVisible();
+      expect(attackPathsVisible).toBe(true);
     });
   });
 });

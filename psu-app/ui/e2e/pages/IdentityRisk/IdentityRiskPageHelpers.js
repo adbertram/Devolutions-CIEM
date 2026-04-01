@@ -18,6 +18,9 @@ class IdentityRiskPageHelpers extends BasePage {
       detailPanel: '.MuiDataGrid-detailPanel',
       entitlementsHeading: '.MuiDataGrid-detailPanel h6:has-text("Entitlements")',
       riskSignalsHeading: '.MuiDataGrid-detailPanel h6:has-text("Risk Signals")',
+      attackPathsHeading: '.MuiDataGrid-detailPanel h6:has-text("Attack Paths")',
+      attackPathChip: '.MuiDataGrid-detailPanel h6:has-text("Attack Paths") ~ div .MuiChip-root, .MuiDataGrid-detailPanel h6:has-text("Attack Paths") + div .MuiChip-root',
+      noAttackPathsMessage: '.MuiDataGrid-detailPanel:has-text("No attack paths detected.")',
       detailDataGrid: '.MuiDataGrid-detailPanel .MuiDataGrid-root',
       // Empty state
       emptyStateMessage: "text=No identity data available"
@@ -77,6 +80,15 @@ class IdentityRiskPageHelpers extends BasePage {
     const entitlements = await this.isElementVisible(this.selectors.entitlementsHeading);
     const riskSignals = await this.isElementVisible(this.selectors.riskSignalsHeading);
     return entitlements && riskSignals;
+  }
+
+  async isAttackPathsSectionVisible() {
+    return await this.isElementVisible(this.selectors.attackPathsHeading);
+  }
+
+  async hasAttackPathFindings() {
+    const noFindings = await this.isElementVisible(this.selectors.noAttackPathsMessage);
+    return !noFindings;
   }
 
   async isPaginationVisible() {

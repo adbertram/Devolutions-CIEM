@@ -29,7 +29,8 @@ const testConfig = {
     environment: '/ciem/ciem/environment',
     config: '/ciem/ciem/config',
     about: '/ciem/ciem/about',
-    identities: '/ciem/ciem/identities'
+    identities: '/ciem/ciem/identities',
+    attackPaths: '/ciem/ciem/attack-paths'
   },
   database: {
     path: resolvePsuDatabasePath()
