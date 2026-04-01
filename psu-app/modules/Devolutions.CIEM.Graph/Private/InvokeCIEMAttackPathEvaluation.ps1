@@ -1,9 +1,12 @@
 function InvokeCIEMAttackPathEvaluation {
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType('CIEMAttackPath')]
     param(
         [Parameter(Mandatory)]
-        [PSCustomObject]$Pattern
+        [PSCustomObject]$Pattern,
+
+        [Parameter()]
+        [string]$SeedNodeId
     )
 
     $ErrorActionPreference = 'Stop'
@@ -21,7 +24,11 @@ function InvokeCIEMAttackPathEvaluation {
         $kindPlaceholders += "@kind$k"
         $parameters["kind$k"] = $kinds[$k]
     }
-    $seedSql = "SELECT id, kind, properties FROM graph_nodes WHERE kind IN ($($kindPlaceholders -join ', '))"
+    $seedSql = "SELECT id, kind, display_name, properties FROM graph_nodes WHERE kind IN ($($kindPlaceholders -join ', '))"
+    if ($SeedNodeId) {
+        $seedSql += " AND id = @seedNodeId"
+        $parameters["seedNodeId"] = $SeedNodeId
+    }
     $seedNodes = @(Invoke-CIEMQuery -Query $seedSql -Parameters $parameters)
 
     # Apply node_filter if present on first step
@@ -38,7 +45,7 @@ function InvokeCIEMAttackPathEvaluation {
     # Initialize paths: each path is an array of interleaved node/edge objects
     $currentPaths = [System.Collections.Generic.List[object]]::new()
     foreach ($node in $seedNodes) {
-        $nodeObj = [PSCustomObject]@{ id = $node.id; kind = $node.kind; properties = $node.properties; _type = 'node' }
+        $nodeObj = [PSCustomObject]@{ id = $node.id; kind = $node.kind; display_name = $node.display_name; properties = $node.properties; _type = 'node' }
         $currentPaths.Add(@(, $nodeObj))
     }
 
@@ -60,7 +67,7 @@ function InvokeCIEMAttackPathEvaluation {
             if ($direction -eq 'reverse') {
                 $edgeSql = @"
 SELECT e.id AS edge_id, e.source_id, e.target_id, e.kind AS edge_kind, e.properties AS edge_properties,
-       n.id AS node_id, n.kind AS node_kind, n.properties AS node_properties
+       n.id AS node_id, n.kind AS node_kind, n.display_name AS node_display_name, n.properties AS node_properties
 FROM graph_edges e
 JOIN graph_nodes n ON n.id = e.source_id
 WHERE e.target_id = @nodeId AND e.kind = @edgeKind
@@ -68,7 +75,7 @@ WHERE e.target_id = @nodeId AND e.kind = @edgeKind
             } else {
                 $edgeSql = @"
 SELECT e.id AS edge_id, e.source_id, e.target_id, e.kind AS edge_kind, e.properties AS edge_properties,
-       n.id AS node_id, n.kind AS node_kind, n.properties AS node_properties
+       n.id AS node_id, n.kind AS node_kind, n.display_name AS node_display_name, n.properties AS node_properties
 FROM graph_edges e
 JOIN graph_nodes n ON n.id = e.target_id
 WHERE e.source_id = @nodeId AND e.kind = @edgeKind
@@ -112,10 +119,11 @@ WHERE e.source_id = @nodeId AND e.kind = @edgeKind
 
                 # Build next node object
                 $nextNodeObj = [PSCustomObject]@{
-                    id         = $match.node_id
-                    kind       = $match.node_kind
-                    properties = $match.node_properties
-                    _type      = 'node'
+                    id           = $match.node_id
+                    kind         = $match.node_kind
+                    display_name = $match.node_display_name
+                    properties   = $match.node_properties
+                    _type        = 'node'
                 }
 
                 # Extend path
@@ -139,13 +147,13 @@ WHERE e.source_id = @nodeId AND e.kind = @edgeKind
         $pathNodes = @($path | Where-Object { $_._type -eq 'node' })
         $pathEdges = @($path | Where-Object { $_._type -eq 'edge' })
 
-        [PSCustomObject]@{
-            PatternId   = $Pattern.id
-            PatternName = $Pattern.name
-            Severity    = $Pattern.severity
-            Category    = $Pattern.category
-            Path        = $pathNodes
-            Edges       = $pathEdges
-        }
+        $attackPath = [CIEMAttackPath]::new()
+        $attackPath.PatternId   = $Pattern.id
+        $attackPath.PatternName = $Pattern.name
+        $attackPath.Severity    = $Pattern.severity
+        $attackPath.Category    = $Pattern.category
+        $attackPath.Path        = $pathNodes
+        $attackPath.Edges       = $pathEdges
+        $attackPath
     })
 }

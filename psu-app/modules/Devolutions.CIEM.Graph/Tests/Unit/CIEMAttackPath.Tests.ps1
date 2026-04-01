@@ -1,14 +1,14 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Infrastructure' 'Data' 'azure_schema.sql'
     Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
 
-    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Discovery' 'Data' 'discovery_schema.sql'
     Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
     $graphSchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'graph_schema.sql'
@@ -134,11 +134,101 @@ Describe 'Attack Path Engine' {
             }
         }
 
+        It 'Handles contains_port with wildcard port "*" matching any target port' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"open_ports":[{"port":"*","protocol":"*","rule_name":"AllowAll"}]}'
+                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
+            }
+        }
+
+        It 'Handles contains_port with port range containing a target port' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"open_ports":[{"port":"1-65535","protocol":"TCP","rule_name":"AllowAllTCP"}]}'
+                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389, 5985, 5986) }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
+            }
+        }
+
+        It 'Handles contains_port with port range not containing target ports' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"open_ports":[{"port":"100-200","protocol":"TCP","rule_name":"AllowRange"}]}'
+                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389, 5985, 5986) }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeFalse
+            }
+        }
+
+        It 'Handles contains_port with mixed single ports and ranges' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"open_ports":[{"port":"443","protocol":"TCP","rule_name":"HTTPS"},{"port":"3380-3400","protocol":"TCP","rule_name":"RDPRange"}]}'
+                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
+            }
+        }
+
+        It 'Handles contains_port with inverted port range (high-low) by normalizing' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"open_ports":[{"port":"5000-3000","protocol":"TCP","rule_name":"InvertedRange"}]}'
+                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(3389) }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
+            }
+        }
+
+        It 'Handles contains_port with non-numeric port string (e.g. "Any") without crashing' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"open_ports":[{"port":"Any","protocol":"*","rule_name":"AllowAll"}]}'
+                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeFalse
+            }
+        }
+
         It 'Throws on unknown filter operator' {
             InModuleScope Devolutions.CIEM {
                 $json = '{"x":1}'
                 $filter = [PSCustomObject]@{ property = 'x'; op = 'bogus'; value = 1 }
                 { ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter } | Should -Throw '*Unknown filter operator*'
+            }
+        }
+
+        It 'Handles gt_or_null returning true when property exceeds threshold' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"daysSinceSignIn":120}'
+                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
+            }
+        }
+
+        It 'Handles gt_or_null returning false when property is below threshold' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"daysSinceSignIn":30}'
+                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeFalse
+            }
+        }
+
+        It 'Handles gt_or_null returning true when property is missing (never-signed-in identity)' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"accountEnabled":true}'
+                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
+            }
+        }
+
+        It 'Handles gt_or_null returning true when property is explicitly null' {
+            InModuleScope Devolutions.CIEM {
+                $json = '{"daysSinceSignIn":null}'
+                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
+                $result | Should -BeTrue
             }
         }
     }
@@ -215,6 +305,24 @@ Describe 'Attack Path Engine' {
                 $path | Should -HaveCount 2
                 $path[0].kind | Should -Be 'Internet'
                 $path[1].kind | Should -Be 'AzureNSG'
+            }
+        }
+
+        It 'Path nodes include display_name from graph_nodes' {
+            InModuleScope Devolutions.CIEM {
+                $pattern = [PSCustomObject]@{
+                    id = 'test-display-name'; name = 'Display name test'; severity = 'high'; category = 'test'
+                    steps = @(
+                        [PSCustomObject]@{ kind = 'Internet' }
+                        [PSCustomObject]@{ edge = 'AllowsInbound'; direction = 'outbound' }
+                        [PSCustomObject]@{ kind = 'AzureNSG' }
+                    )
+                }
+                $results = @(InvokeCIEMAttackPathEvaluation -Pattern $pattern)
+                $path = $results[0].Path
+                # Seed node 'Internet' has DisplayName='Internet', NSG has DisplayName='nsg1'
+                $path[0].display_name | Should -Be 'Internet'
+                $path[1].display_name | Should -Be 'nsg1'
             }
         }
 
@@ -552,6 +660,48 @@ Describe 'Attack Path Engine' {
         }
     }
 
+    Context 'InvokeCIEMAttackPathEvaluation -SeedNodeId constrains seed nodes' {
+
+        BeforeEach {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            # Two users with identical kind but different IDs
+            Save-CIEMGraphNode -Id 'user-a' -Kind 'EntraUser' -DisplayName 'User A' -Provider 'azure' `
+                -Properties '{"accountEnabled":false}'
+            Save-CIEMGraphNode -Id 'user-b' -Kind 'EntraUser' -DisplayName 'User B' -Provider 'azure' `
+                -Properties '{"accountEnabled":false}'
+            Save-CIEMGraphNode -Id '/subscriptions/sub-seed' -Kind 'AzureSubscription' -DisplayName 'Sub' -Provider 'azure'
+
+            # Both have HasRole edges to the subscription
+            Save-CIEMGraphEdge -SourceId 'user-a' -TargetId '/subscriptions/sub-seed' -Kind 'HasRole' `
+                -Properties '{"role_name":"Owner","privileged":true}'
+            Save-CIEMGraphEdge -SourceId 'user-b' -TargetId '/subscriptions/sub-seed' -Kind 'HasRole' `
+                -Properties '{"role_name":"Owner","privileged":true}'
+        }
+
+        It 'Returns paths only from the specified seed node when SeedNodeId is provided' {
+            InModuleScope Devolutions.CIEM {
+                $pattern = [PSCustomObject]@{
+                    id = 'test-seed-constrain'; name = 'Seed Constrain'; severity = 'high'; category = 'test'
+                    steps = @(
+                        [PSCustomObject]@{ kind = @('EntraUser'); node_filter = [PSCustomObject]@{ property = 'accountEnabled'; op = 'eq'; value = $false } }
+                        [PSCustomObject]@{ edge = 'HasRole' }
+                        [PSCustomObject]@{ kind = @('AzureSubscription') }
+                    )
+                }
+                # Without SeedNodeId: returns paths from both users
+                $allResults = @(InvokeCIEMAttackPathEvaluation -Pattern $pattern)
+                $allResults.Count | Should -Be 2
+
+                # With SeedNodeId: returns only user-a path
+                $constrained = @(InvokeCIEMAttackPathEvaluation -Pattern $pattern -SeedNodeId 'user-a')
+                $constrained.Count | Should -Be 1
+                $constrained[0].Path[0].id | Should -Be 'user-a'
+            }
+        }
+    }
+
     Context 'InvokeCIEMAttackPathEvaluation returns empty for insufficient steps' {
 
         It 'Returns empty array for pattern with fewer than 2 steps' {
@@ -585,6 +735,11 @@ Describe 'Attack Path Engine' {
             $param | Should -Not -BeNullOrEmpty
             $validateSet = $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] }
             $validateSet | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Has optional -PrincipalId parameter' {
+            $param = (Get-Command Get-CIEMAttackPath).Parameters['PrincipalId']
+            $param | Should -Not -BeNullOrEmpty
         }
     }
 
@@ -651,6 +806,61 @@ Describe 'Attack Path Engine' {
 
             $results = @(Get-CIEMAttackPath -PatternId 'open-management-port')
             $results | Should -HaveCount 0
+        }
+    }
+
+    Context 'Get-CIEMAttackPath -PrincipalId filter' {
+
+        BeforeEach {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            # Build a multi-hop chain: Internet -> NSG -> VM -> MI -> Subscription
+            Save-CIEMGraphNode -Id '__internet__' -Kind 'Internet' -DisplayName 'Internet' -Provider 'global'
+            Save-CIEMGraphNode -Id 'nsg-filter-1' -Kind 'AzureNSG' -DisplayName 'nsg1' -Provider 'azure'
+            Save-CIEMGraphNode -Id 'vm-filter-1' -Kind 'AzureVM' -DisplayName 'vm1' -Provider 'azure'
+            Save-CIEMGraphNode -Id 'mi-filter-1' -Kind 'EntraManagedIdentity' -DisplayName 'MI-1' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub-filter-1' -Kind 'AzureSubscription' -DisplayName 'Sub1' -Provider 'azure'
+
+            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId 'nsg-filter-1' -Kind 'AllowsInbound' `
+                -Properties '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}' -Computed 1
+            Save-CIEMGraphEdge -SourceId 'nsg-filter-1' -TargetId 'vm-filter-1' -Kind 'AttachedTo' -Computed 1
+            Save-CIEMGraphEdge -SourceId 'vm-filter-1' -TargetId 'mi-filter-1' -Kind 'HasManagedIdentity'
+            Save-CIEMGraphEdge -SourceId 'mi-filter-1' -TargetId '/subscriptions/sub-filter-1' -Kind 'HasRole' `
+                -Properties '{"roleName":"Owner","privileged":true}'
+        }
+
+        It 'Returns attack paths containing the specified principal' {
+            $results = @(Get-CIEMAttackPath -PrincipalId 'mi-filter-1')
+            $results.Count | Should -BeGreaterOrEqual 1
+            # Every returned path must contain the requested principal
+            foreach ($r in $results) {
+                $nodeIds = @($r.Path | ForEach-Object { $_.id })
+                $nodeIds | Should -Contain 'mi-filter-1'
+            }
+        }
+
+        It 'Excludes attack paths that do not contain the specified principal' {
+            # nsg-filter-1 is part of the open-management-port pattern but NOT the dormant-privileged pattern
+            # Query with a principal that only appears in some paths
+            $allResults = @(Get-CIEMAttackPath)
+            $filteredResults = @(Get-CIEMAttackPath -PrincipalId 'mi-filter-1')
+            # Filtered should be subset of all
+            $filteredResults.Count | Should -BeLessOrEqual $allResults.Count
+        }
+
+        It 'Returns empty when principal is not in any attack path' {
+            $results = @(Get-CIEMAttackPath -PrincipalId 'nonexistent-principal')
+            $results | Should -HaveCount 0
+        }
+
+        It 'Can combine -PrincipalId with -Severity filter' {
+            $results = @(Get-CIEMAttackPath -PrincipalId 'mi-filter-1' -Severity 'critical')
+            foreach ($r in $results) {
+                $r.Severity | Should -Be 'critical'
+                $nodeIds = @($r.Path | ForEach-Object { $_.id })
+                $nodeIds | Should -Contain 'mi-filter-1'
+            }
         }
     }
 
