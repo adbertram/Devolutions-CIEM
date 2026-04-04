@@ -45,7 +45,9 @@ This project is a CIEM (Cloud Infrastructure Entitlement Management) solution bu
 
 ### Developer Context
 
-- **Role**: Devolutions employee, PSU developer (not a PSU user/customer)
+- **Role**: Devolutions contractor (25 hrs/week), full-time dev since March 2025 (previously split with product marketing)
+- **Focus**: CIEM project exclusively — PSU app, PowerShell module, identity security
+- **Previous work**: RDM Pester tests, PAM AnyIdentity providers/propagation scripts, content/datasheets
 - **PSU Ownership**: PowerShell Universal is owned by Devolutions (acquired from Ironman Software)
 
 ### CIEM Business Model
@@ -60,7 +62,7 @@ Key context from discussions with Marc-André Moreau:
 
 ### CSPM vs CIEM Positioning (CRITICAL)
 
-Per Marc-André's demo review: the initial implementation was CSPM (CIS best-practice checks), not true CIEM. The project must focus on **CIEM-specific features** that differentiate from free tools:
+Per Simon Chalifoux's detailed review (March 2026): the initial implementation was CSPM (CIS best-practice checks), not true CIEM. CSPM is a commodity — Azure Defender for Cloud offers it free. The project must focus on **CIEM-specific features** that differentiate from free tools:
 
 - **Identity-first data model (CRITICAL)** — The entire system is modeled around **identities**, not resources. Graph/control relationships are the right representation, but the primary axis is identity → entitlements. This is how real CIEMs work.
 - **Identity drill-down view** — Users must be able to drill down from an identity to all entitlements it holds, surfacing compound risk (e.g., "this VM has a managed identity with Owner role on the subscription, a public IP, and RDP open on the network")
@@ -71,17 +73,52 @@ Per Marc-André's demo review: the initial implementation was CSPM (CIS best-pra
 
 Existing Prowler-ported CSPM checks are retained as a secondary feature but are NOT the differentiator.
 
+**Reference Products (from Simon Chalifoux's analysis):**
+- **Delinea** Privilege Control for Cloud Entitlements
+- **BeyondTrust Entitle** (2025 GigaOm Radar Leader)
+- **BloodHound / AzureHound** for attack path detection methodology
+- Microsoft retired **Entra Permissions Management** (formerly CloudKnox) Nov 2025, redirected to Delinea — gap to fill in Azure ecosystem
+- Gartner's four CIEM pillars: Entitlement visibility, Permission right-sizing, Advanced analytics, Compliance automation
+
+### Stakeholders & Team
+
+**CIEM Core Team:**
+
+| Person | Slack ID | Role |
+|--------|----------|------|
+| **Marc-André Moreau** | mamoreau | VP/Project Sponsor — gave CIEM vision, strategic direction, approval authority |
+| **Simon Chalifoux** | schalifoux | Security Architect — gave critical CSPM-vs-CIEM feedback (March 2026), expert on Gartner CIEM pillars. Shaped the identity-first pivot. |
+| **David Hervieux** | dhervieux | Engineering Lead — wants demo video, discussed JSON-first approach with Marc-André. Bilingual (FR/EN). |
+| **Luc Fauvel** | lfauvel | Security — interested in CIEM, introduced by Marc-André, saw demo |
+| **Adam Driscoll** | adriscoll | PSU Creator — module dependency expert, gave PSU license |
+
+**Engineering/Management:**
+
+| Person | Slack ID | Role |
+|--------|----------|------|
+| **Sébastien Duquette** | sduquette | Engineering Manager (RDM PowerShell) — gave Jira/GitHub access, aware of CIEM |
+| **Maxime Bernier** | mbernier | RDM PowerShell Dev — PR reviewer |
+| **Maxime Trottier** | mtrottier | Contract/HR Manager — handles SoW renewals |
+
 ### Slack Context
 
-Primary stakeholder conversation is with **Marc-André Moreau** (`mamoreau`) in the Devolutions Slack workspace.
-
-To retrieve conversation history:
+Use `--profile devolutions` flag on the main `slack` command for all Devolutions workspace operations.
 
 ```bash
-# Switch to Devolutions workspace and read DMs
-slack workspace switch devolutions
-slack dm read mamoreau --limit 50
+# Read DMs with a team member
+slack --profile devolutions dm read mamoreau --limit 50
+
+# List all DMs (include group DMs with -g)
+slack --profile devolutions dm list --table -g
+
+# Read group DM by channel ID
+slack --profile devolutions dm read <channel_id> --limit 50
+
+# Send DM (use devolutions-team-member agent for drafting)
+slack --profile devolutions dm send <username> "message text"
 ```
+
+For representing Adam in Slack communications, use the `devolutions-team-member` agent — it knows Adam's communication style, all team relationships, and project context.
 
 ---
 
