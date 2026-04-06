@@ -43,6 +43,21 @@ function InvokeCIEMGraphEdgeBuild {
 
     $edgeCount = 0
 
+    # Node existence cache to avoid repeated DB queries (N+1 prevention)
+    $nodeExistsCache = @{}
+
+    # Helper: check if node exists in graph, with caching
+    # Must use same $Connection to see uncommitted nodes within a transaction
+    function NodeExists([string]$nodeId) {
+        if (-not $nodeId) { return $false }
+        if ($nodeExistsCache.ContainsKey($nodeId)) { return $nodeExistsCache[$nodeId] }
+        $fkParams = @{ Query = "SELECT 1 FROM graph_nodes WHERE id = @id"; Parameters = @{ id = $nodeId } }
+        if ($Connection) { $fkParams.Connection = $Connection }
+        $exists = (@(Invoke-CIEMQuery @fkParams).Count -gt 0)
+        $nodeExistsCache[$nodeId] = $exists
+        $exists
+    }
+
     foreach ($rel in $Relationships) {
         $edgeKind = $kindMap[$rel.Relationship]
         if (-not $edgeKind) {
@@ -51,15 +66,7 @@ function InvokeCIEMGraphEdgeBuild {
         }
 
         # Only create edge if both source and target nodes exist (FK constraint)
-        # Must use same $Connection to see uncommitted nodes within a transaction
-        $fkParams = @{ Query = "SELECT 1 FROM graph_nodes WHERE id = @id" }
-        if ($Connection) { $fkParams.Connection = $Connection }
-
-        $fkParams.Parameters = @{ id = $rel.SourceId }
-        $sourceExists = @(Invoke-CIEMQuery @fkParams)
-        $fkParams.Parameters = @{ id = $rel.TargetId }
-        $targetExists = @(Invoke-CIEMQuery @fkParams)
-        if ($sourceExists.Count -eq 0 -or $targetExists.Count -eq 0) { continue }
+        if (-not (NodeExists $rel.SourceId) -or -not (NodeExists $rel.TargetId)) { continue }
 
         $splat = @{
             SourceId    = $rel.SourceId

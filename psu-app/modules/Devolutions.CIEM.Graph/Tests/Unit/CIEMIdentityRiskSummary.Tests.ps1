@@ -496,4 +496,102 @@ Describe 'Get-CIEMIdentityRiskSummary' {
             $script:noRolesResult[0].RiskLevel | Should -Be 'Low'
         }
     }
+
+    Context 'Entitlement threshold boundary at exactly 5 assignments' {
+
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            $collectedAt = (Get-Date).ToString('o')
+
+            Save-CIEMGraphNode -Id '/subscriptions/sub-1' -Kind 'AzureSubscription' -DisplayName 'Sub 1' -CollectedAt $collectedAt
+
+            1..5 | ForEach-Object {
+                Save-CIEMGraphNode -Id "/subscriptions/sub-1/resourceGroups/rg-boundary-$_" -Kind 'AzureResourceGroup' `
+                    -DisplayName "rg-boundary-$_" -CollectedAt $collectedAt
+            }
+
+            # Active user with exactly 5 non-privileged role assignments
+            Save-CIEMGraphNode -Id 'user-boundary-5' -Kind 'EntraUser' -DisplayName 'Boundary 5 User' `
+                -CollectedAt $collectedAt `
+                -Properties (@{
+                    accountEnabled           = $true
+                    daysSinceSignIn          = 1
+                    lastSignIn               = (Get-Date).AddDays(-1).ToString('o')
+                    lastInteractiveSignIn    = (Get-Date).AddDays(-1).ToString('o')
+                    lastNonInteractiveSignIn = $null
+                } | ConvertTo-Json -Compress)
+
+            1..5 | ForEach-Object {
+                Save-CIEMGraphEdge -SourceId 'user-boundary-5' `
+                    -TargetId "/subscriptions/sub-1/resourceGroups/rg-boundary-$_" `
+                    -Kind 'HasRole' `
+                    -CollectedAt $collectedAt `
+                    -Properties (@{
+                        role_name     = "Custom Role $_"
+                        privileged    = $false
+                        scope         = "/subscriptions/sub-1/resourceGroups/rg-boundary-$_"
+                        definition_id = "role-custom-$_"
+                    } | ConvertTo-Json -Compress)
+            }
+
+            $script:boundary5Result = @(Get-CIEMIdentityRiskSummary)
+        }
+
+        It 'Identity with exactly 5 non-privileged assignments gets Low risk (threshold uses -gt not -ge)' {
+            $user = $script:boundary5Result | Where-Object { $_.Id -eq 'user-boundary-5' }
+            $user.EntitlementCount | Should -Be 5
+            $user.RiskLevel | Should -Be 'Low'
+        }
+    }
+
+    Context 'Entitlement threshold boundary at 6 assignments' {
+
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            $collectedAt = (Get-Date).ToString('o')
+
+            Save-CIEMGraphNode -Id '/subscriptions/sub-1' -Kind 'AzureSubscription' -DisplayName 'Sub 1' -CollectedAt $collectedAt
+
+            1..6 | ForEach-Object {
+                Save-CIEMGraphNode -Id "/subscriptions/sub-1/resourceGroups/rg-boundary-$_" -Kind 'AzureResourceGroup' `
+                    -DisplayName "rg-boundary-$_" -CollectedAt $collectedAt
+            }
+
+            # Active user with 6 non-privileged role assignments (one past threshold)
+            Save-CIEMGraphNode -Id 'user-boundary-6' -Kind 'EntraUser' -DisplayName 'Boundary 6 User' `
+                -CollectedAt $collectedAt `
+                -Properties (@{
+                    accountEnabled           = $true
+                    daysSinceSignIn          = 1
+                    lastSignIn               = (Get-Date).AddDays(-1).ToString('o')
+                    lastInteractiveSignIn    = (Get-Date).AddDays(-1).ToString('o')
+                    lastNonInteractiveSignIn = $null
+                } | ConvertTo-Json -Compress)
+
+            1..6 | ForEach-Object {
+                Save-CIEMGraphEdge -SourceId 'user-boundary-6' `
+                    -TargetId "/subscriptions/sub-1/resourceGroups/rg-boundary-$_" `
+                    -Kind 'HasRole' `
+                    -CollectedAt $collectedAt `
+                    -Properties (@{
+                        role_name     = "Custom Role $_"
+                        privileged    = $false
+                        scope         = "/subscriptions/sub-1/resourceGroups/rg-boundary-$_"
+                        definition_id = "role-custom-$_"
+                    } | ConvertTo-Json -Compress)
+            }
+
+            $script:boundary6Result = @(Get-CIEMIdentityRiskSummary)
+        }
+
+        It 'Identity with 6 non-privileged assignments gets Medium risk (one past threshold)' {
+            $user = $script:boundary6Result | Where-Object { $_.Id -eq 'user-boundary-6' }
+            $user.EntitlementCount | Should -Be 6
+            $user.RiskLevel | Should -Be 'Medium'
+        }
+    }
 }

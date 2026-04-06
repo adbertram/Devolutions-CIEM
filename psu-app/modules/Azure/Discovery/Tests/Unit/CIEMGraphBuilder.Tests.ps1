@@ -740,6 +740,82 @@ Describe 'Graph Builder Functions' {
                 $edges | Should -BeNullOrEmpty
             }
         }
+
+        It 'Skips edges where source node does not exist but creates edges where both nodes exist' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                # 'missing-node' is NOT in graph_nodes, so this edge should be skipped
+                # 'user-1' -> 'group-1' both exist, so this edge should be created
+                $relationships = @(
+                    [PSCustomObject]@{
+                        SourceId = 'missing-node'; SourceType = 'user'
+                        TargetId = 'group-1'; TargetType = 'group'
+                        Relationship = 'member_of'; CollectedAt = $ts
+                    },
+                    [PSCustomObject]@{
+                        SourceId = 'user-1'; SourceType = 'user'
+                        TargetId = 'group-1'; TargetType = 'group'
+                        Relationship = 'member_of'; CollectedAt = $ts
+                    }
+                )
+
+                $count = InvokeCIEMGraphEdgeBuild -Relationships $relationships -Connection $null -CollectedAt $ts
+                $count | Should -Be 1
+
+                $edges = Get-CIEMGraphEdge -SourceId 'user-1' -Kind 'MemberOf'
+                $edges | Should -HaveCount 1
+            }
+        }
+
+        It 'Skips edges where target node does not exist' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                $relationships = @(
+                    [PSCustomObject]@{
+                        SourceId = 'user-1'; SourceType = 'user'
+                        TargetId = 'missing-target'; TargetType = 'group'
+                        Relationship = 'member_of'; CollectedAt = $ts
+                    }
+                )
+
+                $count = InvokeCIEMGraphEdgeBuild -Relationships $relationships -Connection $null -CollectedAt $ts
+                $count | Should -Be 0
+
+                $edges = Get-CIEMGraphEdge
+                $edges | Should -BeNullOrEmpty
+            }
+        }
+
+        It 'Caches node existence checks across repeated references to the same node' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+                # Multiple relationships referencing the same source/target nodes
+                # The cache should prevent redundant DB queries
+                $relationships = @(
+                    [PSCustomObject]@{
+                        SourceId = 'user-1'; SourceType = 'user'
+                        TargetId = 'group-1'; TargetType = 'group'
+                        Relationship = 'member_of'; CollectedAt = $ts
+                    },
+                    [PSCustomObject]@{
+                        SourceId = 'user-1'; SourceType = 'user'
+                        TargetId = 'role-1'; TargetType = 'directoryRole'
+                        Relationship = 'owner_of'; CollectedAt = $ts
+                    },
+                    [PSCustomObject]@{
+                        SourceId = 'user-1'; SourceType = 'user'
+                        TargetId = 'sp-1'; TargetType = 'servicePrincipal'
+                        Relationship = 'member_of'; CollectedAt = $ts
+                    }
+                )
+
+                $count = InvokeCIEMGraphEdgeBuild -Relationships $relationships -Connection $null -CollectedAt $ts
+                $count | Should -Be 3
+
+                $edges = Get-CIEMGraphEdge -SourceId 'user-1'
+                $edges | Should -HaveCount 3
+            }
+        }
     }
 
     # =========================================================================

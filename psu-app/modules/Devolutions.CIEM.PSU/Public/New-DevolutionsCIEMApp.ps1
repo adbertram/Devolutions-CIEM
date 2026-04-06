@@ -26,7 +26,7 @@ function New-DevolutionsCIEMApp {
             New-CIEMScanHistoryPage -Navigation $Navigation
             New-CIEMIdentityRiskPage -Navigation $Navigation
             New-CIEMAttackPathsPage -Navigation $Navigation
-            New-CIEMGraphPage -Navigation $Navigation
+
             New-CIEMEnvironmentPage -Navigation $Navigation
             New-CIEMConfigPage -Navigation $Navigation
             New-CIEMAboutPage -Navigation $Navigation

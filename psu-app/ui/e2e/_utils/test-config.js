@@ -25,7 +25,7 @@ const testConfig = {
     dashboard: '/ciem/ciem/',
     scan: '/ciem/ciem/scan',
     history: '/ciem/ciem/history',
-    graph: '/ciem/ciem/graph',
+
     environment: '/ciem/ciem/environment',
     config: '/ciem/ciem/config',
     about: '/ciem/ciem/about',

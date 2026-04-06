@@ -31,6 +31,13 @@ function Get-CIEMIdentityRiskSummary {
 
     $ErrorActionPreference = 'Stop'
 
+    if ($null -eq $script:DormantPermissionThresholdDays) {
+        throw 'Module variable $script:DormantPermissionThresholdDays is not initialized. The module may not have loaded correctly.'
+    }
+    if ($null -eq $script:MediumEntitlementThreshold) {
+        throw 'Module variable $script:MediumEntitlementThreshold is not initialized. The module may not have loaded correctly.'
+    }
+
     # Map PrincipalType parameter values to graph node kinds
     $principalTypeToKind = @{
         User             = 'EntraUser'

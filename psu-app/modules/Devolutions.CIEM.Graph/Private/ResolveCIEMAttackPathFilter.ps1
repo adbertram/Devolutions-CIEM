@@ -17,9 +17,22 @@ function ResolveCIEMAttackPathFilter {
     switch ($Filter.op) {
         'eq' { return $propValue -eq $Filter.value }
         'neq' { return $propValue -ne $Filter.value }
-        'gt' { return [double]$propValue -gt [double]$Filter.value }
-        'gt_or_null' { if ($null -eq $propValue) { return $true }; return [double]$propValue -gt [double]$Filter.value }
-        'lt' { return [double]$propValue -lt [double]$Filter.value }
+        'gt' {
+            $numValue = 0; $numFilter = 0
+            if (-not [double]::TryParse([string]$propValue, [ref]$numValue) -or -not [double]::TryParse([string]$Filter.value, [ref]$numFilter)) { return $false }
+            return $numValue -gt $numFilter
+        }
+        'gt_or_null' {
+            if ($null -eq $propValue) { return $true }
+            $numValue = 0; $numFilter = 0
+            if (-not [double]::TryParse([string]$propValue, [ref]$numValue) -or -not [double]::TryParse([string]$Filter.value, [ref]$numFilter)) { return $false }
+            return $numValue -gt $numFilter
+        }
+        'lt' {
+            $numValue = 0; $numFilter = 0
+            if (-not [double]::TryParse([string]$propValue, [ref]$numValue) -or -not [double]::TryParse([string]$Filter.value, [ref]$numFilter)) { return $false }
+            return $numValue -lt $numFilter
+        }
         'in' { return $propValue -in $Filter.value }
         'contains_port' {
             if (-not $propValue) { return $false }

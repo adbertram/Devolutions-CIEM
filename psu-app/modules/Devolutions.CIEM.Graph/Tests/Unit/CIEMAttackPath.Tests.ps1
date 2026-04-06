@@ -952,11 +952,12 @@ Describe 'Attack Path Engine' {
             $results[0].Depth | Should -Be 1
         }
 
-        It 'Returns multiple paths when they exist' {
-            # Add second path: A -> D -> C
+        It 'Returns multiple paths to different destination nodes' {
+            # Add second destination: A -> D -> C2 (different KindC node)
             Save-CIEMGraphNode -Id 'd-1' -Kind 'KindD' -DisplayName 'D1' -Provider 'test'
+            Save-CIEMGraphNode -Id 'c-2' -Kind 'KindC' -DisplayName 'C2' -Provider 'test'
             Save-CIEMGraphEdge -SourceId 'a-1' -TargetId 'd-1' -Kind 'LinksTo'
-            Save-CIEMGraphEdge -SourceId 'd-1' -TargetId 'c-1' -Kind 'LinksTo'
+            Save-CIEMGraphEdge -SourceId 'd-1' -TargetId 'c-2' -Kind 'LinksTo'
 
             $results = @(Get-CIEMGraphPath -FromKind 'KindA' -ToKind 'KindC')
             $results | Should -HaveCount 2
@@ -996,6 +997,63 @@ Describe 'Attack Path Engine' {
             # Should still find A->B->C without infinite loop
             $results = @(Get-CIEMGraphPath -FromKind 'KindA' -ToKind 'KindC')
             $results | Should -HaveCount 1
+        }
+
+        It 'Marks destination nodes as visited to prevent BFS path explosion' {
+            # Diamond: A -> B -> D, A -> C_Alt -> D (same D node, KindD is destination)
+            # Without fix: D reached twice, both enqueued — path explosion
+            # With fix: D marked visited after first find, second arrival skipped
+            Save-CIEMGraphNode -Id 'd-1' -Kind 'KindD' -DisplayName 'D1' -Provider 'test'
+
+            Save-CIEMGraphNode -Id 'c-1-alt' -Kind 'KindC_Alt' -DisplayName 'C1Alt' -Provider 'test'
+            Save-CIEMGraphEdge -SourceId 'a-1' -TargetId 'c-1-alt' -Kind 'LinksTo'
+            Save-CIEMGraphEdge -SourceId 'c-1-alt' -TargetId 'd-1' -Kind 'LinksTo'
+            Save-CIEMGraphEdge -SourceId 'b-1' -TargetId 'd-1' -Kind 'LinksTo'
+
+            # Should find exactly 1 path to D (first discovery marks it visited)
+            $results = @(Get-CIEMGraphPath -FromKind 'KindA' -ToKind 'KindD')
+            $results | Should -HaveCount 1
+            $results[0].ToNode.Id | Should -Be 'd-1'
+        }
+
+        It 'Does not enqueue destination nodes for further traversal' {
+            # If destination nodes were enqueued, they would act as intermediaries
+            # for paths to OTHER destinations of the same kind.
+            # Graph: A -> B (KindDest), A -> C -> B (KindDest already visited)
+            # B is destination. If B were enqueued after first find, adding B -> D (KindDest)
+            # would produce spurious paths.
+            Save-CIEMGraphNode -Id 'dest-1' -Kind 'KindDest' -DisplayName 'Dest1' -Provider 'test'
+            Save-CIEMGraphNode -Id 'mid-1' -Kind 'KindMid' -DisplayName 'Mid1' -Provider 'test'
+            Save-CIEMGraphNode -Id 'dest-2' -Kind 'KindDest' -DisplayName 'Dest2' -Provider 'test'
+
+            Save-CIEMGraphEdge -SourceId 'a-1' -TargetId 'dest-1' -Kind 'LinksTo'
+            Save-CIEMGraphEdge -SourceId 'a-1' -TargetId 'mid-1' -Kind 'LinksTo'
+            Save-CIEMGraphEdge -SourceId 'mid-1' -TargetId 'dest-1' -Kind 'LinksTo'
+            Save-CIEMGraphEdge -SourceId 'dest-1' -TargetId 'dest-2' -Kind 'LinksTo'
+
+            # Should find A->dest-1 only once (not via mid-1 too, since dest-1 is visited)
+            # And should NOT find A->dest-1->dest-2 (dest-1 is terminal, not enqueued)
+            $results = @(Get-CIEMGraphPath -FromKind 'KindA' -ToKind 'KindDest')
+            $results | Should -HaveCount 1
+            $results[0].ToNode.Id | Should -Be 'dest-1'
+        }
+
+        It 'Has optional -MaxPaths parameter defaulting to 100' {
+            $param = (Get-Command Get-CIEMGraphPath).Parameters['MaxPaths']
+            $param | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Stops BFS early when MaxPaths limit is reached' {
+            # Create many paths: A -> X1 -> C, A -> X2 -> C, ... A -> X5 -> C
+            # With MaxPaths=2, should return at most 2
+            foreach ($i in 1..5) {
+                Save-CIEMGraphNode -Id "x-$i" -Kind 'KindX' -DisplayName "X$i" -Provider 'test'
+                Save-CIEMGraphEdge -SourceId 'a-1' -TargetId "x-$i" -Kind 'LinksTo'
+                Save-CIEMGraphEdge -SourceId "x-$i" -TargetId 'c-1' -Kind 'LinksTo'
+            }
+
+            $results = @(Get-CIEMGraphPath -FromKind 'KindA' -ToKind 'KindC' -MaxPaths 2)
+            $results.Count | Should -BeLessOrEqual 2
         }
     }
 }

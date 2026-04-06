@@ -68,7 +68,7 @@ Describe 'Get-CIEMIdentityRiskSignals' {
 
             # Inherited via group: Owner on subscription (privileged)
             Save-CIEMGraphEdge -SourceId 'user-mixed' -TargetId '/subscriptions/sub-1' -Kind 'InheritedRole' -Computed 1 `
-                -Properties (@{ role_name = 'Owner'; privileged = $true; scope = '/subscriptions/sub-1'; definition_id = 'role-owner' } | ConvertTo-Json -Compress)
+                -Properties (@{ role_name = 'Owner'; privileged = $true; scope = '/subscriptions/sub-1'; definition_id = 'role-owner'; inherited_from = 'group-admins'; inherited_from_name = 'Cloud Admins' } | ConvertTo-Json -Compress)
 
             # MemberOf edge: user -> group (for InheritedFrom lookup)
             Save-CIEMGraphEdge -SourceId 'user-mixed' -TargetId 'group-admins' -Kind 'MemberOf' -Computed 0
@@ -453,6 +453,148 @@ Describe 'Get-CIEMIdentityRiskSignals' {
         It 'Does NOT include managed-identity-public-exposure signal' {
             $signal = $script:result.RiskSignals | Where-Object { $_.Signal -eq 'managed-identity-public-exposure' }
             $signal | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'Multi-group InheritedFrom attribution picks correct group' {
+
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            # User node
+            Save-CIEMGraphNode -Id 'user-multi-group' -Kind 'EntraUser' -DisplayName 'Multi Group User' -Provider 'azure' `
+                -Properties (@{
+                    accountEnabled = $true
+                    daysSinceSignIn = 3
+                    lastSignIn = (Get-Date).AddDays(-3).ToString('o')
+                    lastInteractiveSignIn = (Get-Date).AddDays(-3).ToString('o')
+                } | ConvertTo-Json -Compress)
+
+            # Two group nodes
+            Save-CIEMGraphNode -Id 'group-readers' -Kind 'EntraGroup' -DisplayName 'Readers Group' -Provider 'azure'
+            Save-CIEMGraphNode -Id 'group-owners' -Kind 'EntraGroup' -DisplayName 'Owners Group' -Provider 'azure'
+
+            # Two scope targets (edges need unique source+target+kind)
+            Save-CIEMGraphNode -Id '/subscriptions/sub-multi-1' -Kind 'AzureSubscription' -DisplayName 'Sub Multi 1' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub-multi-2' -Kind 'AzureSubscription' -DisplayName 'Sub Multi 2' -Provider 'azure'
+
+            # MemberOf edges: user is member of BOTH groups
+            Save-CIEMGraphEdge -SourceId 'user-multi-group' -TargetId 'group-readers' -Kind 'MemberOf' -Computed 0
+            Save-CIEMGraphEdge -SourceId 'user-multi-group' -TargetId 'group-owners' -Kind 'MemberOf' -Computed 0
+
+            # InheritedRole from Owners Group: Owner (privileged) on sub-1
+            Save-CIEMGraphEdge -SourceId 'user-multi-group' -TargetId '/subscriptions/sub-multi-1' -Kind 'InheritedRole' -Computed 1 `
+                -Properties (@{
+                    role_name = 'Owner'
+                    privileged = $true
+                    scope = '/subscriptions/sub-multi-1'
+                    definition_id = 'role-owner'
+                    inherited_from = 'group-owners'
+                    inherited_from_name = 'Owners Group'
+                } | ConvertTo-Json -Compress)
+
+            # InheritedRole from Readers Group: Reader (non-privileged) on sub-2
+            Save-CIEMGraphEdge -SourceId 'user-multi-group' -TargetId '/subscriptions/sub-multi-2' -Kind 'InheritedRole' -Computed 1 `
+                -Properties (@{
+                    role_name = 'Reader'
+                    privileged = $false
+                    scope = '/subscriptions/sub-multi-2'
+                    definition_id = 'role-reader'
+                    inherited_from = 'group-readers'
+                    inherited_from_name = 'Readers Group'
+                } | ConvertTo-Json -Compress)
+
+            $script:result = Get-CIEMIdentityRiskSignals -PrincipalId 'user-multi-group'
+        }
+
+        It 'Returns 2 inherited roles' {
+            @($script:result.InheritedRoles) | Should -HaveCount 2
+        }
+
+        It 'Owner role shows InheritedFrom as Owners Group not Readers Group' {
+            $ownerRole = $script:result.InheritedRoles | Where-Object { $_.RoleName -eq 'Owner' }
+            $ownerRole.InheritedFrom | Should -Be 'Owners Group'
+        }
+
+        It 'Reader role shows InheritedFrom as Readers Group not Owners Group' {
+            $readerRole = $script:result.InheritedRoles | Where-Object { $_.RoleName -eq 'Reader' }
+            $readerRole.InheritedFrom | Should -Be 'Readers Group'
+        }
+
+        It 'Risk signal for group-inherited-privileged-role references Owners Group' {
+            $signal = $script:result.RiskSignals | Where-Object { $_.Signal -eq 'group-inherited-privileged-role' }
+            $signal | Should -Not -BeNullOrEmpty
+            $signal.Description | Should -BeLike "*Owners Group*"
+            $signal.Description | Should -Not -BeLike "*Readers Group*"
+        }
+    }
+
+    Context 'Dormancy threshold boundary at exactly 90 days' {
+
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            # User with daysSinceSignIn = 90 (exactly at the threshold)
+            Save-CIEMGraphNode -Id 'user-boundary-90' -Kind 'EntraUser' -DisplayName 'Boundary 90 User' -Provider 'azure' `
+                -Properties (@{
+                    accountEnabled = $true
+                    daysSinceSignIn = 90
+                    lastSignIn = (Get-Date).AddDays(-90).ToString('o')
+                    lastInteractiveSignIn = (Get-Date).AddDays(-90).ToString('o')
+                } | ConvertTo-Json -Compress)
+
+            # Scope target node
+            Save-CIEMGraphNode -Id '/subscriptions/sub-1' -Kind 'AzureSubscription' -DisplayName 'Sub 1' -Provider 'azure'
+
+            # Privileged role
+            Save-CIEMGraphEdge -SourceId 'user-boundary-90' -TargetId '/subscriptions/sub-1' -Kind 'HasRole' -Computed 1 `
+                -Properties (@{ role_name = 'Owner'; privileged = $true; scope = '/subscriptions/sub-1'; definition_id = 'role-owner' } | ConvertTo-Json -Compress)
+
+            $script:result90 = Get-CIEMIdentityRiskSignals -PrincipalId 'user-boundary-90'
+        }
+
+        It 'Does NOT trigger dormant-privileged-permissions at exactly 90 days (threshold uses -gt not -ge)' {
+            $signal = $script:result90.RiskSignals | Where-Object { $_.Signal -eq 'dormant-privileged-permissions' }
+            $signal | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'Dormancy threshold boundary at 91 days' {
+
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            # User with daysSinceSignIn = 91 (one day past the threshold)
+            Save-CIEMGraphNode -Id 'user-boundary-91' -Kind 'EntraUser' -DisplayName 'Boundary 91 User' -Provider 'azure' `
+                -Properties (@{
+                    accountEnabled = $true
+                    daysSinceSignIn = 91
+                    lastSignIn = (Get-Date).AddDays(-91).ToString('o')
+                    lastInteractiveSignIn = (Get-Date).AddDays(-91).ToString('o')
+                } | ConvertTo-Json -Compress)
+
+            # Scope target node
+            Save-CIEMGraphNode -Id '/subscriptions/sub-1' -Kind 'AzureSubscription' -DisplayName 'Sub 1' -Provider 'azure'
+
+            # Privileged role
+            Save-CIEMGraphEdge -SourceId 'user-boundary-91' -TargetId '/subscriptions/sub-1' -Kind 'HasRole' -Computed 1 `
+                -Properties (@{ role_name = 'Owner'; privileged = $true; scope = '/subscriptions/sub-1'; definition_id = 'role-owner' } | ConvertTo-Json -Compress)
+
+            $script:result91 = Get-CIEMIdentityRiskSignals -PrincipalId 'user-boundary-91'
+        }
+
+        It 'Triggers dormant-privileged-permissions at 91 days (one day past threshold)' {
+            $signal = $script:result91.RiskSignals | Where-Object { $_.Signal -eq 'dormant-privileged-permissions' }
+            $signal | Should -Not -BeNullOrEmpty
+            $signal.Severity | Should -Be 'Critical'
+        }
+
+        It 'Dormant signal includes DaysSinceSignIn value of 91' {
+            $signal = $script:result91.RiskSignals | Where-Object { $_.Signal -eq 'dormant-privileged-permissions' }
+            $signal.DaysSinceSignIn | Should -Be 91
         }
     }
 

@@ -12,7 +12,10 @@ function Get-CIEMGraphPath {
         [int]$MaxDepth = 5,
 
         [Parameter()]
-        [string]$EdgeKind
+        [string]$EdgeKind,
+
+        [Parameter()]
+        [int]$MaxPaths = 100
     )
 
     $ErrorActionPreference = 'Stop'
@@ -37,6 +40,7 @@ function Get-CIEMGraphPath {
         $visited = @{ $start.Id = $true }
 
         while ($queue.Count -gt 0) {
+            if ($results.Count -ge $MaxPaths) { break }
             $current = $queue.Dequeue()
             if ($current.Depth -ge $MaxDepth) { continue }
 
@@ -82,18 +86,19 @@ WHERE $edgeCondition
                         Edges    = $newPathEdges
                         Depth    = $current.Depth + 1
                     })
-                    # Don't mark destination nodes as visited so multiple paths can reach them
+                    # Mark destination nodes as visited and do NOT enqueue them —
+                    # destinations are terminal to prevent BFS path explosion
+                    $visited[$neighbor.id] = $true
                 } else {
                     # Mark intermediate nodes as visited to prevent cycles
                     $visited[$neighbor.id] = $true
+                    $queue.Enqueue(@{
+                        NodeId    = $neighbor.id
+                        PathNodes = $newPathNodes
+                        PathEdges = $newPathEdges
+                        Depth     = $current.Depth + 1
+                    })
                 }
-
-                $queue.Enqueue(@{
-                    NodeId    = $neighbor.id
-                    PathNodes = $newPathNodes
-                    PathEdges = $newPathEdges
-                    Depth     = $current.Depth + 1
-                })
             }
         }
     }

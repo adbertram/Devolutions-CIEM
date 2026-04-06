@@ -56,6 +56,24 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
         }
     }
 
+    Context 'App registration references' {
+        BeforeAll {
+            $script:AppContent = Get-Content (Join-Path $PSScriptRoot '..' '..' 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1') -Raw
+        }
+
+        It 'Does NOT reference New-CIEMGraphPage (dead function)' {
+            $script:AppContent | Should -Not -Match 'New-CIEMGraphPage'
+        }
+
+        It 'References New-CIEMIdentityRiskPage' {
+            $script:AppContent | Should -Match 'New-CIEMIdentityRiskPage'
+        }
+
+        It 'References New-CIEMAttackPathsPage' {
+            $script:AppContent | Should -Match 'New-CIEMAttackPathsPage'
+        }
+    }
+
     Context 'Sub-module roots array' {
         It '$subModuleRoots contains $script:AzureDiscoveryRoot' {
             $script:Psm1Content | Should -Match '\$subModuleRoots\s*=\s*@\([^)]*\$script:AzureDiscoveryRoot'

@@ -21,65 +21,14 @@ BeforeAll {
 
 Describe 'Graph Node CRUD' {
 
-    Context 'New-CIEMGraphNode' {
-        BeforeEach {
-            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
-        }
-
-        It 'Creates a node and returns CIEMGraphNode object' {
-            $result = New-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1' `
-                -Kind 'AzureVM' `
-                -DisplayName 'vm1' `
-                -Provider 'azure' `
-                -SubscriptionId 'sub1' `
-                -ResourceGroup 'rg1'
-            $result | Should -Not -BeNullOrEmpty
-            $result.GetType().Name | Should -Be 'CIEMGraphNode'
-            $result.Id | Should -Be '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/vm1'
-            $result.Kind | Should -Be 'AzureVM'
-            $result.DisplayName | Should -Be 'vm1'
-        }
-
-        It 'Throws when node with same Id already exists' {
-            New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-dup' -Kind 'AzureVM'
-            { New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-dup' -Kind 'AzureVM' } | Should -Throw
-        }
-
-        It 'Accepts -InputObject parameter set' {
-            $obj = InModuleScope Devolutions.CIEM {
-                $o = [CIEMGraphNode]::new()
-                $o.Id = '/subscriptions/sub1/rg/vm-input'
-                $o.Kind = 'AzureVM'
-                $o.DisplayName = 'vm-input'
-                $o.CollectedAt = (Get-Date).ToString('o')
-                $o
-            }
-            $result = New-CIEMGraphNode -InputObject $obj
-            $result | Should -Not -BeNullOrEmpty
-            $result.Id | Should -Be '/subscriptions/sub1/rg/vm-input'
-        }
-
-        It 'Sets CollectedAt to current time when not provided' {
-            $before = (Get-Date).ToString('o')
-            $result = New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-time' -Kind 'AzureVM'
-            $result.CollectedAt | Should -Not -BeNullOrEmpty
-            $result.CollectedAt | Should -BeGreaterOrEqual $before
-        }
-
-        It 'Defaults Provider to azure when not provided' {
-            $result = New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-prov' -Kind 'AzureVM'
-            $result.Provider | Should -Be 'azure'
-        }
-    }
-
     Context 'Get-CIEMGraphNode' {
         BeforeAll {
             Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
             # Seed 4 test nodes
-            New-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/get-vm1' -Kind 'AzureVM' -DisplayName 'get-vm1' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
-            New-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/get-nsg1' -Kind 'AzureNSG' -DisplayName 'get-nsg1' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
-            New-CIEMGraphNode -Id '/subscriptions/sub2/resourceGroups/rg2/providers/Microsoft.Compute/virtualMachines/get-vm2' -Kind 'AzureVM' -DisplayName 'get-vm2' -Provider 'azure' -SubscriptionId 'sub2' -ResourceGroup 'rg2'
-            New-CIEMGraphNode -Id 'user-guid-1234' -Kind 'EntraUser' -DisplayName 'Test User'
+            Save-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Compute/virtualMachines/get-vm1' -Kind 'AzureVM' -DisplayName 'get-vm1' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+            Save-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/get-nsg1' -Kind 'AzureNSG' -DisplayName 'get-nsg1' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+            Save-CIEMGraphNode -Id '/subscriptions/sub2/resourceGroups/rg2/providers/Microsoft.Compute/virtualMachines/get-vm2' -Kind 'AzureVM' -DisplayName 'get-vm2' -Provider 'azure' -SubscriptionId 'sub2' -ResourceGroup 'rg2'
+            Save-CIEMGraphNode -Id 'user-guid-1234' -Kind 'EntraUser' -DisplayName 'Test User'
         }
 
         It 'Returns all nodes when no filter' {
@@ -126,48 +75,6 @@ Describe 'Graph Node CRUD' {
         }
     }
 
-    Context 'Update-CIEMGraphNode' {
-        BeforeEach {
-            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
-            New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd' -Kind 'AzureVM' -DisplayName 'vm-update' -Properties '{"vmSize":"Standard_B1s"}'
-        }
-
-        It 'Updates Properties field via -Properties parameter' {
-            Update-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd' -Properties '{"vmSize":"Standard_D2s_v3"}'
-            $result = Get-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd'
-            $result.Properties | Should -Be '{"vmSize":"Standard_D2s_v3"}'
-        }
-
-        It 'Does not overwrite unspecified fields (partial update)' {
-            Update-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd' -Properties '{"updated":true}'
-            $result = Get-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd'
-            $result.DisplayName | Should -Be 'vm-update'
-            $result.Kind | Should -Be 'AzureVM'
-        }
-
-        It 'Returns nothing without -PassThru' {
-            $result = Update-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd' -Properties '{"x":1}'
-            $result | Should -BeNullOrEmpty
-        }
-
-        It 'Returns updated object with -PassThru' {
-            $result = Update-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd' -Properties '{"passthru":true}' -PassThru
-            $result | Should -Not -BeNullOrEmpty
-            $result.GetType().Name | Should -Be 'CIEMGraphNode'
-            $result.Properties | Should -Be '{"passthru":true}'
-        }
-
-        It 'Accepts -InputObject for full object update' {
-            $obj = Get-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd'
-            $obj.DisplayName = 'vm-renamed'
-            $obj.ResourceGroup = 'rg-new'
-            Update-CIEMGraphNode -InputObject $obj
-            $result = Get-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-upd'
-            $result.DisplayName | Should -Be 'vm-renamed'
-            $result.ResourceGroup | Should -Be 'rg-new'
-        }
-    }
-
     Context 'Save-CIEMGraphNode' {
         BeforeEach {
             Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
@@ -209,9 +116,9 @@ Describe 'Graph Node CRUD' {
     Context 'Remove-CIEMGraphNode' {
         BeforeEach {
             Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
-            New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-rm1' -Kind 'AzureVM' -DisplayName 'vm-rm1' -Provider 'azure'
-            New-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-rm2' -Kind 'AzureVM' -DisplayName 'vm-rm2' -Provider 'azure'
-            New-CIEMGraphNode -Id 'user-guid-rm1' -Kind 'EntraUser' -DisplayName 'user-rm1' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-rm1' -Kind 'AzureVM' -DisplayName 'vm-rm1' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub1/rg/vm-rm2' -Kind 'AzureVM' -DisplayName 'vm-rm2' -Provider 'azure'
+            Save-CIEMGraphNode -Id 'user-guid-rm1' -Kind 'EntraUser' -DisplayName 'user-rm1' -Provider 'azure'
         }
 
         It 'Removes by -Id' {

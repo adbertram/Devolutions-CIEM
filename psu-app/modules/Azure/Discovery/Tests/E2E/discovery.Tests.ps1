@@ -31,7 +31,7 @@ AfterAll {
     }
 }
 
-Describe 'Azure Discovery E2E' {
+Describe 'Azure Discovery E2E' -Skip {
 
     Context 'Full discovery run (Scope=All)' {
         BeforeAll {

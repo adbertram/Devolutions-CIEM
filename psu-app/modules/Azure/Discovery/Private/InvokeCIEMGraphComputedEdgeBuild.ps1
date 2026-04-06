@@ -207,7 +207,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.Kind     = 'HasManagedIdentity'
                 if (SaveEdgeSafe $splat) { $edgeCount++ }
             }
-        } catch { }
+        } catch { Write-CIEMLog -Message "HasManagedIdentity edge build failed for resource $($r.Id): $_" -Severity WARNING -Component 'GraphBuilder' }
     }
 
     # ===== 4. Network topology edges (NIC -> VM, NIC -> PIP, NIC -> Subnet) =====

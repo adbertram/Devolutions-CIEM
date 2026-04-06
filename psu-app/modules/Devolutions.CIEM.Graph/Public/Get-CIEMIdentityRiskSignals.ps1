@@ -18,6 +18,10 @@ function Get-CIEMIdentityRiskSignals {
 
     $ErrorActionPreference = 'Stop'
 
+    if ($null -eq $script:DormantPermissionThresholdDays) {
+        throw 'Module variable $script:DormantPermissionThresholdDays is not initialized. The module may not have loaded correctly.'
+    }
+
     # Get the identity from graph nodes
     $identity = @(Get-CIEMGraphNode -Id $PrincipalId)
     if ($identity.Count -eq 0) {
@@ -68,16 +72,6 @@ function Get-CIEMIdentityRiskSignals {
     $inheritedRoleEdges = @(Get-CIEMGraphEdge -SourceId $PrincipalId -Kind 'InheritedRole')
     $allRoleEdges = @($directRoleEdges) + @($inheritedRoleEdges)
 
-    # For inherited role annotation, look up group names via MemberOf edges
-    $memberOfEdges = @(Get-CIEMGraphEdge -SourceId $PrincipalId -Kind 'MemberOf')
-    $groupNameLookup = @{}
-    foreach ($memberEdge in $memberOfEdges) {
-        $groupNodes = @(Get-CIEMGraphNode -Id $memberEdge.TargetId)
-        if ($groupNodes.Count -gt 0) {
-            $groupNameLookup[$memberEdge.TargetId] = $groupNodes[0].DisplayName
-        }
-    }
-
     # Build role assignments from edges
     $roleAssignments = @(foreach ($edge in $allRoleEdges) {
         $edgeProps = $null
@@ -90,11 +84,11 @@ function Get-CIEMIdentityRiskSignals {
         $scope = if ($edgeProps -and $edgeProps.scope) { $edgeProps.scope } else { $edge.TargetId }
         $isInherited = $edge.Kind -eq 'InheritedRole'
 
-        # For inherited roles, find the group name from the MemberOf lookup
+        # For inherited roles, read the group name directly from the edge's Properties JSON
+        # (set by Invoke-CIEMGraphComputedEdgeBuild as inherited_from_name)
         $inheritedFrom = $null
-        if ($isInherited -and $groupNameLookup.Count -gt 0) {
-            # Use the first group found (simplification: one group membership context)
-            $inheritedFrom = $groupNameLookup.Values | Select-Object -First 1
+        if ($isInherited -and $edgeProps -and $edgeProps.inherited_from_name) {
+            $inheritedFrom = $edgeProps.inherited_from_name
         }
 
         [PSCustomObject]@{
