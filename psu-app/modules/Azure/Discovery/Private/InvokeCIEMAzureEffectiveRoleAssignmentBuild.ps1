@@ -82,36 +82,52 @@ function InvokeCIEMAzureEffectiveRoleAssignmentBuild {
         $roleName        = if ($roleDef) { $roleDef.RoleName }        else { $null }
         $permissionsJson = if ($roleDef) { $roleDef.PermissionsJson } else { $null }
 
-        # Helper to build a row object
-        $buildRow = {
-            param($pid, $ptype, $origId, $origType)
-            $row = [CIEMAzureEffectiveRoleAssignment]::new()
-            $row.PrincipalId           = $pid
-            $row.PrincipalType         = $ptype
-            $row.PrincipalDisplayName  = $displayNameLookup[$pid]
-            $row.OriginalPrincipalId   = $origId
-            $row.OriginalPrincipalType = $origType
-            $row.RoleDefinitionId      = $roleDefinitionId
-            $row.RoleName              = $roleName
-            $row.Scope                 = $scope
-            $row.PermissionsJson       = $permissionsJson
-            $row.ComputedAt            = $ComputedAt
-            $row
-        }
-
         if ($principalType -eq 'Group') {
             # Expand to all transitive members
             $members = $groupMembersLookup[$principalId]
             if ($members) {
                 foreach ($member in $members) {
-                    $rows.Add((& $buildRow $member.Id $member.Type $principalId 'Group'))
+                    $row = [CIEMAzureEffectiveRoleAssignment]::new()
+                    $row.PrincipalId           = $member.Id
+                    $row.PrincipalType         = $member.Type
+                    $row.PrincipalDisplayName  = $displayNameLookup[$member.Id]
+                    $row.OriginalPrincipalId   = $principalId
+                    $row.OriginalPrincipalType = 'Group'
+                    $row.RoleDefinitionId      = $roleDefinitionId
+                    $row.RoleName              = $roleName
+                    $row.Scope                 = $scope
+                    $row.PermissionsJson       = $permissionsJson
+                    $row.ComputedAt            = $ComputedAt
+                    $rows.Add($row)
                 }
             }
             # Group self-row (direct assignment record)
-            $rows.Add((& $buildRow $principalId $principalType $principalId $principalType))
+            $row = [CIEMAzureEffectiveRoleAssignment]::new()
+            $row.PrincipalId           = $principalId
+            $row.PrincipalType         = $principalType
+            $row.PrincipalDisplayName  = $displayNameLookup[$principalId]
+            $row.OriginalPrincipalId   = $principalId
+            $row.OriginalPrincipalType = $principalType
+            $row.RoleDefinitionId      = $roleDefinitionId
+            $row.RoleName              = $roleName
+            $row.Scope                 = $scope
+            $row.PermissionsJson       = $permissionsJson
+            $row.ComputedAt            = $ComputedAt
+            $rows.Add($row)
         } else {
             # Direct assignment (user, SP, managed identity)
-            $rows.Add((& $buildRow $principalId $principalType $principalId $principalType))
+            $row = [CIEMAzureEffectiveRoleAssignment]::new()
+            $row.PrincipalId           = $principalId
+            $row.PrincipalType         = $principalType
+            $row.PrincipalDisplayName  = $displayNameLookup[$principalId]
+            $row.OriginalPrincipalId   = $principalId
+            $row.OriginalPrincipalType = $principalType
+            $row.RoleDefinitionId      = $roleDefinitionId
+            $row.RoleName              = $roleName
+            $row.Scope                 = $scope
+            $row.PermissionsJson       = $permissionsJson
+            $row.ComputedAt            = $ComputedAt
+            $rows.Add($row)
         }
     }
 

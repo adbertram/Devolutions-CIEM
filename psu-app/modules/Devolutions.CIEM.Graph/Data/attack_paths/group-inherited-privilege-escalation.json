@@ -1,0 +1,11 @@
+{
+  "id": "group-inherited-privilege-escalation",
+  "name": "Identity inherits privileged role through group membership",
+  "severity": "high",
+  "category": "identity-privilege",
+  "description": "An identity holds a privileged role not through direct assignment but via group membership. Group-inherited privileges are harder to audit and can lead to unintended privilege escalation when group membership changes.",
+  "steps": [
+    { "kind": ["EntraUser", "EntraServicePrincipal", "EntraManagedIdentity"] },
+    { "edge": "InheritedRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } }
+  ]
+}

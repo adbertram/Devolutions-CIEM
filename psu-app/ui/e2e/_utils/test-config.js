@@ -28,7 +28,9 @@ const testConfig = {
     graph: '/ciem/ciem/graph',
     environment: '/ciem/ciem/environment',
     config: '/ciem/ciem/config',
-    about: '/ciem/ciem/about'
+    about: '/ciem/ciem/about',
+    identities: '/ciem/ciem/identities',
+    attackPaths: '/ciem/ciem/attack-paths'
   },
   database: {
     path: resolvePsuDatabasePath()

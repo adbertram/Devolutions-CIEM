@@ -11,7 +11,7 @@
 
 ## Module Deployment (Critical)
 - Never upload module files directly to the Azure PSU instance.
-- Always publish the module via `Publish-PSUModule` from `Devolutions.CIEM/`.
+- Local publishing is automated by the `auto-publish-psu` Stop hook (fires after every turn with psu-app/ changes).
 
 ```powershell
 Import-Module ./Devolutions.CIEM.Admin

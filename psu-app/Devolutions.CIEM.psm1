@@ -20,6 +20,7 @@ function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
 _BootLog "Module loading from: $PSScriptRoot"
 
 # --- Sub-module directory roots (for runtime file discovery) ---
+$script:GraphRoot           = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Graph'
 $script:AzureRoot           = Join-Path $PSScriptRoot 'modules/Azure/Infrastructure'
 $script:AzureDiscoveryRoot  = Join-Path $PSScriptRoot 'modules/Azure/Discovery'
 $script:AWSRoot             = Join-Path $PSScriptRoot 'modules/AWS/Infrastructure'
@@ -28,6 +29,7 @@ $script:PSURoot             = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.
 
 # All sub-module roots in load order
 $subModuleRoots = @(
+    $script:GraphRoot
     $script:AzureRoot
     $script:AzureDiscoveryRoot
     $script:AWSRoot
@@ -59,9 +61,9 @@ foreach ($className in @('CIEMServiceCache', 'CIEMProviderService', 'CIEMCheck',
     if (Test-Path $classFile) { try { . $classFile } catch { _BootLog "FAILED to load class $className : $_" 'ERROR' } }
 }
 
-# Unordered classes (Azure, Azure Discovery, AWS - no interdependencies)
+# Unordered classes (Graph, Azure, Azure Discovery, AWS - no interdependencies)
 _BootLog "Loading provider classes..."
-foreach ($root in @($script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot)) {
+foreach ($root in @($script:GraphRoot, $script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot)) {
     foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction SilentlyContinue)) {
         try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR' }
     }
@@ -114,6 +116,11 @@ $script:RelationshipColors = @{
     'transitive_member_of' = '#4caf50'   # Transitive membership (green)
 }
 
+# Risk policy constants
+$script:DormantPermissionThresholdDays = 90
+$script:MediumEntitlementThreshold = 5
+$script:PrivilegedRoleNames = @((Get-Content (Join-Path $script:AzureDiscoveryRoot 'Data/privileged_roles.json') -Raw | ConvertFrom-Json).name)
+
 # --- Initialize database (base + provider schemas) ---
 Write-CIEMLog -Message "Initializing database..." -Component 'ModuleInit'
 try {
@@ -128,6 +135,7 @@ catch {
 foreach ($schema in @(
     @{ Path = Join-Path $script:AzureRoot          'Data/azure_schema.sql';         Label = 'Azure' }
     @{ Path = Join-Path $script:AzureDiscoveryRoot 'Data/discovery_schema.sql';     Label = 'AzureDiscovery' }
+    @{ Path = Join-Path $script:GraphRoot          'Data/graph_schema.sql';         Label = 'Graph' }
 )) {
     try {
         $dbPath = Get-CIEMDatabasePath
