@@ -37,7 +37,7 @@ Group changes into user-facing themes (e.g., "new Identity Risk page", "attack p
 Create a timestamped folder under the skill's `reports/` directory:
 
 ```bash
-mkdir -p .agents/skills/send-status-report/reports/$(date +%Y-%m-%d)
+mkdir -p .claude/skills/send-status-report/reports/$(date +%Y-%m-%d)
 ```
 
 All report artifacts (text + screenshots) go in this folder.
@@ -117,10 +117,10 @@ Check if the skill was invoked with "dryrun" in the arguments. If so, use `--dry
 
 ```bash
 # Dryrun mode — sends to Adam's DM for review
-.agents/skills/send-status-report/scripts/send-report.sh --dryrun .agents/skills/send-status-report/reports/YYYY-MM-DD
+.claude/skills/send-status-report/scripts/send-report.sh --dryrun .claude/skills/send-status-report/reports/YYYY-MM-DD
 
 # Normal mode — sends to the team channel
-.agents/skills/send-status-report/scripts/send-report.sh .agents/skills/send-status-report/reports/YYYY-MM-DD
+.claude/skills/send-status-report/scripts/send-report.sh .claude/skills/send-status-report/reports/YYYY-MM-DD
 ```
 
 The script:
@@ -144,7 +144,6 @@ Channel C0AFCLP7SUF members: Marc-Andre Moreau (mamoreau), Simon Chalifoux (scha
 </rules>
 
 <success_criteria>
-This skill is complete when:
 - [ ] Git log from past week has been gathered (internal reference only)
 - [ ] Report folder created at `reports/YYYY-MM-DD/`
 - [ ] Screenshots captured and reviewed (bad ones removed)
