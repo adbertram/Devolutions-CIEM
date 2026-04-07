@@ -4,6 +4,8 @@ function InvokeCIEMTransaction {
         [scriptblock]$ScriptBlock
     )
 
+    $ErrorActionPreference = 'Stop'
+
     if (-not $script:DatabasePath) {
         $script:DatabasePath = New-CIEMDatabase -PassThru
     }

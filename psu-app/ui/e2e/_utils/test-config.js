@@ -25,10 +25,12 @@ const testConfig = {
     dashboard: '/ciem/ciem/',
     scan: '/ciem/ciem/scan',
     history: '/ciem/ciem/history',
-    graph: '/ciem/ciem/graph',
+
     environment: '/ciem/ciem/environment',
     config: '/ciem/ciem/config',
-    about: '/ciem/ciem/about'
+    about: '/ciem/ciem/about',
+    identities: '/ciem/ciem/identities',
+    attackPaths: '/ciem/ciem/attack-paths'
   },
   database: {
     path: resolvePsuDatabasePath()

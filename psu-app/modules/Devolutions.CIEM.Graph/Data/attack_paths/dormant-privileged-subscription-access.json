@@ -1,0 +1,12 @@
+{
+  "id": "dormant-privileged-subscription-access",
+  "name": "Dormant identity with privileged subscription-level role",
+  "severity": "critical",
+  "category": "identity-hygiene",
+  "description": "An identity holds a privileged role at subscription scope but has not signed in recently. Dormant privileged accounts are prime targets for credential theft or compromise.",
+  "steps": [
+    { "kind": ["EntraUser", "EntraServicePrincipal", "EntraManagedIdentity"], "node_filter": { "property": "daysSinceSignIn", "op": "gt_or_null", "value": 90 } },
+    { "edge": "HasRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } },
+    { "kind": "AzureSubscription" }
+  ]
+}

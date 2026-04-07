@@ -1,5 +1,30 @@
 {
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "_name": "snapshot-psu-status",
+        "_description": "Snapshot psu-app/ git status at turn start for change detection",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/.claude/hooks/scripts/snapshot-psu-status.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "_name": "auto-publish-psu",
+        "_description": "Auto-publish Devolutions.CIEM to local PSU when psu-app/ source files were modified",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/.claude/hooks/scripts/auto-publish-psu.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "_name": "enforce-tdd",

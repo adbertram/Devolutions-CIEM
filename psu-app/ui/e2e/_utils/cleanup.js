@@ -386,6 +386,141 @@ function getTestEffectiveRoleAssignmentCount() {
   }
 }
 
+
+/**
+ * Seed graph_nodes and graph_edges for the test user identity so that
+ * Get-CIEMAttackPath -PrincipalId returns results in the drill-down panel.
+ * Creates a chain: Internet -> AllowsInbound -> NSG -> AttachedTo -> VM -> HasManagedIdentity -> MI(user-1) -> HasRole -> Subscription
+ * The MI node ID matches the test user's Entra resource ID so the attack path links to the identity.
+ */
+function seedIdentityAttackPathData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+
+    const now = new Date().toISOString();
+
+    const insertNode = db.prepare(`
+      INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, collected_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    insertNode.run('__internet__', 'Internet', 'Internet', 'global', now);
+    insertNode.run(`${TEST_PREFIX}nsg-ap-1`, 'AzureNSG', 'E2E NSG', 'azure', now);
+    insertNode.run(`${TEST_PREFIX}vm-ap-1`, 'AzureVM', 'E2E VM', 'azure', now);
+    // MI node uses user-1 ID so it matches the seeded identity
+    insertNode.run(`${TEST_PREFIX}user-1`, 'EntraManagedIdentity', 'E2E Test User', 'azure', now);
+    insertNode.run(`/subscriptions/${TEST_PREFIX}sub-1`, 'AzureSubscription', 'E2E Subscription', 'azure', now);
+
+    const insertEdge = db.prepare(`
+      INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    insertEdge.run('__internet__', `${TEST_PREFIX}nsg-ap-1`, 'AllowsInbound',
+      '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}', 1, now);
+    insertEdge.run(`${TEST_PREFIX}nsg-ap-1`, `${TEST_PREFIX}vm-ap-1`, 'AttachedTo', null, 1, now);
+    insertEdge.run(`${TEST_PREFIX}vm-ap-1`, `${TEST_PREFIX}user-1`, 'HasManagedIdentity', null, 0, now);
+    insertEdge.run(`${TEST_PREFIX}user-1`, `/subscriptions/${TEST_PREFIX}sub-1`, 'HasRole',
+      '{"roleName":"Owner","privileged":true}', 0, now);
+
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[seed] Seeded graph nodes/edges for Identity Attack Path tests.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Clean up graph data seeded for identity attack path tests.
+ */
+function cleanupIdentityAttackPathData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    const likePattern = `${TEST_PREFIX}%`;
+    db.prepare(`DELETE FROM graph_edges WHERE source_id LIKE ? OR target_id LIKE ?`).run(likePattern, likePattern);
+    db.prepare(`DELETE FROM graph_nodes WHERE id LIKE ?`).run(likePattern);
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[cleanup] Identity Attack Path graph data cleaned up.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Seed graph_nodes and graph_edges for the Attack Paths page E2E tests.
+ * Creates data matching two attack path patterns:
+ * 1. open-management-port (3-step): Internet -> AllowsInbound (port 3389) -> NSG
+ * 2. disabled-account-with-roles (2-step): disabled EntraUser -> HasRole -> Subscription
+ */
+function seedAttackPathsPageData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+
+    const now = new Date().toISOString();
+
+    const insertNode = db.prepare(`
+      INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const insertEdge = db.prepare(`
+      INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    // Pattern 1: open-management-port — Internet -> AllowsInbound -> NSG
+    insertNode.run('__internet__', 'Internet', 'Internet', 'global', null, now);
+    insertNode.run(`${TEST_PREFIX}ap-nsg-1`, 'AzureNSG', 'E2E Attack Path NSG', 'azure', null, now);
+    insertEdge.run('__internet__', `${TEST_PREFIX}ap-nsg-1`, 'AllowsInbound',
+      '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}', 1, now);
+
+    // Pattern 2: disabled-account-with-roles — disabled user -> HasRole -> subscription
+    insertNode.run(`${TEST_PREFIX}ap-disabled-user`, 'EntraUser', 'E2E Disabled User', 'azure',
+      '{"accountEnabled":false}', now);
+    insertNode.run(`${TEST_PREFIX}ap-sub-1`, 'AzureSubscription', 'E2E Subscription', 'azure', null, now);
+    insertEdge.run(`${TEST_PREFIX}ap-disabled-user`, `${TEST_PREFIX}ap-sub-1`, 'HasRole',
+      '{"roleName":"Contributor","privileged":false}', 0, now);
+
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[seed] Seeded graph nodes/edges for Attack Paths page tests (2 patterns).');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Clean up Attack Paths page E2E test graph data.
+ */
+function cleanupAttackPathsPageData() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    const likePattern = `${TEST_PREFIX}ap-%`;
+    db.prepare(`DELETE FROM graph_edges WHERE source_id LIKE ? OR target_id LIKE ?`).run(likePattern, likePattern);
+    db.prepare(`DELETE FROM graph_nodes WHERE id LIKE ?`).run(likePattern);
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log('[cleanup] Attack Paths page graph data cleaned up.');
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Returns the count of test-prefixed attack path graph nodes.
+ */
+function getTestAttackPathNodeCount() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: true });
+    const row = db.prepare(`SELECT COUNT(*) as count FROM graph_nodes WHERE id LIKE '${TEST_PREFIX}ap-%'`).get();
+    return row.count;
+  } finally {
+    if (db) db.close();
+  }
+}
+
 module.exports = {
   cleanupTestData, seedChecks, seedTestData,
   seedEnvironmentData, cleanupEnvironmentData,
@@ -393,5 +528,7 @@ module.exports = {
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
+  seedIdentityAttackPathData, cleanupIdentityAttackPathData,
+  seedAttackPathsPageData, cleanupAttackPathsPageData, getTestAttackPathNodeCount,
   TEST_PREFIX
 };

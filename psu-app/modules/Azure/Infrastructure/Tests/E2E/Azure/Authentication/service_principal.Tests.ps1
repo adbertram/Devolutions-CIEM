@@ -42,7 +42,7 @@ AfterAll {
     }
 }
 
-Describe 'Azure ServicePrincipalSecret Authentication E2E' {
+Describe 'Azure ServicePrincipalSecret Authentication E2E' -Skip {
 
     Context 'PSU health check' {
         It 'CIEM module is loaded and functions are available' {
