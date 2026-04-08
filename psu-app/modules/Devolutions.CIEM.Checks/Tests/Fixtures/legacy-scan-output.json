@@ -1,0 +1,10 @@
+[
+  {
+    "CheckId": "entra_security_defaults_enabled",
+    "Status": "PASS",
+    "StatusExtended": "ok",
+    "ResourceId": "resource-1",
+    "ResourceName": "resource-name",
+    "Location": "Global"
+  }
+]
