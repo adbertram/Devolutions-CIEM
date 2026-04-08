@@ -21,12 +21,12 @@ function New-CIEMAttackPathsPage {
             New-UDDynamic -Id 'attackPathsPanel' -Content {
 
                 try {
-                    $hasData = (Invoke-CIEMQuery -Query 'SELECT COUNT(*) as c FROM graph_nodes').c -gt 0
+                    $hasData = (Devolutions.CIEM\Invoke-CIEMQuery -Query 'SELECT COUNT(*) as c FROM graph_nodes').c -gt 0
 
                     if ($hasData) {
                         New-UDDataGrid -LoadRows {
 
-                            $findings = @(Get-CIEMAttackPath)
+                            $findings = @(Devolutions.CIEM\Get-CIEMAttackPath)
                             $idx = 0
                             $gridData = $findings | ForEach-Object {
                                 $idx++
@@ -49,7 +49,7 @@ function New-CIEMAttackPathsPage {
                         } -Columns @(
                             New-UDDataGridColumn -Field 'patternName' -HeaderName 'Pattern Name' -Flex 1
                             New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 130 -Render {
-                                $color = Get-SeverityColor -Severity $EventData.severity
+                                $color = Devolutions.CIEM\Get-SeverityColor -Severity $EventData.severity
                                 New-UDChip -Label $EventData.severity -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
                             }
                             New-UDDataGridColumn -Field 'category' -HeaderName 'Category' -Width 200

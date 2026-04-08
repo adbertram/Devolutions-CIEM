@@ -1,0 +1,31 @@
+BeforeAll {
+    $script:PagesRoot = Join-Path $PSScriptRoot '..' '..' 'Pages'
+    $script:PageFiles = Get-ChildItem -Path $script:PagesRoot -Filter '*.ps1' | Sort-Object Name
+    $script:ModuleCommandPattern = '^(Write-CIEMLog|Get-SeverityColor|Get-StatusColor|Get-PSUInstalledEnvironment|Invoke-CIEMJobWithProgress|New-CIEM(?:ErrorContent|InfoContent|SuccessContent)|Connect-CIEM|Set-CIEMSecret|Save-CIEMAzureAuthenticationProfile|Set-CIEMAzureAuthenticationProfileActive|Update-CIEMProvider|Invoke-CIEMQuery|Get-CIEM(?:AzureArmHierarchy|AzureAuthenticationProfile|AzureDiscoveryRun|AzureIdentityHierarchy|AttackPath|Check|Config|IdentityRiskSignals|IdentityRiskSummary|Provider|ProviderAuthMethod|ScanRun|Secret))$'
+    $script:UnqualifiedCommands = foreach ($pageFile in $script:PageFiles) {
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($pageFile.FullName, [ref]$tokens, [ref]$parseErrors)
+
+        if ($parseErrors.Count -gt 0) {
+            throw "Failed to parse $($pageFile.Name): $($parseErrors[0].Message)"
+        }
+
+        foreach ($commandAst in $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+            $commandName = $commandAst.GetCommandName()
+            if (-not $commandName) { continue }
+            if ($commandName -notmatch $script:ModuleCommandPattern) { continue }
+
+            [PSCustomObject]@{
+                File    = $pageFile.Name
+                Command = $commandName
+            }
+        }
+    }
+}
+
+Describe 'PSU page command qualification' {
+    It 'Qualifies Devolutions.CIEM commands used by PSU page endpoints' {
+        $script:UnqualifiedCommands | Should -BeNullOrEmpty
+    }
+}

@@ -21,12 +21,12 @@ function New-CIEMIdentityRiskPage {
             New-UDDynamic -Id 'identityRiskPanel' -Content {
 
                 try {
-                    $hasData = (Invoke-CIEMQuery -Query 'SELECT COUNT(*) as c FROM graph_nodes WHERE kind IN (''EntraUser'',''EntraServicePrincipal'',''EntraManagedIdentity'',''EntraGroup'')').c -gt 0
+                    $hasData = (Devolutions.CIEM\Invoke-CIEMQuery -Query 'SELECT COUNT(*) as c FROM graph_nodes WHERE kind IN (''EntraUser'',''EntraServicePrincipal'',''EntraManagedIdentity'',''EntraGroup'')').c -gt 0
 
                     if ($hasData) {
                         New-UDDataGrid -LoadRows {
 
-                            $data = @(Get-CIEMIdentityRiskSummary)
+                            $data = @(Devolutions.CIEM\Get-CIEMIdentityRiskSummary)
                             $gridData = $data | ForEach-Object {
                                 @{
                                     id               = $_.Id
@@ -63,7 +63,7 @@ function New-CIEMIdentityRiskPage {
                                 New-UDChip -Label $EventData.privilegedCount -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
                             }
                             New-UDDataGridColumn -Field 'riskLevel' -HeaderName 'Risk Level' -Width 130 -Render {
-                                $color = Get-SeverityColor -Severity $EventData.riskLevel
+                                $color = Devolutions.CIEM\Get-SeverityColor -Severity $EventData.riskLevel
                                 New-UDChip -Label $EventData.riskLevel -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
                             }
                             New-UDDataGridColumn -Field 'lastActivity' -HeaderName 'Last Activity' -Width 160
@@ -72,7 +72,7 @@ function New-CIEMIdentityRiskPage {
                             $principalId = $EventData.row.id
 
                             try {
-                                $details = Get-CIEMIdentityRiskSignals -PrincipalId $principalId
+                                $details = Devolutions.CIEM\Get-CIEMIdentityRiskSignals -PrincipalId $principalId
 
                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '8px 16px' } } -Content {
 
@@ -141,7 +141,7 @@ function New-CIEMIdentityRiskPage {
 
                                     if ($details.RiskSignals.Count -gt 0) {
                                         foreach ($signal in $details.RiskSignals) {
-                                            $sevColor = Get-SeverityColor -Severity $signal.Severity
+                                            $sevColor = Devolutions.CIEM\Get-SeverityColor -Severity $signal.Severity
                                             New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '4px' } } -Content {
                                                 New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                                     New-UDChip -Label $signal.Severity -Size 'small' -Style @{ backgroundColor = $sevColor; color = 'white' }
@@ -162,10 +162,10 @@ function New-CIEMIdentityRiskPage {
 
                                     New-UDDynamic -Content {
                                       try {
-                                        $attackPaths = @(Get-CIEMAttackPath -PrincipalId $principalId)
+                                        $attackPaths = @(Devolutions.CIEM\Get-CIEMAttackPath -PrincipalId $principalId)
                                         if ($attackPaths.Count -gt 0) {
                                             foreach ($ap in $attackPaths) {
-                                                $apSevColor = Get-SeverityColor -Severity $ap.Severity
+                                                $apSevColor = Devolutions.CIEM\Get-SeverityColor -Severity $ap.Severity
                                                 $chainLabels = @($ap.Path | ForEach-Object {
                                                     $label = if ($_.display_name) { $_.display_name } else { $_.kind }
                                                     "$label ($($_.kind))"

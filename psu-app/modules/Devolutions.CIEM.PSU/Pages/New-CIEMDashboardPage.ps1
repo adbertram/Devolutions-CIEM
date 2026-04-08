@@ -17,7 +17,7 @@ function New-CIEMDashboardPage {
 
         # Last Discovery status card
         New-UDDynamic -Content {
-            $lastRun = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
+            $lastRun = @(Devolutions.CIEM\Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
             if ($lastRun.Count -gt 0) {
                 $run = $lastRun[0]
                 $resourceCount = $run.ArmRowCount + $run.EntraRowCount
@@ -34,7 +34,7 @@ function New-CIEMDashboardPage {
         }
 
         # Load available scan runs for the selector (only those with results)
-        $scanRuns = @(Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
+        $scanRuns = @(Devolutions.CIEM\Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
 
         if ($scanRuns -and $scanRuns.Count -gt 0) {
             # Initialize selected scan run to most recent if not already set
@@ -47,7 +47,7 @@ function New-CIEMDashboardPage {
                 New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '400px' } } -Content {
                         New-UDSelect -Id 'scanRunSelector' -Label 'Select Scan Run' -Option {
-                            $runs = @(Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
+                            $runs = @(Devolutions.CIEM\Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
                             foreach ($run in $runs) {
                                 $statusIcon = switch ([string]$run.Status) { 'Completed' { '✓' } 'Failed' { '✗' } default { '…' } }
                                 $label = "$statusIcon $(([datetime]$run.StartTime).ToString('yyyy-MM-dd HH:mm')) - $($run.Providers -join ', ') ($($run.TotalResults) results, $($run.FailedResults) failed)"
@@ -69,7 +69,7 @@ function New-CIEMDashboardPage {
                 $scanRunId = $Session:SelectedScanRunId
                 if (-not $scanRunId) { return }
 
-                $scanRun = Get-CIEMScanRun -Id $scanRunId -IncludeResults
+                $scanRun = Devolutions.CIEM\Get-CIEMScanRun -Id $scanRunId -IncludeResults
                 if (-not $scanRun) {
                     New-UDTypography -Text 'Scan run not found.' -Style @{ color = '#666'; padding = '20px' }
                     return
@@ -175,7 +175,7 @@ function New-CIEMDashboardPage {
                                 New-UDTableColumn -Property 'Title' -Title 'Result'
                                 New-UDTableColumn -Property 'Severity' -Title 'Severity' -Render {
                                     $sev = $EventData.Severity.ToUpper()
-                                    $color = Get-SeverityColor -Severity $sev
+                                    $color = Devolutions.CIEM\Get-SeverityColor -Severity $sev
                                     New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                                 }
                                 New-UDTableColumn -Property 'Service' -Title 'Service'

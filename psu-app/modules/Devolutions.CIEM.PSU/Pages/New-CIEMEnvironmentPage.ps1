@@ -18,7 +18,7 @@ function New-CIEMEnvironmentPage {
 
     New-UDPage -Name 'Environment' -Url '/ciem/environment' -Content {
 
-        Write-CIEMLog -Message "Environment page Content block executing" -Severity INFO -Component 'PSU-EnvironmentPage'
+        Devolutions.CIEM\Write-CIEMLog -Message "Environment page Content block executing" -Severity INFO -Component 'PSU-EnvironmentPage'
 
         # Load ECharts community library from CDN
         New-UDHelmet -Tag 'script' -Attributes @{
@@ -62,7 +62,7 @@ function New-CIEMEnvironmentPage {
                         $provider = $Session:SelectedEnvProvider
                         if (-not $provider) { $provider = 'Azure' }
 
-                        Write-CIEMLog -Message "DISCOVERY ONCLICK: entered handler, provider=$provider" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: entered handler, provider=$provider" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         if ($provider -ne 'Azure') {
                             Show-UDToast -Message "Provider '$provider' is not yet supported for discovery." -Duration 5000 -BackgroundColor '#ff9800'
@@ -71,25 +71,25 @@ function New-CIEMEnvironmentPage {
 
                         Show-UDToast -Message 'Starting Azure discovery...' -Duration 5000 -BackgroundColor '#2196f3'
 
-                        $run = Invoke-CIEMJobWithProgress `
+                        $run = Devolutions.CIEM\Invoke-CIEMJobWithProgress `
                             -ScriptName 'Devolutions.CIEM\Start-CIEMAzureDiscovery' `
                             -ProgressElementId 'envDiscoveryProgress' `
                             -DisableElementIds @('startDiscoveryBtn') `
                             -MaxPollSeconds 600
 
-                        Write-CIEMLog -Message "DISCOVERY ONCLICK: Invoke-CIEMJobWithProgress returned, run type=$($run.GetType().Name), run=$($run | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: Invoke-CIEMJobWithProgress returned, run type=$($run.GetType().Name), run=$($run | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue)" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         $status = $run.Status
                         $armCount = $run.ArmRowCount
                         $entraCount = $run.EntraRowCount
 
-                        Write-CIEMLog -Message "DISCOVERY ONCLICK: parsed results — status=$status, arm=$armCount, entra=$entraCount" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: parsed results — status=$status, arm=$armCount, entra=$entraCount" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         # Clear discovery progress and auto-reload the environment tree
                         Set-UDElement -Id 'envDiscoveryProgress' -Content {}
-                        Write-CIEMLog -Message "DISCOVERY ONCLICK: calling Sync-UDElement envChartDynamic" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: calling Sync-UDElement envChartDynamic" -Severity INFO -Component 'PSU-EnvironmentPage'
                         Sync-UDElement -Id 'envChartDynamic'
-                        Write-CIEMLog -Message "DISCOVERY ONCLICK: Sync-UDElement returned" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: Sync-UDElement returned" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         if ($status -eq 'Completed') {
                             Show-UDToast -Message "Discovery completed: $armCount ARM resources, $entraCount Entra resources" -Duration 8000 -BackgroundColor '#4caf50'
@@ -101,7 +101,7 @@ function New-CIEMEnvironmentPage {
                     }
                     catch {
                         $errorMsg = $_.Exception.Message
-                        Write-CIEMLog -Message "Discovery from Environment page failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "Discovery from Environment page failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
                         Set-UDElement -Id 'envDiscoveryProgress' -Content {}
                         Show-UDToast -Message "Discovery failed: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
                     }
@@ -120,18 +120,18 @@ function New-CIEMEnvironmentPage {
                     New-UDTypography -Text 'Loading environment data...' -Variant 'body1' -Style @{ marginTop = '16px'; color = '#666' }
                 }
             } -Content {
-                Write-CIEMLog -Message "DYNAMIC CONTENT: envChartDynamic Content block entered" -Severity INFO -Component 'PSU-EnvironmentPage'
+                Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: envChartDynamic Content block entered" -Severity INFO -Component 'PSU-EnvironmentPage'
                 $loadedModule = Get-Module 'Devolutions.CIEM' | Select-Object -First 1
-                Write-CIEMLog -Message "ENV PAGE: Loaded module version=$($loadedModule.Version), path=$($loadedModule.ModuleBase)" -Severity INFO -Component 'PSU-EnvironmentPage'
-                Write-CIEMLog -Message "ENV PAGE: DatabasePath=$script:DatabasePath" -Severity INFO -Component 'PSU-EnvironmentPage'
-                Write-CIEMLog -Message "ENV PAGE: ModuleRoot=$script:ModuleRoot" -Severity INFO -Component 'PSU-EnvironmentPage'
+                Devolutions.CIEM\Write-CIEMLog -Message "ENV PAGE: Loaded module version=$($loadedModule.Version), path=$($loadedModule.ModuleBase)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                Devolutions.CIEM\Write-CIEMLog -Message "ENV PAGE: DatabasePath=$script:DatabasePath" -Severity INFO -Component 'PSU-EnvironmentPage'
+                Devolutions.CIEM\Write-CIEMLog -Message "ENV PAGE: ModuleRoot=$script:ModuleRoot" -Severity INFO -Component 'PSU-EnvironmentPage'
                 try {
                     $orient = $Session:SelectedEnvOrient
                     if (-not $orient) { $orient = 'LR' }
                     $viewMode = $Session:SelectedEnvView
                     if (-not $viewMode) { $viewMode = 'Infrastructure' }
 
-                    Write-CIEMLog -Message "DYNAMIC CONTENT: view=$viewMode, orient=$orient" -Severity INFO -Component 'PSU-EnvironmentPage'
+                    Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: view=$viewMode, orient=$orient" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                     if ($viewMode -eq 'Identity') {
                         # --- Identity View ---
@@ -151,9 +151,9 @@ function New-CIEMEnvironmentPage {
                             }
                         }
 
-                        Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureIdentityHierarchy (mode: $assignmentMode)" -Severity INFO -Component 'PSU-EnvironmentPage'
-                        $hierarchy = @(Get-CIEMAzureIdentityHierarchy -Mode $assignmentMode)
-                        Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) identity hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureIdentityHierarchy (mode: $assignmentMode)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        $hierarchy = @(Devolutions.CIEM\Get-CIEMAzureIdentityHierarchy -Mode $assignmentMode)
+                        Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) identity hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         # Identity-specific summary counts
                         $identityCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Identity' }).Count
@@ -183,10 +183,10 @@ function New-CIEMEnvironmentPage {
                         }
                     } else {
                         # --- Infrastructure View ---
-                        Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureArmHierarchy (orient: $orient)" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: calling Get-CIEMAzureArmHierarchy (orient: $orient)" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-                        $hierarchy = @(Get-CIEMAzureArmHierarchy)
-                        Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
+                        $hierarchy = @(Devolutions.CIEM\Get-CIEMAzureArmHierarchy)
+                        Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         # Summary counts
                         $tenantCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Tenant' }).Count
@@ -420,11 +420,11 @@ function New-CIEMEnvironmentPage {
 "@
                     Invoke-UDJavaScript -JavaScript $js
 
-                    Write-CIEMLog -Message "Environment tree rendered: $resCount resources, $subCount subs, $rgCount RGs" -Severity INFO -Component 'PSU-EnvironmentPage'
+                    Devolutions.CIEM\Write-CIEMLog -Message "Environment tree rendered: $resCount resources, $subCount subs, $rgCount RGs" -Severity INFO -Component 'PSU-EnvironmentPage'
                 }
                 catch {
                     $errorMsg = $_.Exception.Message
-                    Write-CIEMLog -Message "Environment auto-load failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
+                    Devolutions.CIEM\Write-CIEMLog -Message "Environment auto-load failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
 
                     if ($errorMsg -match 'No ARM resources found' -or $errorMsg -match 'No effective role assignments' -or $errorMsg -match 'No role assignment resources' -or $errorMsg -match 'No valid role assignment') {
                         New-UDCard -Style @{ textAlign = 'center'; padding = '40px' } -Content {
@@ -435,7 +435,7 @@ function New-CIEMEnvironmentPage {
                             }
                         }
                     } else {
-                        New-CIEMErrorContent -Text 'Failed to Load Environment' -Details $errorMsg
+                        Devolutions.CIEM\New-CIEMErrorContent -Text 'Failed to Load Environment' -Details $errorMsg
                     }
                 }
             }

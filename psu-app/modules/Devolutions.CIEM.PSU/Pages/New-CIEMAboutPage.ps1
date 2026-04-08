@@ -18,7 +18,7 @@ function New-CIEMAboutPage {
             New-UDTypography -Text 'Devolutions CIEM is a security scanning solution that helps identify identity and access management issues across your cloud infrastructure.' -Variant 'body1' -Style @{ marginBottom = '20px' }
 
             # Dynamic provider/check info
-            $providers = @(Get-CIEMProvider)
+            $providers = @(Devolutions.CIEM\Get-CIEMProvider)
             $featureItems = @()
             foreach ($p in $providers) {
                 $featureItems += "$($p.CheckCount) $($p.Name) security checks"

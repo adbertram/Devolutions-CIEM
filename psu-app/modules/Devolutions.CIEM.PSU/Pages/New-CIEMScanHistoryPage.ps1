@@ -19,12 +19,12 @@ function New-CIEMScanHistoryPage {
             New-UDDynamic -Id 'scanHistoryPanel' -Content {
 
                 try {
-                    $scanRuns = @(Get-CIEMScanRun)
+                    $scanRuns = @(Devolutions.CIEM\Get-CIEMScanRun)
 
                     if ($scanRuns -and $scanRuns.Count -gt 0) {
                         New-UDDataGrid -LoadRows {
             
-                            $runs = @(Get-CIEMScanRun)
+                            $runs = @(Devolutions.CIEM\Get-CIEMScanRun)
                             $historyData = $runs | ForEach-Object {
                                 @{
                                     id       = $_.Id
@@ -68,7 +68,7 @@ function New-CIEMScanHistoryPage {
                             New-UDDataGridColumn -Field 'duration' -HeaderName 'Duration' -Width 100
                         ) -AutoHeight $true -Pagination -PageSize 10 -ExportOptions @('CSV', 'JSON') -OnExport {
             
-                            $runs = @(Get-CIEMScanRun -IncludeResults)
+                            $runs = @(Devolutions.CIEM\Get-CIEMScanRun -IncludeResults)
 
                             if ($EventData.Type -eq 'CSV') {
                                 $csvData = $runs | ForEach-Object {
@@ -125,7 +125,7 @@ function New-CIEMScanHistoryPage {
                             $scanRunId = $EventData.row.id
 
                             try {
-                                $scanRun = Get-CIEMScanRun -Id $scanRunId -IncludeResults
+                                $scanRun = Devolutions.CIEM\Get-CIEMScanRun -Id $scanRunId -IncludeResults
                                 $rawResults = $scanRun.ScanResults
 
                                 if ($rawResults -and $rawResults.Count -gt 0) {
@@ -174,7 +174,7 @@ function New-CIEMScanHistoryPage {
                                             New-UDDataGridColumn -Field 'title' -HeaderName 'Finding' -Flex 1
                                             New-UDDataGridColumn -Field 'severity' -HeaderName 'Severity' -Width 110 -Render {
                                                 $sev = $EventData.severity.ToUpper()
-                                                $color = Get-SeverityColor -Severity $sev
+                                                $color = Devolutions.CIEM\Get-SeverityColor -Severity $sev
                                                 New-UDChip -Label $sev -Style @{ backgroundColor = $color; color = 'white' }
                                             }
                                             New-UDDataGridColumn -Field 'status' -HeaderName 'Status' -Width 100 -Render {
