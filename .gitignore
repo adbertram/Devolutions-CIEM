@@ -188,6 +188,5 @@ psu-app/data/ciem.log
 agent_workspaces/
 test-results/
 
-# Weekly status report artifacts (generated, not source)
-.claude/skills/send-status-report/reports/
-.claude/skills/status-reports/reports/
+# Claude Code local config (skills, commands, agents, hooks)
+.claude/
