@@ -11,7 +11,7 @@
 param siteName string = 'devolutions-ciem-psu'
 
 @description('The version of PowerShell Universal')
-param version string = '5.4.4'
+param version string = '2026.1.5'
 
 @description('App Service Plan Pricing Tier')
 @allowed([
@@ -79,6 +79,7 @@ resource appSettings 'Microsoft.Web/sites/config@2024-04-01' = {
   name: 'appsettings'
   properties: {
     WEBSITES_ENABLE_APP_SERVICE_STORAGE: 'true'
+    WEBSITES_CONTAINER_START_TIME_LIMIT: '1800'
     ASPNETCORE_FORWARDEDHEADERS_ENABLED: 'true'
     Jwt__SigningKey: jwtSigningKey
     Api__Url: 'https://${siteName}.azurewebsites.net'
