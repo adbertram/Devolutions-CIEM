@@ -30,8 +30,12 @@ function Get-PSUApp {
     Assert-PSUConnection
 
     $headers = @{
-        'Authorization' = "Bearer $($script:PSUConnection.Token)"
-        'Accept'        = 'application/json'
+        'Authorization'              = "Bearer $($script:PSUConnection.Token)"
+        'Accept'                     = 'application/json'
+        # ngrok free tunnels return a browser-warning HTML interstitial for
+        # GET requests unless this header is set, which silently breaks
+        # Invoke-RestMethod JSON parsing.
+        'ngrok-skip-browser-warning' = 'true'
     }
 
     if ($PSCmdlet.ParameterSetName -eq 'ById') {

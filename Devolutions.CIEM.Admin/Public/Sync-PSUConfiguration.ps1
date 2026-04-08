@@ -26,8 +26,11 @@ function Sync-PSUConfiguration {
     Assert-PSUConnection
 
     $headers = @{
-        'Authorization' = "Bearer $($script:PSUConnection.Token)"
-        'Accept'        = 'application/json'
+        'Authorization'              = "Bearer $($script:PSUConnection.Token)"
+        'Accept'                     = 'application/json'
+        # ngrok free tunnels return a browser-warning HTML interstitial unless
+        # this header is set, which silently breaks Invoke-RestMethod parsing.
+        'ngrok-skip-browser-warning' = 'true'
     }
 
     $uri = "$($script:PSUConnection.Url)/api/v1/configuration"

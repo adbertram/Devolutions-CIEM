@@ -60,9 +60,15 @@ function Invoke-CIEMCommand {
     }
 
     $headers = @{
-        'Authorization' = "Bearer $($script:PSUConnection.Token)"
-        'Accept'        = 'application/json'
-        'Content-Type'  = 'application/json'
+        'Authorization'              = "Bearer $($script:PSUConnection.Token)"
+        'Accept'                     = 'application/json'
+        'Content-Type'               = 'application/json'
+        # ngrok free tunnels inject a browser-warning HTML interstitial for
+        # GET requests from browser-like User-Agents (PowerShell included).
+        # Without this header, /api/v1/script returns HTML instead of the
+        # script list, the executor lookup silently returns nothing, and
+        # the code tries to POST a duplicate script.
+        'ngrok-skip-browser-warning' = 'true'
     }
 
     $baseUrl = $script:PSUConnection.Url

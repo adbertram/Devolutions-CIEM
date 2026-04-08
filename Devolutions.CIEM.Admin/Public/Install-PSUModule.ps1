@@ -50,9 +50,12 @@ function Install-PSUModule {
     Assert-PSUConnection
 
     $headers = @{
-        'Authorization' = "Bearer $($script:PSUConnection.Token)"
-        'Accept'        = 'application/json'
-        'Content-Type'  = 'application/json'
+        'Authorization'              = "Bearer $($script:PSUConnection.Token)"
+        'Accept'                     = 'application/json'
+        'Content-Type'               = 'application/json'
+        # ngrok free tunnels return a browser-warning HTML interstitial unless
+        # this header is set, which silently breaks Invoke-RestMethod parsing.
+        'ngrok-skip-browser-warning' = 'true'
     }
 
     if (-not $Version) {

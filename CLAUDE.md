@@ -31,12 +31,12 @@ Detailed TDD rules, test layer conventions, and what requires tests: `.claude/ru
 
 ## Default PSU Instance (CRITICAL)
 
-**"Local" PSU = the always-on adam-server instance** (Mac Mini) at `https://adam-server.tail2ab7e0.ts.net`. There is NO MacBook PSU — running one would corrupt the Dropbox-synced module repository. Default to this "local" instance for all operations unless the user explicitly says "Azure" or "production":
+**"Local" PSU = the always-on adam-server instance** (Mac Mini). There is NO MacBook PSU — running one would corrupt the Dropbox-synced module repository. Default to this "local" instance for all operations unless the user explicitly says "Azure" or "production":
 
-- **Opening PSU:** Open the URL in `~/Dropbox/GitRepos/Devolutions-CIEM/.ngrok-url` (public) or the tailnet URL above
+- **Opening PSU:** `ngrok api tunnels list --limit 20 --log false | jq -r '.tunnels[] | select(.forwards_to == "http://localhost:5001") | .public_url'`
 - **Publishing modules:** `Publish-PSUModule -LocalOnly` (copies to Dropbox-synced Repository, restarts adam-server app)
 - **Testing commands:** `Invoke-TestCommand -Environment local` (default)
-- **`Connect-PSU`:** `Connect-PSU -Local` (reads `LOCAL_PSU_URL` from `.env`, now points at adam-server tailnet)
+- **`Connect-PSU`:** `Connect-PSU -Local` (resolves the current ngrok URL from the ngrok CLI and reads `LOCAL_PSU_TOKEN` from `.env`)
 - **NEVER run `./scripts/setup-local-psu.sh start`** — it's guarded against accidental use and requires `--force` / `ALLOW_LOCAL_PSU=1`
 
 ## Project Context
@@ -259,8 +259,7 @@ The "local" PSU runs on **adam-server** (headless Mac Mini via Tailscale), not o
 
 | Property | Value |
 |----------|-------|
-| **Tailnet URL** | `https://adam-server.tail2ab7e0.ts.net` (what `Connect-PSU -Local` hits) |
-| **Public URL** | see `~/Dropbox/GitRepos/Devolutions-CIEM/.ngrok-url` (ephemeral, refreshed on ngrok restart) |
+| **Public URL** | `ngrok api tunnels list --limit 20 --log false | jq -r '.tunnels[] \| select(.forwards_to == "http://localhost:5001") \| .public_url'` |
 | **PSU port** | `127.0.0.1:5001` on adam-server |
 | **PSU Version** | 2026.1.0 |
 | **Binary** | `~/.local/share/powershell-universal/Universal.Server` (native macOS ARM64) — on adam-server |
@@ -271,7 +270,7 @@ The "local" PSU runs on **adam-server** (headless Mac Mini via Tailscale), not o
 
 ```bash
 # Connect from MacBook
-Connect-PSU -Local                           # Uses LOCAL_PSU_URL from .env (tailnet URL)
+Connect-PSU -Local                           # Resolves the current ngrok URL from the CLI
 
 # Kickstart PSU on adam-server if it crashes
 ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'
@@ -279,18 +278,17 @@ ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'
 
 **Workflow:** Edit CIEM module on MacBook → Dropbox syncs → adam-server's PSU picks up changes (no publish needed for dev). **NEVER run local PSU on MacBook simultaneously** — both write to the same Dropbox-synced SQLite and will corrupt it.
 
-**ngrok dev domain is broken** (`chummy-nicolasa-unconnotative.ngrok-free.dev` has `certificate: null` on ngrok's side; ngrok blocks all API modifications). Don't try to fix it — use the ephemeral URL from `.ngrok-url`.
+**ngrok dev domain is broken** (`chummy-nicolasa-unconnotative.ngrok-free.dev` has `certificate: null` on ngrok's side; ngrok blocks all API modifications). Don't try to fix it — use the current tunnel URL from `ngrok api tunnels list`.
 
 ### .env Configuration
 
 ```
 AZURE_PSU_URL=https://devolutions-ciem-psu.azurewebsites.net
 AZURE_PSU_TOKEN=<azure-token>
-LOCAL_PSU_URL=https://adam-server.tail2ab7e0.ts.net  # adam-server PSU via tailnet
 LOCAL_PSU_TOKEN=<any-token>  # adam-server runs in Permissive security mode
 ```
 
-`Connect-PSU` reads `AZURE_PSU_URL` by default. Use `-Local` to connect to `LOCAL_PSU_URL` (adam-server).
+`Connect-PSU` reads `AZURE_PSU_URL` by default. Use `-Local` to resolve the current adam-server ngrok URL via the ngrok CLI and read `LOCAL_PSU_TOKEN` from `.env`.
 
 ### Azure PSU Instance (Production)
 

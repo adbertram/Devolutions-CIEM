@@ -5,10 +5,12 @@ function Connect-PSU {
 
     .DESCRIPTION
         Authenticates to PSU by reading credentials from a .env file or accepting
-        parameters directly. Sets up the module-level connection for subsequent commands.
+        parameters directly. For local connections, resolves the current adam-server
+        public URL from the ngrok CLI unless -Url is provided.
 
     .PARAMETER Url
-        The PSU server URL. If not specified, reads from AZURE_PSU_URL or LOCAL_PSU_URL in .env file.
+        The PSU server URL. If not specified, reads AZURE_PSU_URL from .env for Azure,
+        or resolves the current local PSU URL from ngrok when -Local is used.
 
     .PARAMETER Token
         The PSU app token. If not specified, reads from AZURE_PSU_TOKEN or LOCAL_PSU_TOKEN in .env file.
@@ -23,7 +25,7 @@ function Connect-PSU {
         Azure web app name (for Azure-hosted PSU). Enables filesystem operations.
 
     .PARAMETER Local
-        Connect to local PSU instance (uses LOCAL_PSU_URL and LOCAL_PSU_TOKEN from .env).
+        Connect to local PSU instance (resolves URL from ngrok and reads LOCAL_PSU_TOKEN from .env).
 
     .EXAMPLE
         Connect-PSU
@@ -97,9 +99,6 @@ function Connect-PSU {
                     'AZURE_PSU_TOKEN' {
                         if (-not $Token -and -not $Local) { $Token = $value }
                     }
-                    'LOCAL_PSU_URL' {
-                        if (-not $Url -and $Local) { $Url = $value }
-                    }
                     'LOCAL_PSU_TOKEN' {
                         if (-not $Token -and $Local) { $Token = $value }
                     }
@@ -108,9 +107,46 @@ function Connect-PSU {
         }
     }
 
+    if ($Local -and -not $Url) {
+        if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+            throw "PSU URL is required. Connect-PSU -Local resolves the current URL from ngrok CLI, but 'ngrok' is not available in PATH."
+        }
+
+        # Capture only stdout. The ngrok CLI emits the raw HTTP status line
+        # (e.g. "200 OK") to stderr, which would corrupt the JSON if merged
+        # with `2>&1`. Failures are surfaced through $LASTEXITCODE, not stderr
+        # text, so discarding stderr is safe here.
+        $ngrokOutput = (& ngrok api tunnels list --limit 20 --log false 2>$null) | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            throw "PSU URL is required. Connect-PSU -Local failed to query ngrok CLI (exit code $LASTEXITCODE)."
+        }
+
+        if (-not $ngrokOutput -or $ngrokOutput.IndexOf('{') -lt 0) {
+            throw "PSU URL is required. Connect-PSU -Local could not parse ngrok CLI output."
+        }
+
+        $ngrokResponse = $ngrokOutput | ConvertFrom-Json -ErrorAction Stop
+        $localTunnels = @($ngrokResponse.tunnels | Where-Object {
+            $_.forwards_to -eq 'http://localhost:5001' -and $_.public_url
+        })
+
+        if ($localTunnels.Count -eq 0) {
+            throw "PSU URL is required. Connect-PSU -Local could not find an ngrok tunnel that forwards to http://localhost:5001."
+        }
+
+        if ($localTunnels.Count -gt 1) {
+            throw "PSU URL is required. Connect-PSU -Local found multiple ngrok tunnels for http://localhost:5001. Remove the extra tunnel or pass -Url explicitly."
+        }
+
+        $Url = $localTunnels[0].public_url
+    }
+
     # Validate required parameters
     $target = if ($Local) { 'LOCAL' } else { 'AZURE' }
     if (-not $Url) {
+        if ($Local) {
+            throw "PSU URL is required. Provide -Url or ensure ngrok CLI returns the current public URL for http://localhost:5001."
+        }
         throw "PSU URL is required. Provide -Url parameter or set ${target}_PSU_URL in .env file."
     }
     if (-not $Token) {
@@ -123,7 +159,11 @@ function Connect-PSU {
     # Test connection by calling the module endpoint
     Write-Verbose "Testing connection to $Url"
     $headers = @{
-        'Accept' = 'application/json'
+        'Accept'                     = 'application/json'
+        # ngrok free tunnels return a browser-warning HTML interstitial for
+        # GET requests unless this header is set, which silently breaks
+        # Invoke-RestMethod JSON parsing.
+        'ngrok-skip-browser-warning' = 'true'
     }
     if ($Token) {
         $headers['Authorization'] = "Bearer $Token"

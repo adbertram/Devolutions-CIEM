@@ -55,8 +55,11 @@ function Remove-PSUModule {
     $modules = @($modules)
 
     $headers = @{
-        'Authorization' = "Bearer $($script:PSUConnection.Token)"
-        'Accept'        = 'application/json'
+        'Authorization'              = "Bearer $($script:PSUConnection.Token)"
+        'Accept'                     = 'application/json'
+        # ngrok free tunnels return a browser-warning HTML interstitial unless
+        # this header is set, which silently breaks Invoke-RestMethod parsing.
+        'ngrok-skip-browser-warning' = 'true'
     }
 
     $targetDesc = if ($Version) { "$Name v$Version" } else { "$Name (all versions: $($modules.version -join ', '))" }
