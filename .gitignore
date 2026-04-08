@@ -190,3 +190,4 @@ test-results/
 
 # Claude Code local config (skills, commands, agents, hooks)
 .claude/
+.ngrok-url

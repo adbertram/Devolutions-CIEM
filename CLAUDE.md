@@ -31,13 +31,13 @@ Detailed TDD rules, test layer conventions, and what requires tests: `.claude/ru
 
 ## Default PSU Instance (CRITICAL)
 
-**ALWAYS default to the LOCAL PSU instance** (`http://localhost:5001`) for all operations unless the user explicitly says "Azure" or "production". This applies to:
+**"Local" PSU = the always-on adam-server instance** (Mac Mini) at `https://adam-server.tail2ab7e0.ts.net`. There is NO MacBook PSU — running one would corrupt the Dropbox-synced module repository. Default to this "local" instance for all operations unless the user explicitly says "Azure" or "production":
 
-- **Opening PSU:** Open `http://localhost:5001`, not the Azure URL
-- **Publishing modules:** Use `Publish-PSUModule -LocalOnly` (not the default Azure publish)
-- **Testing commands:** Use `-Environment local` (default) or `-Environment azure`
-- **File manager / log scripts:** Use `--local` flag
-- **`Connect-PSU`:** Use `Connect-PSU -Local`
+- **Opening PSU:** Open the URL in `~/Dropbox/GitRepos/Devolutions-CIEM/.ngrok-url` (public) or the tailnet URL above
+- **Publishing modules:** `Publish-PSUModule -LocalOnly` (copies to Dropbox-synced Repository, restarts adam-server app)
+- **Testing commands:** `Invoke-TestCommand -Environment local` (default)
+- **`Connect-PSU`:** `Connect-PSU -Local` (reads `LOCAL_PSU_URL` from `.env`, now points at adam-server tailnet)
+- **NEVER run `./scripts/setup-local-psu.sh start`** — it's guarded against accidental use and requires `--force` / `ALLOW_LOCAL_PSU=1`
 
 ## Project Context
 
@@ -119,6 +119,18 @@ slack --profile devolutions dm send <username> "message text"
 ```
 
 For representing Adam in Slack communications, use the `devolutions-team-member` agent — it knows Adam's communication style, all team relationships, and project context.
+
+### Weekly Status Reports
+
+All status report operations (sending + checking replies) go through the `status-reports` skill (`.claude/skills/status-reports/`). Never draft updates ad-hoc with `git log` + `slack` CLI, and never read the team group DM directly to check for replies — always load the skill.
+
+- **Skill location:** `.claude/skills/status-reports/SKILL.md` (router with two workflows)
+- **Send workflow:** `.claude/skills/status-reports/workflows/send.md` — invoked by `/send-status-report` (accepts `dryrun` arg)
+- **Check-replies workflow:** `.claude/skills/status-reports/workflows/check-replies.md` — fetches team feedback on the latest report
+- **Report archive:** `.claude/skills/status-reports/reports/YYYY-MM-DD/` — each week is a folder with `report.md` + full-page Playwright screenshots. Read prior reports for tone and what's already been communicated.
+- **Send script:** `.claude/skills/status-reports/scripts/send-report.sh` (supports `--dryrun` to DM adbertram first before team send)
+- **Team group DM:** channel `C0AFCLP7SUF` (mamoreau, schalifoux, alistek, adbertram), accessed via `slack --profile devolutions dm read C0AFCLP7SUF`
+- **Content rules:** User-facing feature language only — NO git branches, commits, or developer terminology. Reports ask stakeholders for directional feedback.
 
 ---
 
@@ -241,38 +253,44 @@ After bulk code changes, if the CIEM app shows "App is not running," investigate
 
 ## PowerShell Universal (PSU) Servers
 
-### Local PSU Instance (Development)
+### "Local" PSU Instance = adam-server (Always-On)
+
+The "local" PSU runs on **adam-server** (headless Mac Mini via Tailscale), not on MacBook. MacBook has no running PSU — it edits code that Dropbox syncs to adam-server.
 
 | Property | Value |
 |----------|-------|
-| **URL** | http://localhost:5001 |
+| **Tailnet URL** | `https://adam-server.tail2ab7e0.ts.net` (what `Connect-PSU -Local` hits) |
+| **Public URL** | see `~/Dropbox/GitRepos/Devolutions-CIEM/.ngrok-url` (ephemeral, refreshed on ngrok restart) |
+| **PSU port** | `127.0.0.1:5001` on adam-server |
 | **PSU Version** | 2026.1.0 |
-| **Binary** | `~/.local/share/powershell-universal/Universal.Server` (native macOS ARM64) |
-| **Data** | `local-psu/` (gitignored) |
-| **Database** | `local-psu/database.db` (SQLite) |
+| **Binary** | `~/.local/share/powershell-universal/Universal.Server` (native macOS ARM64) — on adam-server |
+| **Repository** | `/Users/adam/Dropbox/GitRepos/Devolutions-CIEM/local-psu/Repository` (Dropbox-synced) |
+| **Database** | `/Users/adam/Library/Application Support/PowerShellUniversal/database.db` (LOCAL to adam-server — NOT in Dropbox; SQLite + Dropbox corrupts) |
+| **LaunchDaemons** | `com.psu.server`, `com.ngrok.psu` (both KeepAlive) |
+| **Logs** | `/var/log/psu.log`, `/var/log/ngrok-psu.log` on adam-server |
 
 ```bash
-# Start/stop local PSU
-./scripts/setup-local-psu.sh start          # Start and wait for ready
-./scripts/setup-local-psu.sh start --no-wait  # Start without waiting
-./scripts/setup-local-psu.sh stop            # Stop
-./scripts/setup-local-psu.sh status          # Check health
-./scripts/setup-local-psu.sh logs -f         # Follow logs
-./scripts/setup-local-psu.sh reset           # Wipe all data and start fresh
+# Connect from MacBook
+Connect-PSU -Local                           # Uses LOCAL_PSU_URL from .env (tailnet URL)
 
-# Connect from PowerShell
-Connect-PSU -Local                           # Uses LOCAL_PSU_URL from .env
+# Kickstart PSU on adam-server if it crashes
+ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'
 ```
+
+**Workflow:** Edit CIEM module on MacBook → Dropbox syncs → adam-server's PSU picks up changes (no publish needed for dev). **NEVER run local PSU on MacBook simultaneously** — both write to the same Dropbox-synced SQLite and will corrupt it.
+
+**ngrok dev domain is broken** (`chummy-nicolasa-unconnotative.ngrok-free.dev` has `certificate: null` on ngrok's side; ngrok blocks all API modifications). Don't try to fix it — use the ephemeral URL from `.ngrok-url`.
 
 ### .env Configuration
 
 ```
-PROD_PSU_URL=https://devolutions-ciem-psu.azurewebsites.net
-LOCAL_PSU_URL=http://localhost:5001
-PSU_TOKEN=<production-token>  # Local PSU runs in dev mode (no auth needed)
+AZURE_PSU_URL=https://devolutions-ciem-psu.azurewebsites.net
+AZURE_PSU_TOKEN=<azure-token>
+LOCAL_PSU_URL=https://adam-server.tail2ab7e0.ts.net  # adam-server PSU via tailnet
+LOCAL_PSU_TOKEN=<any-token>  # adam-server runs in Permissive security mode
 ```
 
-`Connect-PSU` reads `PROD_PSU_URL` by default. Use `-Local` to connect to `LOCAL_PSU_URL`.
+`Connect-PSU` reads `AZURE_PSU_URL` by default. Use `-Local` to connect to `LOCAL_PSU_URL` (adam-server).
 
 ### Azure PSU Instance (Production)
 

@@ -1,6 +1,21 @@
 #!/bin/bash
 # setup-local-psu.sh
-# Manage local PowerShell Universal instance for development (native macOS ARM64)
+# DEPRECATED: The "local" PSU now runs on adam-server (Mac Mini) via LaunchDaemon com.psu.server.
+# Running PSU on MacBook at the same time WILL CORRUPT the Dropbox-synced module repository.
+# To manage the adam-server PSU, use:
+#   ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'
+# Only run this script if you know exactly what you're doing.
+if [[ "${1:-}" != "--force" ]] && [[ "${ALLOW_LOCAL_PSU:-}" != "1" ]]; then
+    echo "ERROR: setup-local-psu.sh is deprecated."
+    echo "PSU now runs on adam-server. Running a second instance on MacBook will corrupt the shared module repository."
+    echo ""
+    echo "To start/manage the adam-server PSU:"
+    echo "  ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'"
+    echo ""
+    echo "If you really need to run a local PSU on MacBook (e.g., for e2e testing), set ALLOW_LOCAL_PSU=1 or pass --force."
+    exit 1
+fi
+[[ "${1:-}" == "--force" ]] && shift
 
 set -euo pipefail
 
