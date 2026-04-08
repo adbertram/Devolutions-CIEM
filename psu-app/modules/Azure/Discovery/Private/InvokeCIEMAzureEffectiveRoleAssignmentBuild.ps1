@@ -131,9 +131,8 @@ function InvokeCIEMAzureEffectiveRoleAssignmentBuild {
         }
     }
 
-    # 5. Save all rows
-    foreach ($row in $rows) {
-        Save-CIEMAzureEffectiveRoleAssignment -InputObject $row -Connection $Connection
+    if ($rows.Count -gt 0) {
+        Save-CIEMAzureEffectiveRoleAssignment -InputObject $rows -Connection $Connection
     }
 
     $rows.Count

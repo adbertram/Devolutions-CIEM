@@ -15,6 +15,7 @@ class CIEMAzureArmResource {
     [string]$Tags
     [string]$Properties
     [string]$CollectedAt
+    [long]$LastSeenAt
 
     CIEMAzureArmResource() {}
 }

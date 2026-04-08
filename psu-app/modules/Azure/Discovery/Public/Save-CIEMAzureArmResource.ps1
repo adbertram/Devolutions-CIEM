@@ -51,6 +51,9 @@ function Save-CIEMAzureArmResource {
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$CollectedAt,
 
+        [Parameter(ParameterSetName = 'ByProperties')]
+        [long]$LastSeenAt = 0,
+
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [PSObject[]]$InputObject,
 
@@ -58,75 +61,63 @@ function Save-CIEMAzureArmResource {
         [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
 
+    begin {
+        $ErrorActionPreference = 'Stop'
+        $items = [System.Collections.Generic.List[object]]::new()
+    }
+
     process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
-                $collectedAt = if ($obj.CollectedAt) { $obj.CollectedAt } else { (Get-Date).ToString('o') }
-                $parameters = @{
-                    id              = $obj.Id
-                    type            = $obj.Type
-                    name            = $obj.Name
-                    location        = $obj.Location
-                    resource_group  = $obj.ResourceGroup
-                    subscription_id = $obj.SubscriptionId
-                    tenant_id       = $obj.TenantId
-                    kind            = $obj.Kind
-                    sku             = $obj.Sku
-                    identity        = $obj.Identity
-                    managed_by      = $obj.ManagedBy
-                    plan            = $obj.Plan
-                    zones           = $obj.Zones
-                    tags            = $obj.Tags
-                    properties      = $obj.Properties
-                    collected_at    = $collectedAt
-                }
-
-                $sql = @"
-INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at)
-VALUES (@id, @type, @name, @location, @resource_group, @subscription_id, @tenant_id, @kind, @sku, @identity, @managed_by, @plan, @zones, @tags, @properties, @collected_at)
-"@
-
-                if ($Connection) {
-                    Invoke-PSUSQLiteQuery -Connection $Connection -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-                } else {
-                    Invoke-CIEMQuery -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-                }
+                $items.Add([pscustomobject]@{
+                    Id = $obj.Id
+                    Type = $obj.Type
+                    Name = $obj.Name
+                    Location = $obj.Location
+                    ResourceGroup = $obj.ResourceGroup
+                    SubscriptionId = $obj.SubscriptionId
+                    TenantId = $obj.TenantId
+                    Kind = $obj.Kind
+                    Sku = $obj.Sku
+                    Identity = $obj.Identity
+                    ManagedBy = $obj.ManagedBy
+                    Plan = $obj.Plan
+                    Zones = $obj.Zones
+                    Tags = $obj.Tags
+                    Properties = $obj.Properties
+                    CollectedAt = if ($obj.CollectedAt) { $obj.CollectedAt } else { (Get-Date).ToString('o') }
+                    LastSeenAt = if ($obj.PSObject.Properties.Name -contains 'LastSeenAt') { [long]$obj.LastSeenAt } else { 0 }
+                })
             }
             return
         }
 
-        if (-not $CollectedAt) {
-            $CollectedAt = (Get-Date).ToString('o')
+        $items.Add([pscustomobject]@{
+            Id = $Id
+            Type = $Type
+            Name = $Name
+            Location = $Location
+            ResourceGroup = $ResourceGroup
+            SubscriptionId = $SubscriptionId
+            TenantId = $TenantId
+            Kind = $Kind
+            Sku = $Sku
+            Identity = $Identity
+            ManagedBy = $ManagedBy
+            Plan = $Plan
+            Zones = $Zones
+            Tags = $Tags
+            Properties = $Properties
+            CollectedAt = if ($CollectedAt) { $CollectedAt } else { (Get-Date).ToString('o') }
+            LastSeenAt = $LastSeenAt
+        })
+    }
+
+    end {
+        if ($items.Count -eq 0) {
+            return
         }
 
-        $parameters = @{
-            id              = $Id
-            type            = $Type
-            name            = $Name
-            location        = $Location
-            resource_group  = $ResourceGroup
-            subscription_id = $SubscriptionId
-            tenant_id       = $TenantId
-            kind            = $Kind
-            sku             = $Sku
-            identity        = $Identity
-            managed_by      = $ManagedBy
-            plan            = $Plan
-            zones           = $Zones
-            tags            = $Tags
-            properties      = $Properties
-            collected_at    = $CollectedAt
-        }
-
-        $sql = @"
-INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at)
-VALUES (@id, @type, @name, @location, @resource_group, @subscription_id, @tenant_id, @kind, @sku, @identity, @managed_by, @plan, @zones, @tags, @properties, @collected_at)
-"@
-
-        if ($Connection) {
-            Invoke-PSUSQLiteQuery -Connection $Connection -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-        } else {
-            Invoke-CIEMQuery -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-        }
+        SaveCIEMAzureTable -Entity 'ArmResource' -Items $items.ToArray() -Connection $Connection
     }
 }

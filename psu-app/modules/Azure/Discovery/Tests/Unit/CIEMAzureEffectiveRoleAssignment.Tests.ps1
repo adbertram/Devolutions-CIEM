@@ -2,18 +2,31 @@ BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
+    $script:LegacyEraFixture = Get-Content (Join-Path $PSScriptRoot '..' 'Fixtures' 'legacy-era-output.json') -Raw | ConvertFrom-Json
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-
-    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
+    }
+
+    foreach ($schemaPath in @(
+        (Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'),
+        (Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql')
+    )) {
+        foreach ($statement in ((Get-Content $schemaPath -Raw) -split ';\s*\n' | Where-Object { $_.Trim() })) {
+            $trimmed = $statement.Trim()
+            try {
+                Invoke-CIEMQuery -Query $trimmed -AsNonQuery | Out-Null
+            }
+            catch {
+                if ($trimmed -match 'ALTER\s+TABLE' -and $_.Exception.Message -match 'duplicate column') {
+                    continue
+                }
+                throw
+            }
+        }
     }
 }
 
@@ -677,6 +690,65 @@ Describe 'Effective Role Assignment CRUD' {
                     $result | Should -Be 4
                 } finally { $conn.Dispose() }
             }
+        }
+
+        It 'Matches the committed legacy ERA fixture for a mixed direct and group expansion set' {
+            InModuleScope Devolutions.CIEM -Parameters @{
+                directProps = $script:directAssignmentProps
+                groupProps = $script:groupAssignmentProps
+                roleDef1Props = $script:roleDef1Props
+                roleDef2Props = $script:roleDef2Props
+            } {
+                $connStr = "Data Source=$script:DatabasePath"
+                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
+                $conn.Open()
+                try {
+                    $armResources = @(
+                        [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
+                        [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-reader'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef2Props }
+                        [PSCustomObject]@{ Id = 'ra-direct'; Type = 'microsoft.authorization/roleassignments'; Properties = $directProps }
+                        [PSCustomObject]@{ Id = 'ra-group'; Type = 'microsoft.authorization/roleassignments'; Properties = $groupProps }
+                    )
+                    $entraResources = @(
+                        [pscustomobject]@{ Id = 'user-direct'; DisplayName = 'Direct User' }
+                        [pscustomobject]@{ Id = 'member-user'; DisplayName = 'Member User' }
+                        [pscustomobject]@{ Id = 'member-sp'; DisplayName = 'Member SP' }
+                        [pscustomobject]@{ Id = 'group-1'; DisplayName = 'Cloud Admins' }
+                    )
+                    $relationships = @(
+                        [PSCustomObject]@{ SourceId = 'member-user'; SourceType = 'user'; TargetId = 'group-1'; TargetType = 'group'; Relationship = 'transitive_member_of' }
+                        [PSCustomObject]@{ SourceId = 'member-sp'; SourceType = 'servicePrincipal'; TargetId = 'group-1'; TargetType = 'group'; Relationship = 'transitive_member_of' }
+                    )
+                    InvokeCIEMAzureEffectiveRoleAssignmentBuild `
+                        -ArmResources $armResources `
+                        -EntraResources $entraResources `
+                        -Relationships $relationships `
+                        -Connection $conn `
+                        -ComputedAt '2026-01-01T00:00:00Z' | Out-Null
+                } finally { $conn.Dispose() }
+            }
+
+            $normalizedRows = @(
+                Get-CIEMAzureEffectiveRoleAssignment |
+                    Sort-Object PrincipalId, OriginalPrincipalId |
+                    ForEach-Object {
+                        [pscustomobject]@{
+                            PrincipalId = $_.PrincipalId
+                            PrincipalType = $_.PrincipalType
+                            PrincipalDisplayName = $_.PrincipalDisplayName
+                            OriginalPrincipalId = $_.OriginalPrincipalId
+                            OriginalPrincipalType = $_.OriginalPrincipalType
+                            RoleName = $_.RoleName
+                            Scope = $_.Scope
+                        }
+                    }
+            )
+            $normalizedFixture = @(
+                $script:LegacyEraFixture |
+                    Sort-Object PrincipalId, OriginalPrincipalId
+            )
+
+            ($normalizedRows | ConvertTo-Json -Depth 5) | Should -Be ($normalizedFixture | ConvertTo-Json -Depth 5)
         }
 
         # Error/skip paths

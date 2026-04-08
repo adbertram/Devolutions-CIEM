@@ -93,6 +93,8 @@ function New-CIEMDatabase {
     # Store path in module scope for other functions
     $script:DatabasePath = $Path
 
+    Sync-CIEMCheckCatalog -Provider Azure
+
     if ($PassThru) {
         $Path
     }

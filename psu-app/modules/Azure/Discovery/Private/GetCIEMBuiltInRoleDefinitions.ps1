@@ -1,10 +1,15 @@
 function GetCIEMBuiltInRoleDefinitions {
+    [CmdletBinding()]
+    param()
+
+    $ErrorActionPreference = 'Stop'
+
     $now = (Get-Date).ToString('o')
 
     $armApi = Get-CIEMAzureProviderApi -Name 'ARM'
     $uri = "$(($armApi.BaseUrl).TrimEnd('/'))/providers/Microsoft.Authorization/roleDefinitions?api-version=2022-05-01-preview&`$filter=type eq 'BuiltInRole'"
 
-    $results = Invoke-AzureApi -Uri $uri -ResourceName 'BuiltInRoleDefinitions'
+    $results = Invoke-AzureApi -Api ARM -Uri $uri -ResourceName 'BuiltInRoleDefinitions'
 
     foreach ($item in $results) {
         $resource = [CIEMAzureArmResource]::new()

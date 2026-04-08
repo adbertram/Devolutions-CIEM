@@ -6,14 +6,26 @@ BeforeAll {
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-
-    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
+    }
+
+    foreach ($schemaPath in @(
+        (Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'),
+        (Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql')
+    )) {
+        foreach ($statement in ((Get-Content $schemaPath -Raw) -split ';\s*\n' | Where-Object { $_.Trim() })) {
+            $trimmed = $statement.Trim()
+            try {
+                Invoke-CIEMQuery -Query $trimmed -AsNonQuery | Out-Null
+            }
+            catch {
+                if ($trimmed -match 'ALTER\s+TABLE' -and $_.Exception.Message -match 'duplicate column') {
+                    continue
+                }
+                throw
+            }
+        }
     }
 }
 
@@ -70,6 +82,70 @@ Describe 'Start-CIEMAzureDiscovery' {
             InModuleScope Devolutions.CIEM {
                 { Start-CIEMAzureDiscovery } | Should -Throw '*already in progress*'
             }
+        }
+    }
+
+    Context 'Phase array refactor' {
+        BeforeAll {
+            $script:StartDiscoverySource = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Public' 'Start-CIEMAzureDiscovery.ps1') -Raw
+        }
+
+        It 'Invoke-CIEMDiscoveryPhase generic runner exists (private, no dash)' {
+            InModuleScope Devolutions.CIEM {
+                Get-Command -Name 'InvokeCIEMDiscoveryPhase' -ErrorAction Stop | Should -Not -BeNullOrEmpty
+            }
+        }
+
+        It 'ResolveCIEMResourceTypeMetadata lookup helper exists' {
+            InModuleScope Devolutions.CIEM {
+                Get-Command -Name 'ResolveCIEMResourceTypeMetadata' -ErrorAction Stop | Should -Not -BeNullOrEmpty
+            }
+        }
+
+        It 'ResolveCIEMResourceTypeMetadata returns ResourceGraph + ResourceContainers for microsoft.resources/* types' {
+            InModuleScope Devolutions.CIEM {
+                $result = ResolveCIEMResourceTypeMetadata -Type 'microsoft.resources/subscriptions'
+                $result.ApiSource | Should -Be 'ResourceGraph'
+                $result.GraphTable | Should -Be 'ResourceContainers'
+            }
+        }
+
+        It 'ResolveCIEMResourceTypeMetadata returns ResourceGraph + AuthorizationResources for microsoft.authorization/* types' {
+            InModuleScope Devolutions.CIEM {
+                $result = ResolveCIEMResourceTypeMetadata -Type 'microsoft.authorization/roleassignments'
+                $result.ApiSource | Should -Be 'ResourceGraph'
+                $result.GraphTable | Should -Be 'AuthorizationResources'
+            }
+        }
+
+        It 'ResolveCIEMResourceTypeMetadata returns ResourceGraph + Resources for generic microsoft.* types' {
+            InModuleScope Devolutions.CIEM {
+                $result = ResolveCIEMResourceTypeMetadata -Type 'microsoft.compute/virtualmachines'
+                $result.ApiSource | Should -Be 'ResourceGraph'
+                $result.GraphTable | Should -Be 'Resources'
+            }
+        }
+
+        It 'ResolveCIEMResourceTypeMetadata returns Graph + null GraphTable for non-microsoft types' {
+            InModuleScope Devolutions.CIEM {
+                $result = ResolveCIEMResourceTypeMetadata -Type 'user'
+                $result.ApiSource | Should -Be 'Graph'
+                $result.GraphTable | Should -BeNullOrEmpty
+            }
+        }
+
+        It 'Start-CIEMAzureDiscovery source file no longer contains the monolithic if/elif Save-ResourceTypes chain' {
+            # The old helper had a 3-arm if/elseif chain matching resource type prefixes.
+            # After refactor, the chain should be replaced with a single hashtable lookup.
+            # Count the chained elseif+match clauses that reference microsoft.* prefixes.
+            $chainCount = ([regex]::Matches($script:StartDiscoverySource, "-match\s+'\^microsoft\\\.")).Count
+            $chainCount | Should -BeLessThan 3
+        }
+
+        It 'Start-CIEMAzureDiscovery defines a phase array driving Invoke-CIEMDiscoveryPhase' {
+            # After refactor the function body should invoke Invoke-CIEMDiscoveryPhase
+            # at least once (ideally multiple times in a foreach loop).
+            $script:StartDiscoverySource | Should -Match 'InvokeCIEMDiscoveryPhase'
         }
     }
 

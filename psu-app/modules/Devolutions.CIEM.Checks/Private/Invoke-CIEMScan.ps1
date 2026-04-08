@@ -4,12 +4,12 @@ function Invoke-CIEMScan {
         Executes CIEM security checks against cloud resources (internal).
 
     .DESCRIPTION
-        Connects to the specified providers, initializes service data, and
-        executes selected checks sequentially, emitting findings to the pipeline
-        as each check completes.
+        Connects to the requested providers, validates check metadata, loads only the
+        discovery data required by the selected checks, and executes checks in
+        parallel while preserving Invoke-CIEMCheck behavior.
 
-        This is an internal function called by New-CIEMScanRun. It does not
-        create or manage ScanRun lifecycle — the caller is responsible for that.
+        This is an internal function called by New-CIEMScanRun. It does not create
+        or manage ScanRun lifecycle.
 
     .PARAMETER Provider
         One or more cloud providers to scan ('Azure', 'AWS'). Required.
@@ -44,30 +44,200 @@ function Invoke-CIEMScan {
 
     $ErrorActionPreference = 'Stop'
 
+    function ConvertToCIEMCheckObject {
+        param(
+            [Parameter(Mandatory)]
+            [object]$CheckData
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        $check = [CIEMCheck]::new()
+        $check.Id = $CheckData.Id
+        $check.Provider = $CheckData.Provider
+        $check.Service = $CheckData.Service
+        $check.Title = $CheckData.Title
+        $check.Description = $CheckData.Description
+        $check.Risk = $CheckData.Risk
+        $check.Severity = [CIEMCheckSeverity]$CheckData.Severity
+        $check.RelatedUrl = $CheckData.RelatedUrl
+        $check.CheckScript = $CheckData.CheckScript
+        $check.DependsOn = @($CheckData.DependsOn)
+        $check.DataNeeds = @($CheckData.DataNeeds)
+        $check.Disabled = [bool]$CheckData.Disabled
+
+        $remediation = [CIEMCheckRemediation]::new()
+        if ($CheckData.Remediation) {
+            $remediation.Text = $CheckData.Remediation.Text
+            $remediation.Url = $CheckData.Remediation.Url
+        }
+        $check.Remediation = $remediation
+
+        $permissions = [CIEMCheckPermissions]::new()
+        if ($CheckData.Permissions) {
+            $permissions.Graph = @($CheckData.Permissions.Graph)
+            $permissions.ARM = @($CheckData.Permissions.ARM)
+            $permissions.KeyVaultDataPlane = @($CheckData.Permissions.KeyVaultDataPlane)
+            $permissions.IAM = @($CheckData.Permissions.IAM)
+        }
+        $check.Permissions = $permissions
+
+        $check
+    }
+
+    function EnsureServiceBucket {
+        param(
+            [Parameter(Mandatory)]
+            [hashtable]$ServiceData,
+            [Parameter(Mandatory)]
+            [hashtable]$ServiceErrors,
+            [Parameter(Mandatory)]
+            [hashtable]$ServiceStarted,
+            [Parameter(Mandatory)]
+            [string]$ServiceName
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        if (-not $ServiceData.ContainsKey($ServiceName)) {
+            $ServiceData[$ServiceName] = @{}
+            $ServiceErrors[$ServiceName] = @()
+            $ServiceStarted[$ServiceName] = [Diagnostics.Stopwatch]::StartNew()
+        }
+    }
+
+    function GetCIEMAzureScanServiceCache {
+        param(
+            [Parameter(Mandatory)]
+            [string[]]$NeedKeys,
+            [Parameter(Mandatory)]
+            [string[]]$SubscriptionIds,
+            [Parameter(Mandatory)]
+            [bool]$HasDiscoveryData,
+            [Parameter(Mandatory)]
+            [hashtable]$ServiceData,
+            [Parameter(Mandatory)]
+            [hashtable]$ServiceErrors,
+            [Parameter(Mandatory)]
+            [hashtable]$ServiceStarted
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        if (-not $HasDiscoveryData) {
+            foreach ($serviceName in (($NeedKeys | ForEach-Object { ($_ -split ':', 2)[0] }) | Select-Object -Unique)) {
+                $titleCased = $serviceName.Substring(0, 1).ToUpper() + $serviceName.Substring(1)
+                EnsureServiceBucket -ServiceData $ServiceData -ServiceErrors $ServiceErrors -ServiceStarted $ServiceStarted -ServiceName $titleCased
+                $ServiceErrors[$titleCased] += 'No discovery data available — run Start-CIEMAzureDiscovery first'
+            }
+        }
+        else {
+            # Dispatch into per-prefix helpers. Each helper no-ops when no need keys
+            # in its namespace are present, so unconditional invocation is fine.
+            GetCIEMEntraNeeds `
+                -NeedKeys $NeedKeys `
+                -ServiceData $ServiceData `
+                -ServiceErrors $ServiceErrors `
+                -ServiceStarted $ServiceStarted
+
+            GetCIEMIAMNeeds `
+                -NeedKeys $NeedKeys `
+                -SubscriptionIds $SubscriptionIds `
+                -ServiceData $ServiceData `
+                -ServiceErrors $ServiceErrors `
+                -ServiceStarted $ServiceStarted
+
+            # Reject any need keys that aren't claimed by either helper (fail-fast on
+            # unknown top-level prefixes).
+            $unknownPrefixes = @(
+                $NeedKeys | Where-Object { $_ -notlike 'entra:*' -and $_ -notlike 'iam:*' }
+            )
+            if ($unknownPrefixes.Count -gt 0) {
+                throw "Unknown data need '$($unknownPrefixes[0])'."
+            }
+        }
+
+        $caches = @()
+        foreach ($serviceName in $ServiceData.Keys) {
+            $duration = if ($ServiceStarted.ContainsKey($serviceName)) {
+                $ServiceStarted[$serviceName].Stop()
+                $ServiceStarted[$serviceName].Elapsed
+            }
+            else {
+                [timespan]::Zero
+            }
+
+            $caches += [CIEMServiceCache]@{
+                ServiceName = $serviceName
+                Success = @($ServiceErrors[$serviceName]).Count -eq 0
+                Duration = $duration
+                CacheData = $ServiceData[$serviceName]
+                Errors = @($ServiceErrors[$serviceName])
+                Warnings = @()
+                Output = @()
+            }
+        }
+
+        $caches
+    }
+
+    function ConvertToCIEMScanResultObject {
+        param(
+            [Parameter(Mandatory)]
+            [object]$ResultData
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        [CIEMScanResult]::Create(
+            $ResultData.Check,
+            $ResultData.Status.ToString(),
+            $ResultData.StatusExtended,
+            $ResultData.ResourceId,
+            $ResultData.ResourceName,
+            $ResultData.Location
+        )
+    }
+
     Write-CIEMLog -Message "Invoke-CIEMScan called: Provider=[$($Provider -join ',')], CheckId=[$($CheckId -join ',')], Service=[$($Service -join ',')]" -Severity INFO -Component 'Scan'
 
     $providerCount = $Provider.Count
     $progressActivity = "CIEM Scan ($($Provider -join ', '))"
 
-    # Connect to all requested providers at once (Connect-CIEM already supports arrays)
-    Write-Progress -Activity $progressActivity -Status "Connecting to $($Provider -join ', ')..." -PercentComplete 0
-    $connectResult = Connect-CIEM -Provider $Provider -Force
+    $providersToConnect = @($Provider | Where-Object { -not $script:AuthContext[$_] })
+    if ($providersToConnect.Count -gt 0) {
+        Write-Progress -Activity $progressActivity -Status "Connecting to $($providersToConnect -join ', ')..." -PercentComplete 0
+        $connectResult = Connect-CIEM -Provider $providersToConnect
+        $connectLookup = @{}
+        foreach ($providerResult in $connectResult.Providers) {
+            $connectLookup[$providerResult.Provider] = $providerResult
+        }
+    }
+    else {
+        $connectLookup = @{}
+    }
 
-    # Loop over each provider sequentially
     $providerIdx = 0
     foreach ($providerName in $Provider) {
         $providerIdx++
-        $providerResult = $connectResult.Providers | Where-Object { $_.Provider -eq $providerName }
+        $providerResult = if ($connectLookup.ContainsKey($providerName)) {
+            $connectLookup[$providerName]
+        }
+        else {
+            [pscustomobject]@{
+                Provider = $providerName
+                Status = 'AlreadyConnected'
+                Message = 'Already authenticated.'
+            }
+        }
 
-        # Skip this provider if connection failed; mark its checks as SKIPPED
-        if (-not $providerResult -or $providerResult.Status -ne 'Connected') {
+        if ($providerResult.Status -notin @('Connected', 'AlreadyConnected')) {
             $failMsg = if ($providerResult) { $providerResult.Message } else { 'No connection result returned' }
             Write-Warning "Skipping $providerName (connection failed): $failMsg"
 
-            # Emit SKIPPED for each check belonging to this provider
             $skippedChecks = @(Get-CIEMCheck -Provider $providerName)
             if ($CheckId) { $skippedChecks = @($skippedChecks | Where-Object { $CheckId -contains $_.Id }) }
-            if ($Service)  { $skippedChecks = @($skippedChecks | Where-Object { $Service  -contains $_.Service.ToString() }) }
+            if ($Service) { $skippedChecks = @($skippedChecks | Where-Object { $Service -contains $_.Service.ToString() }) }
 
             foreach ($skippedCheck in $skippedChecks) {
                 [CIEMScanResult]::Create($skippedCheck, 'SKIPPED', "Provider $providerName failed to connect: $failMsg", 'N/A', 'N/A')
@@ -75,31 +245,30 @@ function Invoke-CIEMScan {
             continue
         }
 
-        $authContext    = $script:AuthContext[$providerName]
-        $subscriptionIds = @(if ($authContext.PSObject.Properties['SubscriptionIds']) { $authContext.SubscriptionIds } else { @() })
+        $authContext = $script:AuthContext[$providerName]
+        $subscriptionIds = @(if ($authContext -and $authContext.PSObject.Properties.Name -contains 'SubscriptionIds') { $authContext.SubscriptionIds } else { @() })
 
         Write-Verbose "[$providerName] Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
 
-        # --- Check discovery first: determine what will run before fetching any data ---
-        # Filesystem-first: scripts on disk are the authority for which checks exist.
-        # DB provides metadata (title, severity, description, remediation, permissions).
+        Sync-CIEMCheckCatalog -Provider $providerName
+
         $providerModuleRoot = switch ($providerName) {
             'Azure' { Join-Path $script:ModuleRoot 'modules/Azure' }
-            'AWS'   { Join-Path $script:ModuleRoot 'modules/AWS' }
+            'AWS' { Join-Path $script:ModuleRoot 'modules/AWS' }
             default { $null }
         }
         $checkScriptsPath = if ($providerModuleRoot) { Join-Path $providerModuleRoot 'Checks' } else { $null }
-        $checkScripts     = Get-ChildItem -Path "$checkScriptsPath/*.ps1" -ErrorAction SilentlyContinue
+        $checkScripts = @(Get-ChildItem -Path "$checkScriptsPath/*.ps1" -ErrorAction SilentlyContinue)
 
-        if (-not $checkScripts -or $checkScripts.Count -eq 0) {
+        if ($checkScripts.Count -eq 0) {
             Write-Warning "[$providerName] No check scripts found in $checkScriptsPath — skipping provider."
             continue
         }
 
-        # Dot-source all check scripts (loads function definitions — fast, no API calls)
-        foreach ($scriptFile in $checkScripts) { . $scriptFile.FullName }
+        foreach ($scriptFile in $checkScripts) {
+            . $scriptFile.FullName
+        }
 
-        # Load DB metadata and build lookup by script filename
         $dbChecks = @(Get-CIEMCheck -Provider $providerName)
         $dbChecksByScript = @{}
         foreach ($dbCheck in $dbChecks) {
@@ -108,172 +277,205 @@ function Invoke-CIEMScan {
             }
         }
 
-        # Build execution list from filesystem scripts, enriched with DB metadata
-        $checks = [System.Collections.Generic.List[object]]::new()
-        foreach ($scriptFile in $checkScripts) {
-            $fileName     = $scriptFile.Name                          # e.g. Test-EntraSecurityDefaults.ps1
-            $functionName = $fileName -replace '\.ps1$', ''           # e.g. Test-EntraSecurityDefaults
-
-            # Look up DB metadata by filename
-            $dbCheck = $dbChecksByScript[$fileName]
-
-            if ($dbCheck) {
-                # DB entry exists — use it (includes id, service, severity, title, etc.)
-                $check = $dbCheck
-            } else {
-                # No DB entry — derive minimal metadata from filename conventions
-                $derivedId = ($functionName -creplace '([a-z])([A-Z])', '$1_$2' -creplace '([A-Z]+)([A-Z][a-z])', '$1_$2').ToLower() -replace '-', '_'
-                $derivedTitle = ($functionName -replace '^Test-', '') -creplace '([a-z])([A-Z])', '$1 $2' -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
-                $derivedService = if ($functionName -match '^Test-([A-Z][a-z]+)') { $Matches[1] } else { 'Unknown' }
-
-                $check = [CIEMCheck]@{
-                    Id          = $derivedId
-                    Provider    = $providerName
-                    Service     = $derivedService
-                    Title       = $derivedTitle
-                    Severity    = [CIEMCheckSeverity]::medium
-                    CheckScript = $fileName
-                    Disabled    = $false
-                }
-                Write-Verbose "[$providerName] No DB metadata for $fileName — using derived defaults (service=$derivedService)"
-                # Persist derived check to DB so scan_results FK constraint is satisfied
-                Save-CIEMCheck -InputObject $check
+        if (-not $CheckId -and -not $Service) {
+            $missingMetadataScripts = @($checkScripts | Where-Object { -not $dbChecksByScript.ContainsKey($_.Name) })
+            if ($missingMetadataScripts.Count -gt 0) {
+                $missingNames = $missingMetadataScripts.Name -join ', '
+                throw "[$providerName] Check metadata missing for script(s): $missingNames"
             }
-
-            # Apply filters
-            if ($CheckId) {
-                if ($CheckId -notcontains $check.Id) { continue }
-            }
-            if ($Service) {
-                if ($Service -notcontains $check.Service.ToString()) { continue }
-            }
-            if ($check.Disabled) {
-                Write-Verbose "[$providerName] Skipping disabled check: $($check.Id)"
-                continue
-            }
-
-            # Verify the function actually loaded
-            if (-not (Get-Command -Name $functionName -ErrorAction SilentlyContinue)) {
-                Write-Warning "[$providerName] Script $fileName dot-sourced but function $functionName not found — skipping"
-                continue
-            }
-
-            $checks.Add($check)
         }
 
-        if ($checks.Count -eq 0) {
+        $selectedChecks = [System.Collections.Generic.List[CIEMCheck]]::new()
+        foreach ($dbCheck in $dbChecks) {
+            if ($CheckId -and $CheckId -notcontains $dbCheck.Id) {
+                continue
+            }
+            if ($Service -and $Service -notcontains $dbCheck.Service.ToString()) {
+                continue
+            }
+            if ($dbCheck.Disabled) {
+                Write-Verbose "[$providerName] Skipping disabled check: $($dbCheck.Id)"
+                continue
+            }
+
+            $scriptPath = Join-Path $checkScriptsPath $dbCheck.CheckScript
+            if (-not (Test-Path $scriptPath)) {
+                throw "[$providerName] Check '$($dbCheck.Id)' references missing script '$($dbCheck.CheckScript)'."
+            }
+
+            $functionName = $dbCheck.CheckScript -replace '\.ps1$', ''
+            if (-not (Get-Command -Name $functionName -ErrorAction SilentlyContinue)) {
+                throw "[$providerName] Script '$($dbCheck.CheckScript)' did not load function '$functionName'."
+            }
+
+            if (-not $dbCheck.DataNeeds) {
+                throw "[$providerName] Check '$($dbCheck.Id)' is missing data_needs metadata."
+            }
+            if (@($dbCheck.DataNeeds).Count -eq 0) {
+                throw "[$providerName] Check '$($dbCheck.Id)' must declare at least one data need."
+            }
+
+            foreach ($needKey in @($dbCheck.DataNeeds)) {
+                if ($needKey -cne $needKey.ToLowerInvariant()) {
+                    throw "[$providerName] Check '$($dbCheck.Id)' declares non-canonical data need '$needKey'."
+                }
+            }
+
+            # Pre-validate severity BEFORE parallel dispatch. The cast must succeed on
+            # the main thread so we get a meaningful error, not a cross-runspace failure.
+            try {
+                $null = [CIEMCheckSeverity]$dbCheck.Severity
+            }
+            catch {
+                throw "[$providerName] Check '$($dbCheck.Id)' has invalid severity '$($dbCheck.Severity)': $($_.Exception.Message)"
+            }
+
+            $selectedChecks.Add((ConvertToCIEMCheckObject -CheckData $dbCheck))
+        }
+
+        if ($selectedChecks.Count -eq 0) {
             Write-Verbose "[$providerName] No checks to execute after filtering; skipping provider."
             continue
         }
 
-        Write-Verbose "[$providerName] Checks to execute: $($checks.Count) (from $($checkScripts.Count) scripts, $($dbChecks.Count) DB entries)"
-
-        # Derive required services from the checks that will actually run (+ their DependsOn)
-        $servicesToInit = @(
-            @($checks | ForEach-Object { $_.Service.ToString() }) +
-            @($checks | Where-Object { $_.DependsOn } | ForEach-Object { $_.DependsOn }) |
-            Select-Object -Unique
-        )
-        Write-Verbose "[$providerName] Services to initialize (derived from checks): $($servicesToInit -join ', ')"
-
-        # Initialize only the services needed by the filtered checks
-        $providerObj        = Get-CIEMProvider -Name $providerName
-        $serviceCacheLookup = @{}
-        $statusText         = "Scanning $providerName... ($providerIdx of $providerCount providers)"
+        $needKeys = @($selectedChecks | ForEach-Object { $_.DataNeeds } | Select-Object -Unique)
+        $statusText = "Scanning $providerName... ($providerIdx of $providerCount providers)"
         Write-Progress -Activity $progressActivity -Status $statusText -PercentComplete ([math]::Floor((($providerIdx - 1) / $providerCount) * 80 + 5))
 
+        $serviceCacheLookup = @{}
         switch ($providerName) {
             'Azure' {
-                $sw = [Diagnostics.Stopwatch]::new()
-
-                # Check if discovery data is available
                 $latestCompleted = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
-                $latestPartial   = @(Get-CIEMAzureDiscoveryRun -Status 'Partial' -Last 1)
+                $latestPartial = @(Get-CIEMAzureDiscoveryRun -Status 'Partial' -Last 1)
                 $hasDiscoveryData = ($latestCompleted.Count -gt 0) -or ($latestPartial.Count -gt 0)
 
-                if (-not $hasDiscoveryData) {
-                    Write-Warning "[$providerName] No completed discovery run found. Services requiring discovery data will be SKIPPED. Run Start-CIEMAzureDiscovery first."
-                }
+                $azureServiceData = @{}
+                $azureServiceErrors = @{}
+                $azureServiceStarted = @{}
 
-                foreach ($svcName in $servicesToInit) {
-                    $sw.Restart()
-                    if (-not $hasDiscoveryData) {
-                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                            ServiceName = $svcName; Success = $false; Duration = $sw.Elapsed
-                            CacheData = @{}; Errors = @("No discovery data available — run Start-CIEMAzureDiscovery first")
-                            Warnings = @(); Output = @()
-                        }
-                        continue
-                    }
-                    try {
-                        $svcData = switch ($svcName) {
-                            'Entra' { @{ EntraResources = @(Get-CIEMAzureEntraResource) } }
-                            'IAM'   { @{ ArmResources = @(Get-CIEMAzureArmResource -Type 'microsoft.authorization/roleassignments') + @(Get-CIEMAzureArmResource -Type 'microsoft.authorization/roledefinitions') } }
-                            default { @{} }
-                        }
-                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                            ServiceName = $svcName; Success = $true; Duration = $sw.Elapsed
-                            CacheData = $svcData; Errors = @(); Warnings = @(); Output = @()
-                        }
-                        Write-Verbose "[$providerName] Loaded $svcName from discovery data in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
-                    } catch {
-                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                            ServiceName = $svcName; Success = $false; Duration = $sw.Elapsed
-                            CacheData = @{}; Errors = @($_.Exception.Message); Warnings = @(); Output = @()
-                        }
-                        Write-Warning "[$providerName] Failed to load $svcName from discovery data: $($_.Exception.Message)"
-                    }
+                $azureCaches = @(GetCIEMAzureScanServiceCache `
+                    -NeedKeys $needKeys `
+                    -SubscriptionIds $subscriptionIds `
+                    -HasDiscoveryData $hasDiscoveryData `
+                    -ServiceData $azureServiceData `
+                    -ServiceErrors $azureServiceErrors `
+                    -ServiceStarted $azureServiceStarted)
+
+                foreach ($cache in $azureCaches) {
+                    $serviceCacheLookup[$cache.ServiceName] = $cache
+                    Write-Verbose "[$providerName] Loaded $($cache.ServiceName) needs in $([math]::Round($cache.Duration.TotalSeconds, 2))s"
                 }
             }
             'AWS' {
+                $servicesToInit = @(
+                    @($selectedChecks | ForEach-Object { $_.Service.ToString() }) +
+                    @($selectedChecks | Where-Object { $_.DependsOn } | ForEach-Object { $_.DependsOn }) |
+                    Select-Object -Unique
+                )
                 $sw = [Diagnostics.Stopwatch]::new()
                 foreach ($svcName in $servicesToInit) {
                     $sw.Restart()
                     $getFn = "Get-CIEMAWS${svcName}Data"
-                    if (Get-Command $getFn -ErrorAction SilentlyContinue) {
-                        try {
-                            $svcData = & $getFn
-                            $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                                ServiceName = $svcName; Success = $true; Duration = $sw.Elapsed
-                                CacheData = $svcData; Errors = @(); Warnings = @(); Output = @()
-                            }
-                            Write-Verbose "[$providerName] Initialized $svcName in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
-                        } catch {
-                            $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                                ServiceName = $svcName; Success = $false; Duration = $sw.Elapsed
-                                CacheData = @{}; Errors = @($_.Exception.Message); Warnings = @(); Output = @()
-                            }
-                            Write-Warning "[$providerName] Failed to initialize ${svcName}: $($_.Exception.Message)"
+                    if (-not (Get-Command $getFn -ErrorAction SilentlyContinue)) {
+                        continue
+                    }
+                    try {
+                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
+                            ServiceName = $svcName
+                            Success = $true
+                            Duration = $sw.Elapsed
+                            CacheData = (& $getFn)
+                            Errors = @()
+                            Warnings = @()
+                            Output = @()
                         }
-                    } else {
-                        Write-Verbose "[$providerName] No service function for $svcName — checks will run as stubs"
+                    }
+                    catch {
+                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
+                            ServiceName = $svcName
+                            Success = $false
+                            Duration = $sw.Elapsed
+                            CacheData = @{}
+                            Errors = @($_.Exception.Message)
+                            Warnings = @()
+                            Output = @()
+                        }
                     }
                 }
             }
         }
 
-        # Execute checks and emit findings to pipeline
-        $checkIndex  = 0
-        $totalChecks = $checks.Count
-
-        foreach ($check in $checks) {
-            $checkIndex++
-            $providerBasePct = [math]::Floor((($providerIdx - 1) / $providerCount) * 80 + 5)
-            $checkPct        = $providerBasePct + [math]::Floor(($checkIndex / $totalChecks) * (80 / $providerCount))
-            Write-Progress -Activity $progressActivity -Status "$statusText - check $checkIndex of $totalChecks" -CurrentOperation $check.Title -PercentComplete $checkPct
-
+        $workItems = foreach ($check in $selectedChecks) {
             $functionName = $check.CheckScript -replace '\.ps1$', ''
-            Write-Verbose "[$providerName] Running check: $($check.Id)"
+            $neededServices = @($check.Service.ToString())
+            if ($check.DependsOn) {
+                $neededServices += $check.DependsOn
+            }
+            [pscustomobject]@{
+                Check = $check
+                FunctionName = $functionName
+                ProviderName = $providerName
+                ServiceCache = @($neededServices | ForEach-Object {
+                    if ($serviceCacheLookup.ContainsKey($_)) {
+                        $serviceCacheLookup[$_]
+                    }
+                } | Where-Object { $_ })
+            }
+        }
 
-            # Resolve service caches for this check
-            $checkService = $check.Service.ToString()
-            $neededServices = @($checkService)
-            if ($check.DependsOn) { $neededServices += $check.DependsOn }
-            $checkCaches = @($neededServices | ForEach-Object {
-                if ($serviceCacheLookup.ContainsKey($_)) { $serviceCacheLookup[$_] }
-            } | Where-Object { $_ })
+        $parallelResults = @(InvokeCIEMParallelForEach -InputObject $workItems -ThrottleLimit $script:CIEMParallelThrottleLimitScan -ScriptBlock {
+            param($workItem)
 
-            Invoke-CIEMCheck -Check $check -ServiceCache $checkCaches -FunctionName $functionName -ProviderName $providerName
+            $check = [CIEMCheck]::new()
+            foreach ($property in 'Id', 'Provider', 'Service', 'Title', 'Description', 'Risk', 'RelatedUrl', 'CheckScript', 'DependsOn', 'DataNeeds', 'Disabled') {
+                if ($workItem.Check.PSObject.Properties.Name -contains $property) {
+                    $check.$property = $workItem.Check.$property
+                }
+            }
+            $check.Severity = [CIEMCheckSeverity]$workItem.Check.Severity
+
+            $remediation = [CIEMCheckRemediation]::new()
+            if ($workItem.Check.Remediation) {
+                $remediation.Text = $workItem.Check.Remediation.Text
+                $remediation.Url = $workItem.Check.Remediation.Url
+            }
+            $check.Remediation = $remediation
+
+            $permissions = [CIEMCheckPermissions]::new()
+            if ($workItem.Check.Permissions) {
+                $permissions.Graph = @($workItem.Check.Permissions.Graph)
+                $permissions.ARM = @($workItem.Check.Permissions.ARM)
+                $permissions.KeyVaultDataPlane = @($workItem.Check.Permissions.KeyVaultDataPlane)
+                $permissions.IAM = @($workItem.Check.Permissions.IAM)
+            }
+            $check.Permissions = $permissions
+
+            $serviceCaches = @(
+                foreach ($cacheData in @($workItem.ServiceCache)) {
+                    [CIEMServiceCache]@{
+                        ServiceName = $cacheData.ServiceName
+                        Success = [bool]$cacheData.Success
+                        Duration = $cacheData.Duration
+                        CacheData = $cacheData.CacheData
+                        Errors = @($cacheData.Errors)
+                        Warnings = @($cacheData.Warnings)
+                        Output = @($cacheData.Output)
+                    }
+                }
+            )
+
+            Invoke-CIEMCheck -Check $check -ServiceCache $serviceCaches -FunctionName $workItem.FunctionName -ProviderName $workItem.ProviderName
+        })
+
+        foreach ($parallelResult in $parallelResults) {
+            if (-not $parallelResult.Success) {
+                $checkId = if ($parallelResult.Input -and $parallelResult.Input.Check) { $parallelResult.Input.Check.Id } else { 'unknown-check' }
+                throw "[$providerName] Check '$checkId' failed: $($parallelResult.Error)"
+            }
+
+            foreach ($result in @($parallelResult.Result)) {
+                ConvertToCIEMScanResultObject -ResultData $result
+            }
         }
 
         Write-Verbose "[$providerName] Provider scan complete."

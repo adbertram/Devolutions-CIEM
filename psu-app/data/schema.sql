@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS checks (
     check_script TEXT NOT NULL,
     disabled INTEGER NOT NULL DEFAULT 0,
     permissions TEXT,
-    depends_on TEXT
+    depends_on TEXT,
+    data_needs TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_checks_provider ON checks(provider);
@@ -89,6 +90,8 @@ CREATE INDEX IF NOT EXISTS idx_scan_results_resource ON scan_results(resource_id
 -- The ALTER TABLE migration that was here has been removed since the column
 -- was already included in the table definition.
 CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
+
+ALTER TABLE checks ADD COLUMN data_needs TEXT;
 
 -- =============================================================================
 -- Provider Authentication Methods

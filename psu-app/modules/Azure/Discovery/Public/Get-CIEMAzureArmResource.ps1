@@ -18,7 +18,7 @@ function Get-CIEMAzureArmResource {
         [string]$ResourceGroup
     )
 
-    $query = "SELECT id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at FROM azure_arm_resources"
+    $query = "SELECT id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at, last_seen_at FROM azure_arm_resources"
     $conditions = @()
     $parameters = @{}
 
@@ -62,6 +62,7 @@ function Get-CIEMAzureArmResource {
         $obj.Tags = $row.tags
         $obj.Properties = $row.properties
         $obj.CollectedAt = $row.collected_at
+        $obj.LastSeenAt = $row.last_seen_at
         $obj
     })
 }

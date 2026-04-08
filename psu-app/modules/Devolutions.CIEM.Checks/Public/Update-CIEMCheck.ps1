@@ -16,58 +16,100 @@ function Update-CIEMCheck {
         [Parameter(ParameterSetName = 'ByProperties')][string]$RelatedUrl,
         [Parameter(ParameterSetName = 'ByProperties')][bool]$Disabled,
         [Parameter(ParameterSetName = 'ByProperties')][string]$Permissions,
-        [Parameter(ParameterSetName = 'ByProperties')][string]$DependsOn,
+        [Parameter(ParameterSetName = 'ByProperties')][string[]]$DependsOn,
+        [Parameter(ParameterSetName = 'ByProperties')][string[]]$DataNeeds,
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [PSObject[]]$InputObject,
         [switch]$PassThru
     )
-    process {
-        $items = if ($PSCmdlet.ParameterSetName -eq 'InputObject') { $InputObject } else { @($null) }
-        foreach ($item in $items) {
-            if ($item) {
-                $cId = $item.Id
-                $setClauses = @(); $params = @{ id = $cId }
-                # Update all fields from object
-                $fieldMap = @{ provider='provider'; service='service'; title='title'; severity='severity'; check_script='CheckScript'; description='description'; risk='risk'; remediation_text='Remediation.Text'; remediation_url='Remediation.Url'; related_url='RelatedUrl'; disabled='Disabled' }
-                $setClauses += "provider = @provider"; $params.provider = $item.Provider
-                $setClauses += "service = @service"; $params.service = $item.Service
-                $setClauses += "title = @title"; $params.title = $item.Title
-                $setClauses += "severity = @severity"; $params.severity = [string]$item.Severity
-                $setClauses += "check_script = @check_script"; $params.check_script = $item.CheckScript
-                $setClauses += "description = @description"; $params.description = $item.Description
-                $setClauses += "risk = @risk"; $params.risk = $item.Risk
-                $setClauses += "remediation_text = @remediation_text"; $params.remediation_text = $item.Remediation.Text
-                $setClauses += "remediation_url = @remediation_url"; $params.remediation_url = $item.Remediation.Url
-                $setClauses += "related_url = @related_url"; $params.related_url = $item.RelatedUrl
-                $setClauses += "disabled = @disabled"; $params.disabled = if ($item.Disabled) { 1 } else { 0 }
-                if ($item.Permissions) { $setClauses += "permissions = @permissions"; $params.permissions = $item.Permissions | ConvertTo-Json -Compress }
-                if ($item.DependsOn) { $setClauses += "depends_on = @depends_on"; $params.depends_on = $item.DependsOn | ConvertTo-Json -Compress }
-            } else {
-                $cId = $Id
-                $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $cId }
-                if (-not $existing) { throw "Check '$cId' not found." }
 
-                $setClauses = @(); $params = @{ id = $cId }
-                $columnMap = @{
-                    Provider='provider'; Service='service'; Title='title'; Severity='severity'; CheckScript='check_script'
-                    Description='description'; Risk='risk'; RemediationText='remediation_text'; RemediationUrl='remediation_url'
-                    RelatedUrl='related_url'; Disabled='disabled'; Permissions='permissions'; DependsOn='depends_on'
-                }
-                foreach ($paramName in $columnMap.Keys) {
-                    if ($PSBoundParameters.ContainsKey($paramName)) {
-                        $col = $columnMap[$paramName]
-                        $val = $PSBoundParameters[$paramName]
-                        if ($paramName -eq 'Disabled') { $val = if ($val) { 1 } else { 0 } }
-                        $setClauses += "$col = @$col"
-                        $params[$col] = $val
-                    }
+    process {
+        $items = if ($PSCmdlet.ParameterSetName -eq 'InputObject') { $InputObject } else { @([pscustomobject]@{ Id = $Id }) }
+        foreach ($item in $items) {
+            $checkId = $item.Id
+            $existing = @(Get-CIEMCheck -CheckId $checkId)
+            if ($existing.Count -eq 0) {
+                throw "Check '$checkId' not found."
+            }
+
+            $merged = [pscustomobject]@{
+                Id = $existing[0].Id
+                Provider = $existing[0].Provider
+                Service = $existing[0].Service
+                Title = $existing[0].Title
+                Severity = $existing[0].Severity
+                CheckScript = $existing[0].CheckScript
+                Description = $existing[0].Description
+                Risk = $existing[0].Risk
+                RelatedUrl = $existing[0].RelatedUrl
+                Disabled = [bool]$existing[0].Disabled
+                Permissions = $existing[0].Permissions
+                DependsOn = if ($null -ne $existing[0].DependsOn) { @($existing[0].DependsOn) } else { @() }
+                DataNeeds = if ($null -ne $existing[0].DataNeeds) { @($existing[0].DataNeeds) } else { $null }
+                Remediation = [pscustomobject]@{
+                    Text = $existing[0].Remediation.Text
+                    Url = $existing[0].Remediation.Url
                 }
             }
 
-            if ($setClauses.Count -eq 0) { if ($PassThru) { Get-CIEMCheck -CheckId $cId }; continue }
+            if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
+                foreach ($propertyName in @('Provider', 'Service', 'Title', 'Severity', 'CheckScript', 'Description', 'Risk', 'RelatedUrl', 'Disabled', 'Permissions')) {
+                    if ($item.PSObject.Properties.Name -contains $propertyName) {
+                        $merged.$propertyName = $item.$propertyName
+                    }
+                }
 
-            Invoke-CIEMQuery -Query "UPDATE checks SET $($setClauses -join ', ') WHERE id = @id" -Parameters $params -AsNonQuery | Out-Null
-            if ($PassThru) { Get-CIEMCheck -CheckId $cId }
+                if ($item.PSObject.Properties.Name -contains 'DependsOn') {
+                    $merged.DependsOn = if ($null -ne $item.DependsOn) { @($item.DependsOn) } else { @() }
+                }
+
+                if ($item.PSObject.Properties.Name -contains 'DataNeeds') {
+                    if ($null -ne $item.DataNeeds -and @($item.DataNeeds).Count -eq 0) {
+                        throw "Check '$checkId' must declare at least one data need."
+                    }
+                    $merged.DataNeeds = if ($null -ne $item.DataNeeds) { @($item.DataNeeds) } else { $null }
+                }
+
+                if ($item.PSObject.Properties.Name -contains 'Remediation') {
+                    if ($item.Remediation.PSObject.Properties.Name -contains 'Text') {
+                        $merged.Remediation.Text = $item.Remediation.Text
+                    }
+                    if ($item.Remediation.PSObject.Properties.Name -contains 'Url') {
+                        $merged.Remediation.Url = $item.Remediation.Url
+                    }
+                }
+            }
+            else {
+                foreach ($propertyName in @('Provider', 'Service', 'Title', 'Severity', 'CheckScript', 'Description', 'Risk', 'RelatedUrl', 'Disabled', 'Permissions')) {
+                    if ($PSBoundParameters.ContainsKey($propertyName)) {
+                        $merged.$propertyName = $PSBoundParameters[$propertyName]
+                    }
+                }
+
+                if ($PSBoundParameters.ContainsKey('DependsOn')) {
+                    $merged.DependsOn = @($DependsOn)
+                }
+
+                if ($PSBoundParameters.ContainsKey('DataNeeds')) {
+                    if (@($DataNeeds).Count -eq 0) {
+                        throw "Check '$checkId' must declare at least one data need."
+                    }
+                    $merged.DataNeeds = @($DataNeeds)
+                }
+
+                if ($PSBoundParameters.ContainsKey('RemediationText')) {
+                    $merged.Remediation.Text = $RemediationText
+                }
+
+                if ($PSBoundParameters.ContainsKey('RemediationUrl')) {
+                    $merged.Remediation.Url = $RemediationUrl
+                }
+            }
+
+            Save-CIEMCheck -InputObject $merged
+            if ($PassThru) {
+                Get-CIEMCheck -CheckId $checkId
+            }
         }
     }
 }

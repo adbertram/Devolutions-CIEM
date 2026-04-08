@@ -120,6 +120,19 @@ $script:RelationshipColors = @{
 $script:DormantPermissionThresholdDays = 90
 $script:MediumEntitlementThreshold = 5
 $script:PrivilegedRoleNames = @((Get-Content (Join-Path $script:AzureDiscoveryRoot 'Data/privileged_roles.json') -Raw | ConvertFrom-Json).name)
+$script:CIEMSaveTablesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/save-tables.psd1')
+# Tunables (script-scope, all defined in one place for discoverability)
+# CIEMParallelThrottleLimit*: ForEach-Object -Parallel throttle for discovery vs scan workloads.
+# CIEMSqlBatchSize: cap on rows per multi-row INSERT before InvokeCIEMBatchInsert further sub-divides
+#   to stay under SQLite's 999 SQL parameter limit (chunk = floor(999 / column count)).
+# CIEMGraphBatchSize: max sub-requests in a single Microsoft Graph $batch POST (Graph hard cap is 20).
+# CIEMGraphBatchWallClockSeconds: total budget for retry-loop wall-clock time on a single Graph batch
+#   chunk before throwing. Prevents indefinite stalls when sub-requests stay 429.
+$script:CIEMParallelThrottleLimitDiscovery = 5
+$script:CIEMParallelThrottleLimitScan = 10
+$script:CIEMSqlBatchSize = 500
+$script:CIEMGraphBatchSize = 20
+$script:CIEMGraphBatchWallClockSeconds = 300
 
 # --- Initialize database (base + provider schemas) ---
 Write-CIEMLog -Message "Initializing database..." -Component 'ModuleInit'

@@ -4,16 +4,24 @@ function Save-CIEMAzureEntraResource {
     param(
         [Parameter(Mandatory, ParameterSetName = 'ByProperties')]
         [string]$Id,
+
         [Parameter(Mandatory, ParameterSetName = 'ByProperties')]
         [string]$Type,
+
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$DisplayName,
+
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$ParentId,
+
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$Properties,
+
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$CollectedAt = (Get-Date).ToString('o'),
+
+        [Parameter(ParameterSetName = 'ByProperties')]
+        [long]$LastSeenAt = 0,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [PSObject[]]$InputObject,
@@ -21,37 +29,44 @@ function Save-CIEMAzureEntraResource {
         [Parameter()]
         [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
+
+    begin {
+        $ErrorActionPreference = 'Stop'
+        $items = [System.Collections.Generic.List[object]]::new()
+    }
+
     process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
-                $parameters = @{
-                    id           = $item.Id
-                    type         = $item.Type
-                    display_name = $item.DisplayName
-                    parent_id    = $item.ParentId
-                    properties   = $item.Properties
-                    collected_at = if ($item.CollectedAt) { $item.CollectedAt } else { (Get-Date).ToString('o') }
-                }
-                if ($Connection) {
-                    Invoke-PSUSQLiteQuery -Connection $Connection -Query "INSERT OR REPLACE INTO azure_entra_resources (id, type, display_name, parent_id, properties, collected_at) VALUES (@id, @type, @display_name, @parent_id, @properties, @collected_at)" -Parameters $parameters -AsNonQuery | Out-Null
-                } else {
-                    Invoke-CIEMQuery -Query "INSERT OR REPLACE INTO azure_entra_resources (id, type, display_name, parent_id, properties, collected_at) VALUES (@id, @type, @display_name, @parent_id, @properties, @collected_at)" -Parameters $parameters -AsNonQuery | Out-Null
-                }
+                $items.Add([pscustomobject]@{
+                    Id = $item.Id
+                    Type = $item.Type
+                    DisplayName = $item.DisplayName
+                    ParentId = $item.ParentId
+                    Properties = $item.Properties
+                    CollectedAt = if ($item.CollectedAt) { $item.CollectedAt } else { (Get-Date).ToString('o') }
+                    LastSeenAt = if ($item.PSObject.Properties.Name -contains 'LastSeenAt') { [long]$item.LastSeenAt } else { 0 }
+                })
             }
-        } else {
-            $parameters = @{
-                id           = $Id
-                type         = $Type
-                display_name = $DisplayName
-                parent_id    = $ParentId
-                properties   = $Properties
-                collected_at = $CollectedAt
-            }
-            if ($Connection) {
-                Invoke-PSUSQLiteQuery -Connection $Connection -Query "INSERT OR REPLACE INTO azure_entra_resources (id, type, display_name, parent_id, properties, collected_at) VALUES (@id, @type, @display_name, @parent_id, @properties, @collected_at)" -Parameters $parameters -AsNonQuery | Out-Null
-            } else {
-                Invoke-CIEMQuery -Query "INSERT OR REPLACE INTO azure_entra_resources (id, type, display_name, parent_id, properties, collected_at) VALUES (@id, @type, @display_name, @parent_id, @properties, @collected_at)" -Parameters $parameters -AsNonQuery | Out-Null
-            }
+            return
         }
+
+        $items.Add([pscustomobject]@{
+            Id = $Id
+            Type = $Type
+            DisplayName = $DisplayName
+            ParentId = $ParentId
+            Properties = $Properties
+            CollectedAt = $CollectedAt
+            LastSeenAt = $LastSeenAt
+        })
+    }
+
+    end {
+        if ($items.Count -eq 0) {
+            return
+        }
+
+        SaveCIEMAzureTable -Entity 'EntraResource' -Items $items.ToArray() -Connection $Connection
     }
 }

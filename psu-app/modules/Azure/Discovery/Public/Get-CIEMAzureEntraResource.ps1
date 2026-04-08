@@ -44,6 +44,7 @@ function Get-CIEMAzureEntraResource {
         $obj.ParentId = $row.parent_id
         $obj.Properties = $row.properties
         $obj.CollectedAt = $row.collected_at
+        $obj.LastSeenAt = $row.last_seen_at
         $obj
     })
 }

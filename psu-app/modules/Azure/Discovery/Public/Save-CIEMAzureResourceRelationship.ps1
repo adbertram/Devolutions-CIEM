@@ -27,45 +27,41 @@ function Save-CIEMAzureResourceRelationship {
         [PSObject[]]$InputObject
     )
 
+    begin {
+        $ErrorActionPreference = 'Stop'
+        $items = [System.Collections.Generic.List[object]]::new()
+    }
+
     process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
-            foreach ($obj in $InputObject) {
-                $queryParams = @{
-                    Query      = @"
-INSERT OR REPLACE INTO azure_resource_relationships (source_id, source_type, target_id, target_type, relationship, collected_at)
-VALUES (@source_id, @source_type, @target_id, @target_type, @relationship, @collected_at)
-"@
-                    Parameters = @{
-                        source_id    = $obj.SourceId
-                        source_type  = $obj.SourceType
-                        target_id    = $obj.TargetId
-                        target_type  = $obj.TargetType
-                        relationship = $obj.Relationship
-                        collected_at = $obj.CollectedAt
-                    }
-                    AsNonQuery = $true
-                }
-                if ($Connection) { $queryParams.Connection = $Connection }
-                Invoke-CIEMQuery @queryParams | Out-Null
+            foreach ($item in $InputObject) {
+                $items.Add([pscustomobject]@{
+                    SourceId = $item.SourceId
+                    SourceType = $item.SourceType
+                    TargetId = $item.TargetId
+                    TargetType = $item.TargetType
+                    Relationship = $item.Relationship
+                    CollectedAt = $item.CollectedAt
+                })
             }
-        } else {
-            $queryParams = @{
-                Query      = @"
-INSERT OR REPLACE INTO azure_resource_relationships (source_id, source_type, target_id, target_type, relationship, collected_at)
-VALUES (@source_id, @source_type, @target_id, @target_type, @relationship, @collected_at)
-"@
-                Parameters = @{
-                    source_id    = $SourceId
-                    source_type  = $SourceType
-                    target_id    = $TargetId
-                    target_type  = $TargetType
-                    relationship = $Relationship
-                    collected_at = $CollectedAt
-                }
-                AsNonQuery = $true
-            }
-            if ($Connection) { $queryParams.Connection = $Connection }
-            Invoke-CIEMQuery @queryParams | Out-Null
+            return
         }
+
+        $items.Add([pscustomobject]@{
+            SourceId = $SourceId
+            SourceType = $SourceType
+            TargetId = $TargetId
+            TargetType = $TargetType
+            Relationship = $Relationship
+            CollectedAt = $CollectedAt
+        })
+    }
+
+    end {
+        if ($items.Count -eq 0) {
+            return
+        }
+
+        SaveCIEMAzureTable -Entity 'ResourceRelationship' -Items $items.ToArray() -Connection $Connection
     }
 }

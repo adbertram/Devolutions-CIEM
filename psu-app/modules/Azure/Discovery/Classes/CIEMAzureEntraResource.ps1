@@ -5,6 +5,7 @@ class CIEMAzureEntraResource {
     [string]$ParentId
     [string]$Properties
     [string]$CollectedAt
+    [long]$LastSeenAt
 
     CIEMAzureEntraResource() {}
 }

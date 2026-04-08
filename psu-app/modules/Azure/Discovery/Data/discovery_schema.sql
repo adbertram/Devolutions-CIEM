@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS azure_arm_resources (
     zones TEXT,
     tags TEXT,
     properties TEXT,
-    collected_at TEXT NOT NULL
+    collected_at TEXT NOT NULL,
+    last_seen_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_arm_resources_type ON azure_arm_resources(type);
@@ -41,7 +42,8 @@ CREATE TABLE IF NOT EXISTS azure_entra_resources (
     display_name TEXT,
     parent_id TEXT,
     properties TEXT,
-    collected_at TEXT NOT NULL
+    collected_at TEXT NOT NULL,
+    last_seen_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_entra_resources_type ON azure_entra_resources(type);
@@ -129,3 +131,8 @@ CREATE INDEX IF NOT EXISTS idx_effective_ra_principal ON azure_effective_role_as
 CREATE INDEX IF NOT EXISTS idx_effective_ra_scope ON azure_effective_role_assignments(scope);
 CREATE INDEX IF NOT EXISTS idx_effective_ra_role_def ON azure_effective_role_assignments(role_definition_id);
 CREATE INDEX IF NOT EXISTS idx_effective_ra_principal_type ON azure_effective_role_assignments(principal_type);
+
+ALTER TABLE azure_arm_resources ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE azure_entra_resources ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_arm_resources_last_seen ON azure_arm_resources(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_entra_resources_last_seen ON azure_entra_resources(last_seen_at);

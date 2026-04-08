@@ -45,7 +45,8 @@ function New-CIEMCheckMetadata {
         [Parameter()][string]$RelatedUrl,
         [Parameter()][bool]$Disabled = $true,
         [Parameter()][string]$Permissions,
-        [Parameter()][string]$DependsOn
+        [Parameter()][string[]]$DependsOn,
+        [Parameter()][string[]]$DataNeeds
     )
 
     $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $Id }

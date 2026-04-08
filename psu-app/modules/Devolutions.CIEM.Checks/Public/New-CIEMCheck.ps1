@@ -31,7 +31,9 @@ function New-CIEMCheck {
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$Permissions,
         [Parameter(ParameterSetName = 'ByProperties')]
-        [string]$DependsOn,
+        [string[]]$DependsOn,
+        [Parameter(ParameterSetName = 'ByProperties')]
+        [string[]]$DataNeeds,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [PSObject[]]$InputObject

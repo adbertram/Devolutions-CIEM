@@ -39,50 +39,49 @@ function Save-CIEMAzureEffectiveRoleAssignment {
         [PSObject[]]$InputObject
     )
 
-    process {
+    begin {
         $ErrorActionPreference = 'Stop'
-        $sql = "INSERT OR REPLACE INTO azure_effective_role_assignments (principal_id, principal_type, principal_display_name, original_principal_id, original_principal_type, role_definition_id, role_name, scope, permissions_json, computed_at) VALUES (@principal_id, @principal_type, @principal_display_name, @original_principal_id, @original_principal_type, @role_definition_id, @role_name, @scope, @permissions_json, @computed_at)"
+        $items = [System.Collections.Generic.List[object]]::new()
+    }
 
+    process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
-            foreach ($obj in $InputObject) {
-                $queryParams = @{
-                    Query      = $sql
-                    Parameters = @{
-                        principal_id            = $obj.PrincipalId
-                        principal_type          = $obj.PrincipalType
-                        principal_display_name  = $obj.PrincipalDisplayName
-                        original_principal_id   = $obj.OriginalPrincipalId
-                        original_principal_type = $obj.OriginalPrincipalType
-                        role_definition_id      = $obj.RoleDefinitionId
-                        role_name               = $obj.RoleName
-                        scope                   = $obj.Scope
-                        permissions_json        = $obj.PermissionsJson
-                        computed_at             = $obj.ComputedAt
-                    }
-                    AsNonQuery = $true
-                }
-                if ($Connection) { $queryParams.Connection = $Connection }
-                Invoke-CIEMQuery @queryParams | Out-Null
+            foreach ($item in $InputObject) {
+                $items.Add([pscustomobject]@{
+                    PrincipalId = $item.PrincipalId
+                    PrincipalType = $item.PrincipalType
+                    PrincipalDisplayName = $item.PrincipalDisplayName
+                    OriginalPrincipalId = $item.OriginalPrincipalId
+                    OriginalPrincipalType = $item.OriginalPrincipalType
+                    RoleDefinitionId = $item.RoleDefinitionId
+                    RoleName = $item.RoleName
+                    Scope = $item.Scope
+                    PermissionsJson = $item.PermissionsJson
+                    ComputedAt = $item.ComputedAt
+                })
             }
-        } else {
-            $queryParams = @{
-                Query      = $sql
-                Parameters = @{
-                    principal_id            = $PrincipalId
-                    principal_type          = $PrincipalType
-                    principal_display_name  = $PrincipalDisplayName
-                    original_principal_id   = $OriginalPrincipalId
-                    original_principal_type = $OriginalPrincipalType
-                    role_definition_id      = $RoleDefinitionId
-                    role_name               = $RoleName
-                    scope                   = $Scope
-                    permissions_json        = $PermissionsJson
-                    computed_at             = $ComputedAt
-                }
-                AsNonQuery = $true
-            }
-            if ($Connection) { $queryParams.Connection = $Connection }
-            Invoke-CIEMQuery @queryParams | Out-Null
+            return
         }
+
+        $items.Add([pscustomobject]@{
+            PrincipalId = $PrincipalId
+            PrincipalType = $PrincipalType
+            PrincipalDisplayName = $PrincipalDisplayName
+            OriginalPrincipalId = $OriginalPrincipalId
+            OriginalPrincipalType = $OriginalPrincipalType
+            RoleDefinitionId = $RoleDefinitionId
+            RoleName = $RoleName
+            Scope = $Scope
+            PermissionsJson = $PermissionsJson
+            ComputedAt = $ComputedAt
+        })
+    }
+
+    end {
+        if ($items.Count -eq 0) {
+            return
+        }
+
+        SaveCIEMAzureTable -Entity 'EffectiveRoleAssignment' -Items $items.ToArray() -Connection $Connection
     }
 }

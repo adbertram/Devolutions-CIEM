@@ -5,14 +5,26 @@ BeforeAll {
 
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
-    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
-
-    $discoverySchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
-
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
+    }
+
+    foreach ($schemaPath in @(
+        (Join-Path $PSScriptRoot '..' '..' '..' 'Infrastructure' 'Data' 'azure_schema.sql'),
+        (Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql')
+    )) {
+        foreach ($statement in ((Get-Content $schemaPath -Raw) -split ';\s*\n' | Where-Object { $_.Trim() })) {
+            $trimmed = $statement.Trim()
+            try {
+                Invoke-CIEMQuery -Query $trimmed -AsNonQuery | Out-Null
+            }
+            catch {
+                if ($trimmed -match 'ALTER\s+TABLE' -and $_.Exception.Message -match 'duplicate column') {
+                    continue
+                }
+                throw
+            }
+        }
     }
 }
 

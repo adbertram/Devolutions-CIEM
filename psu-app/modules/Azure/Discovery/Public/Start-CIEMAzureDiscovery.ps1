@@ -4,45 +4,13 @@ function Start-CIEMAzureDiscovery {
         Runs a full Azure discovery scan collecting ARM resources, Entra entities, permissions, and relationships.
 
     .DESCRIPTION
-        Orchestrates the Azure discovery pipeline in two phases:
+        Orchestrates the discovery pipeline as a linear sequence of named phases.
+        Each phase is wrapped by InvokeCIEMDiscoveryPhase which handles the
+        stopwatch, try/catch, error accumulation, and log emission uniformly.
 
-        Phase 1 — Collects data into memory from Azure Resource Graph (ARM resources, role definitions)
-        and Microsoft Graph API (Entra users, groups, service principals, directory roles, permissions,
-        and membership/ownership relationships).
-
-        Phase 2 — Writes all collected data to the CIEM database in a single atomic transaction, including
-        resource type metadata, effective role assignments, and security graph nodes/edges for attack path
-        analysis.
-
-        A concurrency guard prevents multiple discovery runs from executing simultaneously. The function
-        creates a CIEMAzureDiscoveryRun record to track progress and final status (Completed, Partial,
-        or Failed). Individual collection failures are caught and accumulated as warnings, allowing the
-        run to complete partially rather than aborting entirely.
-
-    .PARAMETER Scope
-        Which data sources to collect. 'All' collects both ARM and Entra data. 'ARM' collects only
-        Azure Resource Graph data (resources, containers, authorization, built-in roles). 'Entra'
-        collects only Microsoft Graph data (identities, permissions, relationships). Defaults to 'All'.
-
-    .OUTPUTS
-        CIEMAzureDiscoveryRun
-        The completed discovery run record with status, counts, and any error messages.
-
-    .EXAMPLE
-        Start-CIEMAzureDiscovery
-
-        Runs a full discovery collecting all ARM and Entra data.
-
-    .EXAMPLE
-        Start-CIEMAzureDiscovery -Scope Entra
-
-        Runs discovery collecting only Entra identity data from Microsoft Graph.
-
-    .EXAMPLE
-        $run = Start-CIEMAzureDiscovery -Scope ARM
-        $run.ArmRowCount
-
-        Runs ARM-only discovery and inspects how many resources were collected.
+        Per-phase success flags ($armDiscoverySucceeded / $entraDiscoverySucceeded /
+        $relationshipsSucceeded) drive the Completed / Partial / Failed decision
+        at the end of the run.
     #>
     [CmdletBinding()]
     [OutputType('CIEMAzureDiscoveryRun')]
@@ -54,252 +22,366 @@ function Start-CIEMAzureDiscovery {
 
     $ErrorActionPreference = 'Stop'
 
-    # --- Ensure Azure auth context is established (required for PSU job runspaces) ---
+    function SaveResourceTypesFromList {
+        param(
+            [Parameter(Mandatory)]
+            [AllowEmptyCollection()]
+            [object[]]$Resources,
+            [Parameter(Mandatory)]
+            [object]$Connection,
+            [Parameter(Mandatory)]
+            [string]$DiscoveredAt
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        foreach ($typeGroup in @($Resources | Group-Object Type)) {
+            if (-not $typeGroup.Name) { continue }
+
+            $metadata = ResolveCIEMResourceTypeMetadata -Type $typeGroup.Name
+            SaveCIEMAzureResourceType `
+                -Type $typeGroup.Name `
+                -ApiSource $metadata.ApiSource `
+                -GraphTable $metadata.GraphTable `
+                -ResourceCount $typeGroup.Count `
+                -DiscoveredAt $DiscoveredAt `
+                -Connection $Connection
+        }
+    }
+
     if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
-        Write-CIEMLog "Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure..." -Severity INFO -Component 'Discovery'
+        Write-CIEMLog 'Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure...' -Severity INFO -Component 'Discovery'
         Connect-CIEMAzure | Out-Null
     }
 
-    # --- Concurrency guard ---
     $runningRuns = @(Get-CIEMAzureDiscoveryRun -Status 'Running')
     if ($runningRuns.Count -gt 0) {
         throw "A discovery run is already in progress (Id=$($runningRuns[0].Id)). Wait for it to complete or clear stale runs."
     }
 
-    # --- Create run record ---
     $run = New-CIEMAzureDiscoveryRun -Scope $Scope -Status 'Running' -StartedAt (Get-Date).ToString('o')
     Write-CIEMLog "Start-CIEMAzureDiscovery: run #$($run.Id) started, Scope=$Scope" -Severity INFO -Component 'Discovery'
 
     $warningCount = 0
     $errorMessages = [System.Collections.Generic.List[string]]::new()
+    $runStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
 
-    # In-memory accumulators
-    $armResources    = [System.Collections.Generic.List[object]]::new()
-    $entraResources  = [System.Collections.Generic.List[object]]::new()
-    $entraPermissions = [System.Collections.Generic.List[object]]::new()
-    $relationships   = [System.Collections.Generic.List[object]]::new()
+    # Per-phase success flags. Scope=ARM means Entra is "successful" by virtue of
+    # not running, and vice versa — this matches the pre-refactor semantics.
+    $armDiscoverySucceeded = $Scope -eq 'Entra'
+    $entraDiscoverySucceeded = $Scope -eq 'ARM'
+    $relationshipsSucceeded = $true
+
+    $armRowCount = 0
+    $entraRowCount = 0
+    $armTypeCount = 0
+    $entraTypeCount = 0
+    $relationshipCount = 0
+    $warningCounter = [ref]$warningCount
 
     try {
-        # ===== PHASE 1: Collect to memory =====
-
+        # =================================================================
+        # ARM phase (collection + persistence)
+        # =================================================================
         if ($Scope -eq 'All' -or $Scope -eq 'ARM') {
-            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting ARM resources' -PercentComplete 10 -CurrentOperation 'Querying Resource Graph tables'
-            Write-CIEMLog "Collecting ARM resources (Resource Graph)..." -Component 'Discovery'
+            if ($subscriptionIds.Count -eq 0) {
+                throw 'Start-CIEMAzureDiscovery requires at least one subscription ID for ARM discovery.'
+            }
 
+            $armDiscoverySucceeded = $true
+            $armResources = [System.Collections.Generic.List[object]]::new()
+            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting ARM resources' -PercentComplete 10
+
+            # Resource Graph tables — one phase per table so each failure is isolated.
             foreach ($table in @('Resources', 'ResourceContainers', 'AuthorizationResources')) {
-                try {
-                    $results = @(InvokeCIEMResourceGraphQuery -Query $table)
-                    $armResources.AddRange($results)
-                    Write-CIEMLog "ResourceGraph/${table}: $($results.Count) rows" -Component 'Discovery'
+                $phaseOutcome = InvokeCIEMDiscoveryPhase `
+                    -Name "ResourceGraph/$table" `
+                    -ErrorMessages $errorMessages `
+                    -WarningCounter $warningCounter `
+                    -Action {
+                        $results = @(InvokeCIEMResourceGraphQuery -Query $table -SubscriptionId $subscriptionIds)
+                        Write-CIEMLog "ResourceGraph/${table}: $($results.Count) rows" -Component 'Discovery'
+                        , $results
+                    }.GetNewClosure()
+                if (-not $phaseOutcome.Succeeded) {
+                    $armDiscoverySucceeded = $false
                 }
-                catch {
-                    $warningCount++
-                    $msg = "ResourceGraph/${table} failed: $($_.Exception.Message)"
-                    $errorMessages.Add($msg)
-                    Write-Warning $msg
+                elseif ($phaseOutcome.Result) {
+                    $armResources.AddRange([object[]]$phaseOutcome.Result)
                 }
             }
 
-            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting built-in role definitions' -PercentComplete 40 -CurrentOperation 'Enumerating Azure RBAC roles'
-            try {
-                $builtInRoles = @(GetCIEMBuiltInRoleDefinitions)
-                $armResources.AddRange($builtInRoles)
-                Write-CIEMLog "BuiltInRoleDefinitions: $($builtInRoles.Count) rows" -Component 'Discovery'
+            $builtInPhase = InvokeCIEMDiscoveryPhase `
+                -Name 'BuiltInRoleDefinitions' `
+                -ErrorMessages $errorMessages `
+                -WarningCounter $warningCounter `
+                -Action {
+                    $builtInRoles = @(GetCIEMBuiltInRoleDefinitions)
+                    Write-CIEMLog "BuiltInRoleDefinitions: $($builtInRoles.Count) rows" -Component 'Discovery'
+                    , $builtInRoles
+                }
+            if (-not $builtInPhase.Succeeded) {
+                $armDiscoverySucceeded = $false
             }
-            catch {
-                $warningCount++
-                $msg = "BuiltInRoleDefinitions failed: $($_.Exception.Message)"
-                $errorMessages.Add($msg)
-                Write-Warning $msg
+            elseif ($builtInPhase.Result) {
+                $armResources.AddRange([object[]]$builtInPhase.Result)
             }
+
+            $armRowCount = $armResources.Count
+            $armTypeCount = (@($armResources | Group-Object Type)).Count
+
+            $null = InvokeCIEMDiscoveryPhase `
+                -Name 'ARM persistence' `
+                -ErrorMessages $errorMessages `
+                -WarningCounter $warningCounter `
+                -DetailBuilder { param($r) "$armRowCount rows" }.GetNewClosure() `
+                -Action {
+                    InvokeCIEMTransaction {
+                        param($conn)
+
+                        if ($armResources.Count -gt 0) {
+                            foreach ($resource in $armResources) {
+                                $resource.LastSeenAt = $runStart
+                            }
+                            Save-CIEMAzureArmResource -InputObject $armResources -Connection $conn
+                            SaveResourceTypesFromList -Resources $armResources -Connection $conn -DiscoveredAt (Get-Date).ToString('o')
+                        }
+
+                        if ($armDiscoverySucceeded) {
+                            Invoke-PSUSQLiteQuery -Connection $conn -Query 'DELETE FROM azure_arm_resources WHERE last_seen_at < @last_seen_at' -Parameters @{ last_seen_at = $runStart } -AsNonQuery | Out-Null
+                        }
+                    }
+                }.GetNewClosure()
         }
+
+        # =================================================================
+        # Entra phase (entities + permissions + persistence + relationships)
+        # =================================================================
+        $entraResources = [System.Collections.Generic.List[object]]::new()
+        $entraPermissions = [System.Collections.Generic.List[object]]::new()
+        $relationships = [System.Collections.Generic.List[object]]::new()
 
         if ($Scope -eq 'All' -or $Scope -eq 'Entra') {
-            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra entities' -PercentComplete 55 -CurrentOperation 'Querying Microsoft Graph API'
-            Write-CIEMLog "Collecting Entra entities (Graph API)..." -Component 'Discovery'
+            $entraDiscoverySucceeded = $true
 
-            try {
-                $entities = @(InvokeCIEMEntraEntityCollection)
-                $entraResources.AddRange($entities)
-                Write-CIEMLog "Entra entities: $($entities.Count) rows" -Component 'Discovery'
-            }
-            catch {
-                $warningCount++
-                $msg = "EntraEntityCollection failed: $($_.Exception.Message)"
-                $errorMessages.Add($msg)
-                Write-Warning $msg
-            }
-
-            # Extract SPs from collected entities for per-SP calls
-            $collectedSPs = @($entraResources | Where-Object { $_.Type -eq 'servicePrincipal' })
-
-            if ($collectedSPs.Count -gt 0) {
-                Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra permissions' -PercentComplete 70 -CurrentOperation "Processing $($collectedSPs.Count) service principals"
-                try {
-                    $permissions = @(InvokeCIEMEntraPermissionCollection -ServicePrincipals $collectedSPs)
-                    $entraPermissions.AddRange($permissions)
-                    Write-CIEMLog "Entra permissions: $($permissions.Count) rows" -Component 'Discovery'
+            Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra entities' -PercentComplete 55
+            $entityPhase = InvokeCIEMDiscoveryPhase `
+                -Name 'Entra entity collection' `
+                -ErrorMessages $errorMessages `
+                -WarningCounter $warningCounter `
+                -DetailBuilder { param($r) "$(@($r).Count) rows" } `
+                -Action {
+                    $entities = @(InvokeCIEMEntraEntityCollection)
+                    Write-CIEMLog "Entra entities: $($entities.Count) rows" -Component 'Discovery'
+                    , $entities
                 }
-                catch {
-                    $warningCount++
-                    $msg = "EntraPermissionCollection failed: $($_.Exception.Message)"
-                    $errorMessages.Add($msg)
-                    Write-Warning $msg
+            if (-not $entityPhase.Succeeded) {
+                $entraDiscoverySucceeded = $false
+            }
+            elseif ($entityPhase.Result) {
+                $entraResources.AddRange([object[]]$entityPhase.Result)
+            }
+
+            $collectedServicePrincipals = @($entraResources | Where-Object { $_.Type -eq 'servicePrincipal' })
+            if ($collectedServicePrincipals.Count -gt 0) {
+                $permissionPhase = InvokeCIEMDiscoveryPhase `
+                    -Name 'Entra permission collection' `
+                    -ErrorMessages $errorMessages `
+                    -WarningCounter $warningCounter `
+                    -DetailBuilder { param($r) "$(@($r).Count) rows" } `
+                    -Action {
+                        $permissions = @(InvokeCIEMEntraPermissionCollection -ServicePrincipals $collectedServicePrincipals)
+                        Write-CIEMLog "Entra permissions: $($permissions.Count) rows" -Component 'Discovery'
+                        , $permissions
+                    }.GetNewClosure()
+                if (-not $permissionPhase.Succeeded) {
+                    $entraDiscoverySucceeded = $false
+                }
+                elseif ($permissionPhase.Result) {
+                    $entraPermissions.AddRange([object[]]$permissionPhase.Result)
                 }
             }
+
+            $entraRowCount = $entraResources.Count + $entraPermissions.Count
+            $entraTypeCount = (@((@($entraResources) + @($entraPermissions)) | Group-Object Type)).Count
+
+            $null = InvokeCIEMDiscoveryPhase `
+                -Name 'Entra persistence' `
+                -ErrorMessages $errorMessages `
+                -WarningCounter $warningCounter `
+                -DetailBuilder { param($r) "$entraRowCount rows" }.GetNewClosure() `
+                -Action {
+                    InvokeCIEMTransaction {
+                        param($conn)
+
+                        if ($entraResources.Count -gt 0) {
+                            foreach ($resource in $entraResources) {
+                                $resource.LastSeenAt = $runStart
+                            }
+                            Save-CIEMAzureEntraResource -InputObject $entraResources -Connection $conn
+                        }
+
+                        if ($entraPermissions.Count -gt 0) {
+                            foreach ($resource in $entraPermissions) {
+                                $resource.LastSeenAt = $runStart
+                            }
+                            Save-CIEMAzureEntraResource -InputObject $entraPermissions -Connection $conn
+                        }
+
+                        SaveResourceTypesFromList -Resources (@($entraResources) + @($entraPermissions)) -Connection $conn -DiscoveredAt (Get-Date).ToString('o')
+
+                        if ($entraDiscoverySucceeded) {
+                            Invoke-PSUSQLiteQuery -Connection $conn -Query 'DELETE FROM azure_entra_resources WHERE last_seen_at < @last_seen_at' -Parameters @{ last_seen_at = $runStart } -AsNonQuery | Out-Null
+                        }
+                    }
+                }.GetNewClosure()
 
             $collectedGroups = @($entraResources | Where-Object { $_.Type -eq 'group' })
-            $collectedRoles  = @($entraResources | Where-Object { $_.Type -eq 'directoryRole' })
-            $collectedUsers  = @($entraResources | Where-Object { $_.Type -eq 'user' })
+            $collectedRoles = @($entraResources | Where-Object { $_.Type -eq 'directoryRole' })
+            $collectedUsers = @($entraResources | Where-Object { $_.Type -eq 'user' })
 
             if ($collectedGroups.Count -gt 0 -or $collectedRoles.Count -gt 0 -or $collectedUsers.Count -gt 0) {
-                Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra relationships' -PercentComplete 80 -CurrentOperation "$($collectedGroups.Count) groups, $($collectedRoles.Count) roles, $($collectedUsers.Count) users"
-                try {
-                    $rels = @(InvokeCIEMEntraRelationshipCollection `
-                        -Groups         $collectedGroups `
-                        -DirectoryRoles $collectedRoles `
-                        -Users          $collectedUsers)
-                    $relationships.AddRange($rels)
-                    Write-CIEMLog "Entra relationships: $($rels.Count) rows" -Component 'Discovery'
+                $relationshipPhase = InvokeCIEMDiscoveryPhase `
+                    -Name 'Entra relationship collection' `
+                    -ErrorMessages $errorMessages `
+                    -WarningCounter $warningCounter `
+                    -DetailBuilder { param($r) "$(@($r).Count) rows" } `
+                    -Action {
+                        $rels = @(InvokeCIEMEntraRelationshipCollection -Groups $collectedGroups -DirectoryRoles $collectedRoles -Users $collectedUsers)
+                        Write-CIEMLog "Entra relationships: $($rels.Count) rows" -Component 'Discovery'
+                        , $rels
+                    }.GetNewClosure()
+                if (-not $relationshipPhase.Succeeded) {
+                    $relationshipsSucceeded = $false
                 }
-                catch {
-                    $warningCount++
-                    $msg = "EntraRelationshipCollection failed: $($_.Exception.Message)"
-                    $errorMessages.Add($msg)
-                    Write-Warning $msg
+                elseif ($relationshipPhase.Result) {
+                    $relationships.AddRange([object[]]$relationshipPhase.Result)
+                    $relationshipCount = $relationships.Count
                 }
             }
         }
 
-        # ===== PHASE 2: Atomic DB write =====
-        Write-Progress -Activity 'Azure Discovery' -Status 'Writing to database' -PercentComplete 90 -CurrentOperation 'Atomic transaction'
-        Write-CIEMLog "Writing $($armResources.Count) ARM + $($entraResources.Count + $entraPermissions.Count) Entra + $($relationships.Count) relationships to DB..." -Component 'Discovery'
-
-        InvokeCIEMTransaction {
-            param($conn)
-
-            # Clear old data
-            Remove-CIEMAzureArmResource -All -Connection $conn -Confirm:$false
-            Remove-CIEMAzureEntraResource -All -Connection $conn -Confirm:$false
-            Remove-CIEMAzureResourceRelationship -All -Connection $conn -Confirm:$false
-
-            # Insert new data
-            if ($armResources.Count -gt 0) {
-                Save-CIEMAzureArmResource -InputObject $armResources -Connection $conn
-            }
-            if ($entraResources.Count -gt 0) {
-                Save-CIEMAzureEntraResource -InputObject $entraResources -Connection $conn
-            }
-            if ($entraPermissions.Count -gt 0) {
-                Save-CIEMAzureEntraResource -InputObject $entraPermissions -Connection $conn
-            }
-            if ($relationships.Count -gt 0) {
-                Save-CIEMAzureResourceRelationship -InputObject $relationships -Connection $conn
-            }
-
-            # Auto-populate azure_resource_types
-            $allResources = @($armResources) + @($entraResources) + @($entraPermissions)
-            $typeGroups = $allResources | Group-Object -Property Type
-            $discoveredAt = (Get-Date).ToString('o')
-
-            foreach ($tg in $typeGroups) {
-                if (-not $tg.Name) { continue }
-                $apiSource = if ($tg.Name -match '^microsoft\.') {
-                    'ResourceGraph'
-                } else {
-                    'Graph'
-                }
-                $graphTable = if ($tg.Name -match '^microsoft\.resources/') { 'ResourceContainers' }
-                              elseif ($tg.Name -match '^microsoft\.authorization/') { 'AuthorizationResources' }
-                              elseif ($apiSource -eq 'Graph') { $null }
-                              else { 'Resources' }
-
-                SaveCIEMAzureResourceType `
-                    -Type          $tg.Name `
-                    -ApiSource     $apiSource `
-                    -GraphTable    $graphTable `
-                    -ResourceCount $tg.Count `
-                    -DiscoveredAt  $discoveredAt `
-                    -Connection    $conn
-            }
-
-            # Populate effective role assignments (pre-resolved identity-to-resource mappings)
-            Remove-CIEMAzureEffectiveRoleAssignment -All -Confirm:$false -Connection $conn
-            $allEntra = @($entraResources) + @($entraPermissions)
-            $eraCount = InvokeCIEMAzureEffectiveRoleAssignmentBuild `
-                -ArmResources    $armResources `
-                -EntraResources  $allEntra `
-                -Relationships   $relationships `
-                -Connection      $conn `
-                -ComputedAt      (Get-Date).ToString('o')
-            Write-CIEMLog "EffectiveRoleAssignments: $eraCount rows inserted" -Component 'Discovery'
-
-            # Build security graph (nodes + edges for attack path analysis)
-            Remove-CIEMGraphEdge -All -Confirm:$false -Connection $conn
-            Remove-CIEMGraphNode -All -Confirm:$false -Connection $conn
-
-            $graphCollectedAt = (Get-Date).ToString('o')
-            $allEntraForGraph = @($entraResources) + @($entraPermissions)
-
-            $nodeCount = InvokeCIEMGraphNodeBuild `
-                -ArmResources   $armResources `
-                -EntraResources $allEntraForGraph `
-                -Connection     $conn `
-                -CollectedAt    $graphCollectedAt
-            Write-CIEMLog "GraphNodes: $nodeCount nodes created" -Component 'Discovery'
-
-            $collectedEdgeCount = InvokeCIEMGraphEdgeBuild `
-                -Relationships $relationships `
-                -Connection    $conn `
-                -CollectedAt   $graphCollectedAt
-            Write-CIEMLog "GraphEdges: $collectedEdgeCount collected edges created" -Component 'Discovery'
-
-            $computedEdgeCount = InvokeCIEMGraphComputedEdgeBuild `
-                -ArmResources   $armResources `
-                -EntraResources $allEntraForGraph `
-                -Relationships  $relationships `
-                -Connection     $conn `
-                -CollectedAt    $graphCollectedAt
-            Write-CIEMLog "GraphEdges: $computedEdgeCount computed edges created" -Component 'Discovery'
+        # =================================================================
+        # Relationship persistence (only if the collection phase succeeded)
+        # =================================================================
+        if ($relationshipsSucceeded -and $relationships.Count -gt 0) {
+            $null = InvokeCIEMDiscoveryPhase `
+                -Name 'Relationship persistence' `
+                -ErrorMessages $errorMessages `
+                -WarningCounter $warningCounter `
+                -DetailBuilder { param($r) "$relationshipCount rows" }.GetNewClosure() `
+                -Action {
+                    InvokeCIEMTransaction {
+                        param($conn)
+                        Remove-CIEMAzureResourceRelationship -All -Connection $conn -Confirm:$false
+                        Save-CIEMAzureResourceRelationship -InputObject $relationships -Connection $conn
+                    }
+                }.GetNewClosure()
         }
 
-        # ===== Determine final status =====
-        $totalCollected = $armResources.Count + $entraResources.Count + $entraPermissions.Count
+        # =================================================================
+        # Derived build phases (ERA + graph). These read from the DB, so they
+        # run even when individual collection phases degraded to Partial.
+        # =================================================================
+        $allArmResources = $null
+        $allEntraResources = $null
+        $allRelationships = $null
+
+        $null = InvokeCIEMDiscoveryPhase `
+            -Name 'Build data load' `
+            -ErrorMessages $errorMessages `
+            -WarningCounter $warningCounter `
+            -DetailBuilder { param($r) "$($r.ArmCount) ARM, $($r.EntraCount) Entra, $($r.RelCount) relationships" } `
+            -Action {
+                $script:discoveryLoadedArm = @(Get-CIEMAzureArmResource)
+                $script:discoveryLoadedEntra = @(Get-CIEMAzureEntraResource)
+                $script:discoveryLoadedRel = @(Get-CIEMAzureResourceRelationship)
+                [pscustomobject]@{
+                    ArmCount = $script:discoveryLoadedArm.Count
+                    EntraCount = $script:discoveryLoadedEntra.Count
+                    RelCount = $script:discoveryLoadedRel.Count
+                }
+            }
+        $allArmResources = $script:discoveryLoadedArm
+        $allEntraResources = $script:discoveryLoadedEntra
+        $allRelationships = $script:discoveryLoadedRel
+        $script:discoveryLoadedArm = $null
+        $script:discoveryLoadedEntra = $null
+        $script:discoveryLoadedRel = $null
+
+        $null = InvokeCIEMDiscoveryPhase `
+            -Name 'ERA build' `
+            -ErrorMessages $errorMessages `
+            -WarningCounter $warningCounter `
+            -Action {
+                InvokeCIEMTransaction {
+                    param($conn)
+                    Remove-CIEMAzureEffectiveRoleAssignment -All -Confirm:$false -Connection $conn
+                    $eraCount = InvokeCIEMAzureEffectiveRoleAssignmentBuild -ArmResources $allArmResources -EntraResources $allEntraResources -Relationships $allRelationships -Connection $conn -ComputedAt (Get-Date).ToString('o')
+                    Write-CIEMLog "EffectiveRoleAssignments: $eraCount rows inserted" -Component 'Discovery'
+                }
+            }.GetNewClosure()
+
+        $null = InvokeCIEMDiscoveryPhase `
+            -Name 'Graph build' `
+            -ErrorMessages $errorMessages `
+            -WarningCounter $warningCounter `
+            -Action {
+                InvokeCIEMTransaction {
+                    param($conn)
+                    Remove-CIEMGraphEdge -All -Confirm:$false -Connection $conn
+                    Remove-CIEMGraphNode -All -Confirm:$false -Connection $conn
+
+                    $collectedAt = (Get-Date).ToString('o')
+                    $nodeCount = InvokeCIEMGraphNodeBuild -ArmResources $allArmResources -EntraResources $allEntraResources -Connection $conn -CollectedAt $collectedAt
+                    Write-CIEMLog "GraphNodes: $nodeCount nodes created" -Component 'Discovery'
+
+                    $collectedEdgeCount = InvokeCIEMGraphEdgeBuild -Relationships $allRelationships -Connection $conn -CollectedAt $collectedAt
+                    Write-CIEMLog "GraphEdges: $collectedEdgeCount collected edges created" -Component 'Discovery'
+
+                    $computedEdgeCount = InvokeCIEMGraphComputedEdgeBuild -ArmResources $allArmResources -EntraResources $allEntraResources -Relationships $allRelationships -Connection $conn -CollectedAt $collectedAt
+                    Write-CIEMLog "GraphEdges: $computedEdgeCount computed edges created" -Component 'Discovery'
+                }
+            }.GetNewClosure()
+
+        $allArmResources = $null
+        $allEntraResources = $null
+        $allRelationships = $null
+
+        # Re-read the warning count from the ref after all phases are done
+        $warningCount = $warningCounter.Value
+
+        $totalCollected = $armRowCount + $entraRowCount
         $finalStatus = if ($warningCount -gt 0 -and $totalCollected -gt 0) {
             'Partial'
-        } elseif ($totalCollected -eq 0) {
+        }
+        elseif ($totalCollected -eq 0) {
             'Failed'
-        } else {
+        }
+        else {
             'Completed'
         }
 
-        $armTypes   = ($armResources   | Group-Object Type).Count
-        $entraTypes = ((@($entraResources) + @($entraPermissions)) | Group-Object Type).Count
-
         $run = Update-CIEMAzureDiscoveryRun -Id $run.Id `
-            -Status      $finalStatus `
+            -Status $finalStatus `
             -CompletedAt (Get-Date).ToString('o') `
-            -ArmTypeCount   $armTypes `
-            -ArmRowCount    $armResources.Count `
-            -EntraTypeCount $entraTypes `
-            -EntraRowCount  ($entraResources.Count + $entraPermissions.Count) `
-            -WarningCount   $warningCount `
-            -ErrorMessage   ($errorMessages -join '; ') `
+            -ArmTypeCount $armTypeCount `
+            -ArmRowCount $armRowCount `
+            -EntraTypeCount $entraTypeCount `
+            -EntraRowCount $entraRowCount `
+            -WarningCount $warningCount `
+            -ErrorMessage ($errorMessages -join '; ') `
             -PassThru
 
-        Write-CIEMLog "Discovery run #$($run.Id) finished: Status=$finalStatus, ARM=$($armResources.Count), Entra=$($entraResources.Count + $entraPermissions.Count), Relationships=$($relationships.Count), Warnings=$warningCount" -Severity INFO -Component 'Discovery'
+        Write-CIEMLog "Discovery run #$($run.Id) finished: Status=$finalStatus, ARM=$armRowCount, Entra=$entraRowCount, Relationships=$relationshipCount, Warnings=$warningCount" -Severity INFO -Component 'Discovery'
         Write-Progress -Activity 'Azure Discovery' -Completed
-
         $run
     }
     catch {
-        # Unhandled exception — mark run as Failed
-        $errMsg = $_.Exception.Message
-        Write-CIEMLog "Discovery run #$($run.Id) FAILED: $errMsg" -Severity ERROR -Component 'Discovery'
-        Update-CIEMAzureDiscoveryRun -Id $run.Id `
-            -Status       'Failed' `
-            -CompletedAt  (Get-Date).ToString('o') `
-            -ErrorMessage $errMsg | Out-Null
+        $errorMessage = $_.Exception.Message
+        Write-CIEMLog "Discovery run #$($run.Id) FAILED: $errorMessage" -Severity ERROR -Component 'Discovery'
+        Update-CIEMAzureDiscoveryRun -Id $run.Id -Status 'Failed' -CompletedAt (Get-Date).ToString('o') -ErrorMessage $errorMessage | Out-Null
         throw
     }
 }

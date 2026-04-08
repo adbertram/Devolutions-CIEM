@@ -27,7 +27,7 @@ function Get-CIEMScanResult {
 SELECT sr.status, sr.status_extended, sr.resource_id, sr.resource_name, sr.location,
        c.id AS check_id, c.provider, c.service, c.title, c.description, c.risk, c.severity,
        c.remediation_text, c.remediation_url, c.related_url, c.check_script, c.disabled,
-       c.permissions, c.depends_on
+       c.permissions, c.depends_on, c.data_needs
 FROM scan_results sr
 JOIN checks c ON sr.check_id = c.id
 WHERE sr.scan_run_id = @scan_run_id
@@ -64,6 +64,11 @@ WHERE sr.scan_run_id = @scan_run_id
             try { $dependsOnArr = @($row.depends_on | ConvertFrom-Json) } catch {}
         }
 
+        $dataNeedsArr = $null
+        if ($row.data_needs) {
+            try { $dataNeedsArr = @($row.data_needs | ConvertFrom-Json) } catch {}
+        }
+
         [PSCustomObject]@{
             Check = [PSCustomObject]@{
                 Id          = $row.check_id
@@ -80,6 +85,7 @@ WHERE sr.scan_run_id = @scan_run_id
                 RelatedUrl  = $row.related_url
                 CheckScript = $row.check_script
                 DependsOn   = $dependsOnArr
+                DataNeeds   = $dataNeedsArr
                 Disabled    = [bool]$row.disabled
                 Permissions = $permissionsObj
             }

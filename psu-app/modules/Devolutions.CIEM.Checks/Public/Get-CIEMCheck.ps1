@@ -24,7 +24,7 @@ function Get-CIEMCheck {
     .OUTPUTS
         [PSCustomObject[]] Array of check objects with properties:
         Id, Provider, Service, Title, Description, Risk, Severity,
-        Remediation, RelatedUrl, CheckScript, DependsOn, Permissions.
+        Remediation, RelatedUrl, CheckScript, DependsOn, DataNeeds, Permissions.
 
     .EXAMPLE
         Get-CIEMCheck
@@ -133,6 +133,15 @@ function Get-CIEMCheck {
             }
         }
 
+        $dataNeedsArr = $null
+        if ($row.data_needs) {
+            try {
+                $dataNeedsArr = @($row.data_needs | ConvertFrom-Json)
+            } catch {
+                Write-Verbose "Failed to parse data_needs JSON for check $($row.id): $_"
+            }
+        }
+
         [PSCustomObject]@{
             Id          = $row.id
             Provider    = $row.provider
@@ -148,6 +157,7 @@ function Get-CIEMCheck {
             RelatedUrl  = $row.related_url
             CheckScript = $row.check_script
             DependsOn   = $dependsOnArr
+            DataNeeds   = $dataNeedsArr
             Disabled    = [bool]$row.disabled
             Permissions = $permissionsObj
         }

@@ -5,38 +5,56 @@ function InvokeCIEMEntraPermissionCollection {
     )
 
     $now = (Get-Date).ToString('o')
-    $totalSPs = $ServicePrincipals.Count
+    $uniqueServicePrincipals = @($ServicePrincipals | Group-Object Id | ForEach-Object { $_.Group[0] })
 
-    # --- App Role Assignments (per SP) ---
-    $spIndex = 0
-    foreach ($sp in $ServicePrincipals) {
-        $spIndex++
-        Write-Progress -Activity 'Azure Discovery' -Status "Collecting app role assignments ($spIndex/$totalSPs)" -PercentComplete (70 + [math]::Floor(8 * $spIndex / $totalSPs)) -CurrentOperation $sp.DisplayName
-        $assignments = @(Invoke-AzureApi -Api Graph -Path "/servicePrincipals/$($sp.Id)/appRoleAssignments" -ResourceName "AppRoleAssignments/$($sp.Id)")
-        foreach ($a in $assignments) {
-            $r = [CIEMAzureEntraResource]::new()
-            # Composite key for uniqueness (junction records don't have globally-unique IDs)
-            $r.Id          = "$($sp.Id)_$($a.id)"
-            $r.Type        = 'appRoleAssignment'
-            $r.DisplayName = $null
-            $r.ParentId    = $sp.Id
-            $r.Properties  = $a | ConvertTo-Json -Depth 5 -Compress
-            $r.CollectedAt = $now
-            $r
+    if ($uniqueServicePrincipals.Count -gt 0) {
+        Write-Progress -Activity 'Azure Discovery' -Status "Collecting app role assignments ($($uniqueServicePrincipals.Count) service principals)" -PercentComplete 74
+
+        $batchRequests = @(
+            foreach ($servicePrincipal in $uniqueServicePrincipals) {
+                @{
+                    Id = $servicePrincipal.Id
+                    Method = 'GET'
+                    Path = "/servicePrincipals/$($servicePrincipal.Id)/appRoleAssignments"
+                }
+            }
+        )
+
+        $batchResults = Invoke-AzureApi -Api Graph -Requests $batchRequests -ResourceName 'AppRoleAssignmentBatch'
+        foreach ($servicePrincipal in $uniqueServicePrincipals) {
+            if (-not $batchResults.ContainsKey($servicePrincipal.Id)) {
+                throw "InvokeCIEMEntraPermissionCollection missing batch response for '$($servicePrincipal.Id)'."
+            }
+
+            $batchResult = $batchResults[$servicePrincipal.Id]
+            if (-not $batchResult.Success) {
+                $errorDetail = if ($batchResult.Error) { $batchResult.Error } else { "Status $($batchResult.StatusCode)" }
+                throw "InvokeCIEMEntraPermissionCollection failed for '$($servicePrincipal.Id)': $errorDetail"
+            }
+
+            foreach ($assignment in @($batchResult.Items)) {
+                $resource = [CIEMAzureEntraResource]::new()
+                $resource.Id = "$($servicePrincipal.Id)_$($assignment.id)"
+                $resource.Type = 'appRoleAssignment'
+                $resource.DisplayName = $null
+                $resource.ParentId = $servicePrincipal.Id
+                $resource.Properties = $assignment | ConvertTo-Json -Depth 5 -Compress
+                $resource.CollectedAt = $now
+                $resource
+            }
         }
     }
 
-    # --- OAuth2 Permission Grants (single paginated call) ---
     Write-Progress -Activity 'Azure Discovery' -Status 'Collecting OAuth2 permission grants' -PercentComplete 78 -CurrentOperation 'Delegated permissions'
     $grants = @(Invoke-AzureApi -Api Graph -Path '/oauth2PermissionGrants' -ResourceName 'OAuth2PermissionGrants')
-    foreach ($g in $grants) {
-        $r = [CIEMAzureEntraResource]::new()
-        $r.Id          = $g.id
-        $r.Type        = 'oauth2PermissionGrant'
-        $r.DisplayName = $null
-        $r.ParentId    = $g.clientId
-        $r.Properties  = $g | ConvertTo-Json -Depth 5 -Compress
-        $r.CollectedAt = $now
-        $r
+    foreach ($grant in $grants) {
+        $resource = [CIEMAzureEntraResource]::new()
+        $resource.Id = $grant.id
+        $resource.Type = 'oauth2PermissionGrant'
+        $resource.DisplayName = $null
+        $resource.ParentId = $grant.clientId
+        $resource.Properties = $grant | ConvertTo-Json -Depth 5 -Compress
+        $resource.CollectedAt = $now
+        $resource
     }
 }

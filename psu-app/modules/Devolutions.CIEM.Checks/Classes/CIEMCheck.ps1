@@ -43,6 +43,7 @@ class CIEMCheck {
     [string]$RelatedUrl
     [string]$CheckScript
     [string[]]$DependsOn
+    [string[]]$DataNeeds
     [CIEMCheckPermissions]$Permissions
     [bool]$Disabled
 
