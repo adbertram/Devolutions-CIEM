@@ -1,0 +1,12 @@
+[
+  {
+    "Id": "sp-1_assignment-1",
+    "Type": "appRoleAssignment",
+    "ParentId": "sp-1"
+  },
+  {
+    "Id": "sp-1_assignment-2",
+    "Type": "appRoleAssignment",
+    "ParentId": "sp-1"
+  }
+]

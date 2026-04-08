@@ -1,0 +1,38 @@
+[
+  {
+    "PrincipalId": "group-1",
+    "PrincipalType": "Group",
+    "PrincipalDisplayName": "Cloud Admins",
+    "OriginalPrincipalId": "group-1",
+    "OriginalPrincipalType": "Group",
+    "RoleName": "Reader",
+    "Scope": "/subscriptions/sub-2"
+  },
+  {
+    "PrincipalId": "member-sp",
+    "PrincipalType": "servicePrincipal",
+    "PrincipalDisplayName": "Member SP",
+    "OriginalPrincipalId": "group-1",
+    "OriginalPrincipalType": "Group",
+    "RoleName": "Reader",
+    "Scope": "/subscriptions/sub-2"
+  },
+  {
+    "PrincipalId": "member-user",
+    "PrincipalType": "user",
+    "PrincipalDisplayName": "Member User",
+    "OriginalPrincipalId": "group-1",
+    "OriginalPrincipalType": "Group",
+    "RoleName": "Reader",
+    "Scope": "/subscriptions/sub-2"
+  },
+  {
+    "PrincipalId": "user-direct",
+    "PrincipalType": "User",
+    "PrincipalDisplayName": "Direct User",
+    "OriginalPrincipalId": "user-direct",
+    "OriginalPrincipalType": "User",
+    "RoleName": "Contributor",
+    "Scope": "/subscriptions/sub-1"
+  }
+]

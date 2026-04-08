@@ -1,0 +1,44 @@
+[
+  {
+    "SourceId": "group-a",
+    "SourceType": "group",
+    "TargetId": "group-b",
+    "TargetType": "group",
+    "Relationship": "member_of"
+  },
+  {
+    "SourceId": "group-a",
+    "SourceType": "group",
+    "TargetId": "group-b",
+    "TargetType": "group",
+    "Relationship": "transitive_member_of"
+  },
+  {
+    "SourceId": "user-1",
+    "SourceType": "user",
+    "TargetId": "group-a",
+    "TargetType": "group",
+    "Relationship": "member_of"
+  },
+  {
+    "SourceId": "user-1",
+    "SourceType": "user",
+    "TargetId": "group-a",
+    "TargetType": "group",
+    "Relationship": "owner_of"
+  },
+  {
+    "SourceId": "user-1",
+    "SourceType": "user",
+    "TargetId": "group-a",
+    "TargetType": "group",
+    "Relationship": "transitive_member_of"
+  },
+  {
+    "SourceId": "user-1",
+    "SourceType": "user",
+    "TargetId": "group-b",
+    "TargetType": "group",
+    "Relationship": "transitive_member_of"
+  }
+]
