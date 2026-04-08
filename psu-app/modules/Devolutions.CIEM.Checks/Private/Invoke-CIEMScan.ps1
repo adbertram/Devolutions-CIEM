@@ -285,59 +285,59 @@ function Invoke-CIEMScan {
             }
         }
 
-        # Use [List[object]] (not [List[CIEMCheck]]) — module classes get a fresh
-        # dynamic assembly per Import-Module, so a strongly-typed list created here
-        # may receive a CIEMCheck instance from a different assembly version when PSU
-        # has accumulated multiple module loads, causing List<T>.Add() to fail
-        # overload resolution with "Cannot find an overload for Add and the argument
-        # count: 1".
-        $selectedChecks = [System.Collections.Generic.List[object]]::new()
-        foreach ($dbCheck in $dbChecks) {
-            if ($CheckId -and $CheckId -notcontains $dbCheck.Id) {
-                continue
-            }
-            if ($Service -and $Service -notcontains $dbCheck.Service.ToString()) {
-                continue
-            }
-            if ($dbCheck.Disabled) {
-                Write-Verbose "[$providerName] Skipping disabled check: $($dbCheck.Id)"
-                continue
-            }
-
-            $scriptPath = Join-Path $checkScriptsPath $dbCheck.CheckScript
-            if (-not (Test-Path $scriptPath)) {
-                throw "[$providerName] Check '$($dbCheck.Id)' references missing script '$($dbCheck.CheckScript)'."
-            }
-
-            $functionName = $dbCheck.CheckScript -replace '\.ps1$', ''
-            if (-not (Get-Command -Name $functionName -ErrorAction SilentlyContinue)) {
-                throw "[$providerName] Script '$($dbCheck.CheckScript)' did not load function '$functionName'."
-            }
-
-            if (-not $dbCheck.DataNeeds) {
-                throw "[$providerName] Check '$($dbCheck.Id)' is missing data_needs metadata."
-            }
-            if (@($dbCheck.DataNeeds).Count -eq 0) {
-                throw "[$providerName] Check '$($dbCheck.Id)' must declare at least one data need."
-            }
-
-            foreach ($needKey in @($dbCheck.DataNeeds)) {
-                if ($needKey -cne $needKey.ToLowerInvariant()) {
-                    throw "[$providerName] Check '$($dbCheck.Id)' declares non-canonical data need '$needKey'."
+        # Build the selected checks array without using [List[T]] with module-class type
+        # parameters. Module classes get a fresh dynamic assembly per Import-Module.
+        # PSU's long-lived runspace accumulates versions, causing [List[CIEMCheck v_X]]
+        # to reject items from [CIEMCheck v_Y], failing overload resolution.
+        # Solution: accumulate via pipeline instead, which yields a plain object[].
+        $selectedChecks = @(
+            foreach ($dbCheck in $dbChecks) {
+                if ($CheckId -and $CheckId -notcontains $dbCheck.Id) {
+                    continue
                 }
-            }
+                if ($Service -and $Service -notcontains $dbCheck.Service.ToString()) {
+                    continue
+                }
+                if ($dbCheck.Disabled) {
+                    Write-Verbose "[$providerName] Skipping disabled check: $($dbCheck.Id)"
+                    continue
+                }
 
-            # Pre-validate severity BEFORE parallel dispatch. The cast must succeed on
-            # the main thread so we get a meaningful error, not a cross-runspace failure.
-            try {
-                $null = [CIEMCheckSeverity]$dbCheck.Severity
-            }
-            catch {
-                throw "[$providerName] Check '$($dbCheck.Id)' has invalid severity '$($dbCheck.Severity)': $($_.Exception.Message)"
-            }
+                $scriptPath = Join-Path $checkScriptsPath $dbCheck.CheckScript
+                if (-not (Test-Path $scriptPath)) {
+                    throw "[$providerName] Check '$($dbCheck.Id)' references missing script '$($dbCheck.CheckScript)'."
+                }
 
-            $selectedChecks.Add((ConvertToCIEMCheckObject -CheckData $dbCheck))
-        }
+                $functionName = $dbCheck.CheckScript -replace '\.ps1$', ''
+                if (-not (Get-Command -Name $functionName -ErrorAction SilentlyContinue)) {
+                    throw "[$providerName] Script '$($dbCheck.CheckScript)' did not load function '$functionName'."
+                }
+
+                if (-not $dbCheck.DataNeeds) {
+                    throw "[$providerName] Check '$($dbCheck.Id)' is missing data_needs metadata."
+                }
+                if (@($dbCheck.DataNeeds).Count -eq 0) {
+                    throw "[$providerName] Check '$($dbCheck.Id)' must declare at least one data need."
+                }
+
+                foreach ($needKey in @($dbCheck.DataNeeds)) {
+                    if ($needKey -cne $needKey.ToLowerInvariant()) {
+                        throw "[$providerName] Check '$($dbCheck.Id)' declares non-canonical data need '$needKey'."
+                    }
+                }
+
+                # Pre-validate severity BEFORE parallel dispatch. The cast must succeed on
+                # the main thread so we get a meaningful error, not a cross-runspace failure.
+                try {
+                    $null = [CIEMCheckSeverity]$dbCheck.Severity
+                }
+                catch {
+                    throw "[$providerName] Check '$($dbCheck.Id)' has invalid severity '$($dbCheck.Severity)': $($_.Exception.Message)"
+                }
+
+                ConvertToCIEMCheckObject -CheckData $dbCheck
+            }
+        )
 
         if ($selectedChecks.Count -eq 0) {
             Write-Verbose "[$providerName] No checks to execute after filtering; skipping provider."

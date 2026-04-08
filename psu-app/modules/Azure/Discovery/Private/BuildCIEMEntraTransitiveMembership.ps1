@@ -28,7 +28,10 @@ function BuildCIEMEntraTransitiveMembership {
         $null = $groupParents[$relationship.SourceId].Add($relationship.TargetId)
     }
 
-    $results = [System.Collections.Generic.List[CIEMAzureResourceRelationship]]::new()
+    # Use [List[object]] instead of [List[CIEMAzureResourceRelationship]] — module
+    # classes get a fresh assembly per Import-Module. PSU's multi-load runspace will
+    # accumulate versions, causing [List[CIEMType v_X]] to reject items from [CIEMType v_Y].
+    $results = [System.Collections.Generic.List[object]]::new()
     $seenPairs = [System.Collections.Generic.HashSet[string]]::new()
 
     foreach ($relationship in $directMemberships) {

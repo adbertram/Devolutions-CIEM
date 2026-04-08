@@ -65,7 +65,10 @@ function InvokeCIEMAzureEffectiveRoleAssignmentBuild {
         $_.Type -eq 'microsoft.authorization/roleassignments' -and $_.Properties
     })
 
-    $rows = [System.Collections.Generic.List[CIEMAzureEffectiveRoleAssignment]]::new()
+    # Use [List[object]] instead of [List[CIEMAzureEffectiveRoleAssignment]] — module
+    # classes get a fresh assembly per Import-Module. PSU's multi-load runspace will
+    # accumulate versions, causing [List[CIEMType v_X]] to reject items from [CIEMType v_Y].
+    $rows = [System.Collections.Generic.List[object]]::new()
 
     foreach ($ra in $roleAssignments) {
         try { $props = $ra.Properties | ConvertFrom-Json -ErrorAction Stop }
