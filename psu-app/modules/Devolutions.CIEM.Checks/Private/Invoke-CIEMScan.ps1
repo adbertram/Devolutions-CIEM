@@ -285,7 +285,13 @@ function Invoke-CIEMScan {
             }
         }
 
-        $selectedChecks = [System.Collections.Generic.List[CIEMCheck]]::new()
+        # Use [List[object]] (not [List[CIEMCheck]]) — module classes get a fresh
+        # dynamic assembly per Import-Module, so a strongly-typed list created here
+        # may receive a CIEMCheck instance from a different assembly version when PSU
+        # has accumulated multiple module loads, causing List<T>.Add() to fail
+        # overload resolution with "Cannot find an overload for Add and the argument
+        # count: 1".
+        $selectedChecks = [System.Collections.Generic.List[object]]::new()
         foreach ($dbCheck in $dbChecks) {
             if ($CheckId -and $CheckId -notcontains $dbCheck.Id) {
                 continue
