@@ -262,7 +262,7 @@ test.describe('Environment Page', () => {
       restoreArmResources(backedUpRows);
     });
 
-    test('should display No Resources Discovered message', async () => {
+    test('should display No Data Discovered message', async () => {
       const noResourcesVisible = await envPage.isNoResourcesTextVisible();
       expect(noResourcesVisible).toBe(true);
     });

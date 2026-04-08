@@ -33,7 +33,7 @@ class EnvironmentPageHelpers extends BasePage {
       // Loading indicator (shown by New-UDDynamic -LoadingComponent during auto-load)
       loadingIndicator: '#envChartArea .MuiCircularProgress-root',
       // No resources discovered state (shown by auto-load when no discovery data)
-      noResourcesText: "text=No Resources Discovered",
+      noResourcesText: "text=No Data Discovered",
       noResourcesDescription: "text=Run Azure discovery first"
     };
   }

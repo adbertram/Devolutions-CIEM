@@ -148,7 +148,82 @@ function seedTestData() {
       );
     }
 
+    db.pragma('wal_checkpoint(TRUNCATE)');
+
     console.log(`[seed] Seeded scan run 1 (${orderedChecks.length} results, ${failCount1} FAIL) and scan run 2 (${run2Checks.length} results, 0 FAIL).`);
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Back up and clear ALL scan_runs and scan_results (both real and test-prefixed).
+ * Returns { scanRuns, scanResults } for later restoration.
+ * Enables full test isolation — the tests see only what they seed.
+ */
+function backupAndClearAllScanHistory() {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+    const scanRuns = db.prepare('SELECT * FROM scan_runs').all();
+    const scanResults = db.prepare('SELECT * FROM scan_results').all();
+    db.prepare('DELETE FROM scan_results').run();
+    db.prepare('DELETE FROM scan_runs').run();
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log(`[setup] Backed up ${scanRuns.length} scan runs and ${scanResults.length} scan results, cleared tables.`);
+    return { scanRuns, scanResults };
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Restore previously backed-up scan_runs and scan_results.
+ * Clears the current tables first so the restore is authoritative.
+ */
+function restoreScanHistory(backup) {
+  if (!backup) return;
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: false });
+    db.pragma('foreign_keys = ON');
+    db.prepare('DELETE FROM scan_results').run();
+    db.prepare('DELETE FROM scan_runs').run();
+
+    if (backup.scanRuns.length > 0) {
+      const runCols = Object.keys(backup.scanRuns[0]);
+      const runPlaceholders = runCols.map(c => `@${c}`).join(', ');
+      const insertRun = db.prepare(`INSERT OR REPLACE INTO scan_runs (${runCols.join(', ')}) VALUES (${runPlaceholders})`);
+      const insertRuns = db.transaction((items) => { for (const r of items) insertRun.run(r); });
+      insertRuns(backup.scanRuns);
+    }
+
+    if (backup.scanResults.length > 0) {
+      const resCols = Object.keys(backup.scanResults[0]);
+      const resPlaceholders = resCols.map(c => `@${c}`).join(', ');
+      const insertRes = db.prepare(`INSERT OR REPLACE INTO scan_results (${resCols.join(', ')}) VALUES (${resPlaceholders})`);
+      const insertResMany = db.transaction((items) => { for (const r of items) insertRes.run(r); });
+      insertResMany(backup.scanResults);
+    }
+
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    console.log(`[teardown] Restored ${backup.scanRuns.length} scan runs and ${backup.scanResults.length} scan results.`);
+  } finally {
+    if (db) db.close();
+  }
+}
+
+/**
+ * Returns the count of seeded scan_results for a given scan_run_id.
+ * Used in beforeAll assertions to verify the seed actually produced results.
+ */
+function getScanResultCount(scanRunId) {
+  let db;
+  try {
+    db = new Database(testConfig.database.path, { readonly: true });
+    const row = db.prepare('SELECT COUNT(*) as cnt FROM scan_results WHERE scan_run_id = ?').get(scanRunId);
+    return row.cnt;
   } finally {
     if (db) db.close();
   }
@@ -523,6 +598,7 @@ function getTestAttackPathNodeCount() {
 
 module.exports = {
   cleanupTestData, seedChecks, seedTestData,
+  backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount,
   seedEnvironmentData, cleanupEnvironmentData,
   getArmResourceCount, getTestArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
