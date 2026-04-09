@@ -50,6 +50,7 @@ function InvokeCIEMDiscoveryPhase {
         [scriptblock]$Action,
 
         [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
         [System.Collections.Generic.List[string]]$ErrorMessages,
 
         [Parameter(Mandatory)]
