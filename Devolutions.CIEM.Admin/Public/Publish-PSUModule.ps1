@@ -213,6 +213,30 @@ function Publish-PSUModule {
             Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
 
             Write-Host ''
+            Write-Host 'Step 5: Verifying app is healthy...' -ForegroundColor Yellow
+            $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
+            $healthy = $false
+            for ($i = 1; $i -le 10; $i++) {
+                Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
+                try {
+                    $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
+                    if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
+                        $healthy = $true
+                        break
+                    }
+                    Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
+                }
+                catch {
+                    Write-Host "  Not responding yet..." -ForegroundColor Gray
+                }
+                Start-Sleep -Seconds 3
+            }
+            if (-not $healthy) {
+                throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
+            }
+            Write-Host "  [OK] App is healthy" -ForegroundColor Green
+
+            Write-Host ''
             Write-Host '========================================' -ForegroundColor Cyan
             Write-Host 'Publish Point Import Successful!' -ForegroundColor Green
             Write-Host '========================================' -ForegroundColor Cyan
@@ -464,6 +488,30 @@ NuGet API key required. Options:
         Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
         Restart-PSUApp -Name $appName
         Write-Host "  [OK] App restarted" -ForegroundColor Green
+
+        Write-Host ''
+        Write-Host 'Step 8: Verifying app is healthy...' -ForegroundColor Yellow
+        $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
+        $healthy = $false
+        for ($i = 1; $i -le 10; $i++) {
+            Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
+            try {
+                $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
+                if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
+                    $healthy = $true
+                    break
+                }
+                Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
+            }
+            catch {
+                Write-Host "  Not responding yet..." -ForegroundColor Gray
+            }
+            Start-Sleep -Seconds 3
+        }
+        if (-not $healthy) {
+            throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
+        }
+        Write-Host "  [OK] App is healthy" -ForegroundColor Green
 
         Write-Host ''
         Write-Host '========================================' -ForegroundColor Cyan
