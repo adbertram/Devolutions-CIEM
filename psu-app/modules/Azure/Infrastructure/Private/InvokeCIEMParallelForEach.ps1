@@ -106,9 +106,12 @@ function InvokeCIEMParallelForEach {
                 $script:CIEMRunspaceInitialized = $true
             }
 
-            $childBlock = [scriptblock]::Create($using:scriptBlockText)
+            # Create scriptblock inside the module scope so module-defined classes
+            # ([CIEMCheck], [CIEMServiceCache], etc.) are visible at parse time.
+            $moduleInstance = Get-Module Devolutions.CIEM
+            $childBlock = & $moduleInstance { [scriptblock]::Create($args[0]) } $using:scriptBlockText
             try {
-                $result = @(& $childBlock $_)
+                $result = @(& $moduleInstance $childBlock $_)
                 [pscustomobject]@{
                     Input   = $_
                     Success = $true

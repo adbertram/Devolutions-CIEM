@@ -48,7 +48,7 @@ function Invoke-PSUSQLiteQuery {
 
     $ownsConnection = $false
     if ($PSCmdlet.ParameterSetName -eq 'ByDatabase') {
-        $Connection = [Microsoft.Data.Sqlite.SqliteConnection]::new("Data Source=$Database")
+        $Connection = [Microsoft.Data.Sqlite.SqliteConnection]::new("Data Source=$Database;Pooling=False")
         $Connection.Open()
         $ownsConnection = $true
     }

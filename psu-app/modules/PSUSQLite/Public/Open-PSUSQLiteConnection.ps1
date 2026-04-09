@@ -30,7 +30,7 @@ function Open-PSUSQLiteConnection {
         [string]$Database
     )
 
-    $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new("Data Source=$Database")
+    $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new("Data Source=$Database;Pooling=False")
     $conn.Open()
     $conn
 }

@@ -161,9 +161,26 @@ function New-CIEMScanPage {
                 # Initially empty - populated during scan via Set-UDElement
             }
 
+            # Check if discovery has been run — disable scan if not
+            $hasDiscoveryData = @(Devolutions.CIEM\Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1).Count -gt 0
+
+            if (-not $hasDiscoveryData) {
+                New-UDAlert -Severity 'warning' -Text 'Run Azure Discovery from the Environment page before scanning. Checks require collected resource data to evaluate.' -Style @{ marginTop = '16px' }
+            }
+
             # Action Buttons
             New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px' } } -Content {
-                New-UDButton -Id 'startScanBtn' -Text 'Start Scan' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
+                $scanBtnParams = @{
+                    Id = 'startScanBtn'
+                    Text = 'Start Scan'
+                    Variant = 'contained'
+                    Color = 'primary'
+                    ShowLoading = $true
+                }
+                if (-not $hasDiscoveryData) {
+                    $scanBtnParams['Disabled'] = $true
+                }
+                New-UDButton @scanBtnParams -OnClick {
                     try {
                         Devolutions.CIEM\Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
 

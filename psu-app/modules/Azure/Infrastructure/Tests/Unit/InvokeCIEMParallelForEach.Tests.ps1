@@ -50,6 +50,26 @@ Describe 'InvokeCIEMParallelForEach private helper' {
         @($script:result | Where-Object { $_.Success }) | Should -HaveCount 3
     }
 
+    It 'Resolves module-defined class types inside the parallel scriptblock' {
+        $script:result = InModuleScope Devolutions.CIEM {
+            InvokeCIEMParallelForEach -InputObject @([pscustomobject]@{ Id = 'test-1' }) -ThrottleLimit 1 -ScriptBlock {
+                param($workItem)
+                $check = [CIEMCheck]::new()
+                $check.Id = $workItem.Id
+                $check.Provider = 'Azure'
+                $check.Service = 'Entra'
+                $check.Title = 'Test'
+                $check.Severity = [CIEMCheckSeverity]'medium'
+                [pscustomobject]@{ CheckId = $check.Id; TypeName = $check.GetType().Name }
+            }
+        }
+
+        $script:result | Should -HaveCount 1
+        $script:result[0].Success | Should -BeTrue
+        $script:result[0].Result[0].CheckId | Should -Be 'test-1'
+        $script:result[0].Result[0].TypeName | Should -Be 'CIEMCheck'
+    }
+
     It 'Captures exceptions inside the parallel block as Success=$false records' {
         $script:result = InModuleScope Devolutions.CIEM {
             InvokeCIEMParallelForEach -InputObject @([pscustomobject]@{ Bad = $true }) -ThrottleLimit 1 -ScriptBlock {
