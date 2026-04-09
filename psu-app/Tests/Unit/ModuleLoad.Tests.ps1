@@ -113,6 +113,32 @@ Describe 'Module Load — Post-Discovery-Schema' {
         }
     }
 
+    Context 'Check functions are exported' {
+        It 'Get-CIEMCheck is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMCheck -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'New-CIEMCheck is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name New-CIEMCheck -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Update-CIEMCheck is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Update-CIEMCheck -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Get-CIEMCheckMetadata is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMCheckMetadata -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Get-CIEMRequiredPermission is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMRequiredPermission -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Devolutions.CIEM\Get-CIEMCheck resolves via module-qualified call' {
+            { Devolutions.CIEM\Get-CIEMCheck } | Should -Not -Throw
+        }
+    }
+
     Context 'Old functions are NOT exported' {
         It 'Module does not expose Get-CIEMAzureEntraData' {
             Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureEntraData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
