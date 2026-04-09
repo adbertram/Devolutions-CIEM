@@ -16,16 +16,7 @@ BeforeAll {
         (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.Graph' 'Data' 'graph_schema.sql')
     )) {
         foreach ($statement in ((Get-Content $schemaPath -Raw) -split ';\s*\n' | Where-Object { $_.Trim() })) {
-            $trimmed = $statement.Trim()
-            try {
-                Invoke-CIEMQuery -Query $trimmed -AsNonQuery | Out-Null
-            }
-            catch {
-                if ($trimmed -match 'ALTER\s+TABLE' -and $_.Exception.Message -match 'duplicate column') {
-                    continue
-                }
-                throw
-            }
+            Invoke-CIEMQuery -Query $statement.Trim() -AsNonQuery | Out-Null
         }
     }
 }
