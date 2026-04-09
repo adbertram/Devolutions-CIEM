@@ -1,7 +1,7 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
-const { isPSUReady, startPSU, waitForPSU, cancelRunningPSUJobs } = require('./psu-helpers');
+const { isPSUReady, startPSU, waitForPSU, cancelRunningPSUJobs, runPSUCommand } = require('./psu-helpers');
 const { cleanupTestData, seedChecks, seedTestData } = require('./cleanup');
 const { testConfig } = require('./test-config');
 
@@ -40,14 +40,39 @@ module.exports = async function globalSetup() {
     console.log(`[setup] Could not check PSU jobs: ${err.message}`);
   }
 
-  // 4. Clean stale test data and seed fresh data
+  // 4. Back up auth profiles so tests can't corrupt real credentials
+  try {
+    const backupResult = await runPSUCommand(`
+      $profiles = @(Get-PSUCache -Key 'CIEM:AuthProfiles:Azure' -ErrorAction SilentlyContinue)
+      if ($profiles.Count -gt 0) {
+        $profiles | ConvertTo-Json -Depth 10 -Compress
+      } else {
+        '[]'
+      }
+    `);
+    if (backupResult.statusCode === 2 || backupResult.statusCode === 11) {
+      const raw = backupResult.pipelineOutput && backupResult.pipelineOutput.length > 0
+        ? backupResult.pipelineOutput[backupResult.pipelineOutput.length - 1].value
+        : '[]';
+      process.env._E2E_AUTH_PROFILES_BACKUP = raw;
+      const count = JSON.parse(raw).length;
+      console.log(`[setup] Backed up ${count} auth profile(s).`);
+    } else {
+      console.log(`[setup] Could not back up auth profiles (status: ${backupResult.status}).`);
+      process.env._E2E_AUTH_PROFILES_BACKUP = '[]';
+    }
+  } catch (err) {
+    console.log(`[setup] Auth profile backup failed: ${err.message}`);
+    process.env._E2E_AUTH_PROFILES_BACKUP = '[]';
+  }
+
+  // 5. Clean stale test data and seed fresh data (all via SSH+sqlite3)
   cleanupTestData();
   seedChecks();
   seedTestData();
 
-  // 4. Export env vars for tests
+  // 6. Export env vars for tests
   process.env.PSU_BASE_URL = testConfig.urls.psu;
-  process.env.CIEM_DB_PATH = testConfig.database.path;
 
   console.log('[setup] Global setup complete.');
 };

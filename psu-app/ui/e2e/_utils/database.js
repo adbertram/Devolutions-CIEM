@@ -1,35 +1,22 @@
-const Database = require('better-sqlite3');
-const { testConfig } = require('./test-config');
-
-let db = null;
-
-function getDb(readonly = true) {
-  if (!db) {
-    db = new Database(testConfig.database.path, { readonly });
-  }
-  return db;
-}
+const { sshQuery } = require('./psu-helpers');
 
 function query(sql, params = []) {
-  const stmt = getDb().prepare(sql);
-  return stmt.all(...params);
+  // Substitute positional ? params with values for sqlite3 CLI
+  let finalSql = sql;
+  for (const val of params) {
+    finalSql = finalSql.replace('?', `'${String(val).replace(/'/g, "''")}'`);
+  }
+  return sshQuery(finalSql);
 }
 
 function queryOne(sql, params = []) {
-  const stmt = getDb().prepare(sql);
-  return stmt.get(...params);
-}
-
-function close() {
-  if (db) {
-    db.close();
-    db = null;
-  }
+  const rows = query(sql, params);
+  return Array.isArray(rows) ? rows[0] || null : rows;
 }
 
 function getScanRunCount() {
   const row = queryOne('SELECT COUNT(*) as count FROM scan_runs');
-  return row.count;
+  return row ? row.count : 0;
 }
 
 function getLatestScanRun() {
@@ -42,12 +29,12 @@ function getScanResults(scanRunId) {
 
 function getCheckCount() {
   const row = queryOne('SELECT COUNT(*) as count FROM checks');
-  return row.count;
+  return row ? row.count : 0;
 }
 
 function getEnabledCheckCount() {
   const row = queryOne('SELECT COUNT(*) as count FROM checks WHERE disabled = 0');
-  return row.count;
+  return row ? row.count : 0;
 }
 
 function getProviders() {
@@ -73,10 +60,8 @@ function getTestScanResults(scanRunId) {
 }
 
 module.exports = {
-  getDb,
   query,
   queryOne,
-  close,
   getScanRunCount,
   getLatestScanRun,
   getScanResults,

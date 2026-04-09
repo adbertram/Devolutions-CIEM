@@ -215,9 +215,77 @@ async function getActiveAzureAuthProfileCount() {
   return { count: 0, result };
 }
 
+/**
+ * Execute a PowerShell command inside PSU and return the parsed pipeline output.
+ * Throws on non-terminal status or if the job has errors.
+ * For commands that emit JSON via ConvertTo-Json, returns the parsed object/array.
+ * For scalar values (counts, strings), returns the raw string.
+ */
+async function runPSUQuery(command, timeoutMs = 30000) {
+  const result = await runPSUCommand(command, timeoutMs);
+  if (result.statusCode === -1) {
+    throw new Error(`PSU command failed: ${result.status} — ${result.error || 'unknown'}`);
+  }
+  const errors = (result.output || []).filter(o => o.type === 4);
+  if (errors.length > 0 && result.statusCode !== 2 && result.statusCode !== 11) {
+    throw new Error(`PSU command error: ${errors.map(e => e.message).join('; ')}`);
+  }
+  if (!result.pipelineOutput || result.pipelineOutput.length === 0) {
+    return null;
+  }
+  const raw = result.pipelineOutput[result.pipelineOutput.length - 1].value;
+  try { return JSON.parse(raw); } catch { return raw; }
+}
+
+/**
+ * Execute a non-query PowerShell command (INSERT/UPDATE/DELETE) inside PSU.
+ * Does not parse output — just ensures the command completed.
+ */
+async function runPSUNonQuery(command, timeoutMs = 30000) {
+  const result = await runPSUCommand(command, timeoutMs);
+  if (result.statusCode === -1) {
+    throw new Error(`PSU non-query failed: ${result.status} — ${result.error || 'unknown'}`);
+  }
+}
+
+// SSH database path on adam-server (publish point)
+const REMOTE_DB_PATH = '/Users/adam/psu/data/ciem.db';
+const SSH_HOST = 'adam-server';
+
+/**
+ * Execute a SQL query against the CIEM database on adam-server via SSH + sqlite3 CLI.
+ * Bypasses PSU's Microsoft.Data.Sqlite connections entirely — reads directly from the
+ * database file. Use for verification reads in E2E test beforeAll/afterAll where
+ * PSU cross-job WAL visibility is unreliable.
+ *
+ * Returns: for SELECT — parsed JSON array of rows; for scalar — the raw string value.
+ */
+function sshQuery(sql) {
+  const result = execSync(
+    `ssh ${SSH_HOST} "sqlite3 -json '${REMOTE_DB_PATH}' \\"${sql.replace(/"/g, '\\\\\\"')}\\""`,
+    { encoding: 'utf8', timeout: 10000 }
+  ).trim();
+  if (!result) return [];
+  try { return JSON.parse(result); } catch { return result; }
+}
+
+/**
+ * Execute a non-query SQL statement on adam-server via SSH + sqlite3 CLI.
+ * Appends a WAL checkpoint so writes are immediately visible to PSU page reads.
+ */
+function sshNonQuery(sql) {
+  const fullSql = `${sql}; PRAGMA wal_checkpoint(TRUNCATE)`;
+  execSync(
+    `ssh ${SSH_HOST} "sqlite3 '${REMOTE_DB_PATH}' \\"${fullSql.replace(/"/g, '\\\\\\"')}\\""`,
+    { encoding: 'utf8', timeout: 10000 }
+  );
+}
+
 module.exports = {
   isPSUReady, startPSU, waitForPSU,
-  runPSUCommand, cancelRunningPSUJobs, PSU_STATUS, PSU_STATUS_NAMES,
+  runPSUCommand, runPSUQuery, runPSUNonQuery,
+  sshQuery, sshNonQuery,
+  cancelRunningPSUJobs, PSU_STATUS, PSU_STATUS_NAMES,
   deactivateAzureAuthProfile, activateAzureAuthProfile,
   getActiveAzureAuthProfileCount
 };

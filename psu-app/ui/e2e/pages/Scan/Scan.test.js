@@ -1,5 +1,6 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const ScanPageHelpers = require('./ScanPageHelpers');
+const { getCompletedDiscoveryRunCount } = require('../../_utils/cleanup');
 
 test.describe('Scan Page', () => {
   let scanPage;
@@ -7,6 +8,26 @@ test.describe('Scan Page', () => {
   test.beforeEach(async ({ ciemPage }) => {
     scanPage = new ScanPageHelpers(ciemPage);
     await scanPage.navigateToScanPage();
+  });
+
+  test.describe('when no Azure discovery has been run', () => {
+    test.beforeAll(() => {
+      const count = getCompletedDiscoveryRunCount();
+      if (count > 0) {
+        test.skip(true, `Skipping: ${count} completed discovery runs exist`);
+      }
+      console.log(`[setup:no-discovery] Verified 0 completed discovery runs`);
+    });
+
+    test('should disable the Start Scan button', async () => {
+      const enabled = await scanPage.isStartScanButtonEnabled();
+      expect(enabled).toBe(false);
+    });
+
+    test('should show a discovery required alert', async () => {
+      const visible = await scanPage.isDiscoveryRequiredAlertVisible();
+      expect(visible).toBe(true);
+    });
   });
 
   test.describe('when the scan page loads with check data', () => {
@@ -29,9 +50,7 @@ test.describe('Scan Page', () => {
       expect(counts.disabled).toBeGreaterThan(0);
     });
 
-    test('should display Start Scan button in enabled state', async () => {
-      const enabled = await scanPage.isStartScanButtonEnabled();
-      expect(enabled).toBe(true);
+    test('should display Start Scan button with correct text', async () => {
       const text = await scanPage.getStartScanButtonText();
       expect(text).toBe('Start Scan');
     });
@@ -214,6 +233,13 @@ test.describe('Scan Page', () => {
   });
 
   test.describe('when the user clicks Start Scan without selecting any checks', () => {
+    test.beforeAll(() => {
+      const count = getCompletedDiscoveryRunCount();
+      if (count === 0) {
+        test.skip(true, 'Start Scan is disabled when no discovery has been run');
+      }
+    });
+
     test('should display a warning toast asking to select checks', async () => {
       await scanPage.clickStartScan();
       const toast = await scanPage.waitForToast('select at least one check');
@@ -236,6 +262,13 @@ test.describe('Scan Page', () => {
   });
 
   test.describe('when the user executes a scan with a single check', () => {
+    test.beforeAll(() => {
+      const count = getCompletedDiscoveryRunCount();
+      if (count === 0) {
+        test.skip(true, 'Start Scan is disabled when no discovery has been run');
+      }
+    });
+
     test('should show progress UI with disabled button and starting toast', async () => {
       await scanPage.selectSingleCheckBySearch('security_defaults');
       await scanPage.clickStartScan();

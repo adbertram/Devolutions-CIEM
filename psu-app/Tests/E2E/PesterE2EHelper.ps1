@@ -13,7 +13,17 @@ function script:Initialize-PesterE2E {
 
     Import-Module (Join-Path $ProjectRoot 'Devolutions.CIEM.Admin' 'Devolutions.CIEM.Admin.psd1') -Force
 
-    $psuUrl = 'http://localhost:5001'
+    # Read LOCAL_PSU_URL from .env
+    $envFile = Join-Path $ProjectRoot '.env'
+    $psuUrl = $null
+    if (Test-Path $envFile) {
+        Get-Content $envFile | ForEach-Object {
+            if ($_ -match '^LOCAL_PSU_URL=(.+)$') {
+                $psuUrl = $matches[1].Trim()
+            }
+        }
+    }
+    if (-not $psuUrl) { throw "LOCAL_PSU_URL not found in $envFile" }
     $healthUrl = "$psuUrl/api/v1/alive"
     $isReady = $false
 

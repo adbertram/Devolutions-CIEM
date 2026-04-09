@@ -26,6 +26,9 @@ class ScanPageHelpers extends BasePage {
       pagination: '.MuiTablePagination-root',
       severityChip: '.MuiDataGrid-row .MuiChip-root',
 
+      // Discovery required alert
+      discoveryRequiredAlert: '.MuiAlert-root:has-text("Run Azure Discovery")',
+
       // Action buttons
       startScanBtn: '#startScanBtn',
 
@@ -219,6 +222,17 @@ class ScanPageHelpers extends BasePage {
 
   async getStartScanButtonText() {
     return (await this.page.locator(this.selectors.startScanBtn).textContent()).trim();
+  }
+
+  async isDiscoveryRequiredAlertVisible() {
+    return await this.isElementVisible(this.selectors.discoveryRequiredAlert);
+  }
+
+  async getStartScanButtonTooltip() {
+    const btn = this.page.locator(this.selectors.startScanBtn);
+    // MUI wraps disabled buttons in a span with title for tooltip
+    const parent = btn.locator('..');
+    return await parent.getAttribute('title');
   }
 
   // --- Progress Area ---

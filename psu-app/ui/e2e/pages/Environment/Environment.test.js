@@ -190,7 +190,6 @@ test.describe('Environment Page', () => {
   test.describe('when discovery data exists in the database', () => {
     test.beforeAll(() => {
       seedEnvironmentData();
-      // Assert: verify seeded rows are in the DB
       const count = getTestArmResourceCount();
       if (count !== 4) {
         throw new Error(`Expected 4 seeded ARM resources, got ${count}`);
@@ -245,7 +244,6 @@ test.describe('Environment Page', () => {
 
     test.beforeAll(() => {
       backedUpRows = backupAndClearAllArmResources();
-      // Assert: verify table is empty
       const count = getArmResourceCount();
       if (count !== 0) {
         throw new Error(`Expected 0 ARM resources after clearing, got ${count}`);
@@ -293,9 +291,8 @@ test.describe('Environment Page', () => {
 
   test.describe('when identity data exists and Identity view is selected', () => {
     test.beforeAll(() => {
-      seedEnvironmentData(); // Need ARM resources for subscription name resolution
+      seedEnvironmentData();
       seedIdentityViewData();
-      // Assert: verify seeded rows
       const eraCount = getTestEffectiveRoleAssignmentCount();
       if (eraCount < 4) {
         throw new Error(`Expected >= 4 seeded effective role assignments, got ${eraCount}`);

@@ -23,7 +23,7 @@ test.describe('Identity Risk Page', () => {
   });
 
   test.describe('when identity data exists in the database', () => {
-    test.beforeAll(async () => {
+    test.beforeAll(() => {
       seedIdentityViewData();
       const count = getTestEffectiveRoleAssignmentCount();
       if (count < 1) {
@@ -32,7 +32,7 @@ test.describe('Identity Risk Page', () => {
       console.log(`[setup:identity-risk] Seeded ${count} effective role assignments`);
     });
 
-    test.afterAll(async () => {
+    test.afterAll(() => {
       cleanupIdentityViewData();
       console.log('[teardown:identity-risk] Cleaned up seeded data');
     });
@@ -81,11 +81,11 @@ test.describe('Identity Risk Page', () => {
   });
 
   test.describe('when an identity row is expanded', () => {
-    test.beforeAll(async () => {
+    test.beforeAll(() => {
       seedIdentityViewData();
     });
 
-    test.afterAll(async () => {
+    test.afterAll(() => {
       cleanupIdentityViewData();
     });
 
@@ -106,7 +106,7 @@ test.describe('Identity Risk Page', () => {
   });
 
   test.describe('when identity and attack path graph data exist', () => {
-    test.beforeAll(async () => {
+    test.beforeAll(() => {
       seedIdentityViewData();
       seedIdentityAttackPathData();
       const count = getTestEffectiveRoleAssignmentCount();
@@ -116,7 +116,7 @@ test.describe('Identity Risk Page', () => {
       console.log(`[setup:attack-paths] Seeded identity + graph data (${count} role assignments)`);
     });
 
-    test.afterAll(async () => {
+    test.afterAll(() => {
       cleanupIdentityAttackPathData();
       cleanupIdentityViewData();
       console.log('[teardown:attack-paths] Cleaned up identity + graph data');

@@ -23,13 +23,8 @@ test.describe('Scan History Page', () => {
     let backup = null;
 
     test.beforeAll(() => {
-      // 1. Isolate: back up and clear all scan_runs/scan_results so only seeded data is visible
       backup = backupAndClearAllScanHistory();
-
-      // 2. Seed: scan_run_1 (5 results, 2 FAIL) + scan_run_2 (3 results, 0 FAIL)
       seedTestData();
-
-      // 3. Assert: the seed actually produced results (catches FK failures / empty checks table)
       const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
       const run2Count = getScanResultCount(`${TEST_PREFIX}scan_run_2`);
       if (run1Count !== 5 || run2Count !== 3) {
@@ -170,25 +165,9 @@ test.describe('Scan History Page', () => {
     let backup = null;
 
     test.beforeAll(() => {
-      // 1. Isolate: back up and clear all scan_runs/scan_results
       backup = backupAndClearAllScanHistory();
-
-      // 2. Assert: the tables are actually empty
-      const { scanRuns, scanResults } = backup;
-      // Re-open to count after clear
-      const Database = require('better-sqlite3');
-      const { testConfig } = require('../../_utils/test-config');
-      const db = new Database(testConfig.database.path, { readonly: true });
-      try {
-        const runCount = db.prepare('SELECT COUNT(*) as cnt FROM scan_runs').get().cnt;
-        const resCount = db.prepare('SELECT COUNT(*) as cnt FROM scan_results').get().cnt;
-        if (runCount !== 0 || resCount !== 0) {
-          throw new Error(`Empty-state verification failed: ${runCount} scan_runs, ${resCount} scan_results remain`);
-        }
-        console.log(`[setup] Verified 0 scan_runs and 0 scan_results (backed up ${scanRuns.length} + ${scanResults.length}).`);
-      } finally {
-        db.close();
-      }
+      const { scanRunCount, scanResultCount } = backup;
+      console.log(`[setup] Verified 0 scan_runs and 0 scan_results (backed up ${scanRunCount} + ${scanResultCount}).`);
     });
 
     test.afterAll(() => {

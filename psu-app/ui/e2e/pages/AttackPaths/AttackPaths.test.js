@@ -23,7 +23,7 @@ test.describe('Attack Paths Page', () => {
   });
 
   test.describe('when attack path data exists in the graph', () => {
-    test.beforeAll(async () => {
+    test.beforeAll(() => {
       seedAttackPathsPageData();
       const count = getTestAttackPathNodeCount();
       if (count < 1) {
@@ -32,7 +32,7 @@ test.describe('Attack Paths Page', () => {
       console.log(`[setup:attack-paths-page] Seeded ${count} graph nodes for attack path evaluation`);
     });
 
-    test.afterAll(async () => {
+    test.afterAll(() => {
       cleanupAttackPathsPageData();
       console.log('[teardown:attack-paths-page] Cleaned up graph data');
     });
