@@ -172,10 +172,10 @@ For any page or function, identify the independent state axes that affect behavi
 
 ## Database Path (CRITICAL)
 
-PSU uses the **published module's database**, NOT the development source:
-- Correct: `local-psu/Repository/Modules/Devolutions.CIEM/<version>/data/ciem.db`
+PSU uses the **publish point's database**, NOT the development source:
+- Correct: `/Users/adam/psu/data/ciem.db` (on adam-server, accessed via SSH)
 - Wrong: `psu-app/data/ciem.db`
-- `test-config.js` uses `resolvePsuDatabasePath()` to find it dynamically
+- `test-config.js` uses `resolvePsuDatabasePath()` to find it
 - All DB seeding goes to the PSU module's DB
 
 ## SQLite WAL Cross-Process Visibility (CRITICAL)
@@ -818,7 +818,7 @@ For each page:
 - **Module**: `Devolutions.CIEM` — single module with dot-sourced sub-folders
 - **Module root**: `psu-app/`
 - **Database (dev)**: `psu-app/data/ciem.db`
-- **Database (PSU runtime)**: `local-psu/Repository/Modules/Devolutions.CIEM/<version>/data/ciem.db`
+- **Database (PSU runtime)**: `/Users/adam/psu/data/ciem.db` (on adam-server)
 - **Pester framework**: Pester 5.x, PowerShell 7.5+
 - **Playwright framework**: Playwright (Node.js), Chromium only
 - **PSU URL**: `http://localhost:5001` (local), double-path `/ciem/ciem/[page]`

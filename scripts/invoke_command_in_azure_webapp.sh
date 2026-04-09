@@ -20,9 +20,21 @@ if [[ "${1:-}" == "--local" ]]; then
 fi
 
 # Local mode constants
-LOCAL_CONTAINER="devolutions-ciem-psu-local"
-LOCAL_PSU_URL="http://localhost:5001"
-DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/local-psu"
+# Load publish point config from .env
+_env_file="$(cd "$(dirname "$0")/.." && pwd)/.env"
+PUBLISH_POINT_SSH=""
+PUBLISH_POINT_PSU_PATH=""
+LOCAL_PSU_URL=""
+if [ -f "$_env_file" ]; then
+    while IFS='=' read -r key value; do
+        case "$key" in
+            \#*|'') continue ;;
+            PUBLISH_POINT_SSH) PUBLISH_POINT_SSH="$value" ;;
+            PUBLISH_POINT_PSU_PATH) PUBLISH_POINT_PSU_PATH="$value" ;;
+            LOCAL_PSU_URL) LOCAL_PSU_URL="$value" ;;
+        esac
+    done < "$_env_file"
+fi
 
 # Azure mode constants
 RESOURCE_GROUP="devolutions-ciem-rg"
@@ -43,12 +55,12 @@ kudu_exec() {
     local cmd="$1"
 
     if [[ "$LOCAL_MODE" == true ]]; then
-        # Local mode: execute against the local-psu data directory
-        if [[ ! -d "$DATA_DIR" ]]; then
-            echo "Error: Local data directory not found: $DATA_DIR" >&2
+        # Local mode: execute on publish point via SSH
+        if [[ -z "$PUBLISH_POINT_SSH" ]]; then
+            echo "Error: PUBLISH_POINT_SSH not set in .env" >&2
             return 1
         fi
-        bash -c "cd $DATA_DIR && $cmd"
+        ssh "$PUBLISH_POINT_SSH" "cd $PUBLISH_POINT_PSU_PATH && $cmd"
         return $?
     fi
 
@@ -261,8 +273,8 @@ Architecture Note:
   Azure mode: The 'run' command executes in the Kudu sidecar container,
   which shares the /home filesystem with the PSU app container.
 
-  Local mode: The 'run' command executes against the local-psu/ data
-  directory. API calls go to the local PSU instance at $LOCAL_PSU_URL.
+  Local mode: The 'run' command executes on the publish point (adam-server)
+  via SSH. API calls go to the local PSU instance at $LOCAL_PSU_URL.
 EOF
 }
 

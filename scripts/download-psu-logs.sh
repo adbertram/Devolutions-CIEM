@@ -3,7 +3,7 @@
 # Usage: ./download-psu-logs.sh --local|--azure [output_file]
 #
 # Downloads from:
-#   --local: Local PSU instance (localhost:5001, local-psu/ directory)
+#   --local: Local PSU instance (publish point via SSH)
 #   --azure: Azure PSU instance (requires Azure CLI login)
 #     - PSU database (LogEntry table) - App-level logs like [App-Devolutions CIEM]
 #     - Azure Docker logs - Container stdout
@@ -28,17 +28,33 @@ elif [[ "${1:-}" == "--azure" ]]; then
 else
     echo "Usage: $(basename "$0") --local|--azure [output_file]" >&2
     echo "" >&2
-    echo "  --local   Download logs from local PSU (localhost:5001)" >&2
+    echo "  --local   Download logs from local PSU (publish point via SSH)" >&2
     echo "  --azure   Download logs from Azure PSU instance" >&2
     exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/local-psu"
-LOCAL_PSU_URL="http://localhost:5001"
+
+load_env() {
+    local env_file
+    env_file="$(cd "$(dirname "$0")/.." && pwd)/.env"
+    if [ -f "$env_file" ]; then
+        while IFS='=' read -r key value; do
+            case "$key" in
+                \#*|'') continue ;;
+                PUBLISH_POINT_SSH) PUBLISH_POINT_SSH="$value" ;;
+                PUBLISH_POINT_PSU_PATH) PUBLISH_POINT_PSU_PATH="$value" ;;
+                LOCAL_PSU_URL) LOCAL_PSU_URL="$value" ;;
+            esac
+        done < "$env_file"
+    fi
+}
+
+load_env
+
 ENV_FILE="$SCRIPT_DIR/../.env"
 
-# Load .env if it exists
+# Load remaining .env vars (PSU_TOKEN, etc.) via source for Azure mode
 if [ -f "$ENV_FILE" ]; then
   source "$ENV_FILE"
 fi
@@ -59,13 +75,13 @@ echo "Downloading PSU logs to: $OUTPUT_FILE" >&2
 
 if [ "$LOCAL_MODE" = true ]; then
   # ============================================
-  # LOCAL MODE: Collect logs from local PSU instance
+  # LOCAL MODE: Collect logs from publish point via SSH
   # ============================================
   {
     echo "=============================================="
     echo "PSU Diagnostics Report (Local)"
     echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "Source: $DATA_DIR"
+    echo "Source: ${PUBLISH_POINT_SSH}:${PUBLISH_POINT_PSU_PATH}"
     echo "=============================================="
     echo ""
 
@@ -74,12 +90,7 @@ if [ "$LOCAL_MODE" = true ]; then
     # ============================================
     echo "=== PSU Database Logs (LogEntry table) ==="
     echo ""
-    LOCAL_DB="$DATA_DIR/database.db"
-    if [ -f "$LOCAL_DB" ]; then
-      sqlite3 "$LOCAL_DB" "SELECT printf('[%s] [%s] [%s-%s] %s', TimeStamp, Level, Feature, Resource, Message) FROM LogEntry ORDER BY LogId DESC LIMIT 1000;" 2>/dev/null || echo "(database query failed)"
-    else
-      echo "(database not found: $LOCAL_DB)"
-    fi
+    ssh "$PUBLISH_POINT_SSH" "sqlite3 '\$HOME/Library/Application Support/PowerShellUniversal/database.db' \"SELECT printf('[%s] [%s] [%s-%s] %s', TimeStamp, Level, Feature, Resource, Message) FROM LogEntry ORDER BY LogId DESC LIMIT 1000;\"" 2>/dev/null || echo "(database query failed via SSH)"
     echo ""
 
     # ============================================
@@ -90,7 +101,7 @@ if [ "$LOCAL_MODE" = true ]; then
     API_TEMP_ZIP=$(mktemp).zip
     API_TEMP_DIR=$(mktemp -d)
 
-    HTTP_CODE=$(curl -s -w "%{http_code}" "$LOCAL_PSU_URL/api/v1/log" -o "$API_TEMP_ZIP" 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -s -w "%{http_code}" "${LOCAL_PSU_URL}/api/v1/log" -o "$API_TEMP_ZIP" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
       unzip -q "$API_TEMP_ZIP" -d "$API_TEMP_DIR" 2>/dev/null || true
       for log in "$API_TEMP_DIR"/*.txt; do
@@ -108,16 +119,11 @@ if [ "$LOCAL_MODE" = true ]; then
     echo ""
 
     # ============================================
-    # SECTION 3: PSU Stdout Log
+    # SECTION 3: CIEM Application Log
     # ============================================
-    echo "=== PSU Stdout Log ==="
+    echo "=== CIEM Application Log ==="
     echo ""
-    STDOUT_LOG="$DATA_DIR/LogFiles/psu-stdout.log"
-    if [ -f "$STDOUT_LOG" ]; then
-      cat "$STDOUT_LOG"
-    else
-      echo "(not found: $STDOUT_LOG)"
-    fi
+    ssh "$PUBLISH_POINT_SSH" "cat '${PUBLISH_POINT_PSU_PATH}/data/ciem.log'" 2>/dev/null || echo "(not found: ${PUBLISH_POINT_PSU_PATH}/data/ciem.log)"
     echo ""
 
     # ============================================
@@ -125,17 +131,7 @@ if [ "$LOCAL_MODE" = true ]; then
     # ============================================
     echo "=== Additional Log Files ==="
     echo ""
-    if [ -d "$DATA_DIR/LogFiles" ]; then
-      for logfile in "$DATA_DIR/LogFiles/"*; do
-        if [ -f "$logfile" ] && [ "$logfile" != "$STDOUT_LOG" ]; then
-          echo "--- $(basename "$logfile") ---"
-          cat "$logfile"
-          echo ""
-        fi
-      done
-    else
-      echo "(LogFiles directory not found: $DATA_DIR/LogFiles)"
-    fi
+    ssh "$PUBLISH_POINT_SSH" "if [ -d '${PUBLISH_POINT_PSU_PATH}/LogFiles' ]; then for f in '${PUBLISH_POINT_PSU_PATH}/LogFiles/'*; do [ -f \"\$f\" ] && echo \"--- \$(basename \"\$f\") ---\" && cat \"\$f\" && echo ''; done; else echo '(LogFiles directory not found)'; fi" 2>/dev/null || echo "(failed to list log files via SSH)"
 
     echo "=============================================="
     echo "End of Diagnostics Report (Local)"

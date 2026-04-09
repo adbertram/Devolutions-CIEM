@@ -25,9 +25,8 @@ function script:Initialize-PesterE2E {
     }
 
     if (-not $isReady) {
-        Write-Host '[pester-e2e] PSU not ready, starting...'
-        $setupScript = Join-Path $ProjectRoot 'scripts' 'setup-local-psu.sh'
-        & bash $setupScript start --no-wait
+        Write-Host '[pester-e2e] PSU not ready, starting via launchctl...'
+        & sudo launchctl kickstart -k system/com.psu.server
 
         $startTime = Get-Date
         $deadline = $startTime.AddSeconds($TimeoutSeconds)

@@ -1,11 +1,28 @@
 #!/bin/bash
 # Azure PSU File Manager - Query, list, and read files on Azure Web App via Kudu API
+# In --local mode, accesses publish point (adam-server) via SSH
 set -euo pipefail
 
 RESOURCE_GROUP="devolutions-ciem-rg"
 APP_NAME="devolutions-ciem-psu"
 SCM_URL="https://${APP_NAME}.scm.azurewebsites.net"
-DATA_DIR="$(cd "$(dirname "$0")/.." && pwd)/local-psu"
+
+load_env() {
+    local env_file
+    env_file="$(cd "$(dirname "$0")/.." && pwd)/.env"
+    if [ -f "$env_file" ]; then
+        while IFS='=' read -r key value; do
+            case "$key" in
+                \#*|'') continue ;;
+                PUBLISH_POINT_SSH) PUBLISH_POINT_SSH="$value" ;;
+                PUBLISH_POINT_PSU_PATH) PUBLISH_POINT_PSU_PATH="$value" ;;
+                LOCAL_PSU_URL) LOCAL_PSU_URL="$value" ;;
+            esac
+        done < "$env_file"
+    fi
+}
+
+load_env
 
 # Get credentials via Azure CLI
 get_credentials() {
@@ -19,7 +36,7 @@ get_credentials() {
 list_files() {
     local path="${1:-}"
     if [[ "$LOCAL_MODE" == true ]]; then
-        ls -la "$DATA_DIR/$path"
+        ssh "$PUBLISH_POINT_SSH" "ls -la '${PUBLISH_POINT_PSU_PATH}/${path}'"
     else
         local creds
         creds=$(get_credentials)
@@ -36,7 +53,7 @@ list_files() {
 read_file() {
     local path="$1"
     if [[ "$LOCAL_MODE" == true ]]; then
-        cat "$DATA_DIR/$path"
+        ssh "$PUBLISH_POINT_SSH" "cat '${PUBLISH_POINT_PSU_PATH}/${path}'"
     else
         local creds
         creds=$(get_credentials)
@@ -52,7 +69,7 @@ read_file() {
 exec_cmd() {
     local cmd="$1"
     if [[ "$LOCAL_MODE" == true ]]; then
-        bash -c "$cmd"
+        ssh "$PUBLISH_POINT_SSH" "$cmd"
     else
         local creds
         creds=$(get_credentials)
@@ -71,7 +88,7 @@ usage() {
 Usage: $0 [--local] <command> [args]
 
 Options:
-  --local         Use local PSU filesystem (local-psu/) instead of Azure Kudu API
+  --local         Use publish point (adam-server) via SSH instead of Azure Kudu API
 
 Commands:
   list [path]     List files in directory (default: root)
@@ -84,7 +101,7 @@ Examples:
   $0 read site/wwwroot/appsettings.json
   $0 exec "pwsh -c 'Get-Module -ListAvailable'"
   $0 exec "ls -la /home"
-  $0 --local list            # List local PSU root directory
+  $0 --local list            # List publish point PSU root directory
   $0 --local read Repository/.universal/apps.ps1
 EOF
 }

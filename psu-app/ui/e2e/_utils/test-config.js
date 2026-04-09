@@ -1,20 +1,13 @@
 const path = require('path');
-const fs = require('fs');
 
 require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
 /**
- * Resolves the database path used by the local PSU instance.
- * The CIEM module stores its DB OUTSIDE the module version directory so data
- * survives module upgrades. The DB lives at local-psu/data/ciem.db (sibling of Repository/).
+ * Resolves the database path used by the PSU instance on adam-server.
+ * Tests run on adam-server where PSU lives at ~/psu/.
  */
 function resolvePsuDatabasePath() {
-  const psuDataDb = path.resolve(__dirname, '../../../../local-psu/data/ciem.db');
-  if (fs.existsSync(psuDataDb)) {
-    return psuDataDb;
-  }
-  // Fallback to development DB (won't be seen by PSU but allows offline test runs)
-  return path.resolve(__dirname, '../../../data/ciem.db');
+  return '/Users/adam/psu/data/ciem.db';
 }
 
 const testConfig = {
@@ -36,7 +29,6 @@ const testConfig = {
     path: resolvePsuDatabasePath()
   },
   psu: {
-    setupScript: path.resolve(__dirname, '../../../../scripts/setup-local-psu.sh'),
     healthEndpoint: '/api/v1/alive'
   },
   timeouts: {

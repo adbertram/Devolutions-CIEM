@@ -6,7 +6,7 @@ BeforeAll {
     # Verify PSU is reachable and discovery command exists
     $script:cmdCheck = Run-OnPSU 'Get-Command Start-CIEMAzureDiscovery -ErrorAction Stop | Select-Object -ExpandProperty Name'
     if ($script:cmdCheck -ne 'Start-CIEMAzureDiscovery') {
-        throw "Local PSU not reachable or CIEM module not loaded. Start with: ./scripts/setup-local-psu.sh start"
+        throw "Local PSU not reachable or CIEM module not loaded. Start PSU on adam-server: ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'"
     }
 
     # Verify real Azure auth profile exists and is active, then connect

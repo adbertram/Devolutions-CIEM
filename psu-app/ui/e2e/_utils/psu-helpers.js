@@ -1,6 +1,4 @@
 const { execSync } = require('child_process');
-const path = require('path');
-const Database = require('better-sqlite3');
 const { testConfig } = require('./test-config');
 
 async function isPSUReady() {
@@ -16,8 +14,8 @@ async function isPSUReady() {
 }
 
 function startPSU() {
-  console.log('[psu] Starting local PSU server...');
-  execSync(`"${testConfig.psu.setupScript}" start --no-wait`, {
+  console.log('[psu] Starting PSU server via launchctl...');
+  execSync('sudo launchctl kickstart -k system/com.psu.server', {
     stdio: 'inherit',
     timeout: 30000
   });
@@ -40,17 +38,12 @@ async function waitForPSU(timeoutMs = testConfig.timeouts.serverStart) {
 }
 
 /**
- * Get the local PSU app token from the local-psu database.
+ * Get the local PSU app token from the LOCAL_PSU_TOKEN environment variable.
  */
 function getPSUToken() {
-  const dbPath = path.resolve(__dirname, '../../../../local-psu/database.db');
-  const db = new Database(dbPath, { readonly: true });
-  try {
-    const row = db.prepare('SELECT Token FROM AppToken LIMIT 1').get();
-    return row ? row.Token : null;
-  } finally {
-    db.close();
-  }
+  const token = process.env.LOCAL_PSU_TOKEN;
+  if (!token) throw new Error('LOCAL_PSU_TOKEN environment variable is not set');
+  return token;
 }
 
 /**
@@ -58,7 +51,7 @@ function getPSUToken() {
  */
 function getPSUHeaders() {
   const token = getPSUToken();
-  if (!token) throw new Error('No PSU token found in local-psu/database.db');
+  if (!token) throw new Error('No PSU token available (LOCAL_PSU_TOKEN not set)');
   return {
     'Authorization': `Bearer ${token}`,
     'Accept': 'application/json',

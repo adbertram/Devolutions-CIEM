@@ -173,14 +173,12 @@ prowler/.gemini/skills
 .env
 _temp/
 
-# Local PSU instance
-local-psu/
 .playwright-cli/
 plans/
 
 _temp/
 
-# CIEM runtime database and logs (single DB lives in local-psu/data/)
+# CIEM runtime database and logs (runtime DB lives on publish point)
 psu-app/data/ciem.db*
 psu-app/data/ciem.log
 
@@ -191,4 +189,3 @@ test-results/
 # Claude Code local config (skills, commands, agents, hooks)
 .claude/
 .codex/
-.ngrok-url

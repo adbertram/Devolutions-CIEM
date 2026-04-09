@@ -28,13 +28,13 @@ function Publish-PSUModule {
         Path to .env file for loading NuGetApiKey.
 
     .PARAMETER LocalOnly
-        Skip PowerShell Gallery publishing entirely and import the module
-        directly to a local PSU instance.
+        Skip PowerShell Gallery publishing entirely and push the module
+        via SSH/rsync to the publish point PSU instance.
 
     .PARAMETER IncludeData
-        Include database files (*.db, *.db-shm, *.db-wal) in the local module copy.
+        Include database files (*.db, *.db-shm, *.db-wal) in the module push.
         By default (LocalOnly), DB files are excluded to preserve the PSU instance's
-        runtime data. Azure/PSGallery publishes always include data files.
+        runtime data. Azure/PSGallery publishes always exclude data files too.
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app
@@ -91,35 +91,48 @@ function Publish-PSUModule {
     # ========================================================================
     if ($LocalOnly) {
         Write-Host '========================================' -ForegroundColor Cyan
-        Write-Host "Importing $moduleName to Local PSU" -ForegroundColor Cyan
+        Write-Host "Publishing $moduleName to Publish Point PSU" -ForegroundColor Cyan
         Write-Host '========================================' -ForegroundColor Cyan
         Write-Host "Module: $ModulePath"
         Write-Host ''
 
+        # Read publish point config from .env
+        $projectRoot = Split-Path $ModulePath -Parent
+        $envPath = if ($EnvFilePath) { $EnvFilePath } else { Join-Path $projectRoot '.env' }
+        $sshAlias = $null
+        $remotePsuPath = $null
+        if (Test-Path $envPath) {
+            foreach ($line in (Get-Content $envPath -ErrorAction Stop)) {
+                if ($line -match '^\s*#' -or $line -match '^\s*$') { continue }
+                if ($line -match '^([^=]+)=(.*)$') {
+                    switch ($matches[1].Trim()) {
+                        'PUBLISH_POINT_SSH' { $sshAlias = $matches[2].Trim() }
+                        'PUBLISH_POINT_PSU_PATH' { $remotePsuPath = $matches[2].Trim() }
+                    }
+                }
+            }
+        }
+        if (-not $sshAlias) { throw "PUBLISH_POINT_SSH is required in .env (e.g., adam-server)." }
+        if (-not $remotePsuPath) { throw "PUBLISH_POINT_PSU_PATH is required in .env (e.g., /Users/adam/psu)." }
+        $remoteModulesDir = "$remotePsuPath/Repository/Modules"
+
         Write-Host 'Step 1: Connecting to local PSU...' -ForegroundColor Yellow
-        try {
-            $null = Connect-PSU -Local -ErrorAction Stop
-            Write-Host '  [OK] Connected to local PSU' -ForegroundColor Green
-        }
-        catch {
-            throw "Failed to connect to local PSU: $_"
-        }
+        $null = Connect-PSU -Local -ErrorAction Stop
+        Write-Host '  [OK] Connected to local PSU' -ForegroundColor Green
 
         Write-Host ''
         Write-Host 'Step 2: Bumping version...' -ForegroundColor Yellow
 
         $manifest = Import-PowerShellDataFile -Path $manifestPath
         $localVersion = [version]$manifest.ModuleVersion
-        $projectRoot = Split-Path $ModulePath -Parent
-        $localPsuModulesDir = Join-Path $projectRoot 'local-psu' 'Repository' 'Modules'
-        $targetModuleDir = Join-Path $localPsuModulesDir $moduleName
 
-        # Check currently installed version in local PSU
+        # Check currently installed version on publish point via SSH
         $installedVersion = $null
-        if (Test-Path $targetModuleDir) {
-            $versionDirs = Get-ChildItem -Path $targetModuleDir -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+' }
-            if ($versionDirs) {
-                $installedVersion = $versionDirs | ForEach-Object { [version]$_.Name } | Sort-Object -Descending | Select-Object -First 1
+        $remoteVersionOutput = & ssh $sshAlias "ls '$remoteModulesDir/$moduleName/' 2>/dev/null" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $remoteVersionOutput) {
+            $versionStrings = @($remoteVersionOutput | Where-Object { $_ -match '^\d+\.\d+\.\d+' })
+            if ($versionStrings) {
+                $installedVersion = $versionStrings | ForEach-Object { [version]$_ } | Sort-Object -Descending | Select-Object -First 1
             }
         }
 
@@ -158,29 +171,33 @@ function Publish-PSUModule {
         $moduleVersion = $newVersion.ToString()
 
         Write-Host ''
-        Write-Host 'Step 3: Installing module to local PSU...' -ForegroundColor Yellow
+        Write-Host 'Step 3: Pushing module to publish point via SSH...' -ForegroundColor Yellow
 
-        if ($PSCmdlet.ShouldProcess($moduleName, "Install v$moduleVersion to local PSU")) {
+        if ($PSCmdlet.ShouldProcess($moduleName, "Push v$moduleVersion to $sshAlias")) {
 
-            if (-not (Test-Path $localPsuModulesDir)) {
-                throw "Local PSU modules directory not found: $localPsuModulesDir"
-            }
+            # Remove existing module on publish point
+            & ssh $sshAlias "rm -rf '$remoteModulesDir/$moduleName'" 2>$null
 
-            if (Test-Path $targetModuleDir) {
-                Write-Verbose "Removing existing module at: $targetModuleDir"
-                Remove-Item -Path $targetModuleDir -Recurse -Force
-            }
-
-            $targetVersionDir = Join-Path $targetModuleDir $moduleVersion
-            Write-Verbose "Copying module to: $targetVersionDir"
-            Copy-Item -Path $ModulePath -Destination $targetVersionDir -Recurse -Force
+            # Build rsync exclude list
+            $rsyncArgs = @('-az', '--delete')
             if (-not $IncludeData) {
-                # Remove database files from the copy to preserve PSU's runtime data
-                Get-ChildItem -Path $targetVersionDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal' -File | Remove-Item -Force
+                $rsyncArgs += '--exclude=*.db'
+                $rsyncArgs += '--exclude=*.db-shm'
+                $rsyncArgs += '--exclude=*.db-wal'
+            }
+            $rsyncArgs += "$ModulePath/"
+            $rsyncArgs += "${sshAlias}:${remoteModulesDir}/${moduleName}/${moduleVersion}/"
+
+            Write-Verbose "rsync $($rsyncArgs -join ' ')"
+            & rsync @rsyncArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw "rsync to $sshAlias failed with exit code $LASTEXITCODE"
+            }
+
+            if (-not $IncludeData) {
                 Write-Host "  [OK] Excluded *.db files (use -IncludeData to override)" -ForegroundColor Green
             }
-
-            Write-Host "  [OK] Module installed: $moduleName v$moduleVersion" -ForegroundColor Green
+            Write-Host "  [OK] Module pushed: $moduleName v$moduleVersion -> $sshAlias" -ForegroundColor Green
 
             Write-Host ''
             Write-Host 'Step 4: Restarting app...' -ForegroundColor Yellow
@@ -197,7 +214,7 @@ function Publish-PSUModule {
 
             Write-Host ''
             Write-Host '========================================' -ForegroundColor Cyan
-            Write-Host 'Local Import Successful!' -ForegroundColor Green
+            Write-Host 'Publish Point Import Successful!' -ForegroundColor Green
             Write-Host '========================================' -ForegroundColor Cyan
 
             return [PSCustomObject]@{
@@ -211,10 +228,10 @@ function Publish-PSUModule {
         else {
             Write-Host ''
             $manifest = Import-PowerShellDataFile -Path $manifestPath
-            Write-Host '[DRY RUN] Would import to local PSU:' -ForegroundColor Yellow
+            Write-Host '[DRY RUN] Would push to publish point:' -ForegroundColor Yellow
             Write-Host "  Module: $moduleName"
             Write-Host "  Version: $($manifest.ModuleVersion)"
-            Write-Host "  Path: $ModulePath"
+            Write-Host "  Target: ${sshAlias}:${remoteModulesDir}/${moduleName}/$($manifest.ModuleVersion)/"
 
             return [PSCustomObject]@{
                 ModuleName = $moduleName

@@ -14,10 +14,10 @@
 ## PSU Instances
 ### Local PSU
 - "Local" means the always-on PSU instance on `adam-server`, not the MacBook.
-- Normal workflow is edit on the MacBook and let Dropbox sync changes to adam-server, which runs PSU.
-- Current public URL command: `ngrok api tunnels list --limit 20 --log false | jq -r '.tunnels[] | select(.forwards_to == "http://localhost:5001") | .public_url'`
-- `Connect-PSU -Local` resolves the current adam-server ngrok URL from the ngrok CLI and reads `LOCAL_PSU_TOKEN` from `.env`.
-- Do not run `./scripts/setup-local-psu.sh start` on the MacBook unless the user explicitly wants a forced local instance. The script is guarded because a second local PSU can corrupt the Dropbox-synced repo workflow.
+- Normal workflow is edit on MacBook, then `Publish-PSUModule -LocalOnly` pushes via SSH/rsync to adam-server.
+- LAN URL: `http://192.168.86.30:5001` (set as `LOCAL_PSU_URL` in `.env`)
+- `Connect-PSU -Local` reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`.
+- PSU Repository on adam-server: `/Users/adam/psu/Repository` (pushed via SSH, not Dropbox-synced).
 
 ### Azure PSU
 - URL: `https://devolutions-ciem-psu.azurewebsites.net`
@@ -39,7 +39,7 @@ Publish-PSUModule -ModulePath ./psu-app
 Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 ```
 
-- Use `-LocalOnly` for adam-server local development.
+- Use `-LocalOnly` to push to adam-server via SSH/rsync (skips PSGallery).
 - `scripts/azure_psu_file_manager.sh` and `scripts/invoke_command_in_azure_webapp.sh` are for inspection only, not deployment.
 
 ## Testing and Validation

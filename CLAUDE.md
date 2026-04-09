@@ -31,13 +31,12 @@ Detailed TDD rules, test layer conventions, and what requires tests: `.claude/ru
 
 ## Default PSU Instance (CRITICAL)
 
-**"Local" PSU = the always-on adam-server instance** (Mac Mini). There is NO MacBook PSU — running one would corrupt the Dropbox-synced module repository. Default to this "local" instance for all operations unless the user explicitly says "Azure" or "production":
+**"Local" PSU = the always-on adam-server instance** (Mac Mini). There is NO MacBook PSU. Code is pushed to adam-server via SSH/rsync. Default to this "local" instance for all operations unless the user explicitly says "Azure" or "production":
 
-- **Opening PSU:** `ngrok api tunnels list --limit 20 --log false | jq -r '.tunnels[] | select(.forwards_to == "http://localhost:5001") | .public_url'`
-- **Publishing modules:** `Publish-PSUModule -LocalOnly` (copies to Dropbox-synced Repository, restarts adam-server app)
+- **Opening PSU:** URL from `LOCAL_PSU_URL` in `.env` (LAN IP, e.g., `http://192.168.86.30:5001`)
+- **Publishing modules:** `Publish-PSUModule -LocalOnly` (pushes via SSH/rsync to publish point, restarts adam-server app)
 - **Testing commands:** `Invoke-TestCommand -Environment local` (default)
-- **`Connect-PSU`:** `Connect-PSU -Local` (resolves the current ngrok URL from the ngrok CLI and reads `LOCAL_PSU_TOKEN` from `.env`)
-- **NEVER run `./scripts/setup-local-psu.sh start`** — it's guarded against accidental use and requires `--force` / `ALLOW_LOCAL_PSU=1`
+- **`Connect-PSU`:** `Connect-PSU -Local` (reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`)
 
 ## Project Context
 
@@ -183,7 +182,7 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 6. Auto-connects to PSU (reads PROD_PSU_URL/PSU_TOKEN from .env)
 7. Imports the new version to PSU
 
-**With `-LocalOnly`:** Skips steps 2-5, connects to local PSU via `Connect-PSU -Local`, and imports the module directly.
+**With `-LocalOnly`:** Skips steps 2-5, connects to local PSU via `Connect-PSU -Local`, pushes the module via SSH/rsync to the publish point, and restarts the app.
 
 **Why:** The PSU Gallery is the distribution mechanism. Direct uploads bypass version control, break the upgrade path for users, and don't follow the intended distribution model.
 
@@ -216,7 +215,7 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Invoke-TestCom
 
 ## Troubleshooting (CRITICAL)
 
-**ALWAYS use `./scripts/ciem-log.sh` to query the CIEM application log.** Do NOT hardcode `psu-app/data/ciem.log` — the actual log location depends on where PSU loaded the module from (working copy vs published module in `local-psu/Repository/Modules/`). The script finds the most recently modified `ciem.log` automatically.
+**ALWAYS use `./scripts/ciem-log.sh` to query the CIEM application log.** Do NOT hardcode paths — the script SSHs to the publish point (adam-server) to read `~/psu/data/ciem.log` by default, with a local fallback to `psu-app/data/ciem.log`.
 
 ```bash
 # Recent log entries (default: 30 lines)
@@ -243,9 +242,8 @@ The log captures issues that PSU's own logs miss (module initialization, provide
 ### Local PSU Recovery Escalation (MANDATORY ORDER)
 
 1. `Restart-PSUApp -Name 'Devolutions CIEM'` — restart just the CIEM app
-2. `./scripts/setup-local-psu.sh stop && ./scripts/setup-local-psu.sh start` — restart PSU server
+2. `ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'` — restart PSU server on adam-server
 3. **STOP and ask the user** before proceeding to more destructive options
-4. **NEVER run `setup-local-psu.sh reset` without explicit user approval** — it destroys all local PSU state (license, tokens, app registrations, dev mode settings) and requires full manual re-setup
 
 After bulk code changes, if the CIEM app shows "App is not running," investigate whether the changes broke module initialization before restarting anything. Always suppress `Connect-PSU` output when chaining commands: `$null = Connect-PSU -Local; <next command>`
 
@@ -255,40 +253,42 @@ After bulk code changes, if the CIEM app shows "App is not running," investigate
 
 ### "Local" PSU Instance = adam-server (Always-On)
 
-The "local" PSU runs on **adam-server** (headless Mac Mini via Tailscale), not on MacBook. MacBook has no running PSU — it edits code that Dropbox syncs to adam-server.
+The "local" PSU runs on **adam-server** (Mac Mini on LAN), not on MacBook. Code is pushed to adam-server via SSH/rsync when publishing.
 
 | Property | Value |
 |----------|-------|
-| **Public URL** | `ngrok api tunnels list --limit 20 --log false | jq -r '.tunnels[] \| select(.forwards_to == "http://localhost:5001") \| .public_url'` |
-| **PSU port** | `127.0.0.1:5001` on adam-server |
+| **LAN URL** | `http://192.168.86.30:5001` (set in `.env` as `LOCAL_PSU_URL`) |
+| **Public URL** | ngrok tunnel (use `ngrok api tunnels list` on adam-server) |
 | **PSU Version** | 2026.1.0 |
 | **Binary** | `~/.local/share/powershell-universal/Universal.Server` (native macOS ARM64) — on adam-server |
-| **Repository** | `/Users/adam/Dropbox/GitRepos/Devolutions-CIEM/local-psu/Repository` (Dropbox-synced) |
-| **Database** | `/Users/adam/Library/Application Support/PowerShellUniversal/database.db` (LOCAL to adam-server — NOT in Dropbox; SQLite + Dropbox corrupts) |
+| **Repository** | `/Users/adam/psu/Repository` (on adam-server, pushed via SSH/rsync) |
+| **Database** | `/Users/adam/Library/Application Support/PowerShellUniversal/database.db` (on adam-server) |
+| **CIEM data** | `/Users/adam/psu/data/ciem.db`, `/Users/adam/psu/data/ciem.log` (on adam-server) |
 | **LaunchDaemons** | `com.psu.server`, `com.ngrok.psu` (both KeepAlive) |
 | **Logs** | `/var/log/psu.log`, `/var/log/ngrok-psu.log` on adam-server |
 
 ```bash
 # Connect from MacBook
-Connect-PSU -Local                           # Resolves the current ngrok URL from the CLI
+Connect-PSU -Local                           # Reads LOCAL_PSU_URL from .env
 
 # Kickstart PSU on adam-server if it crashes
 ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'
 ```
 
-**Workflow:** Edit CIEM module on MacBook → Dropbox syncs → adam-server's PSU picks up changes (no publish needed for dev). **NEVER run local PSU on MacBook simultaneously** — both write to the same Dropbox-synced SQLite and will corrupt it.
-
-**ngrok dev domain is broken** (`chummy-nicolasa-unconnotative.ngrok-free.dev` has `certificate: null` on ngrok's side; ngrok blocks all API modifications). Don't try to fix it — use the current tunnel URL from `ngrok api tunnels list`.
+**Workflow:** Edit CIEM module on MacBook → `Publish-PSUModule -LocalOnly` pushes via SSH/rsync to adam-server → app restarts automatically.
 
 ### .env Configuration
 
 ```
+LOCAL_PSU_URL=http://192.168.86.30:5001
+PUBLISH_POINT_SSH=adam-server
+PUBLISH_POINT_PSU_PATH=/Users/adam/psu
+LOCAL_PSU_TOKEN=<any-token>  # adam-server runs in Permissive security mode
 AZURE_PSU_URL=https://devolutions-ciem-psu.azurewebsites.net
 AZURE_PSU_TOKEN=<azure-token>
-LOCAL_PSU_TOKEN=<any-token>  # adam-server runs in Permissive security mode
 ```
 
-`Connect-PSU` reads `AZURE_PSU_URL` by default. Use `-Local` to resolve the current adam-server ngrok URL via the ngrok CLI and read `LOCAL_PSU_TOKEN` from `.env`.
+`Connect-PSU` reads `AZURE_PSU_URL` by default. Use `-Local` to read `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`.
 
 ### Azure PSU Instance (Production)
 

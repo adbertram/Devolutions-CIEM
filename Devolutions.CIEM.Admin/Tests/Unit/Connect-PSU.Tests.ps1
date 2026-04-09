@@ -11,52 +11,39 @@ BeforeAll {
 }
 
 Describe 'Connect-PSU' {
-    Context 'when -Local is used and ngrok CLI writes a status line to stderr' {
+    Context 'when -Local is used with LOCAL_PSU_URL in .env' {
         BeforeAll {
-            # Real ngrok CLI writes the JSON response to stdout AND a '200 OK'
-            # HTTP status line to stderr. The buggy code captured both with
-            # `2>&1 | Out-String` and handed the merged text to ConvertFrom-Json,
-            # which failed with a "Additional text encountered after finished
-            # reading JSON content" error.
-            Mock -ModuleName Devolutions.CIEM.Admin ngrok {
-                # Real ngrok writes the HTTP status line to stderr AND the JSON
-                # body to stdout. Buggy code merged them with 2>&1, corrupting
-                # the JSON. Inside a PowerShell function, Write-Error flows
-                # through the PS error stream so `2>&1` redirection actually
-                # captures it (matching how native process stderr is captured).
-                Write-Output @'
-{
-  "next_page_uri": null,
-  "tunnels": [
-    {
-      "forwards_to": "http://localhost:5001",
-      "public_url": "https://mocked.ngrok-free.app",
-      "proto": "https"
-    }
-  ],
-  "uri": "https://api.ngrok.com/tunnels"
-}
+            $script:envFile = Join-Path $TestDrive '.env'
+            Set-Content -Path $script:envFile -Value @'
+LOCAL_PSU_URL=http://192.168.86.30:5001
+LOCAL_PSU_TOKEN=fake-local-token
 '@
-                Write-Error '200 OK' -ErrorAction Continue
-                $global:LASTEXITCODE = 0
-            }
 
-            # Network call to PSU must not reach the wire
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod { @() }
 
-            $script:connectResult = Connect-PSU -Local -Token 'fake-token' -EnvFilePath 'NO_ENV_FILE' -WarningAction SilentlyContinue
+            $script:connectResult = Connect-PSU -Local -EnvFilePath $script:envFile -WarningAction SilentlyContinue
         }
 
-        It 'parses ngrok JSON cleanly even when stderr contains a status line' {
-            $script:connectResult | Should -Not -BeNullOrEmpty
-        }
-
-        It 'resolves the tunnel URL from ngrok stdout JSON' {
-            $script:connectResult.Url | Should -Be 'https://mocked.ngrok-free.app'
+        It 'reads the URL from LOCAL_PSU_URL in .env' {
+            $script:connectResult.Url | Should -Be 'http://192.168.86.30:5001'
         }
 
         It 'reports a connected status' {
             $script:connectResult.Status | Should -Be 'Connected'
+        }
+    }
+
+    Context 'when -Local is used without LOCAL_PSU_URL in .env' {
+        BeforeAll {
+            $script:envFile = Join-Path $TestDrive '.env-no-url'
+            Set-Content -Path $script:envFile -Value @'
+LOCAL_PSU_TOKEN=fake-local-token
+'@
+        }
+
+        It 'throws requiring LOCAL_PSU_URL to be set' {
+            { Connect-PSU -Local -EnvFilePath $script:envFile -WarningAction SilentlyContinue } |
+                Should -Throw -ExpectedMessage '*LOCAL_PSU_URL*'
         }
     }
 

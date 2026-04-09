@@ -7,53 +7,92 @@ BeforeAll {
 }
 
 Describe 'Publish-PSUModule -LocalOnly' {
-    Context 'when Restart-PSUApp fails after the module is copied to local PSU' {
+    BeforeAll {
+        # Build a minimal fake project layout:
+        #   $TestDrive/
+        #     psu-app/                       <-- $ModulePath
+        #       Devolutions.CIEM.psd1
+        #       Devolutions.CIEM.psm1
+        #       .universal/dashboards.ps1
+        #     .env                           <-- publish point config
+        $script:srcDir = Join-Path $TestDrive 'psu-app'
+        New-Item -Path $script:srcDir -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $script:srcDir '.universal') -ItemType Directory -Force | Out-Null
+
+        New-ModuleManifest `
+            -Path (Join-Path $script:srcDir 'Devolutions.CIEM.psd1') `
+            -ModuleVersion '0.0.1' `
+            -RootModule 'Devolutions.CIEM.psm1'
+        Set-Content -Path (Join-Path $script:srcDir 'Devolutions.CIEM.psm1') -Value ''
+        Set-Content `
+            -Path (Join-Path $script:srcDir '.universal/dashboards.ps1') `
+            -Value "New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem'"
+
+        # .env with publish point config
+        $script:envFile = Join-Path $TestDrive '.env'
+        Set-Content -Path $script:envFile -Value @'
+PUBLISH_POINT_SSH=adam-server
+PUBLISH_POINT_PSU_PATH=/Users/adam/psu
+LOCAL_PSU_URL=http://192.168.86.30:5001
+LOCAL_PSU_TOKEN=fake-token
+'@
+    }
+
+    Context 'when rsync push succeeds and Restart-PSUApp fails' {
         BeforeAll {
-            # Build a minimal fake project layout that Publish-PSUModule can consume:
-            #   $TestDrive/
-            #     psu-app/                       <-- $ModulePath
-            #       Devolutions.CIEM.psd1
-            #       Devolutions.CIEM.psm1
-            #       .universal/dashboards.ps1
-            #     local-psu/Repository/Modules/  <-- target install dir
-            $script:srcDir = Join-Path $TestDrive 'psu-app'
-            $script:targetDir = Join-Path $TestDrive 'local-psu/Repository/Modules'
-            New-Item -Path $script:srcDir -ItemType Directory -Force | Out-Null
-            New-Item -Path $script:targetDir -ItemType Directory -Force | Out-Null
-            New-Item -Path (Join-Path $script:srcDir '.universal') -ItemType Directory -Force | Out-Null
-
-            New-ModuleManifest `
-                -Path (Join-Path $script:srcDir 'Devolutions.CIEM.psd1') `
-                -ModuleVersion '0.0.1' `
-                -RootModule 'Devolutions.CIEM.psm1'
-            Set-Content -Path (Join-Path $script:srcDir 'Devolutions.CIEM.psm1') -Value ''
-            Set-Content `
-                -Path (Join-Path $script:srcDir '.universal/dashboards.ps1') `
-                -Value "New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem'"
-
-            # Neutralize external dependencies
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { [PSCustomObject]@{ Url = 'https://mocked'; Status = 'Connected' } }
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
+            Mock -ModuleName Devolutions.CIEM.Admin ssh { '' } -ParameterFilter { $args -match 'ls' }
+            Mock -ModuleName Devolutions.CIEM.Admin ssh {} -ParameterFilter { $args -match 'rm -rf' }
+            Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
             Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp { throw 'Mocked restart failure: PSU connection stale' }
         }
 
         It 'rethrows the Restart-PSUApp failure instead of emitting a warning' {
-            { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -Confirm:$false } |
+            { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } |
                 Should -Throw -ExpectedMessage '*Mocked restart failure*'
         }
 
         It 'invokes Restart-PSUApp with the CIEM app name' {
-            try { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -Confirm:$false } catch {}
+            try { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } catch {}
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Restart-PSUApp -Times 1 -ParameterFilter { $Name -eq 'Devolutions CIEM' }
+        }
+    }
+
+    Context 'when PUBLISH_POINT_SSH is missing from .env' {
+        BeforeAll {
+            $script:noSshEnv = Join-Path $TestDrive '.env-no-ssh'
+            Set-Content -Path $script:noSshEnv -Value @'
+PUBLISH_POINT_PSU_PATH=/Users/adam/psu
+LOCAL_PSU_URL=http://192.168.86.30:5001
+LOCAL_PSU_TOKEN=fake-token
+'@
+        }
+
+        It 'throws requiring PUBLISH_POINT_SSH' {
+            { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:noSshEnv -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*PUBLISH_POINT_SSH*'
+        }
+    }
+
+    Context 'when rsync fails' {
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { [PSCustomObject]@{ Url = 'https://mocked'; Status = 'Connected' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
+            Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
+            Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 1 }
+            Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp {}
+        }
+
+        It 'throws on rsync failure' {
+            { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*rsync*failed*'
         }
     }
 }
 
 Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
     BeforeAll {
-        # Build a minimal fake module layout for the non-LocalOnly path.
-        # Note: the remote path also uses $projectRoot = Split-Path $ModulePath -Parent to find
-        # an .env file, so the parent of the module dir is allowed to be empty (no .env present).
         $script:remoteSrcDir = Join-Path $TestDrive 'remote-psu-app'
         New-Item -Path $script:remoteSrcDir -ItemType Directory -Force | Out-Null
         New-Item -Path (Join-Path $script:remoteSrcDir '.universal') -ItemType Directory -Force | Out-Null
@@ -75,7 +114,6 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
                 $script:PSUConnection.Token = $null
             }
 
-            # First Find-Module call (pre-publish gallery check) returns nothing so the bump is off the local manifest
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module {
                 [PSCustomObject]@{ Version = '0.0.2' }
             }

@@ -46,7 +46,7 @@ All report artifacts (text + screenshots) go in this folder.
 
 Load the `playwright-cli` skill, then navigate the CIEM app and capture screenshots of new or updated features. Save them directly into the report folder.
 
-The CIEM app runs at `http://localhost:5001/ciem/ciem/`. If local PSU is not running, start it first via `./scripts/setup-local-psu.sh start`.
+The CIEM app runs at `http://192.168.86.30:5001/ciem/ciem/` (LOCAL_PSU_URL from .env). If PSU is not running, start it via `ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'`.
 
 **Screenshot capture pattern (per page):**
 

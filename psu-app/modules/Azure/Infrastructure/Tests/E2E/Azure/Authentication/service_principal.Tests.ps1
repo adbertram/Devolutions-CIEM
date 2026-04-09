@@ -13,7 +13,7 @@ BeforeAll {
     # Verify PSU is reachable and CIEM module is loaded
     $script:psuPing = Run-OnPSU 'Get-Command Get-CIEMAzureAuthenticationProfile -ErrorAction Stop | Select-Object -ExpandProperty Name'
     if ($script:psuPing -ne 'Get-CIEMAzureAuthenticationProfile') {
-        throw "Local PSU not reachable or CIEM module not loaded. Start with: ./scripts/setup-local-psu.sh start"
+        throw "Local PSU not reachable or CIEM module not loaded. Start PSU on adam-server: ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'"
     }
 
     # Verify a real SP profile exists for connection tests
