@@ -192,13 +192,8 @@ function Publish-PSUModule {
                     $appName = $matches[1]
                 }
             }
-            try {
-                Restart-PSUApp -Name $appName
-                Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "  [WARN] Could not restart app '$appName': $_" -ForegroundColor Yellow
-            }
+            Restart-PSUApp -Name $appName
+            Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
 
             Write-Host ''
             Write-Host '========================================' -ForegroundColor Cyan
@@ -432,44 +427,26 @@ NuGet API key required. Options:
 
         if (-not $script:PSUConnection.Url) {
             Write-Host '  Not connected to PSU. Attempting auto-connect...' -ForegroundColor Gray
-            try {
-                $null = Connect-PSU -ErrorAction Stop
-                Write-Host '  [OK] Connected to PSU' -ForegroundColor Green
-            }
-            catch {
-                Write-Host "  [WARN] Could not auto-connect to PSU: $_" -ForegroundColor Yellow
-                Write-Host '  Ensure AZURE_PSU_URL and AZURE_PSU_TOKEN are set in .env file' -ForegroundColor Gray
-            }
+            $null = Connect-PSU -ErrorAction Stop
+            Write-Host '  [OK] Connected to PSU' -ForegroundColor Green
         }
 
-        if ($script:PSUConnection.Url) {
-            try {
-                Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
-                Install-PSUModule -Name $moduleName -Version $fullVersion -NoSync
-                Write-Host "  [OK] Module imported" -ForegroundColor Green
-                $updatedPSU = $true
+        Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
+        Install-PSUModule -Name $moduleName -Version $fullVersion -NoSync
+        Write-Host "  [OK] Module imported" -ForegroundColor Green
+        $updatedPSU = $true
 
-                $appName = $script:DefaultAppName
-                $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
-                if (Test-Path $dashboardsPath) {
-                    $dashboardContent = Get-Content $dashboardsPath -Raw
-                    if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
-                        $appName = $matches[1]
-                    }
-                }
-                Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
-                try {
-                    Restart-PSUApp -Name $appName
-                    Write-Host "  [OK] App restarted" -ForegroundColor Green
-                }
-                catch {
-                    Write-Host "  [WARN] Could not restart app: $_" -ForegroundColor Yellow
-                }
-            }
-            catch {
-                Write-Host "  [ERROR] Failed to update PSU: $_" -ForegroundColor Red
+        $appName = $script:DefaultAppName
+        $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
+        if (Test-Path $dashboardsPath) {
+            $dashboardContent = Get-Content $dashboardsPath -Raw
+            if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
+                $appName = $matches[1]
             }
         }
+        Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
+        Restart-PSUApp -Name $appName
+        Write-Host "  [OK] App restarted" -ForegroundColor Green
 
         Write-Host ''
         Write-Host '========================================' -ForegroundColor Cyan
