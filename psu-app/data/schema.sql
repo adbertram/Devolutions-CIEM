@@ -91,8 +91,6 @@ CREATE INDEX IF NOT EXISTS idx_scan_results_resource ON scan_results(resource_id
 -- was already included in the table definition.
 CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
 
-ALTER TABLE checks ADD COLUMN data_needs TEXT;
-
 -- =============================================================================
 -- Provider Authentication Methods
 -- =============================================================================

@@ -132,7 +132,5 @@ CREATE INDEX IF NOT EXISTS idx_effective_ra_scope ON azure_effective_role_assign
 CREATE INDEX IF NOT EXISTS idx_effective_ra_role_def ON azure_effective_role_assignments(role_definition_id);
 CREATE INDEX IF NOT EXISTS idx_effective_ra_principal_type ON azure_effective_role_assignments(principal_type);
 
-ALTER TABLE azure_arm_resources ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE azure_entra_resources ADD COLUMN last_seen_at INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_arm_resources_last_seen ON azure_arm_resources(last_seen_at);
 CREATE INDEX IF NOT EXISTS idx_entra_resources_last_seen ON azure_entra_resources(last_seen_at);

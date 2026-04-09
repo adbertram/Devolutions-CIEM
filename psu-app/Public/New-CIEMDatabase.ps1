@@ -61,24 +61,15 @@ function New-CIEMDatabase {
 
     $isNew = -not (Test-Path $Path)
 
-    # Read and execute schema SQL
+    # Read and execute schema SQL. The schema MUST be fully idempotent — every
+    # CREATE TABLE / CREATE INDEX uses IF NOT EXISTS, and ALTER TABLE migrations
+    # that have been baked into the CREATE TABLE definitions must be removed
+    # from the file. If a statement throws, that is a real bug — fail fast.
     $schemaSql = Get-Content -Path $SchemaPath -Raw
     $conn = Open-PSUSQLiteConnection -Database $Path
     try {
         foreach ($statement in ($schemaSql -split ';\s*\n' | Where-Object { $_.Trim() })) {
-            $trimmed = $statement.Trim()
-            try {
-                Invoke-PSUSQLiteQuery -Connection $conn -Query $trimmed -AsNonQuery | Out-Null
-            }
-            catch {
-                # ALTER TABLE ADD COLUMN fails with "duplicate column name" on re-runs — safe to ignore
-                if ($trimmed -match 'ALTER\s+TABLE' -and $_.Exception.Message -match 'duplicate column') {
-                    Write-Verbose "CIEM DB: Column already exists, skipping: $trimmed"
-                }
-                else {
-                    throw
-                }
-            }
+            Invoke-PSUSQLiteQuery -Connection $conn -Query $statement.Trim() -AsNonQuery | Out-Null
         }
     } finally {
         $conn.Dispose()
