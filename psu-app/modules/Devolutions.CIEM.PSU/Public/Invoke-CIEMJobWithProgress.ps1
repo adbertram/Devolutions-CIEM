@@ -22,7 +22,7 @@ function Invoke-CIEMJobWithProgress {
         [Parameter(Mandatory)]
         [string]$ScriptName,
 
-        [Parameter(Mandatory)]
+        [Parameter()]
         [string]$ProgressElementId,
 
         [string[]]$DisableElementIds,
@@ -42,12 +42,14 @@ function Invoke-CIEMJobWithProgress {
     try {
         Write-CIEMLog -Message "JOB: starting '$ScriptName', progressEl=$ProgressElementId, disableEls=$($DisableElementIds -join ',')" -Severity INFO -Component 'PSU-Progress'
 
-        # Render initial indeterminate progress
-        Set-UDElement -Id $ProgressElementId -Content {
-            New-UDCard -Style @{ marginTop = '16px'; marginBottom = '16px' } -Content {
-                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                    New-UDProgress -Circular -Size 'small'
-                    New-UDTypography -Text 'Initializing...' -Variant 'body2' -Style @{ color = '#666' }
+        # Render initial indeterminate progress (if a target element is provided)
+        if ($ProgressElementId) {
+            Set-UDElement -Id $ProgressElementId -Content {
+                New-UDCard -Style @{ marginTop = '16px'; marginBottom = '16px' } -Content {
+                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                        New-UDProgress -Circular -Size 'small'
+                        New-UDTypography -Text 'Initializing...' -Variant 'body2' -Style @{ color = '#666' }
+                    }
                 }
             }
         }
@@ -83,16 +85,18 @@ function Invoke-CIEMJobWithProgress {
                 $lastLoggedStatus = $currentStatus
             }
 
-            # Render progress UI
-            $pct = $job.PercentComplete
-            Set-UDElement -Id $ProgressElementId -Content {
-                New-UDCard -Style @{ marginTop = '16px'; marginBottom = '16px' } -Content {
-                    if ($pct -gt 0) {
-                        New-UDProgress -PercentComplete $pct
-                    } else {
-                        New-UDProgress
+            # Render progress UI (if a target element is provided)
+            if ($ProgressElementId) {
+                $pct = $job.PercentComplete
+                Set-UDElement -Id $ProgressElementId -Content {
+                    New-UDCard -Style @{ marginTop = '16px'; marginBottom = '16px' } -Content {
+                        if ($pct -gt 0) {
+                            New-UDProgress -PercentComplete $pct
+                        } else {
+                            New-UDProgress
+                        }
+                        New-UDTypography -Text $statusText -Variant 'body2' -Style @{ color = '#666'; marginTop = '8px' }
                     }
-                    New-UDTypography -Text $statusText -Variant 'body2' -Style @{ color = '#666'; marginTop = '8px' }
                 }
             }
 
@@ -104,12 +108,13 @@ function Invoke-CIEMJobWithProgress {
         }
 
         # Handle terminal states
-        # 'Warning' = job completed but produced Write-Warning output (still successful)
+        # PSU status codes: Completed=2, Warning=10 (no output), WarningOutput=11 (has output)
         $status = "$($job.Status)"
-        if ($status -eq 'Completed' -or $status -eq 'Warning') {
-            Write-CIEMLog -Message "JOB: retrieving pipeline output for job $($job.Id)" -Severity INFO -Component 'PSU-Progress'
+        if ($status -eq 'Completed' -or $status -eq 'Warning' -or $status -eq 'WarningOutput') {
+            Write-CIEMLog -Message "JOB: retrieving pipeline output for job $($job.Id) (status=$status)" -Severity INFO -Component 'PSU-Progress'
             $output = Get-PSUJobPipelineOutput -JobId $job.Id -Integrated | Select-Object -First 1
-            Write-CIEMLog -Message "JOB: job $($job.Id) completed (status=$status), output type=$($output.GetType().Name), output=$($output | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue)" -Severity INFO -Component 'PSU-Progress'
+            $outputType = if ($output) { $output.GetType().Name } else { 'null' }
+            Write-CIEMLog -Message "JOB: job $($job.Id) completed (status=$status), output type=$outputType" -Severity INFO -Component 'PSU-Progress'
             return $output
         }
         elseif ($status -eq 'Failed' -or $status -eq 'Error') {

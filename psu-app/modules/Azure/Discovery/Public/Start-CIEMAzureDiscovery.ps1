@@ -103,7 +103,7 @@ function Start-CIEMAzureDiscovery {
                         $results = @(InvokeCIEMResourceGraphQuery -Query $table -SubscriptionId $subscriptionIds)
                         Write-CIEMLog "ResourceGraph/${table}: $($results.Count) rows" -Component 'Discovery'
                         , $results
-                    }.GetNewClosure()
+                    }
                 if (-not $phaseOutcome.Succeeded) {
                     $armDiscoverySucceeded = $false
                 }
@@ -135,7 +135,7 @@ function Start-CIEMAzureDiscovery {
                 -Name 'ARM persistence' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
-                -DetailBuilder { param($r) "$armRowCount rows" }.GetNewClosure() `
+                -DetailBuilder { param($r) "$armRowCount rows" } `
                 -Action {
                     InvokeCIEMTransaction {
                         param($conn)
@@ -152,7 +152,7 @@ function Start-CIEMAzureDiscovery {
                             Invoke-PSUSQLiteQuery -Connection $conn -Query 'DELETE FROM azure_arm_resources WHERE last_seen_at < @last_seen_at' -Parameters @{ last_seen_at = $runStart } -AsNonQuery | Out-Null
                         }
                     }
-                }.GetNewClosure()
+                }
         }
 
         # =================================================================
@@ -194,7 +194,7 @@ function Start-CIEMAzureDiscovery {
                         $permissions = @(InvokeCIEMEntraPermissionCollection -ServicePrincipals $collectedServicePrincipals)
                         Write-CIEMLog "Entra permissions: $($permissions.Count) rows" -Component 'Discovery'
                         , $permissions
-                    }.GetNewClosure()
+                    }
                 if (-not $permissionPhase.Succeeded) {
                     $entraDiscoverySucceeded = $false
                 }
@@ -210,7 +210,7 @@ function Start-CIEMAzureDiscovery {
                 -Name 'Entra persistence' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
-                -DetailBuilder { param($r) "$entraRowCount rows" }.GetNewClosure() `
+                -DetailBuilder { param($r) "$entraRowCount rows" } `
                 -Action {
                     InvokeCIEMTransaction {
                         param($conn)
@@ -235,7 +235,7 @@ function Start-CIEMAzureDiscovery {
                             Invoke-PSUSQLiteQuery -Connection $conn -Query 'DELETE FROM azure_entra_resources WHERE last_seen_at < @last_seen_at' -Parameters @{ last_seen_at = $runStart } -AsNonQuery | Out-Null
                         }
                     }
-                }.GetNewClosure()
+                }
 
             $collectedGroups = @($entraResources | Where-Object { $_.Type -eq 'group' })
             $collectedRoles = @($entraResources | Where-Object { $_.Type -eq 'directoryRole' })
@@ -251,7 +251,7 @@ function Start-CIEMAzureDiscovery {
                         $rels = @(InvokeCIEMEntraRelationshipCollection -Groups $collectedGroups -DirectoryRoles $collectedRoles -Users $collectedUsers)
                         Write-CIEMLog "Entra relationships: $($rels.Count) rows" -Component 'Discovery'
                         , $rels
-                    }.GetNewClosure()
+                    }
                 if (-not $relationshipPhase.Succeeded) {
                     $relationshipsSucceeded = $false
                 }
@@ -270,14 +270,14 @@ function Start-CIEMAzureDiscovery {
                 -Name 'Relationship persistence' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
-                -DetailBuilder { param($r) "$relationshipCount rows" }.GetNewClosure() `
+                -DetailBuilder { param($r) "$relationshipCount rows" } `
                 -Action {
                     InvokeCIEMTransaction {
                         param($conn)
                         Remove-CIEMAzureResourceRelationship -All -Connection $conn -Confirm:$false
                         Save-CIEMAzureResourceRelationship -InputObject $relationships -Connection $conn
                     }
-                }.GetNewClosure()
+                }
         }
 
         # =================================================================
@@ -321,7 +321,7 @@ function Start-CIEMAzureDiscovery {
                     $eraCount = InvokeCIEMAzureEffectiveRoleAssignmentBuild -ArmResources $allArmResources -EntraResources $allEntraResources -Relationships $allRelationships -Connection $conn -ComputedAt (Get-Date).ToString('o')
                     Write-CIEMLog "EffectiveRoleAssignments: $eraCount rows inserted" -Component 'Discovery'
                 }
-            }.GetNewClosure()
+            }
 
         $null = InvokeCIEMDiscoveryPhase `
             -Name 'Graph build' `
@@ -343,7 +343,7 @@ function Start-CIEMAzureDiscovery {
                     $computedEdgeCount = InvokeCIEMGraphComputedEdgeBuild -ArmResources $allArmResources -EntraResources $allEntraResources -Relationships $allRelationships -Connection $conn -CollectedAt $collectedAt
                     Write-CIEMLog "GraphEdges: $computedEdgeCount computed edges created" -Component 'Discovery'
                 }
-            }.GetNewClosure()
+            }
 
         $allArmResources = $null
         $allEntraResources = $null
@@ -381,7 +381,11 @@ function Start-CIEMAzureDiscovery {
     catch {
         $errorMessage = $_.Exception.Message
         Write-CIEMLog "Discovery run #$($run.Id) FAILED: $errorMessage" -Severity ERROR -Component 'Discovery'
-        Update-CIEMAzureDiscoveryRun -Id $run.Id -Status 'Failed' -CompletedAt (Get-Date).ToString('o') -ErrorMessage $errorMessage | Out-Null
+        # Do not overwrite 'Cancelled' status if the run was cancelled by the user
+        $currentRun = Get-CIEMAzureDiscoveryRun -Id $run.Id
+        if ($currentRun.Status -ne 'Cancelled') {
+            Update-CIEMAzureDiscoveryRun -Id $run.Id -Status 'Failed' -CompletedAt (Get-Date).ToString('o') -ErrorMessage $errorMessage | Out-Null
+        }
         throw
     }
 }

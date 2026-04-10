@@ -71,11 +71,18 @@ function New-CIEMEnvironmentPage {
 
                         Show-UDToast -Message 'Starting Azure discovery...' -Duration 5000 -BackgroundColor '#2196f3'
 
+                        # Progress is shown by the auto-refresh status banner above — no ProgressElementId needed
                         $run = Devolutions.CIEM\Invoke-CIEMJobWithProgress `
                             -ScriptName 'Devolutions.CIEM\Start-CIEMAzureDiscovery' `
-                            -ProgressElementId 'envDiscoveryProgress' `
                             -DisableElementIds @('startDiscoveryBtn') `
                             -MaxPollSeconds 600
+
+                        if (-not $run) {
+                            Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: Invoke-CIEMJobWithProgress returned null — job produced no pipeline output" -Severity WARNING -Component 'PSU-EnvironmentPage'
+                            Sync-UDElement -Id 'envChartDynamic'
+                            Show-UDToast -Message "Discovery completed but returned no output — check logs for warnings" -Duration 8000 -BackgroundColor '#ff9800'
+                            return
+                        }
 
                         Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: Invoke-CIEMJobWithProgress returned, run type=$($run.GetType().Name), run=$($run | ConvertTo-Json -Depth 2 -Compress -ErrorAction SilentlyContinue)" -Severity INFO -Component 'PSU-EnvironmentPage'
 
@@ -85,8 +92,7 @@ function New-CIEMEnvironmentPage {
 
                         Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: parsed results — status=$status, arm=$armCount, entra=$entraCount" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-                        # Clear discovery progress and auto-reload the environment tree
-                        Set-UDElement -Id 'envDiscoveryProgress' -Content {}
+                        # Auto-reload the environment tree
                         Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: calling Sync-UDElement envChartDynamic" -Severity INFO -Component 'PSU-EnvironmentPage'
                         Sync-UDElement -Id 'envChartDynamic'
                         Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: Sync-UDElement returned" -Severity INFO -Component 'PSU-EnvironmentPage'
@@ -102,15 +108,55 @@ function New-CIEMEnvironmentPage {
                     catch {
                         $errorMsg = $_.Exception.Message
                         Devolutions.CIEM\Write-CIEMLog -Message "Discovery from Environment page failed: $errorMsg" -Severity ERROR -Component 'PSU-EnvironmentPage'
-                        Set-UDElement -Id 'envDiscoveryProgress' -Content {}
                         Show-UDToast -Message "Discovery failed: $errorMsg" -Duration 8000 -BackgroundColor '#f44336'
                     }
                 }
             }
         }
 
-        # Discovery progress container (separate from chart area to avoid destroying New-UDDynamic)
-        New-UDElement -Tag 'div' -Id 'envDiscoveryProgress' -Content {}
+        # Discovery status banner — auto-refreshes to show running discovery with cancel button
+        New-UDElement -Tag 'div' -Id 'envDiscoveryStatusBanner' -Content {
+            New-UDDynamic -Id 'envDiscoveryStatusDynamic' -AutoRefresh -AutoRefreshInterval 5 -Content {
+                $runningRuns = @(Devolutions.CIEM\Get-CIEMAzureDiscoveryRun -Status 'Running')
+                if ($runningRuns.Count -gt 0) {
+                    $run = $runningRuns[0]
+                    $startedAt = $run.StartedAt
+                    $elapsed = ''
+                    if ($startedAt) {
+                        try {
+                            $startTime = [DateTimeOffset]::Parse($startedAt)
+                            $duration = [DateTimeOffset]::UtcNow - $startTime
+                            if ($duration.TotalMinutes -ge 1) {
+                                $elapsed = " — started $([math]::Floor($duration.TotalMinutes)) min ago"
+                            } else {
+                                $elapsed = " — started $([math]::Floor($duration.TotalSeconds))s ago"
+                            }
+                        } catch {
+                            # Ignore parse errors on started_at
+                        }
+                    }
+
+                    New-UDCard -Style @{ marginTop = '8px'; marginBottom = '8px'; backgroundColor = '#e3f2fd'; border = '1px solid #90caf9' } -Content {
+                        New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -JustifyContent 'space-between' -Content {
+                            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                New-UDProgress -Circular -Size 'small'
+                                New-UDTypography -Text "Discovery in progress (Run #$($run.Id), Scope: $($run.Scope))$elapsed" -Variant 'body2' -Style @{ color = '#1565c0' }
+                            }
+                            New-UDButton -Id 'cancelDiscoveryBtn' -Text 'Cancel' -Variant 'outlined' -Color 'error' -Size 'small' -OnClick {
+                                Devolutions.CIEM\Stop-CIEMAzureDiscovery
+                                # Also cancel PSU jobs running discovery
+                                $discoveryJobs = @(Get-PSUJob -Status 'Running' -Integrated | Where-Object { $_.Script -and $_.Script.Name -like '*Discovery*' })
+                                foreach ($job in $discoveryJobs) {
+                                    Stop-PSUJob -Job $job -Integrated
+                                }
+                                Show-UDToast -Message 'Discovery cancelled' -Duration 5000 -BackgroundColor '#ff9800'
+                                Sync-UDElement -Id 'envDiscoveryStatusDynamic'
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         # Chart area — outer wrapper preserves #envChartArea for E2E selectors
         New-UDElement -Tag 'div' -Id 'envChartArea' -Content {
@@ -346,7 +392,16 @@ function New-CIEMEnvironmentPage {
         }
         var existing = echarts.getInstanceByDom(container);
         if (existing) existing.dispose();
-        var chart = echarts.init(container, 'dark');
+        var bgColor = window.getComputedStyle(document.body).backgroundColor;
+        var isDark = false;
+        if (bgColor) {
+            var match = bgColor.match(/\d+/g);
+            if (match) {
+                var r = parseInt(match[0]), g = parseInt(match[1]), b = parseInt(match[2]);
+                isDark = (r * 0.299 + g * 0.587 + b * 0.114) < 128;
+            }
+        }
+        var chart = echarts.init(container, isDark ? 'dark' : null);
         var data = ${treeJson};
         var isLR = '$orient' === 'LR';
         chart.setOption({
@@ -383,7 +438,7 @@ function New-CIEMEnvironmentPage {
                     align: isLR ? 'right' : 'center',
                     fontSize: 16,
                     fontFamily: '"Roboto","Helvetica","Arial",sans-serif',
-                    color: '#e0e0e0',
+                    color: isDark ? '#e0e0e0' : '#333',
                     formatter: function(params) {
                         var name = params.name || '';
                         if (name.length > 35) return name.substring(0, 32) + '...';
@@ -398,14 +453,14 @@ function New-CIEMEnvironmentPage {
                     }
                 },
                 lineStyle: {
-                    color: '#555',
+                    color: isDark ? '#555' : '#bbb',
                     width: 1.5,
                     curveness: 0.5
                 },
                 emphasis: {
                     focus: 'descendant',
                     itemStyle: { borderWidth: 2 },
-                    label: { color: '#fff', fontSize: 17 }
+                    label: { color: isDark ? '#fff' : '#000', fontSize: 17 }
                 },
                 expandAndCollapse: true,
                 initialTreeDepth: 2,

@@ -28,11 +28,11 @@ Describe 'Invoke-CIEMJobWithProgress' {
             $mandatory | Should -Not -BeNullOrEmpty
         }
 
-        It 'Has mandatory -ProgressElementId parameter' {
+        It 'Has optional -ProgressElementId parameter' {
             $param = (Get-Command Invoke-CIEMJobWithProgress).Parameters['ProgressElementId']
             $param | Should -Not -BeNullOrEmpty
             $mandatory = $param.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] -and $_.Mandatory }
-            $mandatory | Should -Not -BeNullOrEmpty
+            $mandatory | Should -BeNullOrEmpty
         }
 
         It 'Has optional -PollIntervalSeconds parameter defaulting to 3' {
