@@ -112,6 +112,13 @@ Describe 'Effective Role Assignment CRUD' {
             $result = New-CIEMAzureEffectiveRoleAssignment -PrincipalId 'def-ts' -PrincipalType 'User' -OriginalPrincipalId 'def-ts' -OriginalPrincipalType 'User' -RoleDefinitionId 'rd-1' -Scope '/sub/1'
             $result.ComputedAt | Should -Not -BeNullOrEmpty
         }
+
+        It 'Returned Id matches the row fetched by Get-CIEMAzureEffectiveRoleAssignment (regression: connection-scoped last_insert_rowid)' {
+            $result = New-CIEMAzureEffectiveRoleAssignment -PrincipalId 'regress-1' -PrincipalType 'User' -OriginalPrincipalId 'regress-1' -OriginalPrincipalType 'User' -RoleDefinitionId 'rd-1' -Scope '/sub/1' -ComputedAt '2026-01-01T00:00:00Z'
+            $fetched = Get-CIEMAzureEffectiveRoleAssignment -PrincipalId 'regress-1'
+            $result.Id | Should -Be $fetched[0].Id
+            $result.Id | Should -BeGreaterThan 0
+        }
     }
 
     Context 'Get-CIEMAzureEffectiveRoleAssignment' {
@@ -284,9 +291,7 @@ Describe 'Effective Role Assignment CRUD' {
 
         It 'Accepts -Connection parameter for atomic transactions' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     Save-CIEMAzureEffectiveRoleAssignment `
                         -PrincipalId 'conn-test' -PrincipalType 'User' `
@@ -344,9 +349,7 @@ Describe 'Effective Role Assignment CRUD' {
 
         It 'Accepts -Connection parameter for atomic transactions' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     Remove-CIEMAzureEffectiveRoleAssignment -All -Confirm:$false -Connection $conn
                 } finally {
@@ -413,9 +416,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -441,9 +442,7 @@ Describe 'Effective Role Assignment CRUD' {
                 groupProps = $script:groupAssignmentProps
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-reader'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef2Props }
@@ -474,9 +473,7 @@ Describe 'Effective Role Assignment CRUD' {
                 groupProps = $script:groupAssignmentProps
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-reader'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef2Props }
@@ -510,9 +507,7 @@ Describe 'Effective Role Assignment CRUD' {
                 group2Props = $group2AssignProps
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-reader'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef2Props }
@@ -542,9 +537,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -562,9 +555,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -584,9 +575,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -607,9 +596,7 @@ Describe 'Effective Role Assignment CRUD' {
                 groupProps = $script:groupAssignmentProps
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-reader'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef2Props }
@@ -633,9 +620,7 @@ Describe 'Effective Role Assignment CRUD' {
                 roleDef1Props = $script:roleDef1Props
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -661,9 +646,7 @@ Describe 'Effective Role Assignment CRUD' {
                 roleDef1Props = $script:roleDef1Props
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -690,9 +673,7 @@ Describe 'Effective Role Assignment CRUD' {
                 roleDef1Props = $script:roleDef1Props
                 roleDef2Props = $script:roleDef2Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -745,9 +726,7 @@ Describe 'Effective Role Assignment CRUD' {
         # Error/skip paths
         It 'Skips role assignments with null Properties' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = 'ra-null'; Type = 'microsoft.authorization/roleassignments'; Properties = $null }
@@ -760,9 +739,7 @@ Describe 'Effective Role Assignment CRUD' {
 
         It 'Skips role assignments with invalid Properties JSON' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = 'ra-bad'; Type = 'microsoft.authorization/roleassignments'; Properties = 'not-valid-json{{{' }
@@ -775,9 +752,7 @@ Describe 'Effective Role Assignment CRUD' {
 
         It 'Skips role assignments missing principalId in properties' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $props = @{ roleDefinitionId = 'rd-1'; scope = '/sub/1' } | ConvertTo-Json -Compress
                     $armResources = @(
@@ -794,9 +769,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -811,9 +784,7 @@ Describe 'Effective Role Assignment CRUD' {
 
         It 'Sets RoleName and PermissionsJson to null when role definition not found' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $props = @{ principalId = 'orphan-user'; principalType = 'User'; roleDefinitionId = '/unknown/role-def'; scope = '/sub/1' } | ConvertTo-Json -Compress
                     $armResources = @(
@@ -831,9 +802,7 @@ Describe 'Effective Role Assignment CRUD' {
         # Edge cases
         It 'Returns 0 when ArmResources contains no role assignments' {
             InModuleScope Devolutions.CIEM {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = 'vm-1'; Type = 'microsoft.compute/virtualmachines'; Properties = '{}' }
@@ -849,9 +818,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }
@@ -868,9 +835,7 @@ Describe 'Effective Role Assignment CRUD' {
                 directProps = $script:directAssignmentProps
                 roleDef1Props = $script:roleDef1Props
             } {
-                $connStr = "Data Source=$script:DatabasePath"
-                $conn = [Microsoft.Data.Sqlite.SqliteConnection]::new($connStr)
-                $conn.Open()
+                $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = '/providers/Microsoft.Authorization/roleDefinitions/rd-contrib'; Type = 'microsoft.authorization/roledefinitions'; Properties = $roleDef1Props }

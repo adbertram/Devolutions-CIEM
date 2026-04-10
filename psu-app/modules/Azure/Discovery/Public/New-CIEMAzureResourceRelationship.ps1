@@ -39,9 +39,10 @@ function New-CIEMAzureResourceRelationship {
             return
         }
 
-        Invoke-CIEMQuery -Query @"
+        $inserted = Invoke-CIEMQuery -Query @"
 INSERT INTO azure_resource_relationships (source_id, source_type, target_id, target_type, relationship, collected_at)
 VALUES (@source_id, @source_type, @target_id, @target_type, @relationship, @collected_at)
+RETURNING id
 "@ -Parameters @{
             source_id    = $SourceId
             source_type  = $SourceType
@@ -49,9 +50,8 @@ VALUES (@source_id, @source_type, @target_id, @target_type, @relationship, @coll
             target_type  = $TargetType
             relationship = $Relationship
             collected_at = $CollectedAt
-        } -AsNonQuery | Out-Null
+        }
 
-        $newId = Invoke-CIEMQuery -Query "SELECT last_insert_rowid() as id"
-        Get-CIEMAzureResourceRelationship -Id $newId.id
+        Get-CIEMAzureResourceRelationship -Id $inserted.id
     }
 }

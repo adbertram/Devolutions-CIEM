@@ -58,9 +58,8 @@ function New-CIEMAzureEffectiveRoleAssignment {
 
         if (-not $ComputedAt) { $ComputedAt = (Get-Date).ToString('o') }
 
-        Invoke-CIEMQuery -Query "INSERT INTO azure_effective_role_assignments (principal_id, principal_type, principal_display_name, original_principal_id, original_principal_type, role_definition_id, role_name, scope, permissions_json, computed_at) VALUES (@principal_id, @principal_type, @principal_display_name, @original_principal_id, @original_principal_type, @role_definition_id, @role_name, @scope, @permissions_json, @computed_at)" -Parameters @{ principal_id = $PrincipalId; principal_type = $PrincipalType; principal_display_name = $PrincipalDisplayName; original_principal_id = $OriginalPrincipalId; original_principal_type = $OriginalPrincipalType; role_definition_id = $RoleDefinitionId; role_name = $RoleName; scope = $Scope; permissions_json = $PermissionsJson; computed_at = $ComputedAt } -AsNonQuery | Out-Null
+        $inserted = Invoke-CIEMQuery -Query "INSERT INTO azure_effective_role_assignments (principal_id, principal_type, principal_display_name, original_principal_id, original_principal_type, role_definition_id, role_name, scope, permissions_json, computed_at) VALUES (@principal_id, @principal_type, @principal_display_name, @original_principal_id, @original_principal_type, @role_definition_id, @role_name, @scope, @permissions_json, @computed_at) RETURNING id" -Parameters @{ principal_id = $PrincipalId; principal_type = $PrincipalType; principal_display_name = $PrincipalDisplayName; original_principal_id = $OriginalPrincipalId; original_principal_type = $OriginalPrincipalType; role_definition_id = $RoleDefinitionId; role_name = $RoleName; scope = $Scope; permissions_json = $PermissionsJson; computed_at = $ComputedAt }
 
-        $newId = Invoke-CIEMQuery -Query "SELECT last_insert_rowid() as id"
-        Get-CIEMAzureEffectiveRoleAssignment -Id $newId.id
+        Get-CIEMAzureEffectiveRoleAssignment -Id $inserted.id
     }
 }
