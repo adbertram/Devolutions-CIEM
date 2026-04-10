@@ -15,17 +15,23 @@ test.describe('Navigation', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display all 8 navigation items', async () => {
+    test('should display all 9 navigation items', async () => {
       const labels = await navPage.getNavItemLabels();
-      expect(labels).toHaveLength(8);
+      expect(labels).toHaveLength(9);
       expect(labels).toContain('Dashboard');
       expect(labels).toContain('Scan');
       expect(labels).toContain('Scan History');
       expect(labels).toContain('Identities');
       expect(labels).toContain('Attack Paths');
+      expect(labels).toContain('Attack Path Patterns');
       expect(labels).toContain('Environment');
       expect(labels).toContain('Configuration');
       expect(labels).toContain('About');
+    });
+
+    test('should have correct href for Attack Path Patterns link', async () => {
+      const href = await navPage.getNavItemHref('Attack Path Patterns');
+      expect(href).toContain('/ciem/attack-path-patterns');
     });
 
     test('should have correct href for Dashboard link', async () => {

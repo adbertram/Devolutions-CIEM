@@ -15,7 +15,8 @@ const testConfig = {
     config: '/ciem/ciem/config',
     about: '/ciem/ciem/about',
     identities: '/ciem/ciem/identities',
-    attackPaths: '/ciem/ciem/attack-paths'
+    attackPaths: '/ciem/ciem/attack-paths',
+    attackPathPatterns: '/ciem/ciem/attack-path-patterns'
   },
   psu: {
     healthEndpoint: '/api/v1/alive'

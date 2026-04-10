@@ -15,13 +15,8 @@ function Get-CIEMAttackPath {
 
     $ErrorActionPreference = 'Stop'
 
-    # Load patterns from JSON files
-    $patternDir = Join-Path $script:GraphRoot 'Data' 'attack_paths'
-    $patternFiles = @(Get-ChildItem -Path $patternDir -Filter '*.json' -File -ErrorAction Stop)
-
-    $patterns = @($patternFiles | ForEach-Object {
-        Get-Content $_.FullName -Raw | ConvertFrom-Json
-    })
+    # Load patterns from JSON files via shared private loader
+    $patterns = @(GetCIEMAttackPatternDefinition)
 
     # Filter patterns by requested criteria
     if ($PatternId) {
