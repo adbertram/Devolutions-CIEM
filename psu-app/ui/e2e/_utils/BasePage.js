@@ -45,11 +45,17 @@ class BasePage {
   }
 
   async waitForPSUReady() {
-    // Wait for MUI circular progress spinner to disappear (PSU server-side rendering indicator)
+    // PSU server-side dynamic rendering shows a top-level MUI spinner during initial load.
+    // Wait briefly for it to disappear, but don't block on content-level spinners
+    // (e.g., the discovery status banner intentionally shows a spinner while a scan runs).
     const spinner = this.page.locator('.MuiCircularProgress-root');
     const spinnerCount = await spinner.count();
     if (spinnerCount > 0) {
-      await spinner.first().waitFor({ state: 'hidden', timeout: 30000 });
+      try {
+        await spinner.first().waitFor({ state: 'hidden', timeout: 5000 });
+      } catch {
+        // Spinner is still visible after 5s — assume it's legitimate content, not a page loader.
+      }
     }
   }
 

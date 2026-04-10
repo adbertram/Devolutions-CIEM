@@ -5,6 +5,7 @@ const {
   getTestArmResourceCount, getArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns,
+  seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount
 } = require('../../_utils/cleanup');
 const {
@@ -55,6 +56,81 @@ test.describe('Environment Page', () => {
     test('should NOT display a Load Environment button', async () => {
       const btn = envPage.page.locator('#loadEnvBtn');
       await expect(btn).toHaveCount(0);
+    });
+  });
+
+  // --- Discovery status banner: running discovery ---
+
+  test.describe('when a discovery run is in progress', () => {
+    let seededRunId = null;
+
+    test.beforeAll(() => {
+      clearStaleDiscoveryRuns();
+      seededRunId = seedRunningDiscoveryRun();
+      const count = getRunningDiscoveryRunCount();
+      if (count < 1) {
+        throw new Error(`Expected >= 1 running discovery run, got ${count}`);
+      }
+      console.log(`[setup] Seeded running discovery run id=${seededRunId}, running count=${count}`);
+    });
+
+    test.afterAll(() => {
+      if (seededRunId) {
+        cleanupDiscoveryRun(seededRunId);
+      }
+      clearStaleDiscoveryRuns();
+    });
+
+    test('should display the discovery status banner', async () => {
+      await envPage.waitForDiscoveryStatusBanner();
+      const visible = await envPage.isDiscoveryStatusBannerVisible();
+      expect(visible).toBe(true);
+    });
+
+    test('should display progress text in the banner', async () => {
+      await envPage.waitForDiscoveryStatusBanner();
+      const text = await envPage.getDiscoveryStatusBannerText();
+      expect(text).not.toBeNull();
+      expect(text).toContain('Discovery in progress');
+    });
+
+    test('should display a cancel button in the banner', async () => {
+      await envPage.waitForDiscoveryStatusBanner();
+      const visible = await envPage.isCancelDiscoveryButtonVisible();
+      expect(visible).toBe(true);
+    });
+
+    test('should hide the banner after cancelling', async () => {
+      await envPage.waitForDiscoveryStatusBanner();
+      await envPage.clickCancelDiscovery();
+
+      // Wait for toast confirmation
+      const toast = envPage.page.locator('.iziToast:has-text("Discovery cancelled")');
+      await expect(toast).toBeVisible({ timeout: 10000 });
+
+      // Banner should disappear after auto-refresh (5s interval + render time)
+      const bannerCard = envPage.page.locator(envPage.selectors.discoveryStatusBannerCard);
+      await expect(bannerCard).toBeHidden({ timeout: 15000 });
+    });
+  });
+
+  // --- Discovery status banner: no running discovery ---
+
+  test.describe('when no discovery run is in progress', () => {
+    test.beforeAll(() => {
+      clearStaleDiscoveryRuns();
+      const count = getRunningDiscoveryRunCount();
+      if (count !== 0) {
+        throw new Error(`Expected 0 running discovery runs, got ${count}`);
+      }
+      console.log('[setup] Verified 0 running discovery runs.');
+    });
+
+    test('should NOT display the discovery status banner', async () => {
+      // Wait for dynamic content to settle (auto-refresh fires once)
+      await envPage.page.waitForTimeout(6000);
+      const visible = await envPage.isDiscoveryStatusBannerVisible();
+      expect(visible).toBe(false);
     });
   });
 
@@ -153,19 +229,27 @@ test.describe('Environment Page', () => {
       const startingToast = envPage.page.locator('.iziToast:has-text("Starting Azure discovery")');
       await expect(startingToast).toBeVisible({ timeout: 10000 });
 
-      // 2. Wait for discovery to complete — button re-enables when OnClick handler finishes
-      const startBtn = envPage.page.locator(envPage.selectors.startDiscoveryBtn);
-      for (let i = 0; i < 180; i++) { // 180 × 3s = 9 minutes max
-        await envPage.page.waitForTimeout(3000);
-        const isDisabled = await startBtn.getAttribute('disabled');
-        if (isDisabled === null) break;
-      }
+      // 2. Wait for a terminal discovery toast (success or failure) up to 10 minutes.
+      // Watching the toast directly avoids a race between button re-enable polling
+      // and the 8s iziToast autohide window.
+      const terminalToast = envPage.page.locator('.iziToast').filter({
+        hasText: /Discovery (completed|partially completed|finished|failed)/
+      });
+      await expect(terminalToast.first()).toBeVisible({ timeout: 600000 });
 
-      // 3. After discovery, Sync-UDElement triggers tree auto-reload.
+      // 3. CRITICAL: Terminal toast must not be a failure toast.
+      const failureToast = envPage.page.locator('.iziToast:has-text("Discovery failed")');
+      await expect(failureToast).toHaveCount(0);
+
+      // 4. Verify button has re-enabled (OnClick handler returned).
+      const startBtn = envPage.page.locator(envPage.selectors.startDiscoveryBtn);
+      await expect(startBtn).toBeEnabled({ timeout: 15000 });
+
+      // 5. After discovery, Sync-UDElement triggers tree auto-reload.
       // Wait for the summary card to appear (tree loaded with data).
       await envPage.waitForEnvironmentLoaded(30000);
 
-      // 4. Verify summary counts — confirms discovery found resources
+      // 6. Verify summary counts — confirms discovery found resources
       const summaryVisible = await envPage.isSummaryCardVisible();
       expect(summaryVisible).toBe(true);
 
@@ -175,13 +259,18 @@ test.describe('Environment Page', () => {
       const subText = await envPage.getSummaryCount('Subscriptions');
       expect(parseInt(subText)).toBeGreaterThanOrEqual(1);
 
-      // 5. Tree visualization must be rendered
+      // 7. Tree visualization must be rendered
       const treeVisible = await envPage.isTreeContainerVisible();
       expect(treeVisible).toBe(true);
 
-      // 6. Button must be re-enabled after completion
+      // 8. Button must be re-enabled after completion
       const startDisabled = await startBtn.getAttribute('disabled');
       expect(startDisabled).toBeNull();
+
+      // 9. Discovery status banner must be hidden (no running discovery)
+      await envPage.page.waitForTimeout(6000); // Wait for auto-refresh cycle
+      const bannerVisible = await envPage.isDiscoveryStatusBannerVisible();
+      expect(bannerVisible).toBe(false);
     });
   });
 

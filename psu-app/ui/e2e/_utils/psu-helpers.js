@@ -263,7 +263,7 @@ const SSH_HOST = 'adam-server';
 function sshQuery(sql) {
   const result = execSync(
     `ssh ${SSH_HOST} "sqlite3 -json '${REMOTE_DB_PATH}' \\"${sql.replace(/"/g, '\\\\\\"')}\\""`,
-    { encoding: 'utf8', timeout: 10000 }
+    { encoding: 'utf8', timeout: 30000, maxBuffer: 256 * 1024 * 1024 }
   ).trim();
   if (!result) return [];
   try { return JSON.parse(result); } catch { return result; }
@@ -274,10 +274,12 @@ function sshQuery(sql) {
  * Appends a WAL checkpoint so writes are immediately visible to PSU page reads.
  */
 function sshNonQuery(sql) {
-  const fullSql = `${sql}; PRAGMA wal_checkpoint(TRUNCATE)`;
+  // Pipe SQL via stdin so large statement batches don't hit ARG_MAX (E2BIG).
+  // sqlite3 reads SQL commands from stdin when no command argument is supplied.
+  const fullSql = `${sql};\nPRAGMA wal_checkpoint(TRUNCATE);\n`;
   execSync(
-    `ssh ${SSH_HOST} "sqlite3 '${REMOTE_DB_PATH}' \\"${fullSql.replace(/"/g, '\\\\\\"')}\\""`,
-    { encoding: 'utf8', timeout: 10000 }
+    `ssh ${SSH_HOST} "sqlite3 '${REMOTE_DB_PATH}'"`,
+    { encoding: 'utf8', timeout: 60000, maxBuffer: 256 * 1024 * 1024, input: fullSql }
   );
 }
 

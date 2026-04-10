@@ -240,6 +240,24 @@ function getCompletedDiscoveryRunCount() {
   return sshQuery("SELECT COUNT(*) as count FROM azure_discovery_runs WHERE status = 'Completed'")[0].count;
 }
 
+function seedRunningDiscoveryRun() {
+  const now = new Date().toISOString();
+  sshNonQuery(`INSERT INTO azure_discovery_runs (scope, status, started_at) VALUES ('All', 'Running', '${now}')`);
+  const rows = sshQuery("SELECT id FROM azure_discovery_runs WHERE status = 'Running' ORDER BY id DESC LIMIT 1");
+  const id = rows[0].id;
+  console.log(`[seed] Seeded running discovery run id=${id}`);
+  return id;
+}
+
+function cleanupDiscoveryRun(id) {
+  sshNonQuery(`DELETE FROM azure_discovery_runs WHERE id = ${id}`);
+  console.log(`[cleanup] Removed discovery run id=${id}`);
+}
+
+function getRunningDiscoveryRunCount() {
+  return sshQuery("SELECT COUNT(*) as count FROM azure_discovery_runs WHERE status = 'Running'")[0].count;
+}
+
 module.exports = {
   cleanupTestData, seedChecks, seedTestData,
   backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount,
@@ -247,6 +265,7 @@ module.exports = {
   getArmResourceCount, getTestArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns, getCompletedDiscoveryRunCount,
+  seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,
   seedAttackPathsPageData, cleanupAttackPathsPageData, getTestAttackPathNodeCount,

@@ -23,10 +23,16 @@ class EnvironmentPageHelpers extends BasePage {
       // Summary cards (rendered inline in auto-load dynamic region)
       summaryCard: "#envChartArea .MuiCard-root:has-text('Tenants')",
       identitySummaryCard: "#envChartArea .MuiCard-root:has-text('Identities')",
-      // Progress indicators (visible during async discovery job — in separate container)
-      progressCircular: '#envDiscoveryProgress .MuiCircularProgress-root',
-      progressBar: '#envDiscoveryProgress .MuiLinearProgress-root',
-      progressText: '#envDiscoveryProgress .MuiTypography-body2',
+      // Discovery status banner (auto-refresh, shows when a run is in progress)
+      discoveryStatusBanner: '#envDiscoveryStatusBanner',
+      discoveryStatusBannerCard: '#envDiscoveryStatusBanner .MuiCard-root',
+      discoveryStatusBannerProgress: '#envDiscoveryStatusBanner .MuiCircularProgress-root',
+      discoveryStatusBannerText: '#envDiscoveryStatusBanner .MuiTypography-body2',
+      cancelDiscoveryBtn: '#cancelDiscoveryBtn',
+      // Progress indicators (now shown via the status banner)
+      progressCircular: '#envDiscoveryStatusBanner .MuiCircularProgress-root',
+      progressBar: '#envDiscoveryStatusBanner .MuiLinearProgress-root',
+      progressText: '#envDiscoveryStatusBanner .MuiTypography-body2',
       // Chart area (outer wrapper preserves #envChartArea for selectors)
       chartArea: '#envChartArea',
       treeContainer: '#ciemEnvTreeContainer',
@@ -107,6 +113,34 @@ class EnvironmentPageHelpers extends BasePage {
     const identitySummary = this.page.locator(this.selectors.identitySummaryCard);
     const noResources = this.page.locator(this.selectors.noResourcesText);
     await infraSummary.or(identitySummary).or(noResources).first().waitFor({ state: 'visible', timeout });
+  }
+
+  // --- Discovery status banner (auto-refresh) ---
+
+  async isDiscoveryStatusBannerVisible() {
+    const card = this.page.locator(this.selectors.discoveryStatusBannerCard);
+    return await card.isVisible().catch(() => false);
+  }
+
+  async waitForDiscoveryStatusBanner(timeout = 15000) {
+    const card = this.page.locator(this.selectors.discoveryStatusBannerCard);
+    await card.waitFor({ state: 'visible', timeout });
+  }
+
+  async getDiscoveryStatusBannerText() {
+    const el = this.page.locator(this.selectors.discoveryStatusBannerText).first();
+    if (await el.isVisible()) {
+      return await el.textContent();
+    }
+    return null;
+  }
+
+  async isCancelDiscoveryButtonVisible() {
+    return await this.isElementVisible(this.selectors.cancelDiscoveryBtn);
+  }
+
+  async clickCancelDiscovery() {
+    await this.click(this.selectors.cancelDiscoveryBtn);
   }
 
   // --- Progress indicators (during async discovery) ---
