@@ -11,6 +11,17 @@ Describe 'Check data_needs' {
 
         InModuleScope Devolutions.CIEM {
             $script:DatabasePath = $env:CIEM_TEST_DB_PATH
+        }
+
+        $azureSchemaPath = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Infrastructure' 'Data' 'azure_schema.sql'
+        $discoverySchemaPath = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Discovery' 'Data' 'discovery_schema.sql'
+        foreach ($schemaPath in @($azureSchemaPath, $discoverySchemaPath)) {
+            foreach ($statement in ((Get-Content $schemaPath -Raw) -split ';\s*\n' | Where-Object { $_.Trim() })) {
+                Invoke-CIEMQuery -Query $statement.Trim() -AsNonQuery | Out-Null
+            }
+        }
+
+        InModuleScope Devolutions.CIEM {
             $script:AuthContext = @{
                 Azure = [pscustomobject]@{
                     AccountId = 'test-account'

@@ -4,9 +4,9 @@ function Invoke-CIEMScan {
         Executes CIEM security checks against cloud resources (internal).
 
     .DESCRIPTION
-        Connects to the requested providers, validates check metadata, loads only the
-        discovery data required by the selected checks, and executes checks in
-        parallel while preserving Invoke-CIEMCheck behavior.
+        Validates check metadata, loads only the discovery data required by the
+        selected checks from the local database, and executes checks in parallel.
+        Does NOT connect to cloud providers — all data comes from prior discovery runs.
 
         This is an internal function called by New-CIEMScanRun. It does not create
         or manage ScanRun lifecycle.
@@ -111,6 +111,7 @@ function Invoke-CIEMScan {
             [Parameter(Mandatory)]
             [string[]]$NeedKeys,
             [Parameter(Mandatory)]
+            [AllowEmptyCollection()]
             [string[]]$SubscriptionIds,
             [Parameter(Mandatory)]
             [bool]$HasDiscoveryData,
@@ -204,51 +205,9 @@ function Invoke-CIEMScan {
     $providerCount = $Provider.Count
     $progressActivity = "CIEM Scan ($($Provider -join ', '))"
 
-    $providersToConnect = @($Provider | Where-Object { -not $script:AuthContext[$_] })
-    if ($providersToConnect.Count -gt 0) {
-        Write-Progress -Activity $progressActivity -Status "Connecting to $($providersToConnect -join ', ')..." -PercentComplete 0
-        $connectResult = Connect-CIEM -Provider $providersToConnect
-        $connectLookup = @{}
-        foreach ($providerResult in $connectResult.Providers) {
-            $connectLookup[$providerResult.Provider] = $providerResult
-        }
-    }
-    else {
-        $connectLookup = @{}
-    }
-
     $providerIdx = 0
     foreach ($providerName in $Provider) {
         $providerIdx++
-        $providerResult = if ($connectLookup.ContainsKey($providerName)) {
-            $connectLookup[$providerName]
-        }
-        else {
-            [pscustomobject]@{
-                Provider = $providerName
-                Status = 'AlreadyConnected'
-                Message = 'Already authenticated.'
-            }
-        }
-
-        if ($providerResult.Status -notin @('Connected', 'AlreadyConnected')) {
-            $failMsg = if ($providerResult) { $providerResult.Message } else { 'No connection result returned' }
-            Write-Warning "Skipping $providerName (connection failed): $failMsg"
-
-            $skippedChecks = @(Get-CIEMCheck -Provider $providerName)
-            if ($CheckId) { $skippedChecks = @($skippedChecks | Where-Object { $CheckId -contains $_.Id }) }
-            if ($Service) { $skippedChecks = @($skippedChecks | Where-Object { $Service -contains $_.Service.ToString() }) }
-
-            foreach ($skippedCheck in $skippedChecks) {
-                [CIEMScanResult]::Create($skippedCheck, 'SKIPPED', "Provider $providerName failed to connect: $failMsg", 'N/A', 'N/A')
-            }
-            continue
-        }
-
-        $authContext = $script:AuthContext[$providerName]
-        $subscriptionIds = @(if ($authContext -and $authContext.PSObject.Properties.Name -contains 'SubscriptionIds') { $authContext.SubscriptionIds } else { @() })
-
-        Write-Verbose "[$providerName] Authenticated as: $($authContext.AccountId) ($($authContext.AccountType))"
 
         Sync-CIEMCheckCatalog -Provider $providerName
 
@@ -354,6 +313,11 @@ function Invoke-CIEMScan {
                 $latestCompleted = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
                 $latestPartial = @(Get-CIEMAzureDiscoveryRun -Status 'Partial' -Last 1)
                 $hasDiscoveryData = ($latestCompleted.Count -gt 0) -or ($latestPartial.Count -gt 0)
+
+                $subscriptionIds = @(
+                    Invoke-CIEMQuery -Query "SELECT DISTINCT subscription_id FROM azure_arm_resources WHERE subscription_id IS NOT NULL AND subscription_id <> ''" |
+                        ForEach-Object { $_.subscription_id }
+                )
 
                 $azureServiceData = @{}
                 $azureServiceErrors = @{}

@@ -10,24 +10,11 @@ Describe 'Invoke-CIEMScan parallel execution' {
         $script:TestDatabasePath = Join-Path $TestDrive ("ciem-" + [guid]::NewGuid().ToString('N') + '.db')
         $env:CIEM_TEST_DB_PATH = $script:TestDatabasePath
         New-CIEMDatabase -Path $script:TestDatabasePath
+        $discoverySchema = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Discovery' 'Data' 'discovery_schema.sql'
+        Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
         InModuleScope Devolutions.CIEM {
             $script:DatabasePath = $env:CIEM_TEST_DB_PATH
-            $script:AuthContext = @{
-                Azure = [pscustomobject]@{
-                    AccountId = 'test-account'
-                    AccountType = 'ServicePrincipal'
-                    SubscriptionIds = @('sub1')
-                }
-            }
-            $script:AzureAuthContext = [pscustomobject]@{
-                IsConnected = $true
-                TenantId = 'tenant1'
-                SubscriptionIds = @('sub1')
-                ARMToken = 'arm-token'
-                GraphToken = 'graph-token'
-                KeyVaultToken = 'kv-token'
-            }
         }
 
         Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
@@ -198,8 +185,17 @@ Describe 'Invoke-CIEMScan parallel execution' {
         Assert-MockCalled InvokeCIEMParallelForEach -ModuleName Devolutions.CIEM -Times 0 -Exactly
     }
 
-    It 'Does not use an unconditional Connect-CIEM -Force path' {
-        $script:ScanSource | Should -Not -Match 'Connect-CIEM\s+-Provider\s+\$providersToConnect\s+-Force'
+    It 'Does not call Connect-CIEM (scan reads from discovery database only)' {
+        $script:ScanSource | Should -Not -Match '\bConnect-CIEM\b'
+    }
+
+    It 'Does not reference $script:AuthContext (no Azure connection needed)' {
+        $script:ScanSource | Should -Not -Match '\$script:AuthContext'
+    }
+
+    It 'Derives subscription IDs from azure_arm_resources table' {
+        $script:ScanSource | Should -Match 'azure_arm_resources'
+        $script:ScanSource | Should -Match 'subscription_id'
     }
 
     It 'Pre-validates check severities BEFORE parallel dispatch' {
