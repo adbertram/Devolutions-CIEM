@@ -2,6 +2,10 @@ function Get-SeverityColor {
     <#
     .SYNOPSIS
         Returns the display color hex code for a severity or risk level.
+    .DESCRIPTION
+        Looks up the severity in the module-scope severity catalog loaded from
+        modules/Devolutions.CIEM.PSU/Data/severity_catalog.json. Unknown severities
+        return '#666' (gray) as a safe visual fallback.
     #>
     [CmdletBinding()]
     param(
@@ -11,12 +15,6 @@ function Get-SeverityColor {
 
     $ErrorActionPreference = 'Stop'
 
-    switch ($Severity.ToUpper()) {
-        'CRITICAL' { '#9c27b0' }
-        'HIGH'     { '#f44336' }
-        'MEDIUM'   { '#ff9800' }
-        'LOW'      { '#4caf50' }
-        'INFO'     { '#2196f3' }
-        default    { '#666' }
-    }
+    $entry = $script:SeverityByName[$Severity.ToLower()]
+    if ($entry) { $entry.color } else { '#666' }
 }

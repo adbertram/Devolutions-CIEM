@@ -37,6 +37,13 @@ $subModuleRoots = @(
     $script:PSURoot
 )
 
+# --- Severity catalog (single source of truth for name/rank/color/label) ---
+$script:SeverityByName = @{}
+$script:SeverityCatalog = @(
+    Get-Content (Join-Path $script:PSURoot 'Data/severity_catalog.json') -Raw | ConvertFrom-Json
+)
+foreach ($s in $script:SeverityCatalog) { $script:SeverityByName[$s.name] = $s }
+
 # --- Import PSUSQLite (bundled dependency) ---
 _BootLog "Importing PSUSQLite..."
 Import-Module (Join-Path $PSScriptRoot 'modules/PSUSQLite/PSUSQLite.psd1') -Global

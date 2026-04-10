@@ -1,0 +1,7 @@
+[
+  { "name": "critical", "rank": 1, "color": "#9c27b0", "label": "Critical" },
+  { "name": "high",     "rank": 2, "color": "#f44336", "label": "High" },
+  { "name": "medium",   "rank": 3, "color": "#ff9800", "label": "Medium" },
+  { "name": "low",      "rank": 4, "color": "#4caf50", "label": "Low" },
+  { "name": "info",     "rank": 5, "color": "#2196f3", "label": "Info" }
+]
