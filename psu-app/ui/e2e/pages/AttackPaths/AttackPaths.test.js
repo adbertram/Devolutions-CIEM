@@ -46,10 +46,7 @@ test.describe('Attack Paths Page', () => {
 
     test('should display expected column headers', async () => {
       const hasData = await attackPage.hasAttackPathData();
-      if (!hasData) {
-        test.skip(true, 'No attack path data to display columns');
-        return;
-      }
+      expect(hasData).toBe(true);
       const headers = await attackPage.getColumnHeaders();
       expect(headers).toContain('Pattern Name');
       expect(headers).toContain('Severity');
@@ -60,10 +57,7 @@ test.describe('Attack Paths Page', () => {
 
     test('should display severity chips with valid levels', async () => {
       const hasData = await attackPage.hasAttackPathData();
-      if (!hasData) {
-        test.skip(true, 'No attack path data to display severity chips');
-        return;
-      }
+      expect(hasData).toBe(true);
       const chipTexts = await attackPage.getSeverityChipTexts();
       const validLevels = ['critical', 'high', 'medium', 'low'];
       const hasValidChip = chipTexts.some(t => validLevels.includes(t));
@@ -72,20 +66,14 @@ test.describe('Attack Paths Page', () => {
 
     test('should display pagination controls', async () => {
       const hasData = await attackPage.hasAttackPathData();
-      if (!hasData) {
-        test.skip(true, 'No attack path data to display pagination');
-        return;
-      }
+      expect(hasData).toBe(true);
       const paginationVisible = await attackPage.isPaginationVisible();
       expect(paginationVisible).toBe(true);
     });
 
     test('should display quick filter', async () => {
       const hasData = await attackPage.hasAttackPathData();
-      if (!hasData) {
-        test.skip(true, 'No attack path data to display quick filter');
-        return;
-      }
+      expect(hasData).toBe(true);
       const filterVisible = await attackPage.isQuickFilterVisible();
       expect(filterVisible).toBe(true);
     });

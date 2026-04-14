@@ -1,9 +1,35 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const ScanPageHelpers = require('./ScanPageHelpers');
-const { getCompletedDiscoveryRunCount } = require('../../_utils/cleanup');
+const {
+  seedChecks,
+  backupAndClearAllChecks,
+  restoreChecks,
+  getTestCheckCounts,
+  getCompletedDiscoveryRunCount,
+  backupAndClearAllDiscoveryRuns,
+  restoreDiscoveryRuns,
+  seedCompletedDiscoveryRun,
+  backupAndClearAllScanHistory,
+  restoreScanHistory
+} = require('../../_utils/cleanup');
 
 test.describe('Scan Page', () => {
   let scanPage;
+  let checksBackup = null;
+
+  test.beforeAll(() => {
+    checksBackup = backupAndClearAllChecks();
+    seedChecks();
+    const counts = getTestCheckCounts();
+    if (counts.enabled !== 7 || counts.disabled !== 3) {
+      throw new Error(`Expected 7 enabled and 3 disabled seeded checks, got ${counts.enabled} enabled and ${counts.disabled} disabled`);
+    }
+    console.log(`[setup:scan-checks] Verified ${counts.enabled} enabled and ${counts.disabled} disabled seeded checks.`);
+  });
+
+  test.afterAll(() => {
+    restoreChecks(checksBackup);
+  });
 
   test.beforeEach(async ({ ciemPage }) => {
     scanPage = new ScanPageHelpers(ciemPage);
@@ -11,12 +37,19 @@ test.describe('Scan Page', () => {
   });
 
   test.describe('when no Azure discovery has been run', () => {
+    let discoveryBackup = null;
+
     test.beforeAll(() => {
+      discoveryBackup = backupAndClearAllDiscoveryRuns();
       const count = getCompletedDiscoveryRunCount();
-      if (count > 0) {
-        test.skip(true, `Skipping: ${count} completed discovery runs exist`);
+      if (count !== 0) {
+        throw new Error(`Expected 0 completed discovery runs, got ${count}`);
       }
       console.log(`[setup:no-discovery] Verified 0 completed discovery runs`);
+    });
+
+    test.afterAll(() => {
+      restoreDiscoveryRuns(discoveryBackup);
     });
 
     test('should disable the Start Scan button', async () => {
@@ -193,6 +226,12 @@ test.describe('Scan Page', () => {
   });
 
   test.describe('when the user clicks the info icon on a check row', () => {
+    test.afterEach(async () => {
+      if (await scanPage.isInfoModalVisible()) {
+        await scanPage.closeInfoModal();
+      }
+    });
+
     test('should open a modal with the check title', async () => {
       await scanPage.clickInfoButton(0);
       const visible = await scanPage.isInfoModalVisible();
@@ -232,71 +271,75 @@ test.describe('Scan Page', () => {
     });
   });
 
-  test.describe('when the user clicks Start Scan without selecting any checks', () => {
+  test.describe('when completed Azure discovery data exists', () => {
+    let discoveryBackup = null;
+    let scanHistoryBackup = null;
+
     test.beforeAll(() => {
+      discoveryBackup = backupAndClearAllDiscoveryRuns();
+      scanHistoryBackup = backupAndClearAllScanHistory();
+      seedCompletedDiscoveryRun();
       const count = getCompletedDiscoveryRunCount();
-      if (count === 0) {
-        test.skip(true, 'Start Scan is disabled when no discovery has been run');
+      if (count !== 1) {
+        throw new Error(`Expected 1 completed discovery run, got ${count}`);
       }
+      console.log(`[setup:completed-discovery] Verified ${count} completed discovery run.`);
     });
 
-    test('should display a warning toast asking to select checks', async () => {
-      await scanPage.clickStartScan();
-      const toast = await scanPage.waitForToast('select at least one check');
-      expect(toast).toBeTruthy();
+    test.afterAll(() => {
+      restoreScanHistory(scanHistoryBackup);
+      restoreDiscoveryRuns(discoveryBackup);
     });
 
-    test('should not show scan progress area', async () => {
-      await scanPage.clickStartScan();
-      await scanPage.page.waitForTimeout(1000);
-      const empty = await scanPage.isScanProgressAreaEmpty();
-      expect(empty).toBe(true);
+    test.describe('when the user clicks Start Scan without selecting any checks', () => {
+      test('should display a warning toast asking to select checks', async () => {
+        await scanPage.clickStartScan();
+        const toast = await scanPage.waitForToast('select at least one check');
+        expect(toast).toBeTruthy();
+      });
+
+      test('should not show scan progress area', async () => {
+        await scanPage.clickStartScan();
+        await scanPage.page.waitForTimeout(1000);
+        const empty = await scanPage.isScanProgressAreaEmpty();
+        expect(empty).toBe(true);
+      });
+
+      test('should keep the Start Scan button enabled', async () => {
+        await scanPage.clickStartScan();
+        await scanPage.page.waitForTimeout(1000);
+        const enabled = await scanPage.isStartScanButtonEnabled();
+        expect(enabled).toBe(true);
+      });
     });
 
-    test('should keep the Start Scan button enabled', async () => {
-      await scanPage.clickStartScan();
-      await scanPage.page.waitForTimeout(1000);
-      const enabled = await scanPage.isStartScanButtonEnabled();
-      expect(enabled).toBe(true);
-    });
-  });
+    test.describe('when the user executes a scan with a single check', () => {
+      test('should show progress UI with disabled button and starting toast', async () => {
+        await scanPage.selectSingleCheckBySearch('security_defaults');
+        await scanPage.clickStartScan();
+        await scanPage.waitForScanProgress();
+        const statusText = await scanPage.getScanProgressText();
+        expect(statusText.length).toBeGreaterThan(0);
+        const enabled = await scanPage.isStartScanButtonEnabled();
+        expect(enabled).toBe(false);
+        const toast = await scanPage.waitForToast('Starting CIEM scan');
+        expect(toast).toBeTruthy();
+      });
 
-  test.describe('when the user executes a scan with a single check', () => {
-    test.beforeAll(() => {
-      const count = getCompletedDiscoveryRunCount();
-      if (count === 0) {
-        test.skip(true, 'Start Scan is disabled when no discovery has been run');
-      }
-    });
-
-    test('should show progress UI with disabled button and starting toast', async () => {
-      await scanPage.selectSingleCheckBySearch('security_defaults');
-      await scanPage.clickStartScan();
-      await scanPage.waitForScanProgress();
-      const statusText = await scanPage.getScanProgressText();
-      expect(statusText.length).toBeGreaterThan(0);
-      const enabled = await scanPage.isStartScanButtonEnabled();
-      expect(enabled).toBe(false);
-      const toast = await scanPage.waitForToast('Starting CIEM scan');
-      expect(toast).toBeTruthy();
-    });
-
-    test('should complete scan with terminal state card and re-enable button', async ({ }, testInfo) => {
-      testInfo.setTimeout(600000);
-      await scanPage.selectSingleCheckBySearch('security_defaults');
-      await scanPage.clickStartScan();
-      await scanPage.waitForScanComplete(540000);
-      // Verify terminal state (success or failure)
-      const isComplete = await scanPage.isScanCompleteVisible();
-      const isError = await scanPage.isScanErrorVisible();
-      expect(isComplete || isError).toBe(true);
-      // Verify result details in the card
-      const progressArea = scanPage.page.locator(scanPage.selectors.scanProgressArea);
-      const text = (await progressArea.textContent()).trim();
-      expect(text.length).toBeGreaterThan(0);
-      // Verify button is re-enabled
-      const enabled = await scanPage.isStartScanButtonEnabled();
-      expect(enabled).toBe(true);
+      test('should complete scan with terminal state card and re-enable button', async ({ }, testInfo) => {
+        testInfo.setTimeout(600000);
+        await scanPage.selectSingleCheckBySearch('security_defaults');
+        await scanPage.clickStartScan();
+        await scanPage.waitForScanComplete(540000);
+        const isComplete = await scanPage.isScanCompleteVisible();
+        const isError = await scanPage.isScanErrorVisible();
+        expect(isComplete || isError).toBe(true);
+        const progressArea = scanPage.page.locator(scanPage.selectors.scanProgressArea);
+        const text = (await progressArea.textContent()).trim();
+        expect(text.length).toBeGreaterThan(0);
+        const enabled = await scanPage.isStartScanButtonEnabled();
+        expect(enabled).toBe(true);
+      });
     });
   });
 });

@@ -160,7 +160,9 @@ class ScanPageHelpers extends BasePage {
 
   async clickInfoButton(rowIndex) {
     const row = this.page.locator(this.selectors.dataGridRows).nth(rowIndex);
-    await row.locator('button').first().click();
+    const infoButton = row.locator('button').first();
+    await infoButton.waitFor({ state: 'visible', timeout: 15000 });
+    await infoButton.click();
     await this.waitForElement('[role="dialog"]');
   }
 

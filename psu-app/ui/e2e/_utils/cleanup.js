@@ -3,6 +3,10 @@ const { sshQuery, sshNonQuery } = require('./psu-helpers');
 const TEST_PREFIX = '_E2E_TEST_';
 const P = TEST_PREFIX; // shorthand for SQL literals
 
+function sqlValue(value) {
+  return value == null ? 'NULL' : `'${String(value).replace(/'/g, "''")}'`;
+}
+
 function cleanupTestData() {
   // Use '%_E2E_TEST_%' for tables with path-style IDs (e.g. /subscriptions/_E2E_TEST_sub-1)
   sshNonQuery([
@@ -22,9 +26,6 @@ function cleanupTestData() {
 }
 
 function seedChecks() {
-  const existing = sshQuery('SELECT COUNT(*) as cnt FROM checks')[0].cnt;
-  if (existing > 0) return;
-
   const checks = [
     [P+'check_security_defaults',    'Azure','Entra',   'Ensure Security Defaults is enabled','Security defaults provide secure default settings for MFA and blocking legacy authentication.','Without security defaults, users may not be required to use MFA, leaving accounts vulnerable.','CRITICAL','Enable Security Defaults in Azure AD Properties.','azure_entra_security_defaults.ps1',0],
     [P+'check_mfa_enforcement',      'Azure','Entra',   'Ensure Multifactor Authentication is enforced for all users','Multi-factor authentication adds a second layer of identity verification.','Accounts without MFA are significantly more susceptible to compromise.','CRITICAL','Enable MFA for all users via Conditional Access policies.','azure_entra_mfa_enforcement.ps1',0],
@@ -39,16 +40,38 @@ function seedChecks() {
   ];
   const stmts = checks.map(c => {
     const vals = c.map(v => typeof v === 'number' ? v : `'${String(v).replace(/'/g, "''")}'`).join(', ');
-    return `INSERT OR IGNORE INTO checks (id, provider, service, title, description, risk, severity, remediation_text, check_script, disabled) VALUES (${vals})`;
+    return `INSERT OR REPLACE INTO checks (id, provider, service, title, description, risk, severity, remediation_text, check_script, disabled) VALUES (${vals})`;
   });
   sshNonQuery(stmts.join('; '));
   console.log(`[seed] Seeded ${checks.length} test checks.`);
 }
 
+function backupAndClearAllChecks() {
+  const rows = sshQuery('SELECT * FROM checks');
+  sshNonQuery('DELETE FROM checks');
+  console.log(`[setup] Backed up ${rows.length} checks and cleared table.`);
+  return rows;
+}
+
+function restoreChecks(rows) {
+  if (!rows) return;
+
+  const cols = ['id', 'provider', 'service', 'title', 'description', 'risk', 'severity', 'remediation_text', 'remediation_url', 'related_url', 'check_script', 'disabled', 'permissions', 'depends_on', 'data_needs'];
+  const stmts = ['DELETE FROM checks'];
+  for (const r of rows) {
+    const vals = cols.map(c => sqlValue(r[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO checks (${cols.join(', ')}) VALUES (${vals})`);
+  }
+  sshNonQuery(stmts.join('; '));
+  console.log(`[teardown] Restored ${rows.length} checks.`);
+}
+
 function seedTestData() {
-  const provider = sshQuery('SELECT id FROM providers LIMIT 1')[0];
+  seedChecks();
+
+  const provider = sshQuery("SELECT id FROM providers WHERE name = 'Azure' COLLATE NOCASE LIMIT 1")[0];
   if (!provider) { console.log('[seed] No providers -- skipping.'); return; }
-  const checks = sshQuery('SELECT id, severity FROM checks LIMIT 10');
+  const checks = sshQuery(`SELECT id, severity FROM checks WHERE id LIKE '${P}check_%' ORDER BY CASE UPPER(severity) WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, id`);
   if (checks.length === 0) { console.log('[seed] No checks -- skipping.'); return; }
 
   const now = new Date().toISOString();
@@ -90,17 +113,16 @@ function backupAndClearAllScanHistory() {
 function restoreScanHistory(backup) {
   if (!backup) return;
   const { scanRuns = [], scanResults = [] } = backup;
-  if (scanRuns.length === 0 && scanResults.length === 0) return;
 
   const stmts = ['DELETE FROM scan_results', 'DELETE FROM scan_runs'];
   for (const r of scanRuns) {
     const v = [r.id, r.provider_id, r.status, r.started_at, r.completed_at, r.duration_seconds, r.total_results, r.failed_results, r.passed_results]
-      .map(x => x == null ? 'NULL' : `'${String(x).replace(/'/g, "''")}'`).join(', ');
+      .map(sqlValue).join(', ');
     stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES (${v})`);
   }
   for (const r of scanResults) {
     const v = [r.scan_run_id, r.check_id, r.status, r.status_extended, r.resource_id, r.resource_name]
-      .map(x => x == null ? 'NULL' : `'${String(x).replace(/'/g, "''")}'`).join(', ');
+      .map(sqlValue).join(', ');
     stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES (${v})`);
   }
   sshNonQuery(stmts.join('; '));
@@ -109,6 +131,14 @@ function restoreScanHistory(backup) {
 
 function getScanResultCount(scanRunId) {
   return sshQuery(`SELECT COUNT(*) as cnt FROM scan_results WHERE scan_run_id = '${scanRunId}'`)[0].cnt;
+}
+
+function getScanHistoryCounts() {
+  return sshQuery('SELECT (SELECT COUNT(*) FROM scan_runs) as scanRunCount, (SELECT COUNT(*) FROM scan_results) as scanResultCount')[0];
+}
+
+function getTestCheckCounts() {
+  return sshQuery(`SELECT SUM(CASE WHEN disabled = 0 THEN 1 ELSE 0 END) as enabled, SUM(CASE WHEN disabled = 1 THEN 1 ELSE 0 END) as disabled FROM checks WHERE id LIKE '${P}check_%'`)[0];
 }
 
 function seedEnvironmentData() {
@@ -240,6 +270,38 @@ function getCompletedDiscoveryRunCount() {
   return sshQuery("SELECT COUNT(*) as count FROM azure_discovery_runs WHERE status = 'Completed'")[0].count;
 }
 
+function backupAndClearAllDiscoveryRuns() {
+  const rows = sshQuery('SELECT * FROM azure_discovery_runs');
+  sshNonQuery('DELETE FROM azure_discovery_runs');
+  console.log(`[setup] Backed up ${rows.length} discovery runs and cleared table.`);
+  return rows;
+}
+
+function restoreDiscoveryRuns(rows) {
+  if (!rows) return;
+
+  const cols = ['id', 'psu_job_id', 'scope', 'status', 'started_at', 'completed_at', 'arm_type_count', 'arm_row_count', 'entra_type_count', 'entra_row_count', 'warning_count', 'error_message'];
+  const stmts = ['DELETE FROM azure_discovery_runs'];
+  for (const r of rows) {
+    const vals = cols.map(c => sqlValue(r[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO azure_discovery_runs (${cols.join(', ')}) VALUES (${vals})`);
+  }
+  sshNonQuery(stmts.join('; '));
+  console.log(`[teardown] Restored ${rows.length} discovery runs.`);
+}
+
+function seedCompletedDiscoveryRun() {
+  const now = new Date().toISOString();
+  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (-1, 'All', 'Completed', '${now}', '${now}', 1, 1, 1, 1, 0, NULL)`);
+  const rows = sshQuery("SELECT id FROM azure_discovery_runs WHERE psu_job_id = -1 AND status = 'Completed' ORDER BY id DESC LIMIT 1");
+  if (rows.length !== 1) {
+    throw new Error('Seed verification failed: completed discovery run was not inserted');
+  }
+  const id = rows[0].id;
+  console.log(`[seed] Seeded completed discovery run id=${id}`);
+  return id;
+}
+
 function seedRunningDiscoveryRun() {
   const now = new Date().toISOString();
   sshNonQuery(`INSERT INTO azure_discovery_runs (scope, status, started_at) VALUES ('All', 'Running', '${now}')`);
@@ -259,12 +321,13 @@ function getRunningDiscoveryRunCount() {
 }
 
 module.exports = {
-  cleanupTestData, seedChecks, seedTestData,
-  backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount,
+  cleanupTestData, seedChecks, backupAndClearAllChecks, restoreChecks, seedTestData,
+  backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount, getScanHistoryCounts, getTestCheckCounts,
   seedEnvironmentData, cleanupEnvironmentData,
   getArmResourceCount, getTestArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns, getCompletedDiscoveryRunCount,
+  backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,

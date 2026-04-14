@@ -46,10 +46,7 @@ test.describe('Identity Risk Page', () => {
 
     test('should display expected column headers', async () => {
       const hasData = await riskPage.hasIdentityData();
-      if (!hasData) {
-        test.skip(true, 'No identity data to display columns');
-        return;
-      }
+      expect(hasData).toBe(true);
       const headers = await riskPage.getColumnHeaders();
       expect(headers).toContain('Name');
       expect(headers).toContain('Type');
@@ -59,10 +56,7 @@ test.describe('Identity Risk Page', () => {
 
     test('should display risk level chips', async () => {
       const hasData = await riskPage.hasIdentityData();
-      if (!hasData) {
-        test.skip(true, 'No identity data to display risk chips');
-        return;
-      }
+      expect(hasData).toBe(true);
       const chipTexts = await riskPage.getRiskChipTexts();
       const validLevels = ['Critical', 'High', 'Medium', 'Low'];
       const hasValidChip = chipTexts.some(t => validLevels.includes(t));
@@ -71,10 +65,7 @@ test.describe('Identity Risk Page', () => {
 
     test('should display pagination controls', async () => {
       const hasData = await riskPage.hasIdentityData();
-      if (!hasData) {
-        test.skip(true, 'No identity data to display pagination');
-        return;
-      }
+      expect(hasData).toBe(true);
       const paginationVisible = await riskPage.isPaginationVisible();
       expect(paginationVisible).toBe(true);
     });
@@ -83,6 +74,10 @@ test.describe('Identity Risk Page', () => {
   test.describe('when an identity row is expanded', () => {
     test.beforeAll(() => {
       seedIdentityViewData();
+      const count = getTestEffectiveRoleAssignmentCount();
+      if (count < 1) {
+        throw new Error(`Expected seeded identity data, got ${count} rows`);
+      }
     });
 
     test.afterAll(() => {
@@ -91,10 +86,7 @@ test.describe('Identity Risk Page', () => {
 
     test('should show detail panel with Entitlements, Risk Signals, and Attack Paths sections', async () => {
       const hasData = await riskPage.hasIdentityData();
-      if (!hasData) {
-        test.skip(true, 'No identity data to expand');
-        return;
-      }
+      expect(hasData).toBe(true);
       await riskPage.expandRow(0);
       const detailVisible = await riskPage.isDetailPanelVisible();
       expect(detailVisible).toBe(true);
@@ -124,10 +116,7 @@ test.describe('Identity Risk Page', () => {
 
     test('should show attack path findings in the drill-down panel', async () => {
       const hasData = await riskPage.hasIdentityData();
-      if (!hasData) {
-        test.skip(true, 'No identity data to expand');
-        return;
-      }
+      expect(hasData).toBe(true);
       await riskPage.expandRow(0);
       const attackPathsVisible = await riskPage.isAttackPathsSectionVisible();
       expect(attackPathsVisible).toBe(true);
