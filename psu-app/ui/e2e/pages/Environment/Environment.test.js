@@ -220,7 +220,7 @@ test.describe('Environment Page', () => {
       clearStaleDiscoveryRuns();
     });
 
-    test('should complete discovery and auto-load environment tree', async ({}, testInfo) => {
+    test('should complete discovery and auto-load infrastructure and identity trees', async ({}, testInfo) => {
       testInfo.setTimeout(600000); // 10 minutes — real discovery is slow
 
       await envPage.clickStartDiscovery();
@@ -263,11 +263,33 @@ test.describe('Environment Page', () => {
       const treeVisible = await envPage.isTreeContainerVisible();
       expect(treeVisible).toBe(true);
 
-      // 8. Button must be re-enabled after completion
+      // 8. Identity view must render discovered identities and effective roles
+      await envPage.selectView('Identity');
+      await envPage.waitForEnvironmentLoaded(30000);
+
+      const identitySummaryVisible = await envPage.isIdentitySummaryCardVisible();
+      expect(identitySummaryVisible).toBe(true);
+
+      const identityText = await envPage.getSummaryCount('Identities');
+      expect(parseInt(identityText)).toBeGreaterThanOrEqual(1);
+
+      const roleText = await envPage.getSummaryCount('Roles');
+      expect(parseInt(roleText)).toBeGreaterThanOrEqual(1);
+
+      const identityTreeVisible = await envPage.isTreeContainerVisible();
+      expect(identityTreeVisible).toBe(true);
+
+      const assignmentModeVisible = await envPage.isAssignmentModeSelectVisible();
+      expect(assignmentModeVisible).toBe(true);
+
+      await envPage.selectView('Infrastructure');
+      await envPage.waitForEnvironmentLoaded(30000);
+
+      // 9. Button must be re-enabled after completion
       const startDisabled = await startBtn.getAttribute('disabled');
       expect(startDisabled).toBeNull();
 
-      // 9. Discovery status banner must be hidden (no running discovery)
+      // 10. Discovery status banner must be hidden (no running discovery)
       await envPage.page.waitForTimeout(6000); // Wait for auto-refresh cycle
       const bannerVisible = await envPage.isDiscoveryStatusBannerVisible();
       expect(bannerVisible).toBe(false);
