@@ -1,4 +1,4 @@
-Describe 'Get-CIEMAzureProviderApi' {
+Describe 'GetCIEMAzureProviderApi' {
     BeforeAll {
         Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
         Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
@@ -16,7 +16,7 @@ Describe 'Get-CIEMAzureProviderApi' {
     Context 'when querying all provider APIs' {
         BeforeAll {
             $script:allApis = InModuleScope Devolutions.CIEM {
-                Get-CIEMAzureProviderApi
+                GetCIEMAzureProviderApi
             }
         }
 
@@ -32,7 +32,7 @@ Describe 'Get-CIEMAzureProviderApi' {
     Context 'when filtering by -HasPermissions' {
         BeforeAll {
             $script:withPerms = InModuleScope Devolutions.CIEM {
-                Get-CIEMAzureProviderApi -HasPermissions
+                GetCIEMAzureProviderApi -HasPermissions
             }
         }
 
@@ -65,7 +65,7 @@ Describe 'Get-CIEMAzureProviderApi' {
     Context 'when aggregating discovery permissions into unique sets' {
         BeforeAll {
             InModuleScope Devolutions.CIEM {
-                $endpoints = @(Get-CIEMAzureProviderApi -HasPermissions)
+                $endpoints = @(GetCIEMAzureProviderApi -HasPermissions)
                 $script:graphPerms = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
                 $script:azureRoles = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
                 foreach ($ep in $endpoints) {
@@ -109,7 +109,7 @@ Describe 'Get-CIEMAzureProviderApi' {
     Context 'when filtering by -Name' {
         BeforeAll {
             $script:result = InModuleScope Devolutions.CIEM {
-                Get-CIEMAzureProviderApi -Name 'Graph/users'
+                GetCIEMAzureProviderApi -Name 'Graph/users'
             }
         }
 
@@ -129,7 +129,7 @@ Describe 'Get-CIEMAzureProviderApi' {
     Context 'when filtering by -Service' {
         BeforeAll {
             $script:result = InModuleScope Devolutions.CIEM {
-                Get-CIEMAzureProviderApi -Service 'IAM'
+                GetCIEMAzureProviderApi -Service 'IAM'
             }
         }
 
@@ -144,7 +144,7 @@ Describe 'Get-CIEMAzureProviderApi' {
     Context 'when filtering by non-existent name' {
         BeforeAll {
             $script:result = InModuleScope Devolutions.CIEM {
-                Get-CIEMAzureProviderApi -Name 'DoesNotExist'
+                GetCIEMAzureProviderApi -Name 'DoesNotExist'
             }
         }
 

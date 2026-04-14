@@ -1,0 +1,7 @@
+[
+  { "name": "fail",    "color": "#f44336", "label": "Fail" },
+  { "name": "pass",    "color": "#4caf50", "label": "Pass" },
+  { "name": "manual",  "color": "#ff9800", "label": "Manual" },
+  { "name": "error",   "color": "#f44336", "label": "Error" },
+  { "name": "skipped", "color": "#9e9e9e", "label": "Skipped" }
+]

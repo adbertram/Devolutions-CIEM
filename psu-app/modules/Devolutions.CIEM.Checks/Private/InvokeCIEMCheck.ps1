@@ -1,4 +1,4 @@
-function Invoke-CIEMCheck {
+function InvokeCIEMCheck {
     <#
     .SYNOPSIS
         Executes a single CIEM check and emits findings to the pipeline.
@@ -8,7 +8,7 @@ function Invoke-CIEMCheck {
         caches, invokes the check function, counts findings, and handles errors.
         Emits [CIEMScanResult] objects to the pipeline.
 
-        This is a private function called from Invoke-CIEMScan.
+        This is a private function called from InvokeCIEMScan.
 
     .PARAMETER Check
         The CIEMCheck metadata object describing the check to run.
@@ -41,6 +41,8 @@ function Invoke-CIEMCheck {
         [Parameter()]
         [string]$ProviderName
     )
+
+    $ErrorActionPreference = 'Stop'
 
     try {
         # Auto-skip if any required service failed to initialize
@@ -77,13 +79,6 @@ function Invoke-CIEMCheck {
             [CIEMScanResult]::Create($Check, 'SKIPPED', 'Check produced no results - required data may be unavailable (e.g., no accessible subscriptions)', 'N/A', 'N/A')
         }
     } catch {
-        $config = Get-CIEMConfig
-        $continueOnError = if ($null -ne $config -and $null -ne $config.scan) { $config.scan.continueOnError } else { $true }
-        if ($continueOnError) {
-            Write-Warning "[$ProviderName] Check $($Check.Id) failed: $($_.Exception.Message)"
-            [CIEMScanResult]::Create($Check, 'SKIPPED', "Check execution failed: $($_.Exception.Message)", 'N/A', 'N/A')
-        } else {
-            throw
-        }
+        throw
     }
 }

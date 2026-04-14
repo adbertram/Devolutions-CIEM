@@ -14,6 +14,7 @@ function New-CIEMScanResult {
         [Parameter(ParameterSetName = 'InputObject')][string]$ForScanRunId
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 $cScanRunId = if ($ForScanRunId) { $ForScanRunId } else { throw "ForScanRunId is required with InputObject" }

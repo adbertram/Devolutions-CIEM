@@ -20,10 +20,11 @@ function Remove-CIEMAzureResourceRelationship {
         [PSObject[]]$InputObject,
 
         [Parameter()]
-        [object]$Connection
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         switch ($PSCmdlet.ParameterSetName) {
             'ById' {
                 if ($PSCmdlet.ShouldProcess("Id $Id", 'Remove Azure resource relationship')) {

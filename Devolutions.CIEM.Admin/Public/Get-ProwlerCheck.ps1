@@ -41,8 +41,8 @@ function Get-ProwlerCheck {
         [string]$Ref = 'master'
     )
 
-    $shouldThrow = $ErrorActionPreference -eq 'Stop'
     $ErrorActionPreference = 'Stop'
+    $shouldThrow = $true
 
     # Derive supported providers from checks registered in the SQLite checks table
     $supportedProviders = @(Get-CIEMCheck | ForEach-Object { $_.Provider.ToLower() } | Select-Object -Unique)

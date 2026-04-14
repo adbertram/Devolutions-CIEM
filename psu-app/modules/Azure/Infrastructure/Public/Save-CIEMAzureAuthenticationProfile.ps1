@@ -16,7 +16,7 @@ function Save-CIEMAzureAuthenticationProfile {
         [object[]]$InputObject
     )
     process {
-        if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) { return }
+        $ErrorActionPreference = 'Stop'
 
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             # Strip transient properties (resolved secrets) to prevent leaking into PSU Cache
@@ -49,7 +49,7 @@ function Save-CIEMAzureAuthenticationProfile {
         foreach ($entry in $entries) {
             $cId = $entry.Id
 
-            $profiles = Get-CIEMAzureAuthProfileCache
+            $profiles = GetCIEMAzureAuthProfileCache
 
             # Upsert: replace existing or append
             $existingIdx = -1
@@ -63,7 +63,7 @@ function Save-CIEMAzureAuthenticationProfile {
                 $profiles.Add($entry)
             }
 
-            Set-CIEMAzureAuthProfileCache -Profiles $profiles
+            SetCIEMAzureAuthProfileCache -Profiles $profiles
         }
     }
 }

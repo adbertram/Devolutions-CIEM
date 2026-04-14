@@ -14,7 +14,7 @@ if (-not (Test-Path $script:DataRoot)) {
 $script:_BootLogPath = Join-Path $script:DataRoot 'ciem.log'
 function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
     $entry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')] [$Sev] [ModuleInit] $Msg"
-    try { Add-Content -Path $script:_BootLogPath -Value $entry -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}
+    try { Add-Content -Path $script:_BootLogPath -Value $entry -Encoding UTF8 -ErrorAction SilentlyContinue } catch { Write-Verbose "Boot log write failed: $_" }
 }
 
 _BootLog "Module loading from: $PSScriptRoot"
@@ -44,6 +44,13 @@ $script:SeverityCatalog = @(
 )
 foreach ($s in $script:SeverityCatalog) { $script:SeverityByName[$s.name] = $s }
 
+# --- Status catalog (single source of truth for status name/color/label) ---
+$script:StatusByName = @{}
+$script:StatusCatalog = @(
+    Get-Content (Join-Path $script:PSURoot 'Data/status_catalog.json') -Raw | ConvertFrom-Json
+)
+foreach ($s in $script:StatusCatalog) { $script:StatusByName[$s.name] = $s }
+
 # --- Import PSUSQLite (bundled dependency) ---
 _BootLog "Importing PSUSQLite..."
 Import-Module (Join-Path $PSScriptRoot 'modules/PSUSQLite/PSUSQLite.psd1') -Global
@@ -58,21 +65,25 @@ _BootLog "PSUSQLite imported"
 _BootLog "Loading base classes..."
 foreach ($className in @('CIEMAuthenticationContext', 'CIEMProvider')) {
     $classPath = Join-Path $PSScriptRoot "Classes/$className.ps1"
-    try { . $classPath } catch { _BootLog "FAILED to load class $className : $_" 'ERROR' }
+    try { . $classPath } catch { _BootLog "FAILED to load class $className : $_" 'ERROR'; throw }
 }
 
 # Checks classes (explicit order: base types before derived)
 _BootLog "Loading Checks classes..."
 foreach ($className in @('CIEMServiceCache', 'CIEMProviderService', 'CIEMCheck', 'CIEMScanResult')) {
     $classFile = Join-Path $script:ChecksRoot "Classes/$className.ps1"
-    if (Test-Path $classFile) { try { . $classFile } catch { _BootLog "FAILED to load class $className : $_" 'ERROR' } }
+    if (-not (Test-Path $classFile)) {
+        _BootLog "FAILED to load class $className : file not found at $classFile" 'ERROR'
+        throw "Required class file not found: $classFile"
+    }
+    try { . $classFile } catch { _BootLog "FAILED to load class $className : $_" 'ERROR'; throw }
 }
 
 # Unordered classes (Graph, Azure, Azure Discovery, AWS - no interdependencies)
 _BootLog "Loading provider classes..."
 foreach ($root in @($script:GraphRoot, $script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot)) {
     foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction SilentlyContinue)) {
-        try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR' }
+        try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR'; throw }
     }
 }
 
@@ -81,12 +92,12 @@ $_loadedCount = 0
 $_failedCount = 0
 foreach ($subdir in @('Private', 'Public')) {
     foreach ($file in (Get-ChildItem "$PSScriptRoot/$subdir/*.ps1" -ErrorAction SilentlyContinue)) {
-        try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++ }
+        try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++; throw }
     }
     foreach ($root in $subModuleRoots) {
         $rootName = Split-Path $root -Leaf
         foreach ($file in (Get-ChildItem (Join-Path $root "$subdir/*.ps1") -ErrorAction SilentlyContinue)) {
-            try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $rootName/$subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++ }
+            try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $rootName/$subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++; throw }
         }
     }
 }
@@ -96,7 +107,7 @@ Write-CIEMLog -Message "Loaded $_loadedCount functions ($_failedCount failures)"
 
 # --- Load PSU page functions (must be exported for PSU's scriptblock resolution) ---
 foreach ($file in (Get-ChildItem "$script:PSURoot/Pages/*.ps1" -ErrorAction SilentlyContinue)) {
-    try { . $file.FullName; $_loadedCount++ } catch { Write-CIEMLog "FAILED to load Page $($file.Name) : $_" -Severity ERROR -Component 'ModuleInit'; $_failedCount++ }
+    try { . $file.FullName; $_loadedCount++ } catch { Write-CIEMLog "FAILED to load Page $($file.Name) : $_" -Severity ERROR -Component 'ModuleInit'; $_failedCount++; throw }
 }
 Write-CIEMLog -Message "PSU pages loaded (total: $_loadedCount functions, $_failedCount failures)" -Component 'ModuleInit'
 
@@ -115,12 +126,9 @@ $script:ScanConfigCacheKey        = 'CIEM:ScanConfig'
 # AWS
 $script:AWSAuthContext = $null
 # PSU
-$script:RelationshipColors = @{
-    'CONTAINS'             = '#1976d2'   # ARM hierarchy containment (blue)
-    'member_of'            = '#9c27b0'   # Group membership (purple)
-    'owner_of'             = '#f44336'   # Ownership (red)
-    'has_role_member'      = '#ff9800'   # Role membership (orange)
-    'transitive_member_of' = '#4caf50'   # Transitive membership (green)
+$script:RelationshipColors = @{}
+(Get-Content (Join-Path $script:ModuleRoot 'Data/relationship_colors.json') -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object {
+    $script:RelationshipColors[$_.Name] = $_.Value
 }
 
 # Risk policy constants
@@ -149,6 +157,7 @@ try {
 }
 catch {
     Write-CIEMLog -Message "Database initialization failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
+    throw
 }
 
 # Apply provider-specific schemas
@@ -159,26 +168,32 @@ foreach ($schema in @(
 )) {
     try {
         $dbPath = Get-CIEMDatabasePath
-        if ($dbPath -and (Test-Path $schema.Path)) {
-            $conn = Open-PSUSQLiteConnection -Database $dbPath
-            try {
-                $schemaSql = Get-Content -Path $schema.Path -Raw
-                foreach ($statement in ($schemaSql -split ';\s*\n' | Where-Object { $_.Trim() })) {
-                    Invoke-PSUSQLiteQuery -Connection $conn -Query $statement.Trim() -AsNonQuery | Out-Null
-                }
+        if (-not $dbPath) {
+            throw "Database path not resolved for $($schema.Label) schema."
+        }
+        if (-not (Test-Path $schema.Path)) {
+            throw "Schema file not found: $($schema.Path)"
+        }
+
+        $conn = Open-PSUSQLiteConnection -Database $dbPath
+        try {
+            $schemaSql = Get-Content -Path $schema.Path -Raw
+            foreach ($statement in ($schemaSql -split ';\s*\n' | Where-Object { $_.Trim() })) {
+                Invoke-PSUSQLiteQuery -Connection $conn -Query $statement.Trim() -AsNonQuery | Out-Null
             }
-            finally {
-                $conn.Dispose()
-            }
+        }
+        finally {
+            $conn.Dispose()
         }
     }
     catch {
         Write-CIEMLog -Message "$($schema.Label) schema failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
+        throw
     }
 }
 
 # --- Argument completers ---
-Register-CIEMArgumentCompleters
+RegisterCIEMArgumentCompleters
 
 # --- Export all public + page functions ---
 $exportDirs = @("$PSScriptRoot/Public")

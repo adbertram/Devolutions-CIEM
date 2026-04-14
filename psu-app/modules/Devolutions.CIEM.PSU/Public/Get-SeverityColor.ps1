@@ -16,5 +16,8 @@ function Get-SeverityColor {
     $ErrorActionPreference = 'Stop'
 
     $entry = $script:SeverityByName[$Severity.ToLower()]
-    if ($entry) { $entry.color } else { '#666' }
+    if (-not $entry) {
+        throw "Unknown severity '$Severity'. Valid values: $($script:SeverityByName.Keys -join ', ')"
+    }
+    $entry.color
 }

@@ -228,8 +228,8 @@ Describe 'Module Load — Post-Discovery-Schema' {
     }
 
     Context 'File moves completed' {
-        It 'Test-EntraAuthorizationPolicyBooleanSetting.ps1 exists in Checks/Private' {
-            Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.Checks' 'Private' 'Test-EntraAuthorizationPolicyBooleanSetting.ps1' | Should -Exist
+        It 'TestEntraAuthorizationPolicyBooleanSetting.ps1 exists in Checks/Private' {
+            Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.Checks' 'Private' 'TestEntraAuthorizationPolicyBooleanSetting.ps1' | Should -Exist
         }
     }
 }

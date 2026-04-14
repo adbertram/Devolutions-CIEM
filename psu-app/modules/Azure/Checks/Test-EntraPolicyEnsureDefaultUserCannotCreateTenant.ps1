@@ -31,5 +31,5 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
         FailMessage   = 'Non-admin users can create new tenants. This should be restricted to administrators only.'
         ServiceCache  = $ServiceCache
     }
-    Test-EntraAuthorizationPolicyBooleanSetting @params
+    TestEntraAuthorizationPolicyBooleanSetting @params
 }

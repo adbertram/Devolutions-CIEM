@@ -9,6 +9,8 @@ function Get-CheckFunctionName {
     #>
     param([Parameter(Mandatory)][string]$CheckId)
 
+    $ErrorActionPreference = 'Stop'
+
     $parts = $CheckId -split '_' | ForEach-Object {
         if ($_.Length -gt 0) {
             $_.Substring(0, 1).ToUpper() + $_.Substring(1).ToLower()

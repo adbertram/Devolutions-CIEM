@@ -12,6 +12,8 @@ function Get-CIEMAzureEntraResource {
         [string]$ParentId
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $conditions = @()
     $parameters = @{}
     $columnMap = @{

@@ -19,6 +19,8 @@ function Get-PSUInstalledEnvironment {
     [OutputType([PSCustomObject])]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     # Return cached value if available
     if ($script:PSUEnvironment) {
         $script:PSUEnvironment

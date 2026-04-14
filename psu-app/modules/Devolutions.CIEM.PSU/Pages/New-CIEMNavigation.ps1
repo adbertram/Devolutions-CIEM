@@ -10,6 +10,8 @@ function New-CIEMNavigation {
     [OutputType([object[]])]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     @(
         New-UDListItem -Label 'Dashboard' -Icon (New-UDIcon -Icon 'Home') -Href '/ciem'
         New-UDListItem -Label 'Scan' -Icon (New-UDIcon -Icon 'Play') -Href '/ciem/scan'

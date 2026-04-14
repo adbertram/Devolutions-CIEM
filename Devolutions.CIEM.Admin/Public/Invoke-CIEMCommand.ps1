@@ -43,17 +43,9 @@ function Invoke-CIEMCommand {
         [string]$Environment
     )
 
-    # Auto-connect if not connected
-    if (-not $script:PSUConnection.Url -or -not $script:PSUConnection.Token) {
-        Write-Verbose "Not connected to PSU. Attempting auto-connect..."
-        try {
-            $null = Connect-PSU -ErrorAction Stop
-            Write-Verbose "Connected to PSU."
-        }
-        catch {
-            throw "Not connected to PSU and auto-connect failed: $_"
-        }
-    }
+    $ErrorActionPreference = 'Stop'
+
+    Assert-PSUConnection
 
     if ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
         $Command = $ScriptBlock.ToString()
@@ -151,8 +143,7 @@ param([string]$ScriptContent)
 
         $elapsed = (Get-Date) - $startTime
         if ($elapsed.TotalSeconds -ge $TimeoutSeconds) {
-            Write-Warning "Job timed out after ${TimeoutSeconds}s. Status: $statusName"
-            break
+            throw "Job timed out after ${TimeoutSeconds}s. Status: $statusName"
         }
 
         Write-Verbose "Job status: $statusName (elapsed: $([math]::Round($elapsed.TotalSeconds, 1))s)"

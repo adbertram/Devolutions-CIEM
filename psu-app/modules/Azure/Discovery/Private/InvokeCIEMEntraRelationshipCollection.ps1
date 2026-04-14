@@ -11,9 +11,12 @@ function InvokeCIEMEntraRelationshipCollection {
         [PSObject[]]$Users
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $now = (Get-Date).ToString('o')
 
     function NewRelationship($sourceId, $sourceType, $targetId, $targetType, $rel) {
+        $ErrorActionPreference = 'Stop'
         $relationship = [CIEMAzureResourceRelationship]::new()
         $relationship.SourceId = $sourceId
         $relationship.SourceType = $sourceType
@@ -34,6 +37,8 @@ function InvokeCIEMEntraRelationshipCollection {
             [string]$RequestLabel
         )
 
+        $ErrorActionPreference = 'Stop'
+
         if (-not $BatchResults.ContainsKey($RequestId)) {
             throw "InvokeCIEMEntraRelationshipCollection missing batch response for '$RequestLabel'."
         }
@@ -49,6 +54,8 @@ function InvokeCIEMEntraRelationshipCollection {
 
     function ResolveGraphObjectType {
         param([object]$GraphObject)
+
+        $ErrorActionPreference = 'Stop'
 
         if ($GraphObject.PSObject.Properties.Name -contains '@odata.type' -and $GraphObject.'@odata.type') {
             return ($GraphObject.'@odata.type' -replace '#microsoft.graph.', '')

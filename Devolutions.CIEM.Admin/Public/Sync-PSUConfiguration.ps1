@@ -23,6 +23,8 @@ function Sync-PSUConfiguration {
         [switch]$Reset
     )
 
+    $ErrorActionPreference = 'Stop'
+
     Assert-PSUConnection
 
     $headers = @{

@@ -1,9 +1,12 @@
 function New-CIEMSuccessContent {
+    [CmdletBinding()]
     param(
         [string]$Text = 'Complete!',
         [string]$Details,
         [scriptblock]$ActionButton
     )
+
+    $ErrorActionPreference = 'Stop'
     New-UDCard -Style @{ backgroundColor = '#e8f5e9'; marginTop = '12px'; marginBottom = '12px' } -Content {
         New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
             New-UDIcon -Icon 'CheckCircle' -Size 'lg' -Style @{ color = '#4caf50' }

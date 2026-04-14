@@ -26,6 +26,7 @@ function New-CIEMAzureResourceRelationship {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
                 New-CIEMAzureResourceRelationship `

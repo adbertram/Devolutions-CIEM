@@ -9,6 +9,7 @@ function Remove-CIEMAzureDiscoveryRun {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         switch ($PSCmdlet.ParameterSetName) {
             'ById' {
                 if ($PSCmdlet.ShouldProcess($Id, 'Remove Azure discovery run')) {

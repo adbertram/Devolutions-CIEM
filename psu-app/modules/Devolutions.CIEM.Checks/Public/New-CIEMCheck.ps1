@@ -39,6 +39,7 @@ function New-CIEMCheck {
         [PSObject[]]$InputObject
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $item.Id }

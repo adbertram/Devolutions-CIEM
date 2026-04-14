@@ -7,13 +7,15 @@ function Set-CIEMAzureAuthenticationProfileActive {
         [string]$Id
     )
 
+    $ErrorActionPreference = 'Stop'
+
     if ($PSCmdlet.ParameterSetName -eq 'ById') {
         $Profile = Get-CIEMAzureAuthenticationProfile -Id $Id | Select-Object -First 1
         if (-not $Profile) { throw "Azure authentication profile '$Id' not found." }
     }
 
     # Load all profiles, set target active, deactivate all others
-    $profiles = Get-CIEMAzureAuthProfileCache
+    $profiles = GetCIEMAzureAuthProfileCache
 
     $now = (Get-Date).ToString('o')
     foreach ($p in $profiles) {
@@ -26,5 +28,5 @@ function Set-CIEMAzureAuthenticationProfileActive {
         }
     }
 
-    Set-CIEMAzureAuthProfileCache -Profiles $profiles
+    SetCIEMAzureAuthProfileCache -Profiles $profiles
 }

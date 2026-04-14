@@ -99,7 +99,7 @@ function Get-CIEMRequiredPermission {
     if ($Provider -ne 'AWS') {
         $endpointParams = @{ HasPermissions = $true }
         if ($Service) { $endpointParams.Service = $Service }
-        $endpoints = @(Get-CIEMAzureProviderApi @endpointParams)
+        $endpoints = @(GetCIEMAzureProviderApi @endpointParams)
         $discoveryEndpointCount = $endpoints.Count
 
         foreach ($endpoint in $endpoints) {

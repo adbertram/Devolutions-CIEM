@@ -1,4 +1,6 @@
 function ResolveArmResourceLabel($resource, $roleDefLookup, $principalLookup, $parsedProps) {
+    $ErrorActionPreference = 'Stop'
+
     $props = $parsedProps[$resource.Id]
     if ($props) {
         if ($resource.Type -eq 'microsoft.authorization/roledefinitions' -and $props.roleName) {
@@ -32,6 +34,8 @@ function InvokeCIEMArmHierarchyBuild {
         [Parameter(Mandatory)]
         [object[]]$Resources
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $nodes = [System.Collections.Generic.List[PSObject]]::new()
 

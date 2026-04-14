@@ -4,6 +4,8 @@ function InvokeCIEMEntraPermissionCollection {
         [PSObject[]]$ServicePrincipals
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $now = (Get-Date).ToString('o')
     $uniqueServicePrincipals = @($ServicePrincipals | Group-Object Id | ForEach-Object { $_.Group[0] })
 

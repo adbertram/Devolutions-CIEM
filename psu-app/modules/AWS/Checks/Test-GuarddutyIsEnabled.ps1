@@ -10,7 +10,7 @@ function Test-GuarddutyIsEnabled {
         CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType('CIEMScanResult[]')]
     param(
         [Parameter(Mandatory)]
         $Check

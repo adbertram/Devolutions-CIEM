@@ -9,7 +9,7 @@ Describe 'InvokeCIEMResourceGraphQuery' {
         Initialize-DiscoveryTestDatabase
         $script:resourceGraphCalls = [System.Collections.Generic.List[object]]::new()
         Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
-        Mock -ModuleName Devolutions.CIEM Get-CIEMAzureProviderApi {
+        Mock -ModuleName Devolutions.CIEM GetCIEMAzureProviderApi {
             [pscustomobject]@{ BaseUrl = 'https://management.azure.com' }
         }
         Mock -ModuleName Devolutions.CIEM Invoke-AzureApi {

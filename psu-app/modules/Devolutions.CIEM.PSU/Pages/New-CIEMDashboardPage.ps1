@@ -11,6 +11,8 @@ function New-CIEMDashboardPage {
         [object[]]$Navigation
     )
 
+    $ErrorActionPreference = 'Stop'
+
     New-UDPage -Name 'Dashboard' -Url '/ciem' -Content {
         New-UDTypography -Text 'Devolutions CIEM Dashboard' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
@@ -142,13 +144,13 @@ function New-CIEMDashboardPage {
                             New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
                                 New-UDCard -Title "Results by Severity$(if ($chartProviders.Count -gt 1) { " - $chartProvider" })" -Content {
                                     $SeverityData = @(
-                                        @{ Name = 'Critical'; Count = $pCritical; color = '#9c27b0' }
-                                        @{ Name = 'High';     Count = $pHigh;     color = '#f44336' }
-                                        @{ Name = 'Medium';   Count = $pMedium;   color = '#ff9800' }
-                                        @{ Name = 'Low';      Count = $pLow;      color = '#2196f3' }
+                                        @{ Name = 'Critical'; Count = $pCritical; color = (Devolutions.CIEM\Get-SeverityColor -Severity 'critical') }
+                                        @{ Name = 'High';     Count = $pHigh;     color = (Devolutions.CIEM\Get-SeverityColor -Severity 'high') }
+                                        @{ Name = 'Medium';   Count = $pMedium;   color = (Devolutions.CIEM\Get-SeverityColor -Severity 'medium') }
+                                        @{ Name = 'Low';      Count = $pLow;      color = (Devolutions.CIEM\Get-SeverityColor -Severity 'low') }
                                     ) | Where-Object { $_.Count -gt 0 }
                                     if ($SeverityData.Count -gt 0) {
-                                        New-UDChartJS -Type 'doughnut' -Data $SeverityData -DataProperty Count -LabelProperty Name -BackgroundColor @('#9c27b0', '#f44336', '#ff9800', '#2196f3')
+                                        New-UDChartJS -Type 'doughnut' -Data $SeverityData -DataProperty Count -LabelProperty Name -BackgroundColor @($SeverityData.ForEach({ $_.color }))
                                     } else {
                                         New-UDTypography -Text 'No failed results' -Style @{ textAlign = 'center'; padding = '40px' }
                                     }

@@ -11,6 +11,8 @@ function New-CIEMConfigPage {
         [object[]]$Navigation
     )
 
+    $ErrorActionPreference = 'Stop'
+
     New-UDPage -Name 'Configuration' -Url '/ciem/config' -Content {
         # Load configuration from PSU cache (or defaults if first run)
         $CurrentConfig = Devolutions.CIEM\Get-CIEMConfig
@@ -119,9 +121,9 @@ function New-CIEMConfigPage {
                         ManagedIdentityClientId = $azProfileForFields.ManagedIdentityClientId
                     }
                     if ($credProfileId) {
-                        $storedCreds.ClientSecretExists = -not [string]::IsNullOrEmpty((Devolutions.CIEM\Get-CIEMSecret "CIEM_Azure_${credProfileId}_ClientSecret"))
-                        $storedCreds.CertPfxExists = -not [string]::IsNullOrEmpty((Devolutions.CIEM\Get-CIEMSecret "CIEM_Azure_${credProfileId}_CertPfx"))
-                        $storedCreds.CertPasswordExists = -not [string]::IsNullOrEmpty((Devolutions.CIEM\Get-CIEMSecret "CIEM_Azure_${credProfileId}_CertPassword"))
+                        $storedCreds.ClientSecretExists = Test-Path "Secret:CIEM_Azure_${credProfileId}_ClientSecret"
+                        $storedCreds.CertPfxExists = Test-Path "Secret:CIEM_Azure_${credProfileId}_CertPfx"
+                        $storedCreds.CertPasswordExists = Test-Path "Secret:CIEM_Azure_${credProfileId}_CertPassword"
                     }
 
                     switch ($selectedMethod) {
@@ -215,8 +217,8 @@ inp.click();
                     }
                 }
                 elseif ($selectedProvider -eq 'AWS') {
-                    $awsAccessKeyExists = -not [string]::IsNullOrEmpty((Devolutions.CIEM\Get-CIEMSecret 'CIEM_AWS_AccessKeyId'))
-                    $awsSecretKeyExists = -not [string]::IsNullOrEmpty((Devolutions.CIEM\Get-CIEMSecret 'CIEM_AWS_SecretAccessKey'))
+                    $awsAccessKeyExists = Test-Path 'Secret:CIEM_AWS_AccessKeyId'
+                    $awsSecretKeyExists = Test-Path 'Secret:CIEM_AWS_SecretAccessKey'
 
                     switch ($selectedMethod) {
                         'CurrentProfile' {

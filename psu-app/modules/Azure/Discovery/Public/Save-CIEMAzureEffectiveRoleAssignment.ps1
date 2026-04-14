@@ -33,7 +33,7 @@ function Save-CIEMAzureEffectiveRoleAssignment {
         [string]$ComputedAt,
 
         [Parameter()]
-        $Connection,
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [PSObject[]]$InputObject

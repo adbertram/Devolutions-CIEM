@@ -64,6 +64,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
     # ===== Helper: check if node exists in graph =====
     # Must use same $Connection to see uncommitted nodes within a transaction
     function NodeExists([string]$nodeId) {
+        $ErrorActionPreference = 'Stop'
         if (-not $nodeId) { return $false }
         if ($nodeExistsCache.ContainsKey($nodeId)) { return $nodeExistsCache[$nodeId] }
         $fkParams = @{ Query = "SELECT 1 FROM graph_nodes WHERE id = @id"; Parameters = @{ id = $nodeId } }
@@ -77,6 +78,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
     # Role assignment scopes may reference resources with case mismatches vs graph_nodes IDs.
     # Log and skip FK failures rather than crashing the entire discovery run.
     function SaveEdgeSafe([hashtable]$splat) {
+        $ErrorActionPreference = 'Stop'
         try {
             Save-CIEMGraphEdge @splat
             return $true

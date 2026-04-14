@@ -25,6 +25,7 @@ function Save-CIEMScanRun {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         # Resolve provider_id for FK (use first provider, lowercased)
         $primaryProvider = @($ScanRun.Providers)[0]
         $providerId = $primaryProvider.ToString().ToLower()

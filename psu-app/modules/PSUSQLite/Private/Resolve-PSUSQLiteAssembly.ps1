@@ -9,6 +9,8 @@ function Resolve-PSUSQLiteAssembly {
     [CmdletBinding()]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     # Check if already loaded (e.g. running inside PSU integrated environment)
     $loaded = [System.AppDomain]::CurrentDomain.GetAssemblies() |
         Where-Object { $_.GetName().Name -eq 'Microsoft.Data.Sqlite' }

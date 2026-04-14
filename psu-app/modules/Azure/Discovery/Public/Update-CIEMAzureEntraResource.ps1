@@ -21,6 +21,7 @@ function Update-CIEMAzureEntraResource {
         [switch]$PassThru
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 $parameters = @{

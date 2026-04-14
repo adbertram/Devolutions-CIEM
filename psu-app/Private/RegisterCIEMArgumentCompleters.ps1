@@ -1,4 +1,4 @@
-function Register-CIEMArgumentCompleters {
+function RegisterCIEMArgumentCompleters {
     <#
     .SYNOPSIS
         Registers dynamic tab-completion for provider-related parameters.
@@ -11,6 +11,8 @@ function Register-CIEMArgumentCompleters {
     #>
     [CmdletBinding()]
     param()
+
+    $ErrorActionPreference = 'Stop'
 
     # Completer scriptblock that returns provider names
     $providerCompleter = {

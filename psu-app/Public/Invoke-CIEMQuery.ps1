@@ -32,8 +32,10 @@ function Invoke-CIEMQuery {
         [switch]$AsNonQuery,
 
         [Parameter()]
-        $Connection
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
+
+    $ErrorActionPreference = 'Stop'
 
     # Lazy-init: resolve database path if not already set
     if (-not $script:DatabasePath) {

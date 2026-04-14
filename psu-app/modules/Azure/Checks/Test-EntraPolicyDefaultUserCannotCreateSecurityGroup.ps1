@@ -31,5 +31,5 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
         FailMessage   = 'Users can create security groups in Azure portals, API or PowerShell. This should be restricted to administrators only.'
         ServiceCache  = $ServiceCache
     }
-    Test-EntraAuthorizationPolicyBooleanSetting @params
+    TestEntraAuthorizationPolicyBooleanSetting @params
 }

@@ -61,11 +61,9 @@ function Get-GitHubRepoTree {
         [string]$Path
     )
 
-    # Capture caller's ErrorAction before we override
-    $shouldThrow = $ErrorActionPreference -eq 'Stop'
-
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue'
+    $shouldThrow = $true
 
     # Check cache first - key is Owner/Repo/Ref, stores full tree to avoid repeated API calls
     $cacheKey = "$Owner/$Repo/$Ref"

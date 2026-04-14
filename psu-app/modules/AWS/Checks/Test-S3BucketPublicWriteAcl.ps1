@@ -10,7 +10,7 @@ function Test-S3BucketPublicWriteAcl {
         CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType('CIEMScanResult[]')]
     param(
         [Parameter(Mandatory)]
         $Check

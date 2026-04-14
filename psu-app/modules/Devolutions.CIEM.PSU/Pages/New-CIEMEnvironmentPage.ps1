@@ -16,6 +16,8 @@ function New-CIEMEnvironmentPage {
         [object[]]$Navigation
     )
 
+    $ErrorActionPreference = 'Stop'
+
     New-UDPage -Name 'Environment' -Url '/ciem/environment' -Content {
 
         Devolutions.CIEM\Write-CIEMLog -Message "Environment page Content block executing" -Severity INFO -Component 'PSU-EnvironmentPage'

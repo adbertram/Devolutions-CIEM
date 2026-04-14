@@ -24,8 +24,12 @@ function Get-CIEMSecret {
         [string]$Name
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-    if ($inPSUContext) {
-        Get-Item "Secret:$Name" -ErrorAction SilentlyContinue
+    if (-not $inPSUContext) {
+        throw "Not running in PSU context - Secret: drive not available. Cannot retrieve secret '$Name'."
     }
+
+    Get-Item "Secret:$Name"
 }

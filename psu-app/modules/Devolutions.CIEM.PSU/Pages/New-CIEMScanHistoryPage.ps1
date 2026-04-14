@@ -11,6 +11,8 @@ function New-CIEMScanHistoryPage {
         [object[]]$Navigation
     )
 
+    $ErrorActionPreference = 'Stop'
+
     New-UDPage -Name 'Scan History' -Url '/ciem/history' -Content {
         New-UDTypography -Text 'Scan History' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Click on a scan to expand and view detailed results' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }

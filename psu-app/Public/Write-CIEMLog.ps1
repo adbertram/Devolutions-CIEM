@@ -32,6 +32,8 @@ function Write-CIEMLog {
         [string]$Component = 'CIEM'
     )
 
+    $ErrorActionPreference = 'Stop'
+
     # Log file path - uses $script:DataRoot (resolved in psm1 to survive module upgrades).
     $logPath = Join-Path -Path $script:DataRoot -ChildPath 'ciem.log'
 
@@ -43,7 +45,8 @@ function Write-CIEMLog {
 
     # Append to log file (thread-safe with mutex for PSU concurrent access)
     if (-not $script:_LogMutex) {
-        $script:_LogMutex = New-Object System.Threading.Mutex($false, 'CIEMLogMutex')
+        $mutexName = 'CIEMLogMutex_' + ($script:DataRoot.GetHashCode().ToString('x'))
+        $script:_LogMutex = New-Object System.Threading.Mutex($false, $mutexName)
     }
     try {
         $script:_LogMutex.WaitOne() | Out-Null

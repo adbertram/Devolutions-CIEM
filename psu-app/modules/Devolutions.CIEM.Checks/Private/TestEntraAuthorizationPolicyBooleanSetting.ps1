@@ -1,4 +1,4 @@
-function Test-EntraAuthorizationPolicyBooleanSetting {
+function TestEntraAuthorizationPolicyBooleanSetting {
     <#
     .SYNOPSIS
         Tests a boolean setting in the Entra authorization policy defaultUserRolePermissions.

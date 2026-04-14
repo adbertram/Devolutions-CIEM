@@ -10,7 +10,7 @@ function Test-RdsClusterDeletionProtection {
         CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType('CIEMScanResult[]')]
     param(
         [Parameter(Mandatory)]
         $Check

@@ -28,6 +28,8 @@ function Get-CIEMCheckMetadata {
         [string]$Provider
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $conditions = @()
     $params = @{}
 

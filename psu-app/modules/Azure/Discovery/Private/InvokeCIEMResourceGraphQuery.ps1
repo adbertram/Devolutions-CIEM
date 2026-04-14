@@ -20,7 +20,7 @@ function InvokeCIEMResourceGraphQuery {
     }
 
     $now = (Get-Date).ToString('o')
-    $armApi = Get-CIEMAzureProviderApi -Name 'ARM'
+    $armApi = GetCIEMAzureProviderApi -Name 'ARM'
     $uri = "$(($armApi.BaseUrl).TrimEnd('/'))/providers/Microsoft.ResourceGraph/resources?api-version=2021-03-01"
 
     if ($PSCmdlet.ParameterSetName -eq 'BySubscription') {

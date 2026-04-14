@@ -10,7 +10,7 @@ function Test-AppstreamFleetMaximumSessionDuration {
         CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType('CIEMScanResult[]')]
     param(
         [Parameter(Mandatory)]
         $Check

@@ -1,11 +1,11 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
-    $script:ScanSource = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Private' 'Invoke-CIEMScan.ps1') -Raw
+    $script:ScanSource = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Private' 'InvokeCIEMScan.ps1') -Raw
     $script:LegacyScanFixture = Get-Content (Join-Path $PSScriptRoot '..' 'Fixtures' 'legacy-scan-output.json') -Raw | ConvertFrom-Json
 }
 
-Describe 'Invoke-CIEMScan parallel execution' {
+Describe 'InvokeCIEMScan parallel execution' {
     BeforeEach {
         $script:TestDatabasePath = Join-Path $TestDrive ("ciem-" + [guid]::NewGuid().ToString('N') + '.db')
         $env:CIEM_TEST_DB_PATH = $script:TestDatabasePath
@@ -18,7 +18,7 @@ Describe 'Invoke-CIEMScan parallel execution' {
         }
 
         Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
-        Mock -ModuleName Devolutions.CIEM Sync-CIEMCheckCatalog {}
+        Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureDiscoveryRun {
             [pscustomobject]@{ Id = 1; Status = 'Completed' }
         }
@@ -57,7 +57,7 @@ Describe 'Invoke-CIEMScan parallel execution' {
             -DataNeeds @('entra:namedlocations')
 
         InModuleScope Devolutions.CIEM {
-            Invoke-CIEMScan -Provider Azure -CheckId @(
+            InvokeCIEMScan -Provider Azure -CheckId @(
                 'parallel_a',
                 'parallel_b'
             ) | Out-Null
@@ -94,7 +94,7 @@ Describe 'Invoke-CIEMScan parallel execution' {
             -DataNeeds @('entra:securitydefaults')
 
         InModuleScope Devolutions.CIEM {
-            { Invoke-CIEMScan -Provider Azure -CheckId 'parallel_failure' | Out-Null } | Should -Throw "*Check 'entra_security_defaults_enabled' failed: boom*"
+            { InvokeCIEMScan -Provider Azure -CheckId 'parallel_failure' | Out-Null } | Should -Throw "*Check 'entra_security_defaults_enabled' failed: boom*"
         }
     }
 
@@ -149,7 +149,7 @@ Describe 'Invoke-CIEMScan parallel execution' {
             -DataNeeds @('entra:securitydefaults')
 
         $result = InModuleScope Devolutions.CIEM {
-            Invoke-CIEMScan -Provider Azure -CheckId 'parallel_result'
+            InvokeCIEMScan -Provider Azure -CheckId 'parallel_result'
         }
 
         $result | Should -HaveCount 1
@@ -179,7 +179,7 @@ Describe 'Invoke-CIEMScan parallel execution' {
         Mock -ModuleName Devolutions.CIEM InvokeCIEMParallelForEach { throw 'should not be called' }
 
         InModuleScope Devolutions.CIEM {
-            { Invoke-CIEMScan -Provider Azure -Service 'DoesNotExist' | Out-Null } | Should -Not -Throw
+            { InvokeCIEMScan -Provider Azure -Service 'DoesNotExist' | Out-Null } | Should -Not -Throw
         }
 
         Assert-MockCalled InvokeCIEMParallelForEach -ModuleName Devolutions.CIEM -Times 0 -Exactly
@@ -216,10 +216,10 @@ Describe 'Invoke-CIEMScan parallel execution' {
     }
 
     It 'GetCIEMAzureScanServiceCache is reachable from InModuleScope' {
-        # It may live inside Invoke-CIEMScan as a nested function OR as a top-level private
+        # It may live inside InvokeCIEMScan as a nested function OR as a top-level private
         # function — what matters is that the cache function is defined and the other
         # downstream helpers (ConvertToCIEMCheckObject, etc.) remain callable via the
-        # module scope or through Invoke-CIEMScan's own call path.
+        # module scope or through InvokeCIEMScan's own call path.
         InModuleScope Devolutions.CIEM {
             # GetCIEMEntraNeeds and GetCIEMIAMNeeds are top-level module functions (asserted below).
             Get-Command -Name 'GetCIEMEntraNeeds' -ErrorAction Stop | Should -Not -BeNullOrEmpty
@@ -237,7 +237,7 @@ Describe 'Invoke-CIEMScan parallel execution' {
 
     It 'Entra and IAM need-key dispatch is delegated to dedicated module-scope helpers' {
         # GetCIEMEntraNeeds and GetCIEMIAMNeeds live in their own private files under
-        # Devolutions.CIEM.Checks/Private/, not nested inside Invoke-CIEMScan.
+        # Devolutions.CIEM.Checks/Private/, not nested inside InvokeCIEMScan.
         InModuleScope Devolutions.CIEM {
             Get-Command -Name 'GetCIEMEntraNeeds' -ErrorAction Stop | Should -Not -BeNullOrEmpty
             Get-Command -Name 'GetCIEMIAMNeeds' -ErrorAction Stop | Should -Not -BeNullOrEmpty

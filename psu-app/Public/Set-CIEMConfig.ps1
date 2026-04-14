@@ -34,6 +34,8 @@ function Set-CIEMConfig {
     )
 
     begin {
+        $ErrorActionPreference = 'Stop'
+
         # Helper function to set nested property values using dot notation
         # Works with PSCustomObject (from PSU cache) or hashtable
         function Resolve-NestedPropertyPath {
@@ -42,6 +44,8 @@ function Set-CIEMConfig {
                 [string]$Path,
                 $Value
             )
+
+            $ErrorActionPreference = 'Stop'
 
             $parts = $Path -split '\.'
             $current = $Object
@@ -59,28 +63,20 @@ function Set-CIEMConfig {
     }
 
     process {
+        $ErrorActionPreference = 'Stop'
+
         # Check if PSU cache cmdlets are available
         $psuCacheAvailable = Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue
-        $psuCacheConnected = $false
 
-        # Get current config (from cache or defaults)
+        # Get current config
         $config = $null
         if ($psuCacheAvailable) {
-            try {
-                $config = Get-PSUCache -Key $script:CIEMConfigCacheKey -Integrated -ErrorAction Stop
-                $psuCacheConnected = $true
-            }
-            catch {
-                Write-Verbose "PSU cache not accessible: $($_.Exception.Message)"
-            }
+            # PSU context — read from cache (throws on infrastructure failure)
+            $config = ReadPSUCache -Key $script:CIEMConfigCacheKey
         }
 
         if (-not $config) {
             $config = Get-CIEMDefaultConfig
-        }
-
-        if (-not $psuCacheConnected) {
-            Write-Warning "PSU cache not available. Configuration changes will only apply to in-memory config."
         }
 
         # Apply each setting from the provided hashtable
@@ -90,15 +86,10 @@ function Set-CIEMConfig {
         }
 
         if ($PSCmdlet.ShouldProcess($script:CIEMConfigCacheKey, 'Update configuration in PSU cache')) {
-            # Write to PSU cache if available and connected
-            if ($psuCacheConnected) {
-                try {
-                    Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
-                    Write-Verbose "Configuration saved to PSU cache"
-                }
-                catch {
-                    Write-Warning "Failed to save to PSU cache: $($_.Exception.Message)"
-                }
+            # Write to PSU cache if available (throws on failure)
+            if ($psuCacheAvailable) {
+                Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
+                Write-Verbose "Configuration saved to PSU cache"
             }
 
             # Update in-memory config

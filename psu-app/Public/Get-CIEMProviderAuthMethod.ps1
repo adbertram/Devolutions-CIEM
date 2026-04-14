@@ -18,6 +18,8 @@ function Get-CIEMProviderAuthMethod {
         [string]$Provider
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $query = "SELECT method, display_name, sort_order FROM provider_auth_methods WHERE provider = @provider COLLATE NOCASE ORDER BY sort_order"
     $rows = @(Invoke-CIEMQuery -Query $query -Parameters @{ provider = $Provider })
 

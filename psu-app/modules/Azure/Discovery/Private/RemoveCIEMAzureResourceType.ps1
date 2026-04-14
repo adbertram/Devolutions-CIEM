@@ -12,6 +12,7 @@ function RemoveCIEMAzureResourceType {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         switch ($PSCmdlet.ParameterSetName) {
             'InputObject' {
                 foreach ($item in $InputObject) {

@@ -20,6 +20,8 @@ function Get-CIEMRelationshipColor {
         [string]$Relationship
     )
 
+    $ErrorActionPreference = 'Stop'
+
     if ($script:RelationshipColors.ContainsKey($Relationship)) {
         $script:RelationshipColors[$Relationship]
     } else {

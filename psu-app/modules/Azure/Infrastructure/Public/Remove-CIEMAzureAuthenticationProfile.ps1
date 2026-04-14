@@ -7,6 +7,7 @@ function Remove-CIEMAzureAuthenticationProfile {
         [object[]]$InputObject
     )
     begin {
+        $ErrorActionPreference = 'Stop'
         $idsToRemove = [System.Collections.Generic.List[string]]::new()
     }
     process {
@@ -19,9 +20,7 @@ function Remove-CIEMAzureAuthenticationProfile {
         }
     }
     end {
-        if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) { return }
-
-        $profiles = Get-CIEMAzureAuthProfileCache
+        $profiles = GetCIEMAzureAuthProfileCache
         $originalCount = $profiles.Count
 
         if ($PSCmdlet.ParameterSetName -eq 'ByProvider') {
@@ -39,7 +38,7 @@ function Remove-CIEMAzureAuthenticationProfile {
         }
 
         if ($null -ne $filtered -and $filtered.Count -ne $originalCount) {
-            Set-CIEMAzureAuthProfileCache -Profiles $filtered
+            SetCIEMAzureAuthProfileCache -Profiles $filtered
         }
     }
 }

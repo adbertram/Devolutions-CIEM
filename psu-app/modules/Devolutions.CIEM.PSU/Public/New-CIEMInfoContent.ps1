@@ -1,8 +1,11 @@
 function New-CIEMInfoContent {
+    [CmdletBinding()]
     param(
         [string]$Text = 'Info',
         [string]$Details
     )
+
+    $ErrorActionPreference = 'Stop'
     New-UDCard -Style @{ backgroundColor = '#fff3e0'; marginTop = '12px'; marginBottom = '12px' } -Content {
         New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
             New-UDIcon -Icon 'InfoCircle' -Size 'lg' -Style @{ color = '#ff9800' }

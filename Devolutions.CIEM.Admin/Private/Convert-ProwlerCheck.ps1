@@ -53,6 +53,8 @@ function Convert-ProwlerCheck {
     function Get-ServiceDisplayName {
         param([string]$ServiceName)
 
+        $ErrorActionPreference = 'Stop'
+
         $serviceMap = @{
             'entra'      = 'Entra'
             'iam'        = 'IAM'
@@ -83,6 +85,8 @@ function Convert-ProwlerCheck {
             [string]$ServiceName,
             [string]$ProviderName
         )
+
+        $ErrorActionPreference = 'Stop'
 
         $perms = @{}
 
@@ -167,6 +171,8 @@ function Convert-ProwlerCheck {
             [string]$FunctionName
         )
 
+        $ErrorActionPreference = 'Stop'
+
         $scriptContent = @"
 function $FunctionName {
     <#
@@ -204,6 +210,8 @@ function $FunctionName {
             [string]$ServiceDisplayName,
             [hashtable]$Perms
         )
+
+        $ErrorActionPreference = 'Stop'
 
         [ordered]@{
             id           = $Metadata.CheckID

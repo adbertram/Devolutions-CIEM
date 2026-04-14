@@ -18,6 +18,7 @@ function New-DevolutionsCIEMApp {
     param()
 
     process {
+        $ErrorActionPreference = 'Stop'
         $Navigation = New-CIEMNavigation
 
         New-UDApp -Title 'Devolutions CIEM' -Pages @(

@@ -1,4 +1,4 @@
-function Invoke-CIEMScan {
+function InvokeCIEMScan {
     <#
     .SYNOPSIS
         Executes CIEM security checks against cloud resources (internal).
@@ -182,6 +182,56 @@ function Invoke-CIEMScan {
         $caches
     }
 
+    function GetCIEMAWSScanServiceCache {
+        param(
+            [Parameter(Mandatory)]
+            [string[]]$NeedKeys,
+            [Parameter(Mandatory)]
+            [object[]]$SelectedChecks
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        $servicesToInit = @(
+            @($SelectedChecks | ForEach-Object { $_.Service.ToString() }) +
+            @($SelectedChecks | Where-Object { $_.DependsOn } | ForEach-Object { $_.DependsOn }) |
+            Select-Object -Unique
+        )
+        $caches = @()
+        $sw = [Diagnostics.Stopwatch]::new()
+        foreach ($svcName in $servicesToInit) {
+            $sw.Restart()
+            $getFn = "Get-CIEMAWS${svcName}Data"
+            if (-not (Get-Command $getFn -ErrorAction SilentlyContinue)) {
+                continue
+            }
+            try {
+                $caches += [CIEMServiceCache]@{
+                    ServiceName = $svcName
+                    Success = $true
+                    Duration = $sw.Elapsed
+                    CacheData = (& $getFn)
+                    Errors = @()
+                    Warnings = @()
+                    Output = @()
+                }
+            }
+            catch {
+                $caches += [CIEMServiceCache]@{
+                    ServiceName = $svcName
+                    Success = $false
+                    Duration = $sw.Elapsed
+                    CacheData = @{}
+                    Errors = @($_.Exception.Message)
+                    Warnings = @()
+                    Output = @()
+                }
+            }
+        }
+
+        $caches
+    }
+
     function ConvertToCIEMScanResultObject {
         param(
             [Parameter(Mandatory)]
@@ -200,7 +250,7 @@ function Invoke-CIEMScan {
         )
     }
 
-    Write-CIEMLog -Message "Invoke-CIEMScan called: Provider=[$($Provider -join ',')], CheckId=[$($CheckId -join ',')], Service=[$($Service -join ',')]" -Severity INFO -Component 'Scan'
+    Write-CIEMLog -Message "InvokeCIEMScan called: Provider=[$($Provider -join ',')], CheckId=[$($CheckId -join ',')], Service=[$($Service -join ',')]" -Severity INFO -Component 'Scan'
 
     $providerCount = $Provider.Count
     $progressActivity = "CIEM Scan ($($Provider -join ', '))"
@@ -209,14 +259,10 @@ function Invoke-CIEMScan {
     foreach ($providerName in $Provider) {
         $providerIdx++
 
-        Sync-CIEMCheckCatalog -Provider $providerName
+        SyncCIEMCheckCatalog -Provider $providerName
 
-        $providerModuleRoot = switch ($providerName) {
-            'Azure' { Join-Path $script:ModuleRoot 'modules/Azure' }
-            'AWS' { Join-Path $script:ModuleRoot 'modules/AWS' }
-            default { $null }
-        }
-        $checkScriptsPath = if ($providerModuleRoot) { Join-Path $providerModuleRoot 'Checks' } else { $null }
+        $providerModuleRoot = Join-Path $script:ModuleRoot "modules/$providerName"
+        $checkScriptsPath = Join-Path $providerModuleRoot 'Checks'
         $checkScripts = @(Get-ChildItem -Path "$checkScriptsPath/*.ps1" -ErrorAction SilentlyContinue)
 
         if ($checkScripts.Count -eq 0) {
@@ -308,71 +354,41 @@ function Invoke-CIEMScan {
         Write-Progress -Activity $progressActivity -Status $statusText -PercentComplete ([math]::Floor((($providerIdx - 1) / $providerCount) * 80 + 5))
 
         $serviceCacheLookup = @{}
-        switch ($providerName) {
-            'Azure' {
-                $latestCompleted = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
-                $latestPartial = @(Get-CIEMAzureDiscoveryRun -Status 'Partial' -Last 1)
-                $hasDiscoveryData = ($latestCompleted.Count -gt 0) -or ($latestPartial.Count -gt 0)
+        $cacheLoaderFn = "GetCIEM${providerName}ScanServiceCache"
+        if (-not (Get-Command $cacheLoaderFn -ErrorAction SilentlyContinue)) {
+            throw "[$providerName] No scan service cache loader found (expected function '$cacheLoaderFn')."
+        }
 
-                $subscriptionIds = @(
-                    Invoke-CIEMQuery -Query "SELECT DISTINCT subscription_id FROM azure_arm_resources WHERE subscription_id IS NOT NULL AND subscription_id <> ''" |
-                        ForEach-Object { $_.subscription_id }
-                )
+        # Azure loader needs extra context; AWS loader needs selected checks
+        $cacheLoaderParams = @{ NeedKeys = $needKeys }
+        if ($providerName -eq 'Azure') {
+            $latestCompleted = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
+            $latestPartial = @(Get-CIEMAzureDiscoveryRun -Status 'Partial' -Last 1)
+            $hasDiscoveryData = ($latestCompleted.Count -gt 0) -or ($latestPartial.Count -gt 0)
 
-                $azureServiceData = @{}
-                $azureServiceErrors = @{}
-                $azureServiceStarted = @{}
+            $subscriptionIds = @(
+                Invoke-CIEMQuery -Query "SELECT DISTINCT subscription_id FROM azure_arm_resources WHERE subscription_id IS NOT NULL AND subscription_id <> ''" |
+                    ForEach-Object { $_.subscription_id }
+            )
 
-                $azureCaches = @(GetCIEMAzureScanServiceCache `
-                    -NeedKeys $needKeys `
-                    -SubscriptionIds $subscriptionIds `
-                    -HasDiscoveryData $hasDiscoveryData `
-                    -ServiceData $azureServiceData `
-                    -ServiceErrors $azureServiceErrors `
-                    -ServiceStarted $azureServiceStarted)
+            $azureServiceData = @{}
+            $azureServiceErrors = @{}
+            $azureServiceStarted = @{}
 
-                foreach ($cache in $azureCaches) {
-                    $serviceCacheLookup[$cache.ServiceName] = $cache
-                    Write-Verbose "[$providerName] Loaded $($cache.ServiceName) needs in $([math]::Round($cache.Duration.TotalSeconds, 2))s"
-                }
-            }
-            'AWS' {
-                $servicesToInit = @(
-                    @($selectedChecks | ForEach-Object { $_.Service.ToString() }) +
-                    @($selectedChecks | Where-Object { $_.DependsOn } | ForEach-Object { $_.DependsOn }) |
-                    Select-Object -Unique
-                )
-                $sw = [Diagnostics.Stopwatch]::new()
-                foreach ($svcName in $servicesToInit) {
-                    $sw.Restart()
-                    $getFn = "Get-CIEMAWS${svcName}Data"
-                    if (-not (Get-Command $getFn -ErrorAction SilentlyContinue)) {
-                        continue
-                    }
-                    try {
-                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                            ServiceName = $svcName
-                            Success = $true
-                            Duration = $sw.Elapsed
-                            CacheData = (& $getFn)
-                            Errors = @()
-                            Warnings = @()
-                            Output = @()
-                        }
-                    }
-                    catch {
-                        $serviceCacheLookup[$svcName] = [CIEMServiceCache]@{
-                            ServiceName = $svcName
-                            Success = $false
-                            Duration = $sw.Elapsed
-                            CacheData = @{}
-                            Errors = @($_.Exception.Message)
-                            Warnings = @()
-                            Output = @()
-                        }
-                    }
-                }
-            }
+            $cacheLoaderParams['SubscriptionIds'] = $subscriptionIds
+            $cacheLoaderParams['HasDiscoveryData'] = $hasDiscoveryData
+            $cacheLoaderParams['ServiceData'] = $azureServiceData
+            $cacheLoaderParams['ServiceErrors'] = $azureServiceErrors
+            $cacheLoaderParams['ServiceStarted'] = $azureServiceStarted
+        }
+        if ($providerName -eq 'AWS') {
+            $cacheLoaderParams['SelectedChecks'] = $selectedChecks
+        }
+
+        $providerCaches = @(& $cacheLoaderFn @cacheLoaderParams)
+        foreach ($cache in $providerCaches) {
+            $serviceCacheLookup[$cache.ServiceName] = $cache
+            Write-Verbose "[$providerName] Loaded $($cache.ServiceName) needs in $([math]::Round($cache.Duration.TotalSeconds, 2))s"
         }
 
         $workItems = foreach ($check in $selectedChecks) {
@@ -434,7 +450,7 @@ function Invoke-CIEMScan {
                 }
             )
 
-            Invoke-CIEMCheck -Check $check -ServiceCache $serviceCaches -FunctionName $workItem.FunctionName -ProviderName $workItem.ProviderName
+            InvokeCIEMCheck -Check $check -ServiceCache $serviceCaches -FunctionName $workItem.FunctionName -ProviderName $workItem.ProviderName
         })
 
         foreach ($parallelResult in $parallelResults) {

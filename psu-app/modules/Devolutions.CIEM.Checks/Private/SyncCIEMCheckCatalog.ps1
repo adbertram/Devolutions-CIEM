@@ -1,4 +1,4 @@
-function Sync-CIEMCheckCatalog {
+function SyncCIEMCheckCatalog {
     <#
     .SYNOPSIS
         Upserts provider check metadata from the checked-in catalog.
@@ -11,15 +11,12 @@ function Sync-CIEMCheckCatalog {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('Azure', 'AWS')]
         [string]$Provider
     )
 
-    $checksRoot = switch ($Provider) {
-        'Azure' { Join-Path $script:ModuleRoot 'modules/Azure/Checks' }
-        'AWS' { Join-Path $script:ModuleRoot 'modules/AWS/Checks' }
-        default { throw "Unsupported provider '$Provider'." }
-    }
+    $ErrorActionPreference = 'Stop'
+
+    $checksRoot = Join-Path $script:ModuleRoot "modules/$Provider/Checks"
 
     $catalogPath = Join-Path $checksRoot 'check_catalog.json'
     if (-not (Test-Path $catalogPath)) {

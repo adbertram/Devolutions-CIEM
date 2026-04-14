@@ -46,6 +46,7 @@ function Update-CIEMAzureDiscoveryRun {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
                 $parameters = @{

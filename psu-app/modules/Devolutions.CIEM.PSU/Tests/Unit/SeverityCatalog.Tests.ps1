@@ -71,8 +71,39 @@ Describe 'Get-SeverityColor (catalog-backed)' {
         Get-SeverityColor -Severity 'High' | Should -Be '#f44336'
     }
 
-    It 'Returns gray (#666) for unknown severity' {
-        Get-SeverityColor -Severity 'bogus' | Should -Be '#666'
+    It 'Throws for unknown severity' {
+        { Get-SeverityColor -Severity 'bogus' } | Should -Throw "*Unknown severity 'bogus'*"
+    }
+}
+
+Describe 'Get-StatusColor (catalog-backed)' {
+
+    It 'Returns red (#f44336) for FAIL' {
+        Get-StatusColor -Status 'FAIL' | Should -Be '#f44336'
+    }
+
+    It 'Returns green (#4caf50) for PASS' {
+        Get-StatusColor -Status 'PASS' | Should -Be '#4caf50'
+    }
+
+    It 'Returns orange (#ff9800) for MANUAL' {
+        Get-StatusColor -Status 'MANUAL' | Should -Be '#ff9800'
+    }
+
+    It 'Returns gray (#9e9e9e) for SKIPPED' {
+        Get-StatusColor -Status 'SKIPPED' | Should -Be '#9e9e9e'
+    }
+
+    It 'Returns red (#f44336) for ERROR' {
+        Get-StatusColor -Status 'ERROR' | Should -Be '#f44336'
+    }
+
+    It 'Is case-insensitive (lowercase fail returns FAIL color)' {
+        Get-StatusColor -Status 'fail' | Should -Be '#f44336'
+    }
+
+    It 'Throws for unknown status' {
+        { Get-StatusColor -Status 'bogus' } | Should -Throw "*Unknown status 'bogus'*"
     }
 }
 

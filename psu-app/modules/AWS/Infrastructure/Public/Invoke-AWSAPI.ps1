@@ -7,8 +7,7 @@ function Invoke-AWSAPI {
         Single point of entry for all AWS CLI calls. Reads auth context
         (profile/region) from $script:AWSAuthContext set by Connect-CIEMAWS.
 
-        By default, non-success responses result in warnings (silent failure).
-        Use -ErrorAction Stop to throw terminating errors.
+        Throws on any AWS CLI failure.
 
     .PARAMETER Service
         The AWS service name (e.g., 'iam', 's3', 'sts').
@@ -26,8 +25,7 @@ function Invoke-AWSAPI {
         Return the raw string output instead of parsing JSON.
 
     .OUTPUTS
-        [PSObject] The parsed JSON response. Returns nothing on error
-        (unless -ErrorAction Stop is specified).
+        [PSObject] The parsed JSON response. Throws on failure.
 
     .EXAMPLE
         Invoke-AWSAPI -Service iam -Command list-users -ResourceName 'IAM Users'
@@ -56,9 +54,6 @@ function Invoke-AWSAPI {
         [Parameter()]
         [switch]$RawOutput
     )
-
-    # Capture caller's ErrorAction before we override
-    $shouldThrow = $ErrorActionPreference -eq 'Stop'
 
     $ErrorActionPreference = 'Stop'
 
@@ -101,10 +96,7 @@ function Invoke-AWSAPI {
         }
 
         Write-CIEMLog -Message $msg -Severity WARNING -Component 'Invoke-AWSAPI'
-
-        if ($shouldThrow) { throw $msg }
-        Write-Warning $msg
-        return
+        throw $msg
     }
 
     # Parse the successful response (try/catch only around JSON parsing)
@@ -127,8 +119,6 @@ function Invoke-AWSAPI {
     catch {
         $msg = "Failed to parse $ResourceName response: $($_.Exception.Message)"
         Write-CIEMLog -Message $msg -Severity ERROR -Component 'Invoke-AWSAPI'
-
-        if ($shouldThrow) { throw $msg }
-        Write-Warning $msg
+        throw $msg
     }
 }

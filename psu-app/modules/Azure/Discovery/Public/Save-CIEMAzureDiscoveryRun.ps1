@@ -44,6 +44,7 @@ function Save-CIEMAzureDiscoveryRun {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
                 if ($obj.Id -gt 0) {

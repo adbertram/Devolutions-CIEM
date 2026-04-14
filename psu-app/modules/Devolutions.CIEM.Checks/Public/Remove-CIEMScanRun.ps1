@@ -9,6 +9,7 @@ function Remove-CIEMScanRun {
         [object[]]$InputObject
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 $itemId = if ($item.Id) { $item.Id } else { $item }

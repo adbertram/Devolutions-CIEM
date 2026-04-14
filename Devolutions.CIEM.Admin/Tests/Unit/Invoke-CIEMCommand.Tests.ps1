@@ -15,6 +15,63 @@ BeforeAll {
 }
 
 Describe 'Invoke-CIEMCommand' {
+    Context 'when no PSU connection exists' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM.Admin {
+                $script:PSUConnection.Url = $null
+                $script:PSUConnection.Token = $null
+                $script:PSUConnection.IsAzure = $false
+            }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { throw 'Connect-PSU should not be called by Invoke-CIEMCommand' }
+        }
+
+        It 'throws requiring an explicit Connect-PSU call' {
+            { Invoke-CIEMCommand -Command 'Get-Date' } |
+                Should -Throw -ExpectedMessage '*Run Connect-PSU first*'
+        }
+
+        It 'does not auto-connect to PSU' {
+            Should -Invoke -CommandName Connect-PSU -ModuleName Devolutions.CIEM.Admin -Times 0 -Exactly
+        }
+    }
+
+    Context 'when the remote job exceeds the timeout' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM.Admin {
+                $script:PSUConnection.Url = 'https://fake.ngrok-free.app'
+                $script:PSUConnection.Token = 'fake-token'
+                $script:PSUConnection.IsAzure = $false
+            }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod {
+                switch -Regex ($Uri) {
+                    '/api/v1/script$' {
+                        return @(
+                            [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
+                        )
+                    }
+                    '/api/v1/script/\d+\?' { return 42 }
+                    '/api/v1/job/42/output' { return @('late output') }
+                    '/api/v1/job/42/pipelineOutput' { return @() }
+                    '/api/v1/job/42' {
+                        return [PSCustomObject]@{
+                            id        = 42
+                            status    = 1
+                            startTime = (Get-Date)
+                            endTime   = $null
+                        }
+                    }
+                }
+            }
+        }
+
+        It 'throws instead of returning a running result' {
+            { Invoke-CIEMCommand -Command 'Start-Sleep 10' -TimeoutSeconds 0 } |
+                Should -Throw -ExpectedMessage '*timed out*'
+        }
+    }
+
     Context 'when the PSU executor script already exists' {
         BeforeAll {
             # Track every Invoke-RestMethod call so the test can assert

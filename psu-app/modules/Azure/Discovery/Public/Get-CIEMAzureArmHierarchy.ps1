@@ -26,6 +26,8 @@ function Get-CIEMAzureArmHierarchy {
         [string]$SubscriptionId
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $getParams = @{}
     if ($PSBoundParameters.ContainsKey('SubscriptionId')) {
         $getParams['SubscriptionId'] = $SubscriptionId

@@ -24,6 +24,7 @@ function Update-CIEMCheck {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         $items = if ($PSCmdlet.ParameterSetName -eq 'InputObject') { $InputObject } else { @([pscustomobject]@{ Id = $Id }) }
         foreach ($item in $items) {
             $checkId = $item.Id

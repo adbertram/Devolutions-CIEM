@@ -18,6 +18,8 @@ function Get-CIEMAzureArmResource {
         [string]$ResourceGroup
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $query = "SELECT id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at, last_seen_at FROM azure_arm_resources"
     $conditions = @()
     $parameters = @{}

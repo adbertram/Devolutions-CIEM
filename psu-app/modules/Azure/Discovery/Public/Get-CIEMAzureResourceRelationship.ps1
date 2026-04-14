@@ -21,6 +21,8 @@ function Get-CIEMAzureResourceRelationship {
         [string]$Relationship
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $query = "SELECT id, source_id, source_type, target_id, target_type, relationship, collected_at FROM azure_resource_relationships"
     $conditions = @()
     $parameters = @{}

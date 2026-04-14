@@ -9,6 +9,8 @@ function Get-CIEMAzureResourceType {
         [string]$ApiSource
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $conditions = @()
     $parameters = @{}
 

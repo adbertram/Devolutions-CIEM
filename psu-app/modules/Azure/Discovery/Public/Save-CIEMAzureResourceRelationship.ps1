@@ -21,7 +21,7 @@ function Save-CIEMAzureResourceRelationship {
         [string]$CollectedAt,
 
         [Parameter()]
-        $Connection,
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection,
 
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
         [PSObject[]]$InputObject

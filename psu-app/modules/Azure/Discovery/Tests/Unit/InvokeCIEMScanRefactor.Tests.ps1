@@ -2,15 +2,15 @@ BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
-    # Read the Invoke-CIEMScan source and its private helpers for structural assertions.
+    # Read the InvokeCIEMScan source and its private helpers for structural assertions.
     # Entra/ARM resource dispatch lives in GetCIEMEntraNeeds/GetCIEMIAMNeeds after the refactor.
     $checksPrivate = Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.Checks' 'Private'
-    $script:ScanSource = (Get-Content (Join-Path $checksPrivate 'Invoke-CIEMScan.ps1') -Raw) +
+    $script:ScanSource = (Get-Content (Join-Path $checksPrivate 'InvokeCIEMScan.ps1') -Raw) +
         "`n" + (Get-Content (Join-Path $checksPrivate 'GetCIEMEntraNeeds.ps1') -Raw) +
         "`n" + (Get-Content (Join-Path $checksPrivate 'GetCIEMIAMNeeds.ps1') -Raw)
 }
 
-Describe 'Invoke-CIEMScan Refactor' {
+Describe 'InvokeCIEMScan Refactor' {
 
     Context 'Old data function references removed from source' {
         It 'Does not reference Get-CIEMAzureEntraData' {

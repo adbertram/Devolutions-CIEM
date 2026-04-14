@@ -1,5 +1,6 @@
 BeforeAll {
     $script:Psm1Content = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psm1') -Raw
+    $script:Psm1Ast = [System.Management.Automation.Language.Parser]::ParseInput($script:Psm1Content, [ref]$null, [ref]$null)
 }
 
 Describe 'Devolutions.CIEM.psm1 Structure' {
@@ -71,6 +72,34 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
 
         It 'References New-CIEMAttackPathsPage' {
             $script:AppContent | Should -Match 'New-CIEMAttackPathsPage'
+        }
+    }
+
+    Context 'No empty catch blocks' {
+        It 'Does not contain catch {}' {
+            $script:Psm1Content | Should -Not -Match 'catch\s*\{\s*\}'
+        }
+
+        It 'throws after logging module initialization failures' {
+            $violations = @($script:Psm1Ast.FindAll(
+                { param($node) $node -is [System.Management.Automation.Language.CatchClauseAst] },
+                $true
+            ) | Where-Object {
+                $_.Body.Extent.Text -match 'FAILED to load|schema failed|Database initialization failed' -and
+                -not $_.Body.Find({ param($node) $node -is [System.Management.Automation.Language.ThrowStatementAst] }, $true)
+            })
+
+            $violations | Should -BeNullOrEmpty
+        }
+    }
+
+    Context 'Schema application fail-fast behavior' {
+        It 'Throws when an expected provider schema path is missing' {
+            $script:Psm1Content | Should -Match 'Schema file not found'
+        }
+
+        It 'Throws when the module database path is unavailable before schema application' {
+            $script:Psm1Content | Should -Match 'Database path not resolved'
         }
     }
 

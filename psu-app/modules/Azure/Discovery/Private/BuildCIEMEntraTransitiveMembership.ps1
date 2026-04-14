@@ -8,6 +8,8 @@ function BuildCIEMEntraTransitiveMembership {
         [string]$CollectedAt
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $directMemberships = @($Relationships | Where-Object {
         $_.Relationship -eq 'member_of' -and $_.TargetType -eq 'group'
     })

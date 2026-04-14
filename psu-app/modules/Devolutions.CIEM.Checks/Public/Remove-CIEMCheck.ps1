@@ -7,6 +7,7 @@ function Remove-CIEMCheck {
         [PSObject[]]$InputObject
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 if ($PSCmdlet.ShouldProcess($item.Id, 'Remove CIEM check')) {

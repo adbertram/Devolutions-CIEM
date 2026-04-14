@@ -5,7 +5,7 @@ function New-CIEMScanRun {
 
     .DESCRIPTION
         Single public entry point for running CIEM scans. Creates a ScanRun record,
-        delegates check execution to the internal Invoke-CIEMScan, and returns the
+        delegates check execution to the internal InvokeCIEMScan, and returns the
         completed [CIEMScanRun] object with all results attached.
 
         When -Provider is omitted, all enabled providers are scanned. If one
@@ -112,7 +112,7 @@ function New-CIEMScanRun {
         if ($Service)       { $invokeParams.Service = $Service }
         if ($IncludePassed) { $invokeParams.IncludePassed = $true }
 
-        $allFindings = @(Invoke-CIEMScan @invokeParams)
+        $allFindings = @(InvokeCIEMScan @invokeParams)
 
         $scanRun.ScanResults = $allFindings
         $scanRun.Complete()

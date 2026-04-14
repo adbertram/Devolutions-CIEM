@@ -12,6 +12,8 @@ function Get-CIEMAzureDiscoveryRun {
         [int]$Last
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $conditions = @()
     $parameters = @{}
 

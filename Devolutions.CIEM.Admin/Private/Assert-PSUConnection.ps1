@@ -11,6 +11,8 @@ function Assert-PSUConnection {
     [CmdletBinding()]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     if (-not $script:PSUConnection.Url -or -not $script:PSUConnection.Token) {
         throw "Not connected to PSU. Run Connect-PSU first."
     }

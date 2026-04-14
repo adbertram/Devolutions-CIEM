@@ -10,9 +10,9 @@ function Get-CIEMAzureAuthenticationProfile {
         [Parameter()][switch]$ResolveSecrets
     )
 
-    if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) { return @() }
+    $ErrorActionPreference = 'Stop'
 
-    $profiles = Get-CIEMAzureAuthProfileCache
+    $profiles = GetCIEMAzureAuthProfileCache
 
     # Filter in memory
     if ($PSBoundParameters.ContainsKey('Id'))         { $profiles = @($profiles | Where-Object { $_.Id -eq $Id }) }

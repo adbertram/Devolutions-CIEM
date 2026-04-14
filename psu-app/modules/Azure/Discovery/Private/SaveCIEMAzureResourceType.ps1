@@ -29,6 +29,7 @@ function SaveCIEMAzureResourceType {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
                 $discoveredAt = if ($obj.DiscoveredAt) { $obj.DiscoveredAt } else { (Get-Date).ToString('o') }

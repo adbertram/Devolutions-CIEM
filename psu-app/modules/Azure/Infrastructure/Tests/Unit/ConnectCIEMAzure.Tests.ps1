@@ -42,6 +42,29 @@ Describe 'Connect-CIEMAzure' {
         }
     }
 
+    Context 'Data-driven token acquisition' {
+        It 'Defines tokenScopes data array' {
+            $script:ConnectSource | Should -Match '\$tokenScopes\s*='
+        }
+
+        It 'Does not hardcode scope URLs in per-method switch branches' {
+            # Extract the switch block content (between 'switch ($profile.Method)' and the closing shared loop)
+            # Scope URLs should only appear in the $tokenScopes data array, not in the switch body
+            $switchMatch = [regex]::Match($script:ConnectSource, 'switch \(\$profile\.Method\) \{(.+?)\n    \}', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+            if ($switchMatch.Success) {
+                $switchBody = $switchMatch.Groups[1].Value
+                # No hardcoded .default scope URLs inside the switch block
+                $switchBody | Should -Not -Match 'management\.azure\.com/\.default'
+                $switchBody | Should -Not -Match 'graph\.microsoft\.com/\.default'
+                $switchBody | Should -Not -Match 'vault\.azure\.net/\.default'
+            }
+        }
+
+        It 'Uses shared token acquisition loop' {
+            $script:ConnectSource | Should -Match 'foreach \(\$scope in \$tokenScopes\)'
+        }
+    }
+
     Context 'Command structure' {
         It 'Connect-CIEMAzure is a public command' {
             Get-Command -Name Connect-CIEMAzure -Module Devolutions.CIEM -ErrorAction Stop |
@@ -50,6 +73,15 @@ Describe 'Connect-CIEMAzure' {
 
         It 'Has OutputType PSCustomObject' {
             $script:ConnectSource | Should -Match '\[OutputType\(\[PSCustomObject\]\)\]'
+        }
+
+        It 'does not expose the module-defined CIEMAzureAuthenticationProfile class in its public parameter type' {
+            $command = Get-Command -Name Connect-CIEMAzure -Module Devolutions.CIEM -ErrorAction Stop
+            $command.Parameters['AuthenticationProfile'].ParameterType.FullName | Should -Be 'System.Object'
+        }
+
+        It 'does not reference CIEMAzureAuthenticationProfile in the public parameter declaration' {
+            $script:ConnectSource | Should -Not -Match '\[CIEMAzureAuthenticationProfile\]\$AuthenticationProfile'
         }
     }
 }

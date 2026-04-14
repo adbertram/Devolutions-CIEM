@@ -11,6 +11,8 @@ function New-CIEMAboutPage {
         [object[]]$Navigation
     )
 
+    $ErrorActionPreference = 'Stop'
+
     New-UDPage -Name 'About' -Url '/ciem/about' -Content {
         New-UDTypography -Text 'About Devolutions CIEM' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
 

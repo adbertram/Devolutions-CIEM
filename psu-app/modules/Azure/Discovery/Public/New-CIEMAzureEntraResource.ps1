@@ -20,6 +20,7 @@ function New-CIEMAzureEntraResource {
         [PSObject[]]$InputObject
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 $parameters = @{

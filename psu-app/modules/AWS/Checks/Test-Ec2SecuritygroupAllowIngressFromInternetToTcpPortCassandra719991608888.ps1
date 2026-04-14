@@ -12,7 +12,7 @@ function Test-Ec2SecuritygroupAllowIngressFromInternetToTcpPortCassandra71999160
         CIEMCheck object containing check metadata.
     #>
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType('CIEMScanResult[]')]
     param(
         [Parameter(Mandatory)]
         $Check

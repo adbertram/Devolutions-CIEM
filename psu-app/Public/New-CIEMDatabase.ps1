@@ -28,6 +28,8 @@ function New-CIEMDatabase {
         [switch]$PassThru
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $config = Get-CIEMDefaultConfig
 
     # Resolve database path — uses $script:DataRoot (set in psm1) which is already
@@ -84,7 +86,13 @@ function New-CIEMDatabase {
     # Store path in module scope for other functions
     $script:DatabasePath = $Path
 
-    Sync-CIEMCheckCatalog -Provider Azure
+    $modulesDir = Join-Path $script:ModuleRoot 'modules'
+    foreach ($providerName in @('Azure', 'AWS')) {
+        $catalogFile = Join-Path $modulesDir "$providerName/Checks/check_catalog.json"
+        if (Test-Path $catalogFile) {
+            SyncCIEMCheckCatalog -Provider $providerName
+        }
+    }
 
     if ($PassThru) {
         $Path

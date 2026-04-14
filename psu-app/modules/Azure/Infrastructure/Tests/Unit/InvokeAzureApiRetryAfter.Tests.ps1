@@ -261,15 +261,11 @@ Describe 'Invoke-AzureApi retry handling' {
         $source | Should -Match '\bfunction\s+ConvertToSkipTokenBody\b'
     }
 
-    It 'Requires -Api when called with -Uri (no auto-detection)' {
-        Mock -ModuleName Devolutions.CIEM Invoke-RestMethod {
-            [pscustomobject]@{ value = @() }
-        }
-
-        # After the trim, -Api is mandatory on ByUri calls too. Omitting -Api
-        # must throw a parameter-binding error.
-        {
-            Invoke-AzureApi -Uri 'https://graph.microsoft.com/v1.0/users' -ResourceName 'Users' -ErrorAction Stop
-        } | Should -Throw
+    It 'Requires -Api as a mandatory parameter' {
+        # Verify via parameter metadata instead of invoking with missing param
+        # (invoking leaks a "Supply values" prompt to console even non-interactively)
+        $apiParam = (Get-Command Invoke-AzureApi).Parameters['Api']
+        $mandatoryAttr = $apiParam.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] -and $_.Mandatory }
+        $mandatoryAttr | Should -Not -BeNullOrEmpty -Because '-Api must be mandatory on all parameter sets'
     }
 }

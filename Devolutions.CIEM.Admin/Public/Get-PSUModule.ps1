@@ -24,6 +24,8 @@ function Get-PSUModule {
         [string]$Name
     )
 
+    $ErrorActionPreference = 'Stop'
+
     Assert-PSUConnection
 
     $headers = @{

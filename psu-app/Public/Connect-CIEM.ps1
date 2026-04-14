@@ -41,7 +41,7 @@ function Connect-CIEM {
         # Forces re-authentication even if already connected
 
     .NOTES
-        This function must be called before running Invoke-CIEMScan or any other
+        This function must be called before running InvokeCIEMScan or any other
         scan functions.
     #>
     [CmdletBinding()]
@@ -107,52 +107,37 @@ function Connect-CIEM {
             continue
         }
 
-        try {
-            # Discover provider-specific connector function dynamically
-            $connectorName = "Connect-CIEM$p"
-            $connectorCmd = Get-Command -Name $connectorName -ErrorAction SilentlyContinue
+        # Discover provider-specific connector function dynamically
+        $connectorName = "Connect-CIEM$p"
+        $connectorCmd = Get-Command -Name $connectorName -ErrorAction SilentlyContinue
 
-            if (-not $connectorCmd) {
-                throw "Provider connector function '$connectorName' not found. Ensure the Devolutions.CIEM.$p module is imported."
-            }
-
-            Write-CIEMLog -Message "Calling $connectorName..." -Severity INFO -Component 'Connect-CIEM'
-            $connectorParams = @{}
-            if ($AuthenticationProfile) { $connectorParams.AuthenticationProfile = $AuthenticationProfile }
-            $authContext = & $connectorCmd @connectorParams
-            $script:AuthContext[$providerKey] = $authContext
-
-            # Build result based on what the auth context provides
-            $resultObj = [PSCustomObject]@{
-                Provider = $p
-                Status   = 'Connected'
-                Account  = $authContext.AccountId
-                TenantId = if ($authContext.PSObject.Properties['TenantId']) { $authContext.TenantId } else { $null }
-                Message  = "Connected as $($authContext.AccountType)"
-            }
-
-            # Add provider-specific properties
-            if ($authContext.PSObject.Properties['SubscriptionIds']) {
-                $resultObj | Add-Member -NotePropertyName 'Subscriptions' -NotePropertyValue @($authContext.SubscriptionIds).Count
-                $resultObj | Add-Member -NotePropertyName 'SubscriptionIds' -NotePropertyValue @($authContext.SubscriptionIds)
-            }
-
-            Write-CIEMLog -Message "$p connection successful. AccountId: $($authContext.AccountId)" -Severity INFO -Component 'Connect-CIEM'
-            $results.Add($resultObj)
+        if (-not $connectorCmd) {
+            throw "Provider connector function '$connectorName' not found. Ensure the Devolutions.CIEM.$p module is imported."
         }
-        catch {
-            $script:AuthContext[$providerKey] = $null
-            Write-CIEMLog -Message "Failed to connect to $p : $($_.Exception.Message)" -Severity ERROR -Component 'Connect-CIEM'
-            Write-CIEMLog -Message "Stack trace: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'Connect-CIEM'
-            $results.Add([PSCustomObject]@{
-                Provider = $p
-                Status   = 'Failed'
-                Account  = $null
-                TenantId = $null
-                Message  = $_.Exception.Message
-            })
-            Write-Error "Failed to connect to $p : $_"
+
+        Write-CIEMLog -Message "Calling $connectorName..." -Severity INFO -Component 'Connect-CIEM'
+        $connectorParams = @{}
+        if ($AuthenticationProfile) { $connectorParams.AuthenticationProfile = $AuthenticationProfile }
+        $authContext = & $connectorCmd @connectorParams
+        $script:AuthContext[$providerKey] = $authContext
+
+        # Build result based on what the auth context provides
+        $resultObj = [PSCustomObject]@{
+            Provider = $p
+            Status   = 'Connected'
+            Account  = $authContext.AccountId
+            TenantId = if ($authContext.PSObject.Properties['TenantId']) { $authContext.TenantId } else { $null }
+            Message  = "Connected as $($authContext.AccountType)"
         }
+
+        # Add provider-specific properties
+        if ($authContext.PSObject.Properties['SubscriptionIds']) {
+            $resultObj | Add-Member -NotePropertyName 'Subscriptions' -NotePropertyValue @($authContext.SubscriptionIds).Count
+            $resultObj | Add-Member -NotePropertyName 'SubscriptionIds' -NotePropertyValue @($authContext.SubscriptionIds)
+        }
+
+        Write-CIEMLog -Message "$p connection successful. AccountId: $($authContext.AccountId)" -Severity INFO -Component 'Connect-CIEM'
+        $results.Add($resultObj)
     }
 
     # Display summary using Write-Information for proper pipeline behavior

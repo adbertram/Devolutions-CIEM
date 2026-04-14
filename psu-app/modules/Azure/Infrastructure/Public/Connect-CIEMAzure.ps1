@@ -25,7 +25,7 @@ function Connect-CIEMAzure {
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
-        [CIEMAzureAuthenticationProfile]$AuthenticationProfile = (
+        [object]$AuthenticationProfile = (
             @(Get-CIEMAzureAuthenticationProfile -IsActive $true -ResolveSecrets) | Select-Object -First 1
         )
     )
@@ -66,7 +66,19 @@ function Connect-CIEMAzure {
     $inPSUContext = $null -ne (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)
     Write-CIEMLog -Message "PSU context detected: $inPSUContext" -Severity INFO -Component 'Connect-CIEMAzure'
 
-    # 4. Acquire tokens based on method
+    # 4. Token scopes — data drives which tokens to acquire
+    # Adding a new API scope requires one row here + one property on CIEMAzureAuthContext
+    $tokenScopes = @(
+        @{ ApiName = 'ARM';      Resource = 'https://management.azure.com';  ContextProperty = 'ARMToken' }
+        @{ ApiName = 'Graph';    Resource = 'https://graph.microsoft.com';   ContextProperty = 'GraphToken' }
+        @{ ApiName = 'KeyVault'; Resource = 'https://vault.azure.net';       ContextProperty = 'KeyVaultToken' }
+    )
+
+    # 5. Acquire tokens based on method — each method builds a $getToken scriptblock,
+    #    then the shared loop acquires tokens for all scopes
+    $getToken = $null
+    $expiryMode = 'expires_in'  # SP methods use expires_in (seconds); MSI uses expires_on (unix timestamp)
+
     switch ($profile.Method) {
         'ServicePrincipalSecret' {
             Write-CIEMLog -Message "Processing ServicePrincipalSecret authentication via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
@@ -88,51 +100,16 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
 
             $tokenUrl = "https://login.microsoftonline.com/$($profile.TenantId)/oauth2/v2.0/token"
 
-            # Get ARM token via REST API
-            Write-CIEMLog -Message "Requesting ARM token via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $armBody = @{
-                client_id     = $profile.ClientId
-                scope         = 'https://management.azure.com/.default'
-                client_secret = $profile.ClientSecret
-                grant_type    = 'client_credentials'
+            $getToken = {
+                param([string]$Scope)
+                $body = @{
+                    client_id     = $profile.ClientId
+                    scope         = $Scope
+                    client_secret = $profile.ClientSecret
+                    grant_type    = 'client_credentials'
+                }
+                Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
             }
-            $armTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $armBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
-            Write-CIEMLog -Message "ARM token obtained (expires in $($armTokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Get Graph token via REST API
-            Write-CIEMLog -Message "Requesting Graph token via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $graphBody = @{
-                client_id     = $profile.ClientId
-                scope         = 'https://graph.microsoft.com/.default'
-                client_secret = $profile.ClientSecret
-                grant_type    = 'client_credentials'
-            }
-            $graphTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $graphBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
-            Write-CIEMLog -Message "Graph token obtained (expires in $($graphTokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Get KeyVault token via REST API
-            Write-CIEMLog -Message "Requesting KeyVault token via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $keyVaultBody = @{
-                client_id     = $profile.ClientId
-                scope         = 'https://vault.azure.net/.default'
-                client_secret = $profile.ClientSecret
-                grant_type    = 'client_credentials'
-            }
-            $keyVaultTokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $keyVaultBody -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
-            Write-CIEMLog -Message "KeyVault token obtained (expires in $($keyVaultTokenResponse.expires_in)s)" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Compute token expiry (earliest among the three)
-            $expiresInSeconds = @($armTokenResponse.expires_in, $graphTokenResponse.expires_in, $keyVaultTokenResponse.expires_in) |
-                Where-Object { $_ } | Sort-Object | Select-Object -First 1
-            if ($expiresInSeconds) {
-                $ctx.TokenExpiresAt = (Get-Date).AddSeconds([int]$expiresInSeconds)
-            }
-
-            # Store tokens directly on auth context
-            $ctx.ARMToken = $armTokenResponse.access_token
-            $ctx.GraphToken = $graphTokenResponse.access_token
-            $ctx.KeyVaultToken = $keyVaultTokenResponse.access_token
-            Write-CIEMLog -Message "Tokens stored on auth context" -Severity INFO -Component 'Connect-CIEMAzure'
 
             $ctx.AccountId = $profile.ClientId
             $ctx.AccountType = 'ServicePrincipal'
@@ -151,7 +128,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Configuration page."
             }
 
-            # Build client assertion JWT signed with certificate (replaces MSAL dependency)
+            # Build client assertion JWT signed with certificate
             Write-CIEMLog -Message "Building client assertion JWT with certificate (thumbprint: $($profile.Certificate.Thumbprint))..." -Severity INFO -Component 'Connect-CIEMAzure'
             $cert = $profile.Certificate
             $tokenUrl = "https://login.microsoftonline.com/$($profile.TenantId)/oauth2/v2.0/token"
@@ -178,14 +155,13 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $headerB64 = & $toBase64Url $jwtHeader
             $payloadB64 = & $toBase64Url $jwtPayload
 
-            # Sign with RSA-SHA256 (use extension method via static call — PowerShell can't call extension methods directly)
+            # Sign with RSA-SHA256
             $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
             $sigBytes = $rsa.SignData([Text.Encoding]::UTF8.GetBytes("$headerB64.$payloadB64"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
             $sigB64 = [Convert]::ToBase64String($sigBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
             $clientAssertion = "$headerB64.$payloadB64.$sigB64"
 
-            # Acquire tokens via REST using client_assertion
-            $getTokenWithCert = {
+            $getToken = {
                 param([string]$Scope)
                 $body = @{
                     client_id             = $profile.ClientId
@@ -196,27 +172,6 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 }
                 Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
             }
-
-            $armTokenResponse = & $getTokenWithCert -Scope 'https://management.azure.com/.default'
-            $ctx.ARMToken = $armTokenResponse.access_token
-            Write-CIEMLog -Message "ARM token acquired via certificate assertion" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            $graphTokenResponse = & $getTokenWithCert -Scope 'https://graph.microsoft.com/.default'
-            $ctx.GraphToken = $graphTokenResponse.access_token
-            Write-CIEMLog -Message "Graph token acquired via certificate assertion" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            $kvTokenResponse = & $getTokenWithCert -Scope 'https://vault.azure.net/.default'
-            $ctx.KeyVaultToken = $kvTokenResponse.access_token
-            Write-CIEMLog -Message "KeyVault token acquired via certificate assertion" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Compute token expiry (earliest among the three)
-            $expiresInSeconds = @($armTokenResponse.expires_in, $graphTokenResponse.expires_in, $kvTokenResponse.expires_in) |
-                Where-Object { $_ } | Sort-Object | Select-Object -First 1
-            if ($expiresInSeconds) {
-                $ctx.TokenExpiresAt = (Get-Date).AddSeconds([int]$expiresInSeconds)
-            }
-
-            Write-CIEMLog -Message "Certificate authentication completed successfully via REST" -Severity INFO -Component 'Connect-CIEMAzure'
 
             $ctx.AccountId = $profile.ClientId
             $ctx.AccountType = 'ServicePrincipal'
@@ -231,7 +186,6 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 Write-CIEMLog -Message "Using system-assigned managed identity" -Severity INFO -Component 'Connect-CIEMAzure'
             }
 
-            # Azure App Service provides MSI endpoint via environment variables
             $identityEndpoint = $env:IDENTITY_ENDPOINT
             $identityHeader = $env:IDENTITY_HEADER
 
@@ -242,58 +196,18 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
 
             Write-CIEMLog -Message "MSI endpoint detected: $identityEndpoint" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
-            # Helper to get token via MSI endpoint
-            $getMsiToken = {
-                param([string]$Resource)
-                $tokenUri = "$identityEndpoint`?api-version=2019-08-01&resource=$Resource"
+            $expiryMode = 'expires_on'
+
+            $getToken = {
+                param([string]$Scope)
+                # MSI uses resource URL (no .default suffix) — Scope parameter is the resource URL
+                $tokenUri = "$identityEndpoint`?api-version=2019-08-01&resource=$Scope"
                 if ($miClientId) {
                     $tokenUri += "&client_id=$miClientId"
                 }
                 $headers = @{ 'X-IDENTITY-HEADER' = $identityHeader }
                 Invoke-RestMethod -Uri $tokenUri -Headers $headers -Method Get -ErrorAction Stop
             }
-
-            # Get ARM token
-            Write-CIEMLog -Message "Requesting ARM token via MSI REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $armTokenResponse = & $getMsiToken -Resource 'https://management.azure.com/'
-            Write-CIEMLog -Message "ARM token obtained (expires: $($armTokenResponse.expires_on))" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Get Graph token
-            Write-CIEMLog -Message "Requesting Graph token via MSI REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $graphTokenResponse = & $getMsiToken -Resource 'https://graph.microsoft.com/'
-            Write-CIEMLog -Message "Graph token obtained (expires: $($graphTokenResponse.expires_on))" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Get KeyVault token
-            Write-CIEMLog -Message "Requesting KeyVault token via MSI REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $keyVaultTokenResponse = & $getMsiToken -Resource 'https://vault.azure.net/'
-            Write-CIEMLog -Message "KeyVault token obtained (expires: $($keyVaultTokenResponse.expires_on))" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Compute token expiry from expires_on (Unix timestamp)
-            $expiresOn = @($armTokenResponse.expires_on, $graphTokenResponse.expires_on, $keyVaultTokenResponse.expires_on) |
-                Where-Object { $_ } | Sort-Object | Select-Object -First 1
-            if ($expiresOn) {
-                $ctx.TokenExpiresAt = [DateTimeOffset]::FromUnixTimeSeconds([long]$expiresOn).LocalDateTime
-            }
-
-            # Store tokens directly on auth context
-            $ctx.ARMToken = $armTokenResponse.access_token
-            $ctx.GraphToken = $graphTokenResponse.access_token
-            $ctx.KeyVaultToken = $keyVaultTokenResponse.access_token
-            Write-CIEMLog -Message "Tokens stored on auth context" -Severity INFO -Component 'Connect-CIEMAzure'
-
-            # Extract tenant ID and account ID from ARM token JWT payload
-            $tokenParts = $armTokenResponse.access_token.Split('.')
-            $payload = $tokenParts[1]
-            $padLength = 4 - ($payload.Length % 4)
-            if ($padLength -lt 4) { $payload += ('=' * $padLength) }
-            $decodedPayload = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($payload))
-            $tokenClaims = $decodedPayload | ConvertFrom-Json
-            $ctx.TenantId = $tokenClaims.tid
-            $ctx.AccountId = $tokenClaims.oid
-            $ctx.AccountType = 'ManagedIdentity'
-            Write-CIEMLog -Message "Extracted from token - TenantId: $($ctx.TenantId), ObjectId: $($ctx.AccountId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
-
-            Write-CIEMLog -Message "Managed Identity authentication completed successfully" -Severity INFO -Component 'Connect-CIEMAzure'
         }
         default {
             $ctx.LastError = "Unknown authentication method: $($profile.Method)"
@@ -301,20 +215,60 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
         }
     }
 
+    # 6. Shared token acquisition loop — driven by $tokenScopes data
+    $tokenResponses = @{}
+    $isMsi = $profile.Method -eq 'ManagedIdentity'
+
+    foreach ($scope in $tokenScopes) {
+        # SP methods use '.default' suffix; MSI uses trailing '/'
+        $formattedScope = if ($isMsi) { "$($scope.Resource)/" } else { "$($scope.Resource)/.default" }
+
+        Write-CIEMLog -Message "Requesting $($scope.ApiName) token..." -Severity INFO -Component 'Connect-CIEMAzure'
+        $response = & $getToken -Scope $formattedScope
+        $tokenResponses[$scope.ApiName] = $response
+        $ctx.($scope.ContextProperty) = $response.access_token
+        Write-CIEMLog -Message "$($scope.ApiName) token acquired" -Severity INFO -Component 'Connect-CIEMAzure'
+    }
+
+    # 7. Shared expiry computation
+    if ($expiryMode -eq 'expires_in') {
+        $expiresInSeconds = @($tokenResponses.Values | ForEach-Object { $_.expires_in }) |
+            Where-Object { $_ } | Sort-Object | Select-Object -First 1
+        if ($expiresInSeconds) {
+            $ctx.TokenExpiresAt = (Get-Date).AddSeconds([int]$expiresInSeconds)
+        }
+    } else {
+        $expiresOn = @($tokenResponses.Values | ForEach-Object { $_.expires_on }) |
+            Where-Object { $_ } | Sort-Object | Select-Object -First 1
+        if ($expiresOn) {
+            $ctx.TokenExpiresAt = [DateTimeOffset]::FromUnixTimeSeconds([long]$expiresOn).LocalDateTime
+        }
+    }
+
+    Write-CIEMLog -Message "Tokens stored on auth context" -Severity INFO -Component 'Connect-CIEMAzure'
+
+    # 8. ManagedIdentity post-processing: extract tenant/account from ARM JWT
+    if ($isMsi) {
+        $tokenParts = $tokenResponses['ARM'].access_token.Split('.')
+        $payload = $tokenParts[1]
+        $padLength = 4 - ($payload.Length % 4)
+        if ($padLength -lt 4) { $payload += ('=' * $padLength) }
+        $decodedPayload = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($payload))
+        $tokenClaims = $decodedPayload | ConvertFrom-Json
+        $ctx.TenantId = $tokenClaims.tid
+        $ctx.AccountId = $tokenClaims.oid
+        $ctx.AccountType = 'ManagedIdentity'
+        Write-CIEMLog -Message "Extracted from token - TenantId: $($ctx.TenantId), ObjectId: $($ctx.AccountId)" -Severity DEBUG -Component 'Connect-CIEMAzure'
+    }
+
     # List accessible subscriptions via ARM REST API
     Write-CIEMLog -Message "Getting accessible subscriptions via ARM REST API..." -Severity DEBUG -Component 'Connect-CIEMAzure'
-    try {
-        $subHeaders = @{ Authorization = "Bearer $($ctx.ARMToken)" }
-        $subResponse = Invoke-RestMethod -Uri 'https://management.azure.com/subscriptions?api-version=2022-12-01' `
-            -Headers $subHeaders -Method Get -ErrorAction Stop
-        $subscriptions = @($subResponse.value | Where-Object { $_.state -eq 'Enabled' } | ForEach-Object {
-            [PSCustomObject]@{ Id = $_.subscriptionId }
-        })
-    }
-    catch {
-        Write-CIEMLog -Message "ARM subscription listing failed: $($_.Exception.Message). Continuing with empty subscription list." -Severity WARNING -Component 'Connect-CIEMAzure'
-        $subscriptions = @()
-    }
+    $subHeaders = @{ Authorization = "Bearer $($ctx.ARMToken)" }
+    $subResponse = Invoke-RestMethod -Uri 'https://management.azure.com/subscriptions?api-version=2022-12-01' `
+        -Headers $subHeaders -Method Get -ErrorAction Stop
+    $subscriptions = @($subResponse.value | Where-Object { $_.state -eq 'Enabled' } | ForEach-Object {
+        [PSCustomObject]@{ Id = $_.subscriptionId }
+    })
     Write-CIEMLog -Message "Found $($subscriptions.Count) enabled subscriptions" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
     # Filter to configured subscriptions if specified

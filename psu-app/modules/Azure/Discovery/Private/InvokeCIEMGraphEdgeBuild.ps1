@@ -49,6 +49,7 @@ function InvokeCIEMGraphEdgeBuild {
     # Helper: check if node exists in graph, with caching
     # Must use same $Connection to see uncommitted nodes within a transaction
     function NodeExists([string]$nodeId) {
+        $ErrorActionPreference = 'Stop'
         if (-not $nodeId) { return $false }
         if ($nodeExistsCache.ContainsKey($nodeId)) { return $nodeExistsCache[$nodeId] }
         $fkParams = @{ Query = "SELECT 1 FROM graph_nodes WHERE id = @id"; Parameters = @{ id = $nodeId } }

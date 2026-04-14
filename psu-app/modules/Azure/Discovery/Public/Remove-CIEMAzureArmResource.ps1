@@ -14,10 +14,11 @@ function Remove-CIEMAzureArmResource {
         [PSObject[]]$InputObject,
 
         [Parameter()]
-        [object]$Connection
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         switch ($PSCmdlet.ParameterSetName) {
             'ById' {
                 if ($PSCmdlet.ShouldProcess($Id, 'Remove ARM resource')) {

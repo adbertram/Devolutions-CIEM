@@ -21,6 +21,7 @@ function Save-CIEMCheck {
         [PSObject[]]$InputObject
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 if ($item.PSObject.Properties.Name -contains 'DataNeeds' -and $null -ne $item.DataNeeds -and @($item.DataNeeds).Count -eq 0) {

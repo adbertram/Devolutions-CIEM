@@ -1,4 +1,4 @@
-function Get-CIEMAzureProviderApi {
+function GetCIEMAzureProviderApi {
     [CmdletBinding()]
     [OutputType('CIEMAzureProviderApi[]')]
     param(

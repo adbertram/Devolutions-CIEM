@@ -1,4 +1,4 @@
-function ConvertTo-CIEMProvider {
+function ConvertToCIEMProvider {
     <#
     .SYNOPSIS
         Converts a PSCustomObject to a typed CIEMProvider instance.
@@ -22,6 +22,7 @@ function ConvertTo-CIEMProvider {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($InputObject -is [CIEMProvider]) {
             return $InputObject
         }

@@ -30,6 +30,7 @@ function Update-CIEMAzureResourceRelationship {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
                 $setClauses = @(); $params = @{ id = $obj.Id }

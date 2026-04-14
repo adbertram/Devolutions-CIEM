@@ -85,32 +85,58 @@ class CIEMScanRun {
         return "{0:N0}s" -f $span.TotalSeconds
     }
 
-    # Calculate counts from ScanResults (provider-agnostic — counts all statuses uniformly)
+    # Calculate counts from ScanResults and per-provider summaries in a single pass
     [void] UpdateCounts() {
-        if ($this.ScanResults) {
-            $this.FailedResults  = @($this.ScanResults | Where-Object { $_.Status -eq 'FAIL'    }).Count
-            $this.PassedResults  = @($this.ScanResults | Where-Object { $_.Status -eq 'PASS'    }).Count
-            $this.SkippedResults = @($this.ScanResults | Where-Object { $_.Status -eq 'SKIPPED' }).Count
-            $this.ManualResults  = @($this.ScanResults | Where-Object { $_.Status -eq 'MANUAL'  }).Count
-            $this.TotalResults   = $this.FailedResults + $this.PassedResults + $this.SkippedResults + $this.ManualResults
-        }
-    }
+        $this.FailedResults  = 0
+        $this.PassedResults  = 0
+        $this.SkippedResults = 0
+        $this.ManualResults  = 0
 
-    # Calculate per-provider sub-summaries (called after UpdateCounts)
-    [void] UpdateProviderSummaries() {
+        # Per-provider counters keyed by provider name
+        $providerCounters = @{}
+        foreach ($p in $this.Providers) {
+            $providerCounters[$p] = @{ Total = 0; FAIL = 0; PASS = 0; SKIPPED = 0; MANUAL = 0 }
+        }
+
+        if ($this.ScanResults) {
+            foreach ($r in $this.ScanResults) {
+                $s = [string]$r.Status
+                switch ($s) {
+                    'FAIL'    { $this.FailedResults++ }
+                    'PASS'    { $this.PassedResults++ }
+                    'SKIPPED' { $this.SkippedResults++ }
+                    'MANUAL'  { $this.ManualResults++ }
+                }
+
+                $prov = $r.Check.Provider
+                if ($prov -and $providerCounters.ContainsKey($prov)) {
+                    $pc = $providerCounters[$prov]
+                    $pc.Total++
+                    $pc[$s]++
+                }
+            }
+        }
+
+        $this.TotalResults = $this.FailedResults + $this.PassedResults + $this.SkippedResults + $this.ManualResults
+
         $this.ProviderSummaries = @(
             foreach ($providerName in $this.Providers) {
-                $pr = @($this.ScanResults | Where-Object { $_.Check.Provider -eq $providerName })
+                $pc = $providerCounters[$providerName]
                 [PSCustomObject]@{
                     Provider       = $providerName
-                    TotalResults   = $pr.Count
-                    FailedResults  = @($pr | Where-Object { $_.Status -eq 'FAIL'    }).Count
-                    PassedResults  = @($pr | Where-Object { $_.Status -eq 'PASS'    }).Count
-                    SkippedResults = @($pr | Where-Object { $_.Status -eq 'SKIPPED' }).Count
-                    ManualResults  = @($pr | Where-Object { $_.Status -eq 'MANUAL'  }).Count
+                    TotalResults   = $pc.Total
+                    FailedResults  = $pc['FAIL']
+                    PassedResults  = $pc['PASS']
+                    SkippedResults = $pc['SKIPPED']
+                    ManualResults  = $pc['MANUAL']
                 }
             }
         )
+    }
+
+    # UpdateProviderSummaries is now integrated into UpdateCounts (single-pass)
+    [void] UpdateProviderSummaries() {
+        # No-op — kept for backwards compat; UpdateCounts builds summaries in one pass
     }
 
     # Mark scan as completed

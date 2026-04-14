@@ -59,6 +59,8 @@ function Connect-PSU {
         [switch]$Local
     )
 
+    $ErrorActionPreference = 'Stop'
+
     # Find .env file if not specified
     if (-not $EnvFilePath) {
         $searchPaths = @(

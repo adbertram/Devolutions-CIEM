@@ -1,7 +1,10 @@
 function InvokeCIEMEntraEntityCollection {
+    $ErrorActionPreference = 'Stop'
+
     $now = (Get-Date).ToString('o')
 
     function MapEntraResource($type, $item) {
+        $ErrorActionPreference = 'Stop'
         $r = [CIEMAzureEntraResource]::new()
         $r.Id          = $item.id
         $r.Type        = $type

@@ -27,6 +27,8 @@ function Start-PSUApp {
         [switch]$PassThru
     )
 
+    $ErrorActionPreference = 'Stop'
+
     Assert-PSUConnection
 
     if ($PSCmdlet.ParameterSetName -eq 'ByName') {

@@ -14,7 +14,7 @@ function Remove-CIEMAzureEffectiveRoleAssignment {
         [PSObject[]]$InputObject,
 
         [Parameter()]
-        [object]$Connection
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
 
     process {

@@ -47,6 +47,8 @@ function Install-PSUModule {
         [switch]$NoSync
     )
 
+    $ErrorActionPreference = 'Stop'
+
     Assert-PSUConnection
 
     $headers = @{

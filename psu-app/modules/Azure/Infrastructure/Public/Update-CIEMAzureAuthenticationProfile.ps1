@@ -16,6 +16,7 @@ function Update-CIEMAzureAuthenticationProfile {
         [switch]$PassThru
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) {
             throw "Not running in PSU context. Cannot access PSU Cache."
         }
@@ -25,7 +26,7 @@ function Update-CIEMAzureAuthenticationProfile {
                 $now = (Get-Date).ToString('o')
                 $cId = $item.Id
 
-                $profiles = Get-CIEMAzureAuthProfileCache
+                $profiles = GetCIEMAzureAuthProfileCache
 
                 $found = $false
                 for ($i = 0; $i -lt $profiles.Count; $i++) {
@@ -41,7 +42,7 @@ function Update-CIEMAzureAuthenticationProfile {
                 }
                 if (-not $found) { throw "Azure authentication profile '$cId' not found." }
 
-                Set-CIEMAzureAuthProfileCache -Profiles $profiles
+                SetCIEMAzureAuthProfileCache -Profiles $profiles
 
                 if ($PassThru) { Get-CIEMAzureAuthenticationProfile -Id $cId }
             }
@@ -49,7 +50,7 @@ function Update-CIEMAzureAuthenticationProfile {
             $now = (Get-Date).ToString('o')
             $cId = $Id
 
-            $profiles = Get-CIEMAzureAuthProfileCache
+            $profiles = GetCIEMAzureAuthProfileCache
 
             $found = $false
             for ($i = 0; $i -lt $profiles.Count; $i++) {
@@ -66,7 +67,7 @@ function Update-CIEMAzureAuthenticationProfile {
             }
             if (-not $found) { throw "Azure authentication profile '$cId' not found." }
 
-            Set-CIEMAzureAuthProfileCache -Profiles $profiles
+            SetCIEMAzureAuthProfileCache -Profiles $profiles
 
             if ($PassThru) { Get-CIEMAzureAuthenticationProfile -Id $cId }
         }

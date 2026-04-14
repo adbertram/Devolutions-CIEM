@@ -68,11 +68,9 @@ function Save-GitHubRepoFile {
         [string]$Destination
     )
 
-    # Capture caller's ErrorAction before we override
-    $shouldThrow = $ErrorActionPreference -eq 'Stop'
-
     $ErrorActionPreference = 'Stop'
     $ProgressPreference = 'SilentlyContinue'
+    $shouldThrow = $true
 
     $uri = "https://raw.githubusercontent.com/$Owner/$Repo/$Ref/$Path"
     $headers = @{

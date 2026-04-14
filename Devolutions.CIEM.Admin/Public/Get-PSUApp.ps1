@@ -27,6 +27,8 @@ function Get-PSUApp {
         [int]$Id
     )
 
+    $ErrorActionPreference = 'Stop'
+
     Assert-PSUConnection
 
     $headers = @{

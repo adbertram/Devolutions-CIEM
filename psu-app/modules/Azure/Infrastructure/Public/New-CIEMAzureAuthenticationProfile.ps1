@@ -17,6 +17,7 @@ function New-CIEMAzureAuthenticationProfile {
         [object[]]$InputObject
     )
     process {
+        $ErrorActionPreference = 'Stop'
         if ($null -eq (Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue)) {
             throw "Not running in PSU context. Cannot access PSU Cache."
         }
@@ -36,7 +37,7 @@ function New-CIEMAzureAuthenticationProfile {
         foreach ($entry in $entries) {
             $cId = $entry.Id
 
-            $profiles = Get-CIEMAzureAuthProfileCache
+            $profiles = GetCIEMAzureAuthProfileCache
 
             # Check for duplicate
             $existing = $profiles | Where-Object { $_.Id -eq $cId }
@@ -44,7 +45,7 @@ function New-CIEMAzureAuthenticationProfile {
 
             # Append and write back
             $profiles.Add($entry)
-            Set-CIEMAzureAuthProfileCache -Profiles $profiles
+            SetCIEMAzureAuthProfileCache -Profiles $profiles
 
             # Return created object
             Get-CIEMAzureAuthenticationProfile -Id $cId

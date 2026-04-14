@@ -22,11 +22,13 @@ function Get-CIEMDefaultConfig {
     [OutputType([PSCustomObject])]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     [PSCustomObject]@{
         scan = [PSCustomObject]@{
             throttleLimit = 10
             timeoutSeconds = 300
-            continueOnError = $true
+            continueOnError = $false
         }
         output = [PSCustomObject]@{
             verboseLogging = $false

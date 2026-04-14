@@ -24,7 +24,7 @@ function Connect-CIEMAWS {
     }
 
     # Read auth config from PSU Cache (mirrors Azure auth profile pattern)
-    $authConfig = try { Get-PSUCache -Key $script:AWSAuthProfileCacheKey -ErrorAction SilentlyContinue } catch { $null }
+    $authConfig = Get-PSUCache -Key $script:AWSAuthProfileCacheKey -ErrorAction SilentlyContinue
 
     # Default to CurrentProfile if no auth config exists
     $authMethod = if ($authConfig -and $authConfig.Method) { $authConfig.Method } else { 'CurrentProfile' }

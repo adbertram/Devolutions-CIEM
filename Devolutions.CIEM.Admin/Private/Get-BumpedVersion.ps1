@@ -1,5 +1,8 @@
 function Get-BumpedVersion {
     param([version]$Base, [string]$Component)
+
+    $ErrorActionPreference = 'Stop'
+
     switch ($Component) {
         'Major' { [version]::new($Base.Major + 1, 0, 0) }
         'Minor' { [version]::new($Base.Major, $Base.Minor + 1, 0) }

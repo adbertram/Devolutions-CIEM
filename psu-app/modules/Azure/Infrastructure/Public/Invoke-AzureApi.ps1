@@ -403,7 +403,7 @@ function Invoke-AzureApi {
             throw "Invoke-AzureApi batch mode supports Graph APIs only. Received '$BatchApi'."
         }
 
-        $batchEndpoint = (Get-CIEMAzureProviderApi -Name $BatchApi).BaseUrl.TrimEnd('/')
+        $batchEndpoint = (GetCIEMAzureProviderApi -Name $BatchApi).BaseUrl.TrimEnd('/')
         $batchUri = "$batchEndpoint/`$batch"
         $results = @{}
 
@@ -556,7 +556,7 @@ function Invoke-AzureApi {
     }
 
     if ($PSCmdlet.ParameterSetName -eq 'ByPath') {
-        $apiRecord = Get-CIEMAzureProviderApi -Name $Api
+        $apiRecord = GetCIEMAzureProviderApi -Name $Api
         if (-not $apiRecord) {
             throw "No API endpoint record found for '$Api' in azure_provider_apis table."
         }
@@ -574,12 +574,13 @@ function Invoke-AzureApi {
         $jsonBody = $Body | ConvertTo-Json -Depth 20 -Compress
     }
 
-    $token = switch ($Api) {
-        'Graph' { $script:AzureAuthContext.GraphToken }
-        'GraphBeta' { $script:AzureAuthContext.GraphToken }
-        'ARM' { $script:AzureAuthContext.ARMToken }
-        'KeyVault' { $script:AzureAuthContext.KeyVaultToken }
+    $tokenPropertyMap = @{
+        'Graph'     = 'GraphToken'
+        'GraphBeta' = 'GraphToken'
+        'ARM'       = 'ARMToken'
+        'KeyVault'  = 'KeyVaultToken'
     }
+    $token = $script:AzureAuthContext.($tokenPropertyMap[$Api])
 
     if (-not $token) {
         throw "$Api API call requested but no $Api token available. Run Connect-CIEM first."

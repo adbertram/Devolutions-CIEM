@@ -23,26 +23,16 @@ function Reset-CIEMConfig {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'SupportsShouldProcess is declared')]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     if ($PSCmdlet.ShouldProcess($script:CIEMConfigCacheKey, 'Reset configuration to defaults')) {
         $defaults = Get-CIEMDefaultConfig
 
         # Check if PSU cache cmdlets are available
         $psuCacheAvailable = Get-Command -Name 'Set-PSUCache' -ErrorAction SilentlyContinue
-        $psuCacheConnected = $false
-
         if ($psuCacheAvailable) {
-            try {
-                Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $defaults -Persist -Integrated -ErrorAction Stop
-                $psuCacheConnected = $true
-                Write-Verbose "Configuration reset to defaults in PSU cache"
-            }
-            catch {
-                Write-Verbose "PSU cache not accessible: $($_.Exception.Message)"
-            }
-        }
-
-        if (-not $psuCacheConnected) {
-            Write-Warning "PSU cache not available. Configuration reset only applies to in-memory config."
+            Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $defaults -Persist -Integrated -ErrorAction Stop
+            Write-Verbose "Configuration reset to defaults in PSU cache"
         }
 
         # Update in-memory config

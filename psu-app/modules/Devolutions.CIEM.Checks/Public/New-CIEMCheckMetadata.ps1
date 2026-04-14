@@ -49,6 +49,8 @@ function New-CIEMCheckMetadata {
         [Parameter()][string[]]$DataNeeds
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $Id }
     if ($existing) {
         Write-Verbose "Check metadata '$Id' already exists, skipping."

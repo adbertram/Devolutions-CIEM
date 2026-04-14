@@ -28,7 +28,7 @@ function Start-CIEMAzureDiscovery {
             [AllowEmptyCollection()]
             [object[]]$Resources,
             [Parameter(Mandatory)]
-            [object]$Connection,
+            [Microsoft.Data.Sqlite.SqliteConnection]$Connection,
             [Parameter(Mandatory)]
             [string]$DiscoveredAt
         )

@@ -52,7 +52,7 @@ Describe 'Check data_needs' {
     It 'Preserves user disabled state when the catalog syncs' {
         Disable-CIEMCheck -CheckId 'entra_security_defaults_enabled'
         InModuleScope Devolutions.CIEM {
-            Sync-CIEMCheckCatalog -Provider Azure
+            SyncCIEMCheckCatalog -Provider Azure
         }
         (Get-CIEMCheck -CheckId 'entra_security_defaults_enabled').Disabled | Should -BeTrue
     }
@@ -111,7 +111,7 @@ Describe 'Check data_needs' {
     }
 
     It 'Missing data_needs throws at scan planning' {
-        Mock -ModuleName Devolutions.CIEM Sync-CIEMCheckCatalog {}
+        Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
 
         Save-CIEMCheck -Id 'scan_missing_data_needs' `
             -Provider 'Azure' `
@@ -121,7 +121,7 @@ Describe 'Check data_needs' {
             -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1'
 
         InModuleScope Devolutions.CIEM {
-            { Invoke-CIEMScan -Provider Azure -CheckId 'scan_missing_data_needs' } | Should -Throw '*missing data_needs*'
+            { InvokeCIEMScan -Provider Azure -CheckId 'scan_missing_data_needs' } | Should -Throw '*missing data_needs*'
         }
     }
 
@@ -135,12 +135,12 @@ Describe 'Check data_needs' {
         Mock -ModuleName Devolutions.CIEM InvokeCIEMParallelForEach { @() }
 
         InModuleScope Devolutions.CIEM {
-            { Invoke-CIEMScan -Provider Azure | Out-Null } | Should -Not -Throw
+            { InvokeCIEMScan -Provider Azure | Out-Null } | Should -Not -Throw
         }
     }
 
     It 'Planner unions data needs and fetches each slice once' {
-        Mock -ModuleName Devolutions.CIEM Sync-CIEMCheckCatalog {}
+        Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureDiscoveryRun {
             [pscustomobject]@{ Id = 1; Status = 'Completed' }
         }
@@ -173,7 +173,7 @@ Describe 'Check data_needs' {
             -DataNeeds @('iam:roleassignments')
 
         InModuleScope Devolutions.CIEM {
-            Invoke-CIEMScan -Provider Azure -CheckId @(
+            InvokeCIEMScan -Provider Azure -CheckId @(
                 'union_a',
                 'union_b',
                 'union_c'
@@ -186,7 +186,7 @@ Describe 'Check data_needs' {
     }
 
     It 'Unknown data need throws at planning' {
-        Mock -ModuleName Devolutions.CIEM Sync-CIEMCheckCatalog {}
+        Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureDiscoveryRun {
             [pscustomobject]@{ Id = 1; Status = 'Completed' }
         }
@@ -200,12 +200,12 @@ Describe 'Check data_needs' {
             -DataNeeds @('entra:bogus')
 
         InModuleScope Devolutions.CIEM {
-            { Invoke-CIEMScan -Provider Azure -CheckId 'unknown_need' } | Should -Throw "*Unknown data need 'entra:bogus'*"
+            { InvokeCIEMScan -Provider Azure -CheckId 'unknown_need' } | Should -Throw "*Unknown data need 'entra:bogus'*"
         }
     }
 
     It 'Data needs must use lowercase canonical form' {
-        Mock -ModuleName Devolutions.CIEM Sync-CIEMCheckCatalog {}
+        Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
 
         Save-CIEMCheck -Id 'noncanonical_need' `
             -Provider 'Azure' `
@@ -216,12 +216,12 @@ Describe 'Check data_needs' {
             -DataNeeds @('Entra:Users')
 
         InModuleScope Devolutions.CIEM {
-            { Invoke-CIEMScan -Provider Azure -CheckId 'noncanonical_need' } | Should -Throw "*declares non-canonical data need 'Entra:Users'*"
+            { InvokeCIEMScan -Provider Azure -CheckId 'noncanonical_need' } | Should -Throw "*declares non-canonical data need 'Entra:Users'*"
         }
     }
 
     It 'Targeted accessor uses the declared resource type filter' {
-        Mock -ModuleName Devolutions.CIEM Sync-CIEMCheckCatalog {}
+        Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureDiscoveryRun {
             [pscustomobject]@{ Id = 1; Status = 'Completed' }
         }
@@ -237,7 +237,7 @@ Describe 'Check data_needs' {
             -DataNeeds @('entra:users')
 
         InModuleScope Devolutions.CIEM {
-            Invoke-CIEMScan -Provider Azure -CheckId 'targeted_accessor' | Out-Null
+            InvokeCIEMScan -Provider Azure -CheckId 'targeted_accessor' | Out-Null
         }
 
         Assert-MockCalled Get-CIEMAzureEntraResource -ModuleName Devolutions.CIEM -Times 1 -Exactly -ParameterFilter { $Type -eq 'user' }

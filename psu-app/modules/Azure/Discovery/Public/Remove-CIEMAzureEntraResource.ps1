@@ -11,9 +11,10 @@ function Remove-CIEMAzureEntraResource {
         [PSObject[]]$InputObject,
 
         [Parameter()]
-        [object]$Connection
+        [Microsoft.Data.Sqlite.SqliteConnection]$Connection
     )
     process {
+        $ErrorActionPreference = 'Stop'
         switch ($PSCmdlet.ParameterSetName) {
             'InputObject' {
                 foreach ($item in $InputObject) {

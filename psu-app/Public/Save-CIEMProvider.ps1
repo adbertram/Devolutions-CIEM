@@ -30,6 +30,7 @@ function Save-CIEMProvider {
     )
 
     process {
+        $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
                 $now = (Get-Date).ToString('o')

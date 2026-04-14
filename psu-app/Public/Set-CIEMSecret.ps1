@@ -25,14 +25,18 @@ function Set-CIEMSecret {
         [string]$Value
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $inPSUContext = $null -ne (Get-PSDrive -Name 'Secret' -ErrorAction SilentlyContinue)
-    if ($inPSUContext) {
-        # PSU Secret: drive doesn't support Set-Item - use PSU cmdlets instead
-        $existingVar = Get-PSUVariable -Name $Name -ErrorAction SilentlyContinue
-        if ($existingVar) {
-            Set-PSUVariable -Variable $existingVar -Value $Value -ErrorAction SilentlyContinue | Out-Null
-        } else {
-            New-PSUVariable -Name $Name -Value $Value -Vault 'Database' -ErrorAction SilentlyContinue | Out-Null
-        }
+    if (-not $inPSUContext) {
+        throw "Not running in PSU context - Secret: drive not available. Cannot store secret '$Name'."
+    }
+
+    # PSU Secret: drive doesn't support Set-Item - use PSU cmdlets instead
+    $existingVar = Get-PSUVariable -Name $Name -ErrorAction SilentlyContinue
+    if ($existingVar) {
+        Set-PSUVariable -Variable $existingVar -Value $Value | Out-Null
+    } else {
+        New-PSUVariable -Name $Name -Value $Value -Vault 'Database' | Out-Null
     }
 }

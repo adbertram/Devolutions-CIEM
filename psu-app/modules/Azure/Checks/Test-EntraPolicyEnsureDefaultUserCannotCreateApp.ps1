@@ -31,5 +31,5 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
         FailMessage   = 'Users can register applications. This setting should be disabled to require administrator approval for application registration.'
         ServiceCache  = $ServiceCache
     }
-    Test-EntraAuthorizationPolicyBooleanSetting @params
+    TestEntraAuthorizationPolicyBooleanSetting @params
 }

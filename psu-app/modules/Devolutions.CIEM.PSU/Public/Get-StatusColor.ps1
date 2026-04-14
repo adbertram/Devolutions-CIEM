@@ -1,4 +1,20 @@
 function Get-StatusColor {
-    param([string]$Status)
-    if ($Status -eq 'FAIL') { '#f44336' } else { '#4caf50' }
+    <#
+    .SYNOPSIS
+        Returns the display color hex code for a scan result status.
+    .DESCRIPTION
+        Looks up the status in the module-scope status catalog loaded from
+        modules/Devolutions.CIEM.PSU/Data/status_catalog.json.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][string]$Status)
+
+    $ErrorActionPreference = 'Stop'
+
+    $entry = $script:StatusByName[$Status.ToLower()]
+    if (-not $entry) {
+        throw "Unknown status '$Status'. Valid values: $($script:StatusByName.Keys -join ', ')"
+    }
+    $entry.color
 }

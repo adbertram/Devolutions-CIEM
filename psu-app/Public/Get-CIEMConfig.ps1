@@ -28,49 +28,41 @@ function Get-CIEMConfig {
     [OutputType([PSCustomObject])]
     param()
 
-    $config = $null
+    $ErrorActionPreference = 'Stop'
 
-    # Check if PSU cache cmdlets are available and connected
+    # Check if PSU cache cmdlets are available
     $psuCacheAvailable = Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue
 
-    if ($psuCacheAvailable) {
-        try {
-            $config = Get-PSUCache -Key $script:CIEMConfigCacheKey -Integrated -ErrorAction Stop
-
-            if (-not $config) {
-                # First run - initialize with defaults
-                $config = Get-CIEMDefaultConfig
-                Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
-                Write-Verbose "Initialized CIEM:Config in PSU cache with defaults"
-            }
-            else {
-                # Backfill any missing top-level keys from defaults (handles config schema upgrades)
-                $defaults = Get-CIEMDefaultConfig
-                $needsUpdate = $false
-                foreach ($prop in $defaults.PSObject.Properties) {
-                    if (-not $config.PSObject.Properties[$prop.Name]) {
-                        $config | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
-                        $needsUpdate = $true
-                        Write-Verbose "Backfilled missing config key: $($prop.Name)"
-                    }
-                }
-                if ($needsUpdate) {
-                    Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
-                    Write-Verbose "Updated CIEM:Config in PSU cache with backfilled keys"
-                }
-            }
-        }
-        catch {
-            # PSU cache command exists but we're not connected (e.g., local dev)
-            Write-Verbose "PSU cache not accessible: $($_.Exception.Message)"
-            $config = $null
-        }
+    if (-not $psuCacheAvailable) {
+        # Not in PSU context — return in-memory defaults (legitimate)
+        Write-Verbose "PSU cache not available. Using in-memory defaults."
+        return [PSCustomObject](Get-CIEMDefaultConfig)
     }
 
-    # Fallback to in-memory defaults if PSU cache not available or failed
+    # PSU context — read from cache (throws on infrastructure failure)
+    $config = ReadPSUCache -Key $script:CIEMConfigCacheKey
+
     if (-not $config) {
-        Write-Verbose "Using in-memory defaults"
+        # First run — initialize cache with defaults
         $config = Get-CIEMDefaultConfig
+        Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
+        Write-Verbose "Initialized CIEM:Config in PSU cache with defaults"
+    }
+    else {
+        # Backfill any missing top-level keys from defaults (handles config schema upgrades)
+        $defaults = Get-CIEMDefaultConfig
+        $needsUpdate = $false
+        foreach ($prop in $defaults.PSObject.Properties) {
+            if (-not $config.PSObject.Properties[$prop.Name]) {
+                $config | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+                $needsUpdate = $true
+                Write-Verbose "Backfilled missing config key: $($prop.Name)"
+            }
+        }
+        if ($needsUpdate) {
+            Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
+            Write-Verbose "Updated CIEM:Config in PSU cache with backfilled keys"
+        }
     }
 
     [PSCustomObject]$config

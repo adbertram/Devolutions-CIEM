@@ -15,6 +15,8 @@ function Get-CIEMDatabasePath {
     [OutputType([string])]
     param()
 
+    $ErrorActionPreference = 'Stop'
+
     if (-not $script:DatabasePath) {
         $script:DatabasePath = New-CIEMDatabase -PassThru
     }
