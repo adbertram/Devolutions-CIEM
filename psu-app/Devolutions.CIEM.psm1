@@ -25,6 +25,7 @@ $script:AzureRoot           = Join-Path $PSScriptRoot 'modules/Azure/Infrastruct
 $script:AzureDiscoveryRoot  = Join-Path $PSScriptRoot 'modules/Azure/Discovery'
 $script:AWSRoot             = Join-Path $PSScriptRoot 'modules/AWS/Infrastructure'
 $script:ChecksRoot          = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Checks'
+$script:EffectivePermissionsRoot = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.EffectivePermissions'
 $script:PSURoot             = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.PSU'
 
 # All sub-module roots in load order
@@ -34,6 +35,7 @@ $subModuleRoots = @(
     $script:AzureDiscoveryRoot
     $script:AWSRoot
     $script:ChecksRoot
+    $script:EffectivePermissionsRoot
     $script:PSURoot
 )
 
@@ -81,7 +83,7 @@ foreach ($className in @('CIEMServiceCache', 'CIEMProviderService', 'CIEMCheck',
 
 # Unordered classes (Graph, Azure, Azure Discovery, AWS - no interdependencies)
 _BootLog "Loading provider classes..."
-foreach ($root in @($script:GraphRoot, $script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot)) {
+foreach ($root in @($script:GraphRoot, $script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot, $script:EffectivePermissionsRoot)) {
     foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction SilentlyContinue)) {
         try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR'; throw }
     }

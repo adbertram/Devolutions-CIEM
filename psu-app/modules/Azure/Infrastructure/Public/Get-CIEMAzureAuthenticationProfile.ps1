@@ -51,7 +51,7 @@ function Get-CIEMAzureAuthenticationProfile {
                     $pfxName = if ($obj.SecretName) { $obj.SecretName } else { "CIEM_Azure_$($obj.Id)_CertPfx" }
                     $pwdName = if ($obj.SecretName) { ($obj.SecretName -replace '_CertPfx$', '_CertPassword') } else { "CIEM_Azure_$($obj.Id)_CertPassword" }
                     $obj.CertificatePfxBase64 = Get-CIEMSecret $pfxName
-                    $obj.CertificatePassword = Get-CIEMSecret $pwdName
+                    $obj.CertificatePassword = if (Test-Path "Secret:$pwdName") { Get-CIEMSecret $pwdName } else { $null }
 
                     if ($obj.CertificatePfxBase64) {
                         try {

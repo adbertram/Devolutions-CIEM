@@ -66,4 +66,5 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
+- CIEM feature ideas: `docs/ciem-discovery-feature-ideas.md` - consult this when looking for new CIEM feature ideas. Discovery ideas are read-only by default; write/action ideas require explicit re-scoping before implementation.
 - PSU Azure hosting docs: `docs/psu-docs/config/hosting/azure.md`

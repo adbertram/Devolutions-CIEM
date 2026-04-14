@@ -18,7 +18,7 @@ BeforeAll {
     }
 }
 
-Describe 'Resource Query Commands E2E' -Skip {
+Describe 'Resource Query Commands E2E' {
 
     Context 'Get-CIEMAzureArmResource' {
         BeforeAll {

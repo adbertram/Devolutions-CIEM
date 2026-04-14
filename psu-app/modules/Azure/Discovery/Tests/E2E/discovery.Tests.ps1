@@ -31,12 +31,12 @@ AfterAll {
     }
 }
 
-Describe 'Azure Discovery E2E' -Skip {
+Describe 'Azure Discovery E2E' {
 
     Context 'Full discovery run (Scope=All)' {
         BeforeAll {
             # Run full discovery — connect + discover in the same runspace (each Run-OnPSU is isolated)
-            # Uses Run-OnPSU-LongRunning: starts job via REST, waits via Wait-PSUJob (gRPC)
+            # Uses Run-OnPSU-LongRunning so the discovery job gets a full E2E timeout.
             $script:discoveryRun = Run-OnPSU-LongRunning @'
                 Connect-CIEMAzure | Out-Null
                 $run = Start-CIEMAzureDiscovery -Scope All

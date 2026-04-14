@@ -339,6 +339,8 @@ The architecture planning document is at `docs/devolutions-ciem-app-architecture
 - **PSU Integration**: PSU App with scan configuration and results viewer pages
 - **Data Model**: Finding objects stored as job output (no custom tables)
 
+For new CIEM feature ideas, consult `docs/ciem-discovery-feature-ideas.md`. Discovery ideas are read-only by default. Write/action ideas in that backlog must not be implemented as cloud, IdP, PAM, ticketing, or infrastructure write operations unless the user explicitly re-scopes the work.
+
 ### Key Decisions
 
 | Aspect | Decision |

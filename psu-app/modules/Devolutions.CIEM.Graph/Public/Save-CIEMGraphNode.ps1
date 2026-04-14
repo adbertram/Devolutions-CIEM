@@ -22,7 +22,8 @@ function Save-CIEMGraphNode {
         [string]$ResourceGroup,
 
         [Parameter(ParameterSetName = 'ByProperties')]
-        [string]$Properties,
+        [AllowNull()]
+        [string]$Properties = $null,
 
         [Parameter(ParameterSetName = 'ByProperties')]
         [string]$CollectedAt,

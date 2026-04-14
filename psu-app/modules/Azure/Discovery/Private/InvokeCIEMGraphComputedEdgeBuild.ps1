@@ -5,8 +5,10 @@ function InvokeCIEMGraphComputedEdgeBuild {
     .DESCRIPTION
         Analyzes ARM resources, Entra resources, and collected relationships to derive computed
         edges that represent inferred relationships not directly collected from APIs:
-          - HasRole: identity -> scope (from role assignments)
-          - InheritedRole: group member -> scope (expanded from group role assignments)
+        - HasRole: identity -> scope (from role assignments)
+        - InheritedRole: group member -> scope (expanded from group role assignments)
+          - HasAppRoleAssignment: service principal -> resource service principal
+          - HasOAuthGrant: service principal -> resource service principal
           - HasManagedIdentity: ARM resource -> managed identity service principal
           - AttachedTo: NIC -> VM
           - HasPublicIP: NIC -> Public IP
@@ -197,6 +199,62 @@ function InvokeCIEMGraphComputedEdgeBuild {
     }
 
     # ===== 3. HasManagedIdentity edges =====
+    # ===== 3. App role and OAuth grant edges =====
+    foreach ($e in $EntraResources) {
+        if (-not $e.Properties) { continue }
+
+        if ($e.Type -eq 'appRoleAssignment') {
+            try { $assignmentProps = $e.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+
+            $sourceId = $assignmentProps.principalId
+            if (-not $sourceId) { $sourceId = $e.ParentId }
+            $targetId = $assignmentProps.resourceId
+            if (-not $sourceId -or -not $targetId) { continue }
+            if ((NodeExists $sourceId) -and (NodeExists $targetId)) {
+                $edgePropsJson = @{
+                    assignment_id = $assignmentProps.id
+                    app_role_id = $assignmentProps.appRoleId
+                    principal_type = $assignmentProps.principalType
+                    resource_display_name = $assignmentProps.resourceDisplayName
+                    discovered_resource_id = $e.Id
+                } | ConvertTo-Json -Depth 5 -Compress
+
+                $splat = $baseSplat.Clone()
+                $splat.SourceId = $sourceId
+                $splat.TargetId = $targetId
+                $splat.Kind = 'HasAppRoleAssignment'
+                $splat.Properties = $edgePropsJson
+                if (SaveEdgeSafe $splat) { $edgeCount++ }
+            }
+        }
+
+        if ($e.Type -eq 'oauth2PermissionGrant') {
+            try { $grantProps = $e.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+
+            $sourceId = $grantProps.clientId
+            if (-not $sourceId) { $sourceId = $e.ParentId }
+            $targetId = $grantProps.resourceId
+            if (-not $sourceId -or -not $targetId) { continue }
+            if ((NodeExists $sourceId) -and (NodeExists $targetId)) {
+                $edgePropsJson = @{
+                    grant_id = $grantProps.id
+                    scope = $grantProps.scope
+                    consent_type = $grantProps.consentType
+                    principal_id = $grantProps.principalId
+                    discovered_resource_id = $e.Id
+                } | ConvertTo-Json -Depth 5 -Compress
+
+                $splat = $baseSplat.Clone()
+                $splat.SourceId = $sourceId
+                $splat.TargetId = $targetId
+                $splat.Kind = 'HasOAuthGrant'
+                $splat.Properties = $edgePropsJson
+                if (SaveEdgeSafe $splat) { $edgeCount++ }
+            }
+        }
+    }
+
+    # ===== 4. HasManagedIdentity edges =====
     foreach ($r in $ArmResources) {
         if (-not $r.Identity) { continue }
         try {
@@ -212,7 +270,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
         } catch { Write-CIEMLog -Message "HasManagedIdentity edge build failed for resource $($r.Id): $_" -Severity WARNING -Component 'GraphBuilder' }
     }
 
-    # ===== 4. Network topology edges (NIC -> VM, NIC -> PIP, NIC -> Subnet) =====
+    # ===== 5. Network topology edges (NIC -> VM, NIC -> PIP, NIC -> Subnet) =====
     $nics = @($ArmResources | Where-Object { $_.Type -eq 'microsoft.network/networkinterfaces' -and $_.Properties })
     foreach ($nic in $nics) {
         try { $nicProps = $nic.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
@@ -277,7 +335,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
         }
     }
 
-    # ===== 5. AllowsInbound edges: Internet -> NSG (aggregated per NSG) =====
+    # ===== 6. AllowsInbound edges: Internet -> NSG (aggregated per NSG) =====
     $nsgs = @($ArmResources | Where-Object { $_.Type -eq 'microsoft.network/networksecuritygroups' -and $_.Properties })
     foreach ($nsg in $nsgs) {
         try { $nsgProps = $nsg.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
@@ -320,7 +378,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
         }
     }
 
-    # ===== 6. ContainedIn: resource -> subscription =====
+    # ===== 7. ContainedIn: resource -> subscription =====
     # Build subscription node ID lookup: subscription_id -> node id
     $subNodeIds = @{}
     foreach ($r in $ArmResources) {

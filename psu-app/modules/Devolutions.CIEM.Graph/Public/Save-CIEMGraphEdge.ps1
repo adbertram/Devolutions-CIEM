@@ -13,7 +13,8 @@ function Save-CIEMGraphEdge {
         [string]$Kind,
 
         [Parameter(ParameterSetName = 'ByProperties')]
-        [string]$Properties,
+        [AllowNull()]
+        [string]$Properties = $null,
 
         [Parameter(ParameterSetName = 'ByProperties')]
         [int]$Computed = 0,

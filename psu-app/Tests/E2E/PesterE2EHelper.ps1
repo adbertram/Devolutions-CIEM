@@ -109,45 +109,5 @@ function script:Run-OnPSU-LongRunning {
         [int]$TimeoutSeconds = 600
     )
 
-    $wrappedCommand = @"
-`$ErrorActionPreference = 'Continue'
-`$__result = & { $Command }
-if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
-"@
-    # Start the job with a short timeout — we just need the job ID
-    $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -TimeoutSeconds 5)
-    $jobResult = $allOutput | Where-Object { $_.PSObject.Properties.Name -contains 'JobId' } | Select-Object -Last 1
-
-    if (-not $jobResult -or -not $jobResult.JobId) { throw "PSU command returned no job result." }
-
-    $jobId = $jobResult.JobId
-    Write-Host "Started PSU job $jobId, waiting up to ${TimeoutSeconds}s..."
-
-    # Wait for completion using PSU's gRPC-based Wait-PSUJob
-    Wait-PSUJob -JobId $jobId -Timeout $TimeoutSeconds | Out-Null
-
-    # Get final status (Status is PowerShellUniversal.JobStatus enum — string comparison works)
-    $finalJob = Get-PSUJob -Id $jobId
-    $statusName = "$($finalJob.Status)"
-
-    if ($statusName -eq 'Failed') {
-        $errOutput = Get-PSUJobOutput -JobId $jobId
-        $errMsgs = @($errOutput) | Where-Object { $_.Type -eq 4 } | ForEach-Object { $_.Message }
-        throw "PSU job $jobId failed: $($errMsgs -join '; ')"
-    }
-    if ($statusName -notin @('Completed', 'Warning')) {
-        throw "PSU job $jobId did not complete within ${TimeoutSeconds}s. Status: $statusName"
-    }
-
-    Write-Host "PSU job $jobId completed with status: $statusName"
-
-    # Get-PSUJobPipelineOutput returns raw strings (the JSON our wrapper emitted)
-    $pipelineOutput = Get-PSUJobPipelineOutput -JobId $jobId
-    if (-not $pipelineOutput) { return $null }
-
-    $rawValue = @($pipelineOutput)[-1]
-    if ($rawValue -eq '___NULL___') { return $null }
-
-    try { $rawValue | ConvertFrom-Json }
-    catch { $rawValue }
+    Run-OnPSU -Command $Command -TimeoutSeconds $TimeoutSeconds
 }
