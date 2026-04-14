@@ -1,0 +1,13 @@
+{
+  "id": "guest-in-privileged-group",
+  "name": "Guest user is a member of a group that holds a privileged role",
+  "severity": "high",
+  "category": "identity-privilege",
+  "description": "A guest account has indirect access to a privileged role via group membership. Group-based privilege is harder to audit than direct assignment, and guest membership in a privileged group is a common oversight when group owners add external collaborators without realizing the downstream role inheritance. Review group membership and ensure privileged groups exclude guests.",
+  "steps": [
+    { "kind": "EntraUser", "node_filter": { "property": "userType", "op": "eq", "value": "Guest" } },
+    { "edge": "MemberOf", "direction": "outbound" },
+    { "kind": "EntraGroup" },
+    { "edge": "HasRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } }
+  ]
+}

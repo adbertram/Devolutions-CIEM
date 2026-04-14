@@ -1,0 +1,11 @@
+{
+  "id": "guest-user-with-privileged-role",
+  "name": "Guest user holding a privileged role",
+  "severity": "critical",
+  "category": "identity-privilege",
+  "description": "An external guest account (B2B collaborator from another tenant) holds a privileged Azure role. Guests originate outside your identity boundary and cannot be governed by your internal onboarding or offboarding processes. Privileged access granted to guests should be rare, scoped, and time-limited via Entitlement Management or PIM.",
+  "steps": [
+    { "kind": "EntraUser", "node_filter": { "property": "userType", "op": "eq", "value": "Guest" } },
+    { "edge": "HasRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } }
+  ]
+}

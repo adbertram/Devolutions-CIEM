@@ -19,7 +19,7 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
 
     Context 'Happy path — shipped catalog' {
 
-        It 'returns all 6 known pattern IDs' {
+        It 'returns all 10 known pattern IDs' {
             $results = @(Get-CIEMAttackPathPattern)
             $ids = @($results | ForEach-Object { $_.Id })
             $ids | Should -Contain 'disabled-account-with-roles'
@@ -28,19 +28,27 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
             $ids | Should -Contain 'internet-exposed-privileged-mi'
             $ids | Should -Contain 'open-management-port'
             $ids | Should -Contain 'public-vm-to-keyvault'
+            $ids | Should -Contain 'guest-user-with-privileged-role'
+            $ids | Should -Contain 'privileged-managed-identity-broad-scope'
+            $ids | Should -Contain 'service-principal-owner-on-subscription'
+            $ids | Should -Contain 'guest-in-privileged-group'
         }
 
-        It 'returns at least 6 patterns (resilient to future additions)' {
-            @(Get-CIEMAttackPathPattern).Count | Should -BeGreaterOrEqual 6
+        It 'returns at least 10 patterns (resilient to future additions)' {
+            @(Get-CIEMAttackPathPattern).Count | Should -BeGreaterOrEqual 10
         }
 
         $knownPatterns = @(
-            @{ Id = 'disabled-account-with-roles';               StepCount = 2; Severity = 'high';     Category = 'identity-hygiene' }
-            @{ Id = 'dormant-privileged-subscription-access';    StepCount = 3; Severity = 'critical'; Category = 'identity-hygiene' }
-            @{ Id = 'group-inherited-privilege-escalation';      StepCount = 2; Severity = 'high';     Category = 'identity-privilege' }
-            @{ Id = 'internet-exposed-privileged-mi';            StepCount = 8; Severity = 'critical'; Category = 'identity-network-compound' }
-            @{ Id = 'open-management-port';                      StepCount = 3; Severity = 'high';     Category = 'network-exposure' }
-            @{ Id = 'public-vm-to-keyvault';                     StepCount = 9; Severity = 'critical'; Category = 'identity-network-compound' }
+            @{ Id = 'disabled-account-with-roles';                   StepCount = 2; Severity = 'high';     Category = 'identity-hygiene' }
+            @{ Id = 'dormant-privileged-subscription-access';        StepCount = 3; Severity = 'critical'; Category = 'identity-hygiene' }
+            @{ Id = 'group-inherited-privilege-escalation';          StepCount = 2; Severity = 'high';     Category = 'identity-privilege' }
+            @{ Id = 'internet-exposed-privileged-mi';                StepCount = 8; Severity = 'critical'; Category = 'identity-network-compound' }
+            @{ Id = 'open-management-port';                          StepCount = 3; Severity = 'high';     Category = 'network-exposure' }
+            @{ Id = 'public-vm-to-keyvault';                         StepCount = 9; Severity = 'critical'; Category = 'identity-network-compound' }
+            @{ Id = 'guest-user-with-privileged-role';               StepCount = 2; Severity = 'critical'; Category = 'identity-privilege' }
+            @{ Id = 'privileged-managed-identity-broad-scope';       StepCount = 5; Severity = 'critical'; Category = 'identity-privilege' }
+            @{ Id = 'service-principal-owner-on-subscription';       StepCount = 3; Severity = 'high';     Category = 'identity-privilege' }
+            @{ Id = 'guest-in-privileged-group';                     StepCount = 4; Severity = 'high';     Category = 'identity-privilege' }
         )
 
         It 'projects <Id> with StepCount=<StepCount>, Severity=<Severity>, Category=<Category>' -TestCases $knownPatterns {
@@ -81,16 +89,88 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
 
     Context 'Caller-side filtering via Where-Object' {
 
-        It 'filtering by Severity critical returns exactly 3 patterns' {
+        It 'filtering by Severity critical returns exactly 5 patterns' {
             $critical = @(Get-CIEMAttackPathPattern | Where-Object Severity -eq 'critical')
-            $critical.Count | Should -Be 3
+            $critical.Count | Should -Be 5
             $critical | ForEach-Object { $_.Severity | Should -Be 'critical' }
         }
 
-        It 'filtering by Severity high returns exactly 3 patterns' {
+        It 'filtering by Severity high returns exactly 5 patterns' {
             $high = @(Get-CIEMAttackPathPattern | Where-Object Severity -eq 'high')
-            $high.Count | Should -Be 3
+            $high.Count | Should -Be 5
             $high | ForEach-Object { $_.Severity | Should -Be 'high' }
+        }
+    }
+
+    Context 'Schema guardrails — shipped patterns only use known primitives' {
+
+        BeforeAll {
+            $script:ValidNodeKinds = @(
+                'EntraUser', 'EntraServicePrincipal', 'EntraGroup', 'EntraManagedIdentity', 'EntraDirectoryRole',
+                'AzureTenant', 'AzureSubscription', 'AzureResourceGroup', 'AzureVM', 'AzureNIC', 'AzureNSG',
+                'AzureVNet', 'AzurePublicIP', 'AzureKeyVault', 'AzureRoleAssignment',
+                'Internet'
+            )
+            $script:ValidEdgeKinds = @(
+                'HasRole', 'InheritedRole', 'MemberOf', 'TransitiveMemberOf', 'OwnerOf',
+                'HasRoleMember', 'HasManagedIdentity', 'AttachedTo', 'HasPublicIP',
+                'InSubnet', 'AllowsInbound', 'ContainedIn'
+            )
+            $script:ValidFilterOps = @('eq', 'neq', 'gt', 'lt', 'gt_or_null', 'in', 'contains_port')
+
+            $script:PatternDir = InModuleScope Devolutions.CIEM { Join-Path $script:GraphRoot 'Data' 'attack_paths' }
+            $script:PatternFiles = @(Get-ChildItem -Path $script:PatternDir -Filter '*.json' -File)
+        }
+
+        It 'every step with a kind uses a known node kind' {
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                foreach ($step in $raw.steps) {
+                    if ($step.kind) {
+                        $kinds = @($step.kind)
+                        foreach ($k in $kinds) {
+                            $k | Should -BeIn $script:ValidNodeKinds -Because "pattern '$($raw.id)' in $($file.Name) uses unknown kind '$k'"
+                        }
+                    }
+                }
+            }
+        }
+
+        It 'every step with an edge uses a known edge kind' {
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                foreach ($step in $raw.steps) {
+                    if ($step.edge) {
+                        $step.edge | Should -BeIn $script:ValidEdgeKinds -Because "pattern '$($raw.id)' in $($file.Name) uses unknown edge '$($step.edge)'"
+                    }
+                }
+            }
+        }
+
+        It 'every filter op is a known operator' {
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                foreach ($step in $raw.steps) {
+                    if ($step.node_filter) {
+                        $step.node_filter.op | Should -BeIn $script:ValidFilterOps -Because "pattern '$($raw.id)' node_filter op '$($step.node_filter.op)' is unknown"
+                    }
+                    if ($step.filter) {
+                        $step.filter.op | Should -BeIn $script:ValidFilterOps -Because "pattern '$($raw.id)' edge filter op '$($step.filter.op)' is unknown"
+                    }
+                }
+            }
+        }
+
+        It 'every pattern has required top-level fields' {
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                $raw.id          | Should -Not -BeNullOrEmpty -Because "pattern in $($file.Name) missing id"
+                $raw.name        | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing name"
+                $raw.severity    | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing severity"
+                $raw.category    | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing category"
+                $raw.description | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing description"
+                @($raw.steps).Count | Should -BeGreaterThan 0 -Because "pattern '$($raw.id)' has no steps"
+            }
         }
     }
 

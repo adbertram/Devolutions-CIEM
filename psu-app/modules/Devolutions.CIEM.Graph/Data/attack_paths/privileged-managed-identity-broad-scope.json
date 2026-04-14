@@ -1,0 +1,14 @@
+{
+  "id": "privileged-managed-identity-broad-scope",
+  "name": "VM with managed identity holding a privileged subscription role",
+  "severity": "critical",
+  "category": "identity-privilege",
+  "description": "A VM's managed identity holds a privileged role at subscription scope. Any compromise of the VM - via an application vulnerability, RDP credential theft, or insider access - hands the attacker a token that can act across the entire subscription. Managed identities attached to workloads should be granted least-privilege roles scoped to only the resources the workload actually needs.",
+  "steps": [
+    { "kind": "AzureVM" },
+    { "edge": "HasManagedIdentity", "direction": "outbound" },
+    { "kind": "EntraManagedIdentity" },
+    { "edge": "HasRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } },
+    { "kind": "AzureSubscription" }
+  ]
+}
