@@ -127,7 +127,7 @@ function New-CIEMDashboardPage {
                     if (-not $chartProviders -or $chartProviders.Count -eq 0) { $chartProviders = @('Azure') }
 
                     foreach ($chartProvider in $chartProviders) {
-                        $providerResults  = @($ScanResults | Where-Object { $_.Check.Provider -eq $chartProvider })
+                        $providerResults  = @($ScanResults | Where-Object { $_.Provider -eq $chartProvider })
                         $providerFailed   = @($providerResults | Where-Object { $_.Status -eq 'FAIL' })
                         $pCritical = @($providerFailed | Where-Object { $_.Severity.ToUpper() -eq 'CRITICAL' }).Count
                         $pHigh     = @($providerFailed | Where-Object { $_.Severity.ToUpper() -eq 'HIGH' }).Count
