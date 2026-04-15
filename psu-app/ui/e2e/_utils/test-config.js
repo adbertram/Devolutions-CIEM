@@ -15,7 +15,6 @@ const testConfig = {
     config: '/ciem/ciem/config',
     about: '/ciem/ciem/about',
     identities: '/ciem/ciem/identities',
-    effectivePermissions: '/ciem/ciem/effective-permissions',
     attackPaths: '/ciem/ciem/attack-paths',
     attackPathPatterns: '/ciem/ciem/attack-path-patterns'
   },

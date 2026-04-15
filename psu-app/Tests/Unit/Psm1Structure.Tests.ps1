@@ -66,8 +66,12 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:AppContent | Should -Not -Match 'New-CIEMGraphPage'
         }
 
-        It 'References New-CIEMIdentityRiskPage' {
-            $script:AppContent | Should -Match 'New-CIEMIdentityRiskPage'
+        It 'Does NOT reference New-CIEMIdentityRiskPage' {
+            $script:AppContent | Should -Not -Match 'New-CIEMIdentityRiskPage'
+        }
+
+        It 'References New-CIEMIdentitiesPage' {
+            $script:AppContent | Should -Match 'New-CIEMIdentitiesPage'
         }
 
         It 'References New-CIEMAttackPathsPage' {

@@ -142,7 +142,8 @@ WHERE e.kind IN ($roleKinds)
         $permission = [CIEMEffectivePermission]::new()
         $permission.Provider = [CIEMEffectivePermissionProvider]::Azure
         $permission.Principal = NewPrincipal -Row $row
-        $permission.Target = NewTarget -Row $row
+        $target = NewTarget -Row $row
+        $permission.Target = $target
         $permission.Privileged = $privileged
         $permission.CollectedAt = $row.edge_collected_at
 
@@ -156,7 +157,7 @@ WHERE e.kind IN ($roleKinds)
         $entitlement.PropertiesJson = $row.edge_properties
         $permission.Entitlement = $entitlement
 
-        $permission.Actions = @(ConvertCIEMEffectivePermissionAction -Provider Azure -PermissionsJson $props.permissions_json -EntitlementName $props.role_name -Privileged:$privileged)
+        $permission.Actions = @(ConvertCIEMEffectivePermissionAction -Provider Azure -PermissionsJson $props.permissions_json -EntitlementName $props.role_name -Privileged:$privileged -TargetType $target.Type)
 
         if ($row.edge_kind -eq 'InheritedRole') {
             $permission.Path = @(
@@ -211,13 +212,14 @@ WHERE e.kind = 'HasRoleMember'
 
     foreach ($row in @(Invoke-CIEMQuery -Query $directorySql)) {
         $evidenceId = "azure-graph-edge-$($row.edge_id)"
-        $actions = @(ConvertCIEMEffectivePermissionAction -Provider Azure -EntitlementName $row.target_name -NativeAction @($row.target_name))
+        $target = NewTarget -Row $row
+        $actions = @(ConvertCIEMEffectivePermissionAction -Provider Azure -EntitlementName $row.target_name -NativeAction @($row.target_name) -TargetType $target.Type)
         $privileged = @($actions | Where-Object { $_.AccessLevel -eq [CIEMAccessLevel]::PermissionAdmin }).Count -gt 0
 
         $permission = [CIEMEffectivePermission]::new()
         $permission.Provider = [CIEMEffectivePermissionProvider]::Azure
         $permission.Principal = NewPrincipal -Row $row
-        $permission.Target = NewTarget -Row $row
+        $permission.Target = $target
         $permission.Actions = $actions
         $permission.Privileged = $privileged
         $permission.CollectedAt = $row.edge_collected_at
@@ -273,8 +275,9 @@ WHERE e.kind IN ('HasAppRoleAssignment','HasOAuthGrant')
         $permission = [CIEMEffectivePermission]::new()
         $permission.Provider = [CIEMEffectivePermissionProvider]::Azure
         $permission.Principal = NewPrincipal -Row $row
-        $permission.Target = NewTarget -Row $row
-        $permission.Actions = @(ConvertCIEMEffectivePermissionAction -Provider Azure -EntitlementName $row.edge_kind -NativeAction $nativeActions)
+        $target = NewTarget -Row $row
+        $permission.Target = $target
+        $permission.Actions = @(ConvertCIEMEffectivePermissionAction -Provider Azure -EntitlementName $row.edge_kind -NativeAction $nativeActions -TargetType $target.Type)
         $permission.Privileged = @($permission.Actions | Where-Object { $_.AccessLevel -in @([CIEMAccessLevel]::Manage, [CIEMAccessLevel]::PermissionAdmin, [CIEMAccessLevel]::SecretAccess) }).Count -gt 0
         $permission.CollectedAt = $row.edge_collected_at
 

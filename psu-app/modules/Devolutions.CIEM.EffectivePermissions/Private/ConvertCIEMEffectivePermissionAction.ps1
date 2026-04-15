@@ -21,7 +21,11 @@ function ConvertCIEMEffectivePermissionAction {
         [CIEMPermissionEffect]$Effect = [CIEMPermissionEffect]::Allow,
 
         [Parameter()]
-        [bool]$Privileged
+        [bool]$Privileged,
+
+        [Parameter()]
+        [AllowNull()]
+        [string]$TargetType
     )
 
     $ErrorActionPreference = 'Stop'
@@ -73,6 +77,7 @@ function ConvertCIEMEffectivePermissionAction {
         $obj = [CIEMEffectivePermissionAction]::new()
         $obj.NativeAction = $Action
         $obj.AccessLevel = ResolveAccessLevel -Action $Action -IsDataAction $IsDataAction
+        $obj.Description = ResolveCIEMEffectivePermissionActionDescription -Provider $Provider -NativeAction $Action -TargetType $TargetType
         $obj.Effect = $Effect
         $obj.Privileged = $Privileged
         $obj

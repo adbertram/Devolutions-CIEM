@@ -17,6 +17,28 @@ BeforeAll {
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
     }
+
+    $script:NewTestCIEMAzurePermissionJson = {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory)]
+            [AllowEmptyCollection()]
+            [string[]]$Actions,
+
+            [Parameter(Mandatory)]
+            [AllowEmptyCollection()]
+            [string[]]$DataActions
+        )
+
+        @(
+            @{
+                actions = @($Actions)
+                notActions = @()
+                dataActions = @($DataActions)
+                notDataActions = @()
+            }
+        ) | ConvertTo-Json -Depth 5 -Compress
+    }
 }
 
 Describe 'Get-CIEMEffectivePermission' {
@@ -60,23 +82,13 @@ Describe 'Get-CIEMEffectivePermission' {
             Save-CIEMGraphNode -Id 'group-admins' -Kind 'EntraGroup' -DisplayName 'Cloud Admins' -Provider 'azure'
             Save-CIEMGraphNode -Id '/subscriptions/sub-1' -Kind 'AzureSubscription' -DisplayName 'Sub 1' -Provider 'azure' -SubscriptionId 'sub-1'
 
-            $readerPermissions = @(
-                @{
-                    actions = @('Microsoft.Resources/subscriptions/resourceGroups/read')
-                    notActions = @()
-                    dataActions = @()
-                    notDataActions = @()
-                }
-            ) | ConvertTo-Json -Depth 5 -Compress
+            $readerPermissions = & $script:NewTestCIEMAzurePermissionJson `
+                -Actions @('Microsoft.Resources/subscriptions/resourceGroups/read') `
+                -DataActions @()
 
-            $ownerPermissions = @(
-                @{
-                    actions = @('*')
-                    notActions = @()
-                    dataActions = @()
-                    notDataActions = @()
-                }
-            ) | ConvertTo-Json -Depth 5 -Compress
+            $ownerPermissions = & $script:NewTestCIEMAzurePermissionJson `
+                -Actions @('*') `
+                -DataActions @()
 
             Save-CIEMGraphEdge -SourceId 'user-direct' -TargetId '/subscriptions/sub-1' -Kind 'HasRole' -Computed 1 `
                 -Properties (@{
@@ -126,6 +138,74 @@ Describe 'Get-CIEMEffectivePermission' {
         }
     }
 
+    Context 'when Azure RBAC actions need friendly descriptions' {
+
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+
+            Save-CIEMGraphNode -Id 'user-friendly' -Kind 'EntraUser' -DisplayName 'Friendly User' -Provider 'azure'
+            Save-CIEMGraphNode -Id 'tenant-friendly' -Kind 'AzureTenant' -DisplayName 'Tenant' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub-friendly/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/vault-friendly' `
+                -Kind 'AzureKeyVault' `
+                -DisplayName 'Friendly Vault' `
+                -Provider 'azure' `
+                -Properties '{"arm_type":"microsoft.keyvault/vaults"}'
+
+            $tenantReaderPermissions = & $script:NewTestCIEMAzurePermissionJson `
+                -Actions @('*/read') `
+                -DataActions @()
+
+            $keyVaultSecretPermissions = & $script:NewTestCIEMAzurePermissionJson `
+                -Actions @() `
+                -DataActions @(
+                    'Microsoft.KeyVault/vaults/secrets/getSecret/action',
+                    'Microsoft.KeyVault/vaults/secrets/readMetadata/action'
+                )
+
+            Save-CIEMGraphEdge -SourceId 'user-friendly' -TargetId 'tenant-friendly' -Kind 'HasRole' -Computed 1 `
+                -Properties (@{
+                    role_name = 'Tenant Reader'
+                    role_definition_id = 'role-tenant-reader'
+                    permissions_json = $tenantReaderPermissions
+                    privileged = $false
+                    principal_type = 'User'
+                } | ConvertTo-Json -Compress)
+
+            Save-CIEMGraphEdge -SourceId 'user-friendly' -TargetId '/subscriptions/sub-friendly/resourceGroups/rg/providers/Microsoft.KeyVault/vaults/vault-friendly' -Kind 'HasRole' -Computed 1 `
+                -Properties (@{
+                    role_name = 'Key Vault Secrets User'
+                    role_definition_id = 'role-keyvault-secrets'
+                    permissions_json = $keyVaultSecretPermissions
+                    privileged = $true
+                    principal_type = 'User'
+                } | ConvertTo-Json -Compress)
+
+            $script:friendlyResults = @(Get-CIEMEffectivePermission -Provider Azure)
+        }
+
+        It 'Describes wildcard tenant read access in plain language' {
+            $tenantPermission = $script:friendlyResults | Where-Object { $_.Target.Type -eq 'AzureTenant' }
+            $tenantPermission.Actions[0].Description | Should -Be 'Can read all resources in the Azure tenant'
+        }
+
+        It 'Describes Key Vault secret data actions in plain language' {
+            $keyVaultPermission = $script:friendlyResults | Where-Object { $_.Target.Type -eq 'AzureKeyVault' }
+            $keyVaultPermission.Actions.Description | Should -Contain 'Can read secret values in this Azure Key Vault'
+            $keyVaultPermission.Actions.Description | Should -Contain 'Can read secret metadata in this Azure Key Vault'
+        }
+
+        It 'Describes wildcard Azure authorization actions in plain language' {
+            InModuleScope Devolutions.CIEM {
+                ResolveCIEMEffectivePermissionActionDescription `
+                    -Provider Azure `
+                    -NativeAction 'Microsoft.Authorization/classicAdministrators/roleAssignments/write' `
+                    -TargetType 'AzureSubscription' |
+                    Should -Be 'Can modify Azure role assignments in this Azure subscription'
+            }
+        }
+    }
+
     Context 'when directory role and app consent graph edges exist' {
 
         BeforeAll {
@@ -139,10 +219,17 @@ Describe 'Get-CIEMEffectivePermission' {
 
             Save-CIEMGraphEdge -SourceId 'user-admin' -TargetId 'dir-role-1' -Kind 'HasRoleMember' -Computed 0
 
+            Save-CIEMGraphEdge -SourceId 'sp-client' -TargetId 'sp-resource' -Kind 'HasAppRoleAssignment' -Computed 1 `
+                -Properties (@{
+                    assignment_id = 'assignment-1'
+                    app_role_id = 'app-role-1'
+                    principal_type = 'ServicePrincipal'
+                } | ConvertTo-Json -Compress)
+
             Save-CIEMGraphEdge -SourceId 'sp-client' -TargetId 'sp-resource' -Kind 'HasOAuthGrant' -Computed 1 `
                 -Properties (@{
                     grant_id = 'grant-1'
-                    scope = 'User.Read Directory.Read.All'
+                    scope = 'User.Read Directory.Read.All Activity.Read.All User.ReadBasic.All Sites.FullControl.All Directory.AccessAsUser.All TeamsAppInstallation.ReadWriteForTeam openid'
                     consent_type = 'AllPrincipals'
                 } | ConvertTo-Json -Compress)
 
@@ -154,9 +241,88 @@ Describe 'Get-CIEMEffectivePermission' {
             $directoryRole.Principal.DisplayName | Should -Be 'Directory Admin'
         }
 
+        It 'Describes directory roles as actions the principal can perform' {
+            $directoryRole = $script:results | Where-Object { [string]$_.Entitlement.Type -eq 'DirectoryRole' }
+            $directoryRole.Actions[0].Description | Should -Be 'Can administer all Microsoft Entra resources'
+        }
+
         It 'Projects OAuth grants as typed OAuth grant entitlements' {
             $oauthGrant = $script:results | Where-Object { [string]$_.Entitlement.Type -eq 'OAuthGrant' }
             $oauthGrant.Actions[0].NativeAction | Should -Be 'User.Read'
+        }
+
+        It 'Describes OAuth grants as Microsoft Graph actions' {
+            $oauthGrant = $script:results | Where-Object { [string]$_.Entitlement.Type -eq 'OAuthGrant' }
+            $oauthGrant.Actions.Description | Should -Contain 'Can read Microsoft Graph user data'
+            $oauthGrant.Actions.Description | Should -Contain 'Can read Microsoft Graph directory data'
+            $oauthGrant.Actions.Description | Should -Contain 'Can read Microsoft Graph activity data'
+            $oauthGrant.Actions.Description | Should -Contain 'Can read basic Microsoft Graph user data'
+            $oauthGrant.Actions.Description | Should -Contain 'Can fully control Microsoft Graph site data'
+            $oauthGrant.Actions.Description | Should -Contain 'Can access Microsoft Graph directory data as the signed-in user'
+            $oauthGrant.Actions.Description | Should -Contain 'Can read and modify Microsoft Teams app installations for teams'
+            $oauthGrant.Actions.Description | Should -Contain 'Can sign the user in with OpenID Connect'
+        }
+
+        It 'Describes app role assignments as application access actions' {
+            $appRoleAssignment = $script:results | Where-Object { [string]$_.Entitlement.Type -eq 'AppRoleAssignment' }
+            $appRoleAssignment.Actions[0].Description | Should -Be 'Can access this enterprise application'
+        }
+
+        It 'Does not describe effective actions as held roles or entitlements' {
+            $actionDescriptions = @($script:results | ForEach-Object { $_.Actions.Description })
+            ($actionDescriptions -join "`n") | Should -Not -Match '\b(hold|entitlement|directory role)\b'
+        }
+    }
+
+    Context 'when description catalog mappings are missing' {
+
+        It 'Throws for <Name>' -TestCases @(
+            @{
+                Name = 'unmapped Microsoft Graph permission subjects'
+                NativeAction = 'UnknownSubject.Read.All'
+                TargetType = 'EntraServicePrincipal'
+                ExpectedMessage = "*Microsoft Graph permission subject 'UnknownSubject'*"
+            },
+            @{
+                Name = 'unmapped Microsoft Graph permission verbs'
+                NativeAction = 'User.UnknownVerb.All'
+                TargetType = 'EntraServicePrincipal'
+                ExpectedMessage = "*Microsoft Graph permission verb 'UnknownVerb'*"
+            },
+            @{
+                Name = 'unmapped Microsoft Entra directory roles'
+                NativeAction = 'Unknown Directory Role'
+                TargetType = 'EntraDirectoryRole'
+                ExpectedMessage = "*Microsoft Entra directory role 'Unknown Directory Role'*"
+            },
+            @{
+                Name = 'unmapped effective permission target scopes'
+                NativeAction = '*/read'
+                TargetType = 'AzureUnknownResource'
+                ExpectedMessage = "*target scope 'AzureUnknownResource'*"
+            },
+            @{
+                Name = 'unmapped Azure action resource paths'
+                NativeAction = 'Microsoft.Unknown/widgets/read'
+                TargetType = 'AzureSubscription'
+                ExpectedMessage = "*Azure resource path 'Microsoft.Unknown/widgets'*"
+            }
+        ) {
+            param(
+                [string]$Name,
+                [string]$NativeAction,
+                [string]$TargetType,
+                [string]$ExpectedMessage
+            )
+
+            InModuleScope Devolutions.CIEM -Parameters @{
+                NativeAction = $NativeAction
+                TargetType = $TargetType
+                ExpectedMessage = $ExpectedMessage
+            } {
+                { ResolveCIEMEffectivePermissionActionDescription -Provider Azure -NativeAction $NativeAction -TargetType $TargetType } |
+                    Should -Throw $ExpectedMessage
+            }
         }
     }
 
@@ -188,6 +354,10 @@ Describe 'Get-CIEMEffectivePermission' {
         It 'Returns only selected principal rows when PrincipalId is specified' {
             $script:principalResults | Should -HaveCount 1
             $script:principalResults[0].Principal.Id | Should -Be 'user-reader'
+        }
+
+        It 'Describes Azure role names as actions when permission JSON is absent' {
+            $script:principalResults[0].Actions[0].Description | Should -Be 'Can read Azure resources in this Azure subscription'
         }
     }
 

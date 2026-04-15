@@ -1,0 +1,418 @@
+{
+  "scopeDescriptions": {
+    "AzureTenant": "the Azure tenant",
+    "AzureManagementGroup": "this Azure management group",
+    "AzureSubscription": "this Azure subscription",
+    "AzureResourceGroup": "this Azure resource group",
+    "AzureKeyVault": "this Azure Key Vault",
+    "AzureStorageAccount": "this Azure Storage account",
+    "AzureVM": "this Azure virtual machine",
+    "AzureVMSS": "this Azure virtual machine scale set",
+    "AzureSQLServer": "this Azure SQL server",
+    "AzureSQLDatabase": "this Azure SQL database",
+    "AzureAppService": "this Azure App Service",
+    "AzureResource": "this Azure resource"
+  },
+  "directoryRoleDescriptions": {
+    "Agent ID Administrator": "Can manage Microsoft Entra Agent ID configuration",
+    "Agent ID Developer": "Can create and manage Microsoft Entra Agent ID resources",
+    "Agent Registry Administrator": "Can manage Microsoft Entra agent registry resources",
+    "AI Administrator": "Can manage Microsoft 365 AI settings and resources",
+    "Application Administrator": "Can manage Microsoft Entra applications and service principals",
+    "Application Developer": "Can create Microsoft Entra application registrations",
+    "Attack Payload Author": "Can create Microsoft 365 attack simulation payloads",
+    "Attack Simulation Administrator": "Can manage Microsoft 365 attack simulations",
+    "Attribute Assignment Administrator": "Can assign custom security attributes to Microsoft Entra objects",
+    "Attribute Assignment Reader": "Can read custom security attributes on Microsoft Entra objects",
+    "Attribute Definition Administrator": "Can define custom security attributes for Microsoft Entra objects",
+    "Attribute Definition Reader": "Can read custom security attribute definitions",
+    "Attribute Log Administrator": "Can manage custom security attribute audit logs",
+    "Attribute Log Reader": "Can read custom security attribute audit logs",
+    "Attribute Provisioning Administrator": "Can manage custom security attribute provisioning",
+    "Attribute Provisioning Reader": "Can read custom security attribute provisioning settings",
+    "Authentication Administrator": "Can manage authentication methods for non-admin users",
+    "Authentication Extensibility Administrator": "Can manage authentication extensibility settings",
+    "Authentication Extensibility Password Administrator": "Can manage password-related authentication extensibility settings",
+    "Authentication Policy Administrator": "Can manage Microsoft Entra authentication policies",
+    "Azure DevOps Administrator": "Can manage Azure DevOps policies backed by Microsoft Entra ID",
+    "Azure Information Protection Administrator": "Can manage Azure Information Protection settings",
+    "B2C IEF Keyset Administrator": "Can manage Azure AD B2C Identity Experience Framework keysets",
+    "B2C IEF Policy Administrator": "Can manage Azure AD B2C Identity Experience Framework policies",
+    "Billing Administrator": "Can manage Microsoft 365 billing and subscriptions",
+    "Cloud App Security Administrator": "Can manage Microsoft Defender for Cloud Apps settings",
+    "Cloud Application Administrator": "Can manage Microsoft Entra enterprise applications and service principals",
+    "Cloud Device Administrator": "Can manage Microsoft Entra joined and registered devices",
+    "Compliance Administrator": "Can manage Microsoft Purview compliance settings",
+    "Compliance Data Administrator": "Can manage Microsoft Purview compliance data",
+    "Conditional Access Administrator": "Can manage Conditional Access policies",
+    "Customer Lockbox Access Approver": "Can approve Microsoft Customer Lockbox requests",
+    "Desktop Analytics Administrator": "Can manage Desktop Analytics deployment plans and assets",
+    "Directory Readers": "Can read Microsoft Entra directory resources",
+    "Directory Synchronization Accounts": "Can read Microsoft Entra directory synchronization information",
+    "Directory Writers": "Can update Microsoft Entra users, groups, and service principals",
+    "Domain Name Administrator": "Can manage Microsoft Entra domain names",
+    "Dragon Administrator": "Can manage Dragon app settings",
+    "Dynamics 365 Administrator": "Can manage Dynamics 365 service settings",
+    "Dynamics 365 Business Central Administrator": "Can manage Dynamics 365 Business Central settings",
+    "Edge Administrator": "Can manage Microsoft Edge enterprise settings",
+    "Entra Backup Administrator": "Can manage Microsoft Entra backups and recovery operations",
+    "Entra Backup Reader": "Can read Microsoft Entra backup data",
+    "Exchange Administrator": "Can manage Exchange Online settings",
+    "Exchange Backup Administrator": "Can manage Exchange Online backup operations",
+    "Exchange Recipient Administrator": "Can manage Exchange Online recipients",
+    "Extended Directory User Administrator": "Can manage extended Microsoft Entra user properties",
+    "External ID User Flow Administrator": "Can manage External ID user flows",
+    "External ID User Flow Attribute Administrator": "Can manage External ID user flow attributes",
+    "External Identity Provider Administrator": "Can manage external identity providers",
+    "Fabric Administrator": "Can manage Microsoft Fabric settings",
+    "Global Administrator": "Can administer all Microsoft Entra resources",
+    "Global Reader": "Can read Microsoft Entra configuration and administrative data",
+    "Global Secure Access Administrator": "Can manage Global Secure Access settings",
+    "Global Secure Access Log Reader": "Can read Global Secure Access logs",
+    "Groups Administrator": "Can manage Microsoft Entra groups",
+    "Guest Inviter": "Can invite guest users to the tenant",
+    "Helpdesk Administrator": "Can reset passwords and invalidate refresh tokens for eligible users",
+    "Hybrid Identity Administrator": "Can manage hybrid identity configuration",
+    "Identity Governance Administrator": "Can manage Microsoft Entra ID Governance configuration",
+    "Insights Administrator": "Can administer Microsoft Viva Insights",
+    "Insights Analyst": "Can analyze Microsoft Viva Insights data",
+    "Insights Business Leader": "Can read Microsoft Viva Insights business dashboards",
+    "Intune Administrator": "Can manage Microsoft Intune settings",
+    "IoT Device Administrator": "Can manage Microsoft Entra IoT devices",
+    "Kaizala Administrator": "Can manage Microsoft Kaizala settings",
+    "Knowledge Administrator": "Can manage Microsoft knowledge content",
+    "Knowledge Manager": "Can create and manage Microsoft knowledge content",
+    "License Administrator": "Can manage license assignments for users and groups",
+    "Lifecycle Workflows Administrator": "Can manage Microsoft Entra lifecycle workflows",
+    "Message Center Privacy Reader": "Can read Microsoft 365 Message Center privacy messages",
+    "Message Center Reader": "Can read Microsoft 365 Message Center messages",
+    "Microsoft 365 Backup Administrator": "Can manage Microsoft 365 Backup",
+    "Microsoft 365 Migration Administrator": "Can manage Microsoft 365 migrations",
+    "Microsoft Entra Joined Device Local Administrator": "Can manage local administrator access on Microsoft Entra joined devices",
+    "Microsoft Graph Data Connect Administrator": "Can manage Microsoft Graph Data Connect settings",
+    "Microsoft Hardware Warranty Administrator": "Can manage Microsoft hardware warranty claims",
+    "Microsoft Hardware Warranty Specialist": "Can read Microsoft hardware warranty information",
+    "Network Administrator": "Can manage Microsoft network connectivity recommendations",
+    "Office Apps Administrator": "Can manage Microsoft 365 Apps cloud settings",
+    "Organizational Branding Administrator": "Can manage organizational branding",
+    "Organizational Data Source Administrator": "Can manage organizational data sources",
+    "Organizational Messages Approver": "Can approve organizational messages",
+    "Organizational Messages Writer": "Can create organizational messages",
+    "Partner Tier1 Support": "Can perform Tier 1 partner support tasks",
+    "Partner Tier2 Support": "Can perform Tier 2 partner support tasks",
+    "Password Administrator": "Can reset passwords for eligible users",
+    "People Administrator": "Can manage people profile settings",
+    "Permissions Management Administrator": "Can manage Microsoft Entra Permissions Management settings",
+    "Places Administrator": "Can manage Microsoft Places settings",
+    "Power Platform Administrator": "Can manage Power Platform environments and policies",
+    "Printer Administrator": "Can manage Universal Print printers and connectors",
+    "Printer Technician": "Can register printers and manage printer status",
+    "Privileged Authentication Administrator": "Can manage authentication methods for all users",
+    "Privileged Role Administrator": "Can manage Microsoft Entra role assignments",
+    "Reports Reader": "Can read Microsoft 365 usage reports",
+    "Search Administrator": "Can manage Microsoft Search configuration",
+    "Search Editor": "Can manage Microsoft Search content",
+    "Security Administrator": "Can manage Microsoft Entra security settings and reports",
+    "Security Operator": "Can manage Microsoft Entra security incidents and alerts",
+    "Security Reader": "Can read Microsoft Entra security settings and reports",
+    "Service Support Administrator": "Can manage Microsoft service support requests",
+    "SharePoint Administrator": "Can manage SharePoint Online settings",
+    "SharePoint Advanced Management Administrator": "Can manage SharePoint Advanced Management settings",
+    "SharePoint Backup Administrator": "Can manage SharePoint Online backup operations",
+    "SharePoint Embedded Administrator": "Can manage SharePoint Embedded settings",
+    "Skype for Business Administrator": "Can manage Skype for Business settings",
+    "Teams Administrator": "Can manage Microsoft Teams settings",
+    "Teams Communications Administrator": "Can manage Microsoft Teams communication settings",
+    "Teams Communications Support Engineer": "Can troubleshoot Microsoft Teams communication issues",
+    "Teams Communications Support Specialist": "Can troubleshoot basic Microsoft Teams communication issues",
+    "Teams Devices Administrator": "Can manage Teams-certified devices",
+    "Teams External Collaboration Administrator": "Can manage Microsoft Teams external collaboration settings",
+    "Teams Reader": "Can read Microsoft Teams settings",
+    "Teams Telephony Administrator": "Can manage Microsoft Teams telephony settings",
+    "Tenant Creator": "Can create Microsoft Entra tenants",
+    "Tenant Governance Administrator": "Can manage tenant governance settings",
+    "Tenant Governance Reader": "Can read tenant governance settings",
+    "Tenant Governance Relationship Administrator": "Can manage tenant governance relationships",
+    "Tenant Governance Relationship Reader": "Can read tenant governance relationships",
+    "Usage Summary Reports Reader": "Can read usage summary reports",
+    "User Administrator": "Can manage Microsoft Entra users and groups",
+    "User Experience Success Manager": "Can read and manage user experience success data",
+    "Virtual Visits Administrator": "Can manage Microsoft Virtual Visits settings",
+    "Viva Glint Tenant Administrator": "Can manage Viva Glint tenant settings",
+    "Viva Goals Administrator": "Can manage Viva Goals settings",
+    "Viva Pulse Administrator": "Can manage Viva Pulse settings",
+    "Windows 365 Administrator": "Can manage Windows 365 settings",
+    "Windows Update Deployment Administrator": "Can manage Windows Update deployment settings",
+    "Yammer Administrator": "Can manage Yammer settings"
+  },
+  "targetActionDescriptions": {
+    "EntraApplication": "Can access this Microsoft Entra application",
+    "EntraGroup": "Can access this Microsoft Entra group",
+    "EntraServicePrincipal": "Can access this enterprise application",
+    "EntraUser": "Can access this Microsoft Entra user"
+  },
+  "azureRoleNameDescriptions": {
+    "Contributor": "Can manage Azure resources in {scope}",
+    "Key Vault Administrator": "Can manage keys, secrets, and certificates in {scope}",
+    "Key Vault Certificates Officer": "Can manage certificates in {scope}",
+    "Key Vault Crypto Officer": "Can manage keys in {scope}",
+    "Key Vault Crypto Service Encryption User": "Can read key metadata and unwrap keys in {scope}",
+    "Key Vault Crypto User": "Can perform cryptographic operations with keys in {scope}",
+    "Key Vault Reader": "Can read Azure Key Vault properties in {scope}",
+    "Key Vault Secrets Officer": "Can manage secrets in {scope}",
+    "Key Vault Secrets User": "Can read secret values in {scope}",
+    "Owner": "Can manage Azure resources and grant access to others in {scope}",
+    "Reader": "Can read Azure resources in {scope}",
+    "User Access Administrator": "Can manage Azure role assignments in {scope}"
+  },
+  "graphPermissionSubjects": {
+    "AccessReview": "access review",
+    "Activity": "activity",
+    "AppCatalog": "app catalog",
+    "Application": "application",
+    "AppRoleAssignment": "app role assignment",
+    "Approvals": "approval",
+    "Calendars": "calendar",
+    "Channel": "channel",
+    "ChatMember": "chat member",
+    "CopilotStudio": "Copilot Studio",
+    "Dataset": "dataset",
+    "DelegatedAdminRelationship": "delegated admin relationship",
+    "Directory": "directory",
+    "EduAssignments": "education assignment",
+    "EduRoster": "education roster",
+    "EntitlementManagement": "entitlement management",
+    "ExternalConnection": "external connection",
+    "Files": "file",
+    "FileStorageContainer": "file storage container",
+    "Flows": "Power Automate flow",
+    "Forms": "form",
+    "Group": "group",
+    "Group-Conversation": "group conversation",
+    "GroupMember": "group member",
+    "InformationProtectionPolicy": "information protection policy",
+    "M365BillingPlatform": "Microsoft 365 billing platform",
+    "Mail": "mail",
+    "MLModel": "machine learning model",
+    "NetworkAccessPolicy": "network access policy",
+    "Organization": "organization",
+    "People": "people",
+    "Policy": "policy",
+    "Presence": "presence",
+    "PrinterShare": "printer share",
+    "PrintJob": "print job",
+    "Report": "report",
+    "RoleManagement": "role management",
+    "SensitivityLabel": "sensitivity label",
+    "Sites": "site",
+    "Tasks": "task",
+    "Team": "team",
+    "TeamsAppInstallation": "Teams app installation",
+    "TeamsTab": "Teams tab",
+    "TermStore": "term store",
+    "User": "user",
+    "UserAuthenticationMethod": "user authentication method",
+    "UserState": "user state"
+  },
+  "graphPermissionVerbs": {
+    "Create": "create",
+    "FullControl": "fully control",
+    "Manage": "manage",
+    "Read": "read",
+    "ReadBasic": "read basic",
+    "ReadWrite": "read and modify",
+    "Write": "modify"
+  },
+  "actionDescriptions": [
+    {
+      "provider": "Azure",
+      "pattern": "^AppCatalog\\.Submit$",
+      "description": "Can submit apps to the Microsoft Teams app catalog"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^CopilotStudio\\.Copilots\\.Invoke$",
+      "description": "Can invoke Copilot Studio copilots through Microsoft Graph"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Directory\\.AccessAsUser\\.All$",
+      "description": "Can access Microsoft Graph directory data as the signed-in user"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^FileStorageContainer\\.Selected$",
+      "description": "Can access selected file storage containers through Microsoft Graph"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^MLModel\\.Execute\\.All$",
+      "description": "Can execute Microsoft Graph machine learning models"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^TeamsAppInstallation\\.ReadWriteForTeam$",
+      "description": "Can read and modify Microsoft Teams app installations for teams"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^TeamsAppInstallation\\.ReadWriteSelfForTeam$",
+      "description": "Can read and modify this app's Teams installation for teams"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^email$",
+      "description": "Can read the signed-in user's email address"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^offline_access$",
+      "description": "Can maintain access after the user signs out"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^openid$",
+      "description": "Can sign the user in with OpenID Connect"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^profile$",
+      "description": "Can read the signed-in user's basic profile"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^User$",
+      "description": "Can access Microsoft Graph user data"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^user_impersonation$",
+      "description": "Can access Azure Resource Manager as the signed-in user"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^\\*$",
+      "description": "Can manage all resources in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^\\*/read$",
+      "description": "Can read all resources in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/read$",
+      "description": "Can read Azure Key Vault properties in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/write$",
+      "description": "Can modify Azure Key Vault properties in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/delete$",
+      "description": "Can delete Azure Key Vaults in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/\\*$",
+      "description": "Can modify all properties of Azure Key Vaults in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/secrets/getSecret/action$",
+      "description": "Can read secret values in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/secrets/readMetadata/action$",
+      "description": "Can read secret metadata in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/secrets/read$",
+      "description": "Can read Key Vault secret metadata in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/secrets/write$",
+      "description": "Can create or modify Key Vault secrets in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/secrets/delete$",
+      "description": "Can delete Key Vault secrets in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/keys/read$",
+      "description": "Can read Key Vault key metadata in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/keys/decrypt/action$",
+      "description": "Can decrypt data with Key Vault keys in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/keys/encrypt/action$",
+      "description": "Can encrypt data with Key Vault keys in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/keys/sign/action$",
+      "description": "Can sign data with Key Vault keys in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/keys/unwrap/action$",
+      "description": "Can unwrap keys with Key Vault keys in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.KeyVault/vaults/keys/wrap/action$",
+      "description": "Can wrap keys with Key Vault keys in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.Authorization/.*/roleAssignments/(write|delete)$",
+      "description": "Can modify Azure role assignments in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.Authorization/.*/roleDefinitions/(write|delete)$",
+      "description": "Can modify Azure role definitions in {scope}"
+    },
+    {
+      "provider": "Azure",
+      "pattern": "^Microsoft\\.Authorization/elevateAccess/Action$",
+      "description": "Can elevate access to manage Azure resources in {scope}"
+    }
+  ],
+  "resourceDescriptions": {
+    "*": "Azure resources",
+    "microsoft.authorization/*": "Azure authorization resources",
+    "microsoft.authorization/roleassignments": "Azure role assignments",
+    "microsoft.authorization/roledefinitions": "Azure role definitions",
+    "microsoft.insights/alertrules": "Azure alert rules",
+    "microsoft.keyvault/checknameavailability": "Azure Key Vault name availability checks",
+    "microsoft.keyvault/deletedvaults": "deleted Azure Key Vaults",
+    "microsoft.keyvault/locations/*": "Azure Key Vault regional resources",
+    "microsoft.keyvault/operations": "Azure Key Vault provider operations",
+    "microsoft.keyvault/vaults": "Azure Key Vaults",
+    "microsoft.keyvault/vaults/*": "Azure Key Vault child resources",
+    "microsoft.keyvault/vaults/certificates": "Key Vault certificates",
+    "microsoft.keyvault/vaults/keys": "Key Vault keys",
+    "microsoft.keyvault/vaults/secrets": "Key Vault secrets",
+    "microsoft.resources/deployments": "Azure deployments",
+    "microsoft.resources/subscriptions": "Azure subscriptions",
+    "microsoft.resources/subscriptions/resourcegroups": "Azure resource groups",
+    "microsoft.support": "Azure support resources",
+    "microsoft.storage/storageaccounts": "Azure Storage accounts",
+    "microsoft.compute/virtualmachines": "Azure virtual machines",
+    "microsoft.web/sites": "Azure App Services",
+    "microsoft.sql/servers": "Azure SQL servers",
+    "microsoft.sql/servers/databases": "Azure SQL databases"
+  }
+}

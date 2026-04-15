@@ -22,6 +22,7 @@ test.describe('Navigation', () => {
       expect(labels).toContain('Scan');
       expect(labels).toContain('Scan History');
       expect(labels).toContain('Identities');
+      expect(labels).not.toContain('Effective Permissions');
       expect(labels).toContain('Attack Paths');
       expect(labels).toContain('Attack Path Patterns');
       expect(labels).toContain('Environment');
@@ -47,6 +48,11 @@ test.describe('Navigation', () => {
     test('should have correct href for Scan History link', async () => {
       const href = await navPage.getNavItemHref('Scan History');
       expect(href).toContain('/ciem/history');
+    });
+
+    test('should have correct href for Identities link', async () => {
+      const href = await navPage.getNavItemHref('Identities');
+      expect(href).toContain('/ciem/identities');
     });
 
     test('should have correct href for Configuration link', async () => {

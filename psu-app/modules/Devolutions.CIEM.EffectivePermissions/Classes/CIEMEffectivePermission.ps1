@@ -105,6 +105,7 @@ class CIEMEffectiveResource {
 
 class CIEMEffectivePermissionAction {
     [string]$NativeAction
+    [string]$Description
     [CIEMAccessLevel]$AccessLevel
     [CIEMPermissionEffect]$Effect
     [string]$Condition

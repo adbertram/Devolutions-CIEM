@@ -254,6 +254,7 @@ if (result.status !== 'Completed') {
 | Page redirects | `waitForNavigation()` | `waitForURL('**/path', { timeout: 15000 })` | PSU `Invoke-UDRedirect` is async |
 | Text selectors | `text=No failed results` | Scope to parent: `.MuiCard-root:has-text('Severity') >> text=...` | Same text in multiple cards |
 | DataGrid expand | Click the row | Click `[aria-label="Expand"]` | MUI DataGrid uses dedicated toggle |
+| DataGrid detail content | Wait only for `.MuiDataGrid-detailPanel` | After expanding, wait for expected panel content text such as `Entitlement Path` | PSU `LoadDetailContent` can render after the detail panel shell is already visible |
 | Toast notifications | `.MuiSnackbar-root` | `.iziToast` | PSU uses iziToast, not MUI Snackbar |
 | MUI Select open | Click `<input>` | Click `[role="combobox"]` | Hidden input is not interactive |
 | Dynamic element IDs | `#myDynamicId` | Check actual rendered HTML | `New-UDDynamic -Id` uses internal UUIDs |

@@ -222,9 +222,9 @@ function getTestEffectiveRoleAssignmentCount() {
   return sshQuery(`SELECT COUNT(*) as count FROM azure_effective_role_assignments WHERE principal_id LIKE '${P}%'`)[0].count;
 }
 
-function seedEffectivePermissionsPageData() {
+function seedIdentitiesPageData() {
   const now = new Date().toISOString();
-  const permissionsJson = JSON.stringify([
+  const keyVaultPermissionsJson = JSON.stringify([
     {
       Actions: ['Microsoft.KeyVault/vaults/read'],
       NotActions: [],
@@ -232,27 +232,51 @@ function seedEffectivePermissionsPageData() {
       NotDataActions: []
     }
   ]);
-  const roleProperties = JSON.stringify({
+  const ownerPermissionsJson = JSON.stringify([
+    {
+      Actions: ['Microsoft.Authorization/roleAssignments/write'],
+      NotActions: [],
+      DataActions: [],
+      NotDataActions: []
+    }
+  ]);
+  const identityProperties = JSON.stringify({
+    accountEnabled: true,
+    daysSinceSignIn: 120,
+    lastSignIn: '2025-12-01T12:30:00Z',
+    lastInteractiveSignIn: '2025-12-01T12:30:00Z',
+    lastNonInteractiveSignIn: '2025-12-02T08:15:00Z'
+  });
+  const keyVaultRoleProperties = JSON.stringify({
     role_definition_id: `${P}roledef-keyvault-reader`,
     role_name: 'Key Vault Reader',
-    permissions_json: permissionsJson,
+    permissions_json: keyVaultPermissionsJson,
     privileged: false
   });
+  const ownerRoleProperties = JSON.stringify({
+    role_definition_id: `${P}roledef-owner`,
+    role_name: 'Owner',
+    permissions_json: ownerPermissionsJson,
+    privileged: true,
+    scope: `/subscriptions/${P}sub-1`
+  });
   sshNonQuery([
-    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ep-user-1','EntraUser','E2E Effective Permissions User','azure','{}','${now}')`,
-    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at) VALUES ('${P}ep-keyvault-1','AzureKeyVault','E2E Effective Permissions Key Vault','azure','${P}sub-1','e2e-rg-1','{"arm_type":"microsoft.keyvault/vaults"}','${now}')`,
-    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ep-user-1','${P}ep-keyvault-1','HasRole',${sqlValue(roleProperties)},0,'${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}identity-user-1','EntraUser','E2E Identities User','azure',${sqlValue(identityProperties)},'${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at) VALUES ('${P}identity-keyvault-1','AzureKeyVault','E2E Identities Key Vault','azure','${P}sub-1','e2e-rg-1','{"arm_type":"microsoft.keyvault/vaults"}','${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}sub-1','AzureSubscription','E2E Identities Subscription','azure','{}','${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}identity-user-1','${P}identity-keyvault-1','HasRole',${sqlValue(keyVaultRoleProperties)},0,'${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}identity-user-1','/subscriptions/${P}sub-1','HasRole',${sqlValue(ownerRoleProperties)},0,'${now}')`,
   ].join('; '));
-  console.log('[seed] Seeded Effective Permissions page graph data.');
+  console.log('[seed] Seeded Identities page graph data.');
 }
 
-function cleanupEffectivePermissionsPageData() {
-  sshNonQuery(`DELETE FROM graph_edges WHERE source_id LIKE '${P}ep-%' OR target_id LIKE '${P}ep-%'; DELETE FROM graph_nodes WHERE id LIKE '${P}ep-%'`);
-  console.log('[cleanup] Effective Permissions page graph data cleaned up.');
+function cleanupIdentitiesPageData() {
+  sshNonQuery(`DELETE FROM graph_edges WHERE source_id LIKE '${P}identity-%' OR target_id LIKE '${P}identity-%' OR target_id = '/subscriptions/${P}sub-1'; DELETE FROM graph_nodes WHERE id LIKE '${P}identity-%' OR id = '/subscriptions/${P}sub-1'`);
+  console.log('[cleanup] Identities page graph data cleaned up.');
 }
 
-function getTestEffectivePermissionGraphEdgeCount() {
-  return sshQuery(`SELECT COUNT(*) as count FROM graph_edges WHERE source_id LIKE '${P}ep-%' OR target_id LIKE '${P}ep-%'`)[0].count;
+function getTestIdentitiesGraphEdgeCount() {
+  return sshQuery(`SELECT COUNT(*) as count FROM graph_edges WHERE source_id LIKE '${P}identity-%' OR target_id LIKE '${P}identity-%' OR target_id = '/subscriptions/${P}sub-1'`)[0].count;
 }
 
 function seedIdentityAttackPathData() {
@@ -364,7 +388,7 @@ module.exports = {
   backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
-  seedEffectivePermissionsPageData, cleanupEffectivePermissionsPageData, getTestEffectivePermissionGraphEdgeCount,
+  seedIdentitiesPageData, cleanupIdentitiesPageData, getTestIdentitiesGraphEdgeCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,
   seedAttackPathsPageData, cleanupAttackPathsPageData, getTestAttackPathNodeCount,
   TEST_PREFIX

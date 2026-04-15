@@ -17,7 +17,6 @@ function New-CIEMNavigation {
         New-UDListItem -Label 'Scan' -Icon (New-UDIcon -Icon 'Play') -Href '/ciem/scan'
         New-UDListItem -Label 'Scan History' -Icon (New-UDIcon -Icon 'ClockRotateLeft') -Href '/ciem/history'
         New-UDListItem -Label 'Identities' -Icon (New-UDIcon -Icon 'UserShield') -Href '/ciem/identities'
-        New-UDListItem -Label 'Effective Permissions' -Icon (New-UDIcon -Icon 'Key') -Href '/ciem/effective-permissions'
         New-UDListItem -Label 'Attack Paths' -Icon (New-UDIcon -Icon 'Route') -Href '/ciem/attack-paths'
         New-UDListItem -Label 'Attack Path Patterns' -Icon (New-UDIcon -Icon 'InfoCircle') -Href '/ciem/attack-path-patterns'
         New-UDListItem -Label 'Environment' -Icon (New-UDIcon -Icon 'SiteMap') -Href '/ciem/environment'
