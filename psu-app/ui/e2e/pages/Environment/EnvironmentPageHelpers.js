@@ -198,6 +198,67 @@ class EnvironmentPageHelpers extends BasePage {
     return await this.isElementVisible(this.selectors.treeContainer);
   }
 
+  async getTreeNodeByName(nodeName) {
+    await this.page.waitForFunction(() => {
+      const container = document.getElementById('ciemEnvTreeContainer');
+      return window.echarts && container && window.echarts.getInstanceByDom(container);
+    });
+
+    return await this.page.evaluate((name) => {
+      const container = document.getElementById('ciemEnvTreeContainer');
+      const chart = window.echarts.getInstanceByDom(container);
+      const root = chart.getOption().series[0].data[0];
+      const stack = [root];
+      while (stack.length > 0) {
+        const node = stack.pop();
+        if (node.name === name) return node;
+        for (const child of node.children || []) {
+          stack.push(child);
+        }
+      }
+      return null;
+    }, nodeName);
+  }
+
+  async getTreeNodeDescendantNames(nodeName, nodeType) {
+    await this.page.waitForFunction(() => {
+      const container = document.getElementById('ciemEnvTreeContainer');
+      return window.echarts && container && window.echarts.getInstanceByDom(container);
+    });
+
+    return await this.page.evaluate(({ name, type }) => {
+      const container = document.getElementById('ciemEnvTreeContainer');
+      const chart = window.echarts.getInstanceByDom(container);
+      const root = chart.getOption().series[0].data[0];
+      const stack = [root];
+      let target = null;
+      while (stack.length > 0) {
+        const node = stack.pop();
+        const matchesName = node.name === name;
+        const matchesType = !type || (node.value && node.value.nodeType === type);
+        if (matchesName && matchesType) {
+          target = node;
+          break;
+        }
+        for (const child of node.children || []) {
+          stack.push(child);
+        }
+      }
+      if (!target) return null;
+
+      const descendants = [];
+      const children = [...(target.children || [])];
+      while (children.length > 0) {
+        const node = children.pop();
+        descendants.push(node.name);
+        for (const child of node.children || []) {
+          children.push(child);
+        }
+      }
+      return descendants;
+    }, { name: nodeName, type: nodeType });
+  }
+
   // --- View select ---
 
   async isViewSelectVisible() {

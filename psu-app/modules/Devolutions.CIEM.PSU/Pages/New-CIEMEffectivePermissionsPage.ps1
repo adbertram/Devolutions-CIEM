@@ -83,6 +83,7 @@ function New-CIEMEffectivePermissionsPage {
                         $pathTypes = @($_.Path | ForEach-Object { [string]$_.Type } | Select-Object -Unique) -join ', '
                         $pathText = @($_.Path | ForEach-Object { $_.Description }) -join ' | '
                         $evidenceText = @($_.Evidence | ForEach-Object { "$($_.SourceSystem):$($_.SourceApi):$($_.SourceRecordId)" }) -join ' | '
+                        $targetType = [string]$_.Target.Type
 
                         @{
                             id = "$($_.Provider)-$($_.Principal.Id)-$($_.Entitlement.Type)-$($_.Target.Id)-$($_.Entitlement.Id)"
@@ -92,7 +93,8 @@ function New-CIEMEffectivePermissionsPage {
                             actions = $actionLabels
                             accessLevel = $accessLevels
                             target = $_.Target.DisplayName
-                            targetType = $_.Target.Type
+                            targetType = $targetType
+                            targetIcon = Resolve-CIEMResourceIconDataUri -GraphKind $targetType -PropertiesJson $_.Target.PropertiesJson
                             scope = $_.Entitlement.ScopeId
                             entitlement = $_.Entitlement.Name
                             entitlementType = [string]$_.Entitlement.Type
@@ -111,7 +113,27 @@ function New-CIEMEffectivePermissionsPage {
                     New-UDDataGridColumn -Field 'principalType' -HeaderName 'Type' -Width 150
                     New-UDDataGridColumn -Field 'actions' -HeaderName 'Can Do' -Flex 1
                     New-UDDataGridColumn -Field 'accessLevel' -HeaderName 'Access Level' -Width 150
-                    New-UDDataGridColumn -Field 'target' -HeaderName 'Target Resource' -Flex 1
+                    New-UDDataGridColumn -Field 'target' -HeaderName 'Target Resource' -Flex 1 -Render {
+                        New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                            if ($EventData.targetIcon) {
+                                New-UDElement -Tag 'img' -Attributes @{
+                                    src = $EventData.targetIcon
+                                    alt = "$($EventData.targetType) icon"
+                                    'data-ciem-resource-icon' = 'target'
+                                    style = @{
+                                        width = '18px'
+                                        height = '18px'
+                                        flexShrink = '0'
+                                    }
+                                }
+                            }
+                            New-UDTypography -Text $EventData.target -Variant 'body2' -Style @{
+                                overflow = 'hidden'
+                                textOverflow = 'ellipsis'
+                                whiteSpace = 'nowrap'
+                            }
+                        }
+                    }
                     New-UDDataGridColumn -Field 'scope' -HeaderName 'Scope' -Flex 1
                     New-UDDataGridColumn -Field 'entitlement' -HeaderName 'Entitlement' -Width 180
                     New-UDDataGridColumn -Field 'pathType' -HeaderName 'Path Type' -Width 160

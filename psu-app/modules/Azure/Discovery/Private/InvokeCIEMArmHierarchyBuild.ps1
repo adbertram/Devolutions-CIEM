@@ -148,8 +148,12 @@ function InvokeCIEMArmHierarchyBuild {
                         Resource     = $null
                     })
 
+                    $childResources = @($rgGroup.Group | Where-Object {
+                        $_.Type -ne 'microsoft.resources/subscriptions/resourcegroups'
+                    })
+
                     # Group resources within RG by type
-                    $byType = $rgGroup.Group | Group-Object -Property Type
+                    $byType = $childResources | Group-Object -Property Type
 
                     foreach ($typeGroup in $byType) {
                         # Extract short type name (e.g., "microsoft.keyvault/vaults" → "Vaults")

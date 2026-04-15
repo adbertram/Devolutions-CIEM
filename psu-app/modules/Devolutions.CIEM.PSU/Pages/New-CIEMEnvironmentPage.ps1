@@ -266,67 +266,53 @@ function New-CIEMEnvironmentPage {
 
                     # --- Convert flat hierarchy to nested ECharts tree data ---
 
-                    # Resource type → icon mapping
-                    $resourceTypeIcons = @{
-                        'microsoft.compute/virtualmachines'              = [char]::ConvertFromUtf32(0x1F5A5)   # desktop computer
-                        'microsoft.compute/virtualmachines/extensions'   = [char]::ConvertFromUtf32(0x1F9E9)   # puzzle piece
-                        'microsoft.compute/disks'                        = [char]::ConvertFromUtf32(0x1F4BF)   # optical disc
-                        'microsoft.keyvault/vaults'                      = [char]::ConvertFromUtf32(0x1F511)   # key
-                        'microsoft.storage/storageaccounts'              = [char]::ConvertFromUtf32(0x1F4E6)   # package
-                        'microsoft.network/virtualnetworks'              = [char]::ConvertFromUtf32(0x1F310)   # globe with meridians
-                        'microsoft.network/networksecuritygroups'        = [char]::ConvertFromUtf32(0x1F6E1)   # shield
-                        'microsoft.network/networkinterfaces'            = [char]::ConvertFromUtf32(0x1F50C)   # electric plug
-                        'microsoft.network/publicipaddresses'            = [char]::ConvertFromUtf32(0x1F4CD)   # round pushpin
-                        'microsoft.network/networkwatchers'              = [char]::ConvertFromUtf32(0x1F441)   # eye
-                        'microsoft.web/sites'                            = [char]::ConvertFromUtf32(0x1F310)   # globe
-                        'microsoft.web/sites/slots'                      = [char]::ConvertFromUtf32(0x1F310)   # globe
-                        'microsoft.web/serverfarms'                      = [char]::ConvertFromUtf32(0x1F4CB)   # clipboard
-                        'microsoft.web/staticsites'                      = [char]::ConvertFromUtf32(0x1F4C4)   # page facing up
-                        'microsoft.web/certificates'                     = [char]::ConvertFromUtf32(0x1F4DC)   # scroll
-                        'microsoft.web/customapis'                       = [char]::ConvertFromUtf32(0x1F517)   # link
-                        'microsoft.sql/servers'                          = [char]::ConvertFromUtf32(0x1F5C4)   # file cabinet
-                        'microsoft.sql/servers/databases'                = [char]::ConvertFromUtf32(0x1F5C3)   # card file box
-                        'microsoft.sqlvirtualmachine/sqlvirtualmachines' = [char]::ConvertFromUtf32(0x1F5C4)   # file cabinet
-                        'microsoft.cognitiveservices/accounts'           = [char]::ConvertFromUtf32(0x1F9E0)   # brain
-                        'microsoft.logic/workflows'                      = [char]::ConvertFromUtf32(0x1F504)   # arrows counterclockwise
-                        'microsoft.insights/components'                  = [char]::ConvertFromUtf32(0x1F4CA)   # bar chart
-                        'microsoft.insights/actiongroups'                = [char]::ConvertFromUtf32(0x1F514)   # bell
-                        'microsoft.operationalinsights/workspaces'       = [char]::ConvertFromUtf32(0x1F4CA)   # bar chart
-                        'microsoft.alertsmanagement/smartdetectoralertrules' = [char]::ConvertFromUtf32(0x1F6A8) # rotating light
-                        'microsoft.managedidentity/userassignedidentities'   = [char]::ConvertFromUtf32(0x1F464) # bust in silhouette
-                        'microsoft.authorization/roledefinitions'        = [char]::ConvertFromUtf32(0x1F4DC)   # scroll
-                        'microsoft.authorization/roleassignments'        = [char]::ConvertFromUtf32(0x1F465)   # busts in silhouette
-                        'microsoft.portal/dashboards'                    = [char]::ConvertFromUtf32(0x1F4CA)   # bar chart
-                        'microsoft.powerplatform/accounts'               = [char]::ConvertFromUtf32(0x26A1)    # high voltage
-                        'microsoft.migrate/movecollections'              = [char]::ConvertFromUtf32(0x1F4E4)   # outbox tray
-                        'microsoft.devtestlab/schedules'                 = [char]::ConvertFromUtf32(0x1F552)   # clock
-                    }
-
-                    # Node type styling table (color, default icon, size)
+                    # Node type styling table (color, size)
                     $nodeStyles = @{
-                        'Tenant'        = @{ Color = '#42a5f5'; Icon = [char]::ConvertFromUtf32(0x1F3E2); Size = 32 }
-                        'Subscription'  = @{ Color = '#66bb6a'; Icon = [char]::ConvertFromUtf32(0x1F4CB); Size = 26 }
-                        'ResourceGroup' = @{ Color = '#ffa726'; Icon = [char]::ConvertFromUtf32(0x1F4C1); Size = 22 }
-                        'Category'      = @{ Color = '#ab47bc'; Icon = [char]::ConvertFromUtf32(0x1F512); Size = 22 }
-                        'Resource'      = @{ Color = '#78909c'; Icon = [char]0x2699;                       Size = 16 }
+                        'Tenant'        = @{ Color = '#42a5f5'; Size = 32 }
+                        'Subscription'  = @{ Color = '#66bb6a'; Size = 26 }
+                        'ResourceGroup' = @{ Color = '#ffa726'; Size = 22 }
+                        'Category'      = @{ Color = '#ab47bc'; Size = 22 }
+                        'Resource'      = @{ Color = '#78909c'; Size = 16 }
                     }
                     # Identity view node types
-                    $nodeStyles['IdentityType']    = @{ Color = '#7b1fa2'; Icon = [char]::ConvertFromUtf32(0x1F465); Size = 26 }  # busts in silhouette
-                    $nodeStyles['Identity']        = @{ Color = '#1565c0'; Icon = [char]::ConvertFromUtf32(0x1F464); Size = 22 }  # bust in silhouette
-                    $nodeStyles['Role']            = @{ Color = '#00838f'; Icon = [char]::ConvertFromUtf32(0x1F511); Size = 20 }  # key
-                    $nodeStyles['Scope']           = @{ Color = '#558b2f'; Icon = [char]::ConvertFromUtf32(0x1F3AF); Size = 16 }  # target/bullseye
+                    $nodeStyles['IdentityType'] = @{ Color = '#7b1fa2'; Size = 26 }
+                    $nodeStyles['Identity']     = @{ Color = '#1565c0'; Size = 22 }
+                    $nodeStyles['Role']         = @{ Color = '#00838f'; Size = 20 }
+                    $nodeStyles['Scope']        = @{ Color = '#558b2f'; Size = 16 }
 
-                    $defaultStyle = @{ Color = '#bdbdbd'; Icon = [char]0x25CF; Size = 18 }
+                    $defaultStyle = @{ Color = '#bdbdbd'; Size = 18 }
 
+                    $nodeById = @{}
+                    foreach ($node in $hierarchy) {
+                        $nodeById[$node.NodeId] = $node
+                    }
                     $lookup = @{}
                     foreach ($node in $hierarchy) {
                         $style = $nodeStyles[$node.NodeType] ?? $defaultStyle
                         $nodeColor = $style.Color
                         $nodeSize  = $style.Size
 
-                        # Resolve icon: use resource-type-specific icon for Category/Resource nodes, else default
                         $resType = if ($node.ResourceType) { $node.ResourceType } elseif ($node.Resource) { $node.Resource.Type } else { $null }
-                        $nodeIcon = if ($resType -and $resourceTypeIcons[$resType]) { $resourceTypeIcons[$resType] } else { $style.Icon }
+                        $entraType = $null
+                        if ($viewMode -eq 'Identity') {
+                            $identityTypeLabel = $null
+                            if ($node.NodeType -eq 'IdentityType') {
+                                $identityTypeLabel = $node.Label
+                            } elseif ($node.NodeType -eq 'Identity' -and $node.ParentNodeId -and $nodeById.ContainsKey($node.ParentNodeId)) {
+                                $identityTypeLabel = $nodeById[$node.ParentNodeId].Label
+                            }
+                            if ($identityTypeLabel) {
+                                $identityTypeName = $identityTypeLabel -replace '\s+\(\d+\)$', ''
+                                $entraType = switch ($identityTypeName) {
+                                    'User' { 'user' }
+                                    'Group' { 'group' }
+                                    'ServicePrincipal' { 'servicePrincipal' }
+                                    'ManagedIdentity' { 'ManagedIdentity' }
+                                    default { $null }
+                                }
+                            }
+                        }
+                        $nodeIcon = Resolve-CIEMResourceIconDataUri -NodeType ([string]$node.NodeType) -AzureResourceType $resType -EntraType $entraType
 
                         $tooltipParts = @($node.NodeType)
                         if ($node.NodeType -eq 'Resource' -and $node.Resource) {
@@ -335,7 +321,9 @@ function New-CIEMEnvironmentPage {
                         }
 
                         $lookup[$node.NodeId] = @{
-                            name       = "$nodeIcon $($node.Label)"
+                            name       = [string]$node.Label
+                            symbol     = "image://$nodeIcon"
+                            symbolKeepAspect = $true
                             value      = @{
                                 nodeType = $node.NodeType
                                 tooltip  = ($tooltipParts -join '|')
@@ -357,8 +345,11 @@ function New-CIEMEnvironmentPage {
                     }
 
                     $treeRoot = if ($roots.Count -eq 1) { $roots[0] } else {
+                        $rootIcon = Resolve-CIEMResourceIconDataUri -GraphKind 'AzureResource'
                         @{
-                            name       = "$([char]0x2601) Cloud Environment"
+                            name       = 'Cloud Environment'
+                            symbol     = "image://$rootIcon"
+                            symbolKeepAspect = $true
                             symbolSize = 34
                             itemStyle  = @{ color = '#90a4ae'; borderColor = '#90a4ae' }
                             children   = $roots

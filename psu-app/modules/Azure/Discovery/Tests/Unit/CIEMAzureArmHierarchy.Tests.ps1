@@ -158,4 +158,29 @@ Describe 'Get-CIEMAzureArmHierarchy' {
             $resources[0].Resource.Name | Should -Be 'vm1'
         }
     }
+
+    Context 'Resource group ARM rows' {
+        BeforeAll {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_arm_resources"
+
+            Save-CIEMAzureArmResource -Id '/subscriptions/sub1/resourceGroups/rg-a' `
+                -Type 'microsoft.resources/subscriptions/resourcegroups' -Name 'rg-a' -ResourceGroup 'rg-a' -SubscriptionId 'sub1' -TenantId 'tenant1'
+
+            Save-CIEMAzureArmResource -Id '/subscriptions/sub1/resourceGroups/rg-a/providers/Microsoft.Compute/virtualMachines/vm1' `
+                -Type 'microsoft.compute/virtualmachines' -Name 'vm1' -ResourceGroup 'rg-a' -SubscriptionId 'sub1' -TenantId 'tenant1'
+        }
+
+        It 'Does not render the resource group ARM row as a child Resource node' {
+            $result = Get-CIEMAzureArmHierarchy
+
+            $resourceGroups = @($result | Where-Object { $_.NodeType -eq 'ResourceGroup' })
+            $resourceGroups | Should -HaveCount 1
+            $resourceGroups[0].Label | Should -Be 'rg-a'
+
+            $resources = @($result | Where-Object { $_.NodeType -eq 'Resource' })
+            $resources | Should -HaveCount 1
+            $resources[0].Resource.Name | Should -Be 'vm1'
+            $resources[0].Resource.Type | Should -Be 'microsoft.compute/virtualmachines'
+        }
+    }
 }

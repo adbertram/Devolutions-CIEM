@@ -302,8 +302,8 @@ test.describe('Environment Page', () => {
     test.beforeAll(() => {
       seedEnvironmentData();
       const count = getTestArmResourceCount();
-      if (count !== 4) {
-        throw new Error(`Expected 4 seeded ARM resources, got ${count}`);
+      if (count !== 5) {
+        throw new Error(`Expected 5 seeded ARM resources, got ${count}`);
       }
       console.log(`[setup] Verified ${count} test ARM resources seeded.`);
     });
@@ -337,6 +337,18 @@ test.describe('Environment Page', () => {
     test('should render tree visualization container', async () => {
       const treeVisible = await envPage.isTreeContainerVisible();
       expect(treeVisible).toBe(true);
+    });
+
+    test('should use resource icon image symbols in the tree visualization', async () => {
+      const keyVaultNode = await envPage.getTreeNodeByName('e2e-kv-1');
+      expect(keyVaultNode).not.toBeNull();
+      expect(keyVaultNode.symbol).toMatch(/^image:\/\/data:image\/svg\+xml;base64,/);
+    });
+
+    test('should not render a resource group ARM row as a duplicate child resource', async () => {
+      const descendants = await envPage.getTreeNodeDescendantNames('e2e-rg-1', 'ResourceGroup');
+      expect(descendants).not.toBeNull();
+      expect(descendants).not.toContain('e2e-rg-1');
     });
 
     test('should re-render tree when layout orientation is changed', async () => {

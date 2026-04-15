@@ -67,4 +67,5 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
 - CIEM feature ideas: `docs/ciem-discovery-feature-ideas.md` - consult this when looking for new CIEM feature ideas. Discovery ideas are read-only by default; write/action ideas require explicit re-scoping before implementation.
+- Resource icons: `psu-app/modules/Devolutions.CIEM.PSU/Data/icons/` contains official Azure, Entra, and AWS icon source packs, curated SVGs in `resources/`, and `resource-icon-map.json` for CIEM resource type mappings.
 - PSU Azure hosting docs: `docs/psu-docs/config/hosting/azure.md`

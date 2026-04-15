@@ -147,16 +147,17 @@ function seedEnvironmentData() {
   const sub1 = `${P}sub-0000-0000-0000-000000000001`;
   const sub2 = `${P}sub-0000-0000-0000-000000000002`;
   sshNonQuery([
+    `INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, collected_at) VALUES ('/subscriptions/${sub1}/resourceGroups/e2e-rg-1','microsoft.resources/subscriptions/resourcegroups','e2e-rg-1','eastus','e2e-rg-1','${sub1}','${tenant}','${now}')`,
     `INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, collected_at) VALUES ('${P}rg1-vnet','microsoft.network/virtualnetworks','e2e-vnet-1','eastus','e2e-rg-1','${sub1}','${tenant}','${now}')`,
     `INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, collected_at) VALUES ('${P}rg1-nsg','microsoft.network/networksecuritygroups','e2e-nsg-1','eastus','e2e-rg-1','${sub1}','${tenant}','${now}')`,
     `INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, collected_at) VALUES ('${P}rg1-sa','microsoft.storage/storageaccounts','e2esa1','eastus','e2e-rg-1','${sub1}','${tenant}','${now}')`,
     `INSERT OR REPLACE INTO azure_arm_resources (id, type, name, location, resource_group, subscription_id, tenant_id, collected_at) VALUES ('${P}rg2-kv','microsoft.keyvault/vaults','e2e-kv-1','westus2','e2e-rg-2','${sub2}','${tenant}','${now}')`,
   ].join('; '));
-  console.log('[seed] Seeded 4 ARM resources for Environment page tests.');
+  console.log('[seed] Seeded 5 ARM resources for Environment page tests.');
 }
 
 function cleanupEnvironmentData() {
-  sshNonQuery(`DELETE FROM azure_arm_resources WHERE id LIKE '${P}%'`);
+  sshNonQuery(`DELETE FROM azure_arm_resources WHERE id LIKE '%${P}%'`);
   console.log('[cleanup] Environment test data cleaned up.');
 }
 
@@ -165,11 +166,11 @@ function getArmResourceCount() {
 }
 
 function getTestArmResourceCount() {
-  return sshQuery(`SELECT COUNT(*) as count FROM azure_arm_resources WHERE id LIKE '${P}%'`)[0].count;
+  return sshQuery(`SELECT COUNT(*) as count FROM azure_arm_resources WHERE id LIKE '%${P}%'`)[0].count;
 }
 
 function backupAndClearAllArmResources() {
-  const rows = sshQuery(`SELECT * FROM azure_arm_resources WHERE id NOT LIKE '${P}%'`);
+  const rows = sshQuery(`SELECT * FROM azure_arm_resources WHERE id NOT LIKE '%${P}%'`);
   sshNonQuery('DELETE FROM azure_arm_resources');
   console.log(`[setup] Backed up ${rows.length} ARM resources and cleared table.`);
   return rows;
@@ -219,6 +220,39 @@ function cleanupIdentityViewData() {
 
 function getTestEffectiveRoleAssignmentCount() {
   return sshQuery(`SELECT COUNT(*) as count FROM azure_effective_role_assignments WHERE principal_id LIKE '${P}%'`)[0].count;
+}
+
+function seedEffectivePermissionsPageData() {
+  const now = new Date().toISOString();
+  const permissionsJson = JSON.stringify([
+    {
+      Actions: ['Microsoft.KeyVault/vaults/read'],
+      NotActions: [],
+      DataActions: [],
+      NotDataActions: []
+    }
+  ]);
+  const roleProperties = JSON.stringify({
+    role_definition_id: `${P}roledef-keyvault-reader`,
+    role_name: 'Key Vault Reader',
+    permissions_json: permissionsJson,
+    privileged: false
+  });
+  sshNonQuery([
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ep-user-1','EntraUser','E2E Effective Permissions User','azure','{}','${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at) VALUES ('${P}ep-keyvault-1','AzureKeyVault','E2E Effective Permissions Key Vault','azure','${P}sub-1','e2e-rg-1','{"arm_type":"microsoft.keyvault/vaults"}','${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ep-user-1','${P}ep-keyvault-1','HasRole',${sqlValue(roleProperties)},0,'${now}')`,
+  ].join('; '));
+  console.log('[seed] Seeded Effective Permissions page graph data.');
+}
+
+function cleanupEffectivePermissionsPageData() {
+  sshNonQuery(`DELETE FROM graph_edges WHERE source_id LIKE '${P}ep-%' OR target_id LIKE '${P}ep-%'; DELETE FROM graph_nodes WHERE id LIKE '${P}ep-%'`);
+  console.log('[cleanup] Effective Permissions page graph data cleaned up.');
+}
+
+function getTestEffectivePermissionGraphEdgeCount() {
+  return sshQuery(`SELECT COUNT(*) as count FROM graph_edges WHERE source_id LIKE '${P}ep-%' OR target_id LIKE '${P}ep-%'`)[0].count;
 }
 
 function seedIdentityAttackPathData() {
@@ -330,6 +364,7 @@ module.exports = {
   backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
+  seedEffectivePermissionsPageData, cleanupEffectivePermissionsPageData, getTestEffectivePermissionGraphEdgeCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,
   seedAttackPathsPageData, cleanupAttackPathsPageData, getTestAttackPathNodeCount,
   TEST_PREFIX
