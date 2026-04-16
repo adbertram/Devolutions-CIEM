@@ -309,19 +309,19 @@ function seedAttackPathsPageData() {
     `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('__internet__','${P}ap-nsg-1','AllowsInbound','{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}',1,'${now}')`,
     // Pattern 2: disabled-account-with-roles
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-disabled-user','EntraUser','E2E Disabled User','azure','{"accountEnabled":false}','${now}')`,
-    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-sub-1','AzureSubscription','E2E Subscription','azure',null,'${now}')`,
-    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ap-disabled-user','${P}ap-sub-1','HasRole','{"roleName":"Contributor","privileged":false}',0,'${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}ap-sub-1','AzureSubscription','E2E Subscription','azure',null,'${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ap-disabled-user','/subscriptions/${P}ap-sub-1','HasRole','{"role_name":"Contributor","role_definition_id":"/subscriptions/${P}ap-sub-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","privileged":false}',0,'${now}')`,
   ].join('; '));
   console.log('[seed] Seeded graph data for Attack Paths page tests (2 patterns).');
 }
 
 function cleanupAttackPathsPageData() {
-  sshNonQuery(`DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%'; DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%'`);
+  sshNonQuery(`DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%' OR target_id = '/subscriptions/${P}ap-sub-1'; DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`);
   console.log('[cleanup] Attack Paths page graph data cleaned up.');
 }
 
 function getTestAttackPathNodeCount() {
-  return sshQuery(`SELECT COUNT(*) as count FROM graph_nodes WHERE id LIKE '${P}ap-%'`)[0].count;
+  return sshQuery(`SELECT COUNT(*) as count FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`)[0].count;
 }
 
 function getCompletedDiscoveryRunCount() {

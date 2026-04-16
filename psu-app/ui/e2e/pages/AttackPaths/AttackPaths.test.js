@@ -6,6 +6,25 @@ test.describe('Attack Paths Page', () => {
   let attackPage;
 
   test.beforeEach(async ({ ciemPage }) => {
+    await ciemPage.addInitScript(() => {
+      let clipboardText = '';
+      const originalExecCommand = document.execCommand.bind(document);
+      document.execCommand = (command) => {
+        if (command === 'copy') {
+          const activeElement = document.activeElement;
+          clipboardText = activeElement && 'value' in activeElement ? activeElement.value : window.getSelection().toString();
+          return true;
+        }
+        return originalExecCommand(command);
+      };
+      Object.defineProperty(navigator, 'clipboard', {
+        value: {
+          writeText: async (value) => { clipboardText = value; },
+          readText: async () => clipboardText
+        },
+        configurable: true
+      });
+    });
     attackPage = new AttackPathsPageHelpers(ciemPage);
     await attackPage.navigateToAttackPathsPage();
   });
@@ -76,6 +95,34 @@ test.describe('Attack Paths Page', () => {
       expect(hasData).toBe(true);
       const filterVisible = await attackPage.isQuickFilterVisible();
       expect(filterVisible).toBe(true);
+    });
+
+    test('should display remediation guidance when an attack path row is expanded', async () => {
+      const hasData = await attackPage.hasAttackPathData();
+      expect(hasData).toBe(true);
+      await attackPage.expandFirstRow();
+      expect(await attackPage.isRemediationBlockVisible()).toBe(true);
+      const remediation = await attackPage.getRemediationText();
+      expect(remediation).toMatch(/^1\./);
+      expect(remediation).toContain('rerun Azure discovery');
+      expect(await attackPage.isRemediationScriptBlockVisible()).toBe(true);
+      const script = await attackPage.getRemediationScriptText();
+      expect(script).toContain('$ErrorActionPreference = \'Stop\'');
+      expect(script).toMatch(/az (network nsg rule delete|role assignment delete|ad group member remove)/);
+      expect(script).not.toContain('{{');
+    });
+
+    test('should copy remediation script when the script copy icon is clicked', async () => {
+      const hasData = await attackPage.hasAttackPathData();
+      expect(hasData).toBe(true);
+      await attackPage.expandFirstRow();
+      expect(await attackPage.isRemediationScriptCopyButtonVisible()).toBe(true);
+      expect(await attackPage.isRemediationScriptCopyIdleVisible()).toBe(true);
+      expect(await attackPage.isRemediationScriptCopySuccessVisible()).toBe(false);
+      const script = await attackPage.getRemediationScriptText();
+      await attackPage.copyRemediationScriptToClipboard();
+      await expect.poll(async () => await attackPage.isRemediationScriptCopySuccessVisible()).toBe(true);
+      await expect.poll(async () => await attackPage.getClipboardText()).toBe(script);
     });
   });
 });

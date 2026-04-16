@@ -10,6 +10,13 @@ class AttackPathsPageHelpers extends BasePage {
       dataGrid: '.MuiDataGrid-root',
       dataGridRows: '.MuiDataGrid-row',
       dataGridColumnHeaders: '.MuiDataGrid-columnHeader',
+      detailPanelToggle: '.MuiDataGrid-row [aria-label="Expand"], .MuiDataGrid-row [aria-label="expand row"]',
+      detailPanel: '.MuiDataGrid-detailPanel',
+      remediationBlock: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation="true"]',
+      remediationScriptBlock: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script="true"]',
+      remediationScriptCopyButton: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script-copy="true"] a',
+      remediationScriptCopyIdle: '.MuiDataGrid-detailPanel [data-ciem-copy-idle="true"]',
+      remediationScriptCopySuccess: '.MuiDataGrid-detailPanel [data-ciem-copy-success="true"]',
       pagination: '.MuiTablePagination-root',
       severityChip: '.MuiDataGrid-row .MuiChip-root',
       quickFilter: '.MuiDataGrid-toolbarQuickFilter input',
@@ -65,6 +72,58 @@ class AttackPathsPageHelpers extends BasePage {
       texts.push((await chips.nth(i).textContent()).trim());
     }
     return texts;
+  }
+
+  async expandFirstRow() {
+    await this.waitForElement(this.selectors.dataGrid);
+    const row = this.page.locator(this.selectors.dataGridRows).first();
+    const toggle = row.locator('[aria-label="Expand"], [aria-label="expand row"]');
+    const toggleCount = await toggle.count();
+    if (toggleCount > 0) {
+      await toggle.first().click();
+    } else {
+      await row.click();
+    }
+
+    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });
+    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });
+    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });
+  }
+
+  async isRemediationBlockVisible() {
+    return await this.isElementVisible(this.selectors.remediationBlock);
+  }
+
+  async getRemediationText() {
+    return (await this.page.locator(this.selectors.remediationBlock).textContent()).trim();
+  }
+
+  async isRemediationScriptBlockVisible() {
+    return await this.isElementVisible(this.selectors.remediationScriptBlock);
+  }
+
+  async getRemediationScriptText() {
+    return (await this.page.locator(this.selectors.remediationScriptBlock).textContent()).trim();
+  }
+
+  async isRemediationScriptCopyButtonVisible() {
+    return await this.isElementVisible(this.selectors.remediationScriptCopyButton);
+  }
+
+  async isRemediationScriptCopyIdleVisible() {
+    return await this.isElementVisible(this.selectors.remediationScriptCopyIdle);
+  }
+
+  async isRemediationScriptCopySuccessVisible() {
+    return await this.isElementVisible(this.selectors.remediationScriptCopySuccess);
+  }
+
+  async copyRemediationScriptToClipboard() {
+    await this.page.locator(this.selectors.remediationScriptCopyButton).click();
+  }
+
+  async getClipboardText() {
+    return await this.page.evaluate(() => navigator.clipboard.readText());
   }
 
   async isPaginationVisible() {
