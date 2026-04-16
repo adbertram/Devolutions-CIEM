@@ -258,6 +258,7 @@ if (result.status !== 'Completed') {
 | Toast notifications | `.MuiSnackbar-root` | `.iziToast` | PSU uses iziToast, not MUI Snackbar |
 | MUI Select open | Click `<input>` | Click `[role="combobox"]` | Hidden input is not interactive |
 | Dynamic element IDs | `#myDynamicId` | Check actual rendered HTML | `New-UDDynamic -Id` uses internal UUIDs |
+| Clipboard assertions on local PSU | Read `navigator.clipboard` directly on `http://192.168.86.30:5001` | Install a test-only clipboard shim with `page.addInitScript()` before navigation | Chromium does not expose Clipboard API on private-IP HTTP origins |
 | Nested cards | `#parent .MuiCard-root` | `#parent > .MuiCard-root` or scope with text | `New-CIEMErrorContent` nests cards |
 | `:has-text()` | `.MuiCard-root:has-text("Tenants")` | Locator chaining: `.MuiTypography-caption`, `{ hasText: /^Tenants$/ }` | `:has-text()` matches any ancestor |
 
