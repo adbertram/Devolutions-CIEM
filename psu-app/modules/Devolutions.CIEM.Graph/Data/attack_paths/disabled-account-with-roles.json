@@ -4,6 +4,8 @@
   "severity": "high",
   "category": "identity-hygiene",
   "description": "A disabled Entra account still has active Azure RBAC role assignments. If the account is re-enabled or its credentials are compromised, the attacker inherits all assigned roles.",
+  "remediation": "1. Open the disabled identity in Microsoft Entra ID and confirm it should remain disabled.\n2. In Azure RBAC, find every active role assignment for this identity at the listed scope.\n3. Remove active role assignments from the disabled identity.\n4. If access is still required, assign it to an active owner-approved identity instead of re-enabling the disabled account.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
+  "remediation_script": "attack_path_remediation_scripts/disabled-account-still-holding-active-role-assignments/remediate.ps1",
   "steps": [
     { "kind": ["EntraUser", "EntraServicePrincipal"], "node_filter": { "property": "accountEnabled", "op": "eq", "value": false } },
     { "edge": "HasRole", "direction": "outbound" }

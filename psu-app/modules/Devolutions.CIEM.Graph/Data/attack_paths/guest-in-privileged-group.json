@@ -4,6 +4,8 @@
   "severity": "high",
   "category": "identity-privilege",
   "description": "A guest account has indirect access to a privileged role via group membership. Group-based privilege is harder to audit than direct assignment, and guest membership in a privileged group is a common oversight when group owners add external collaborators without realizing the downstream role inheritance. Review group membership and ensure privileged groups exclude guests.",
+  "remediation": "1. Identify the privileged group shown in the path and review its role assignments.\n2. Remove the guest user from the privileged group.\n3. If the guest needs access, grant a direct, narrowly scoped, time-bound assignment instead of group-inherited privilege.\n4. Review the privileged group's owners and membership approval process to prevent external users from being added again.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
+  "remediation_script": "attack_path_remediation_scripts/guest-user-is-a-member-of-a-group-that-holds-a-privileged-role/remediate.ps1",
   "steps": [
     { "kind": "EntraUser", "node_filter": { "property": "userType", "op": "eq", "value": "Guest" } },
     { "edge": "MemberOf", "direction": "outbound" },

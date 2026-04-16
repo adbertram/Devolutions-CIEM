@@ -28,6 +28,8 @@ function Get-CIEMAttackPathPattern {
             Severity    = $_.severity
             Category    = $_.category
             Description = $_.description
+            Remediation = $_.remediation
+            RemediationScriptPath = $_.remediation_script
             StepCount   = [int]$stepCount
         }
     })

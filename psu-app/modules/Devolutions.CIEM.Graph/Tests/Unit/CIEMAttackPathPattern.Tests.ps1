@@ -60,6 +60,29 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
             $p.Category  | Should -Be $Category
             $p.Name      | Should -Not -BeNullOrEmpty
             $p.Description | Should -Not -BeNullOrEmpty
+            $p.Remediation | Should -Not -BeNullOrEmpty
+            $p.RemediationScriptPath | Should -Not -BeNullOrEmpty
+        }
+
+        It 'returns remediation guidance for every shipped pattern' {
+            $results = @(Get-CIEMAttackPathPattern)
+            foreach ($p in $results) {
+                $p.Remediation | Should -Not -BeNullOrEmpty -Because "pattern '$($p.Id)' must provide remediation guidance"
+                $p.Remediation | Should -Match 'rerun Azure discovery' -Because "pattern '$($p.Id)' remediation must include validation guidance"
+            }
+        }
+
+        It 'maps every shipped pattern to a rule-name slug remediation script folder' {
+            $scriptRoot = InModuleScope Devolutions.CIEM { Join-Path $script:GraphRoot 'Data' }
+            $results = @(Get-CIEMAttackPathPattern)
+            foreach ($p in $results) {
+                $slug = InModuleScope Devolutions.CIEM -Parameters @{ name = $p.Name } {
+                    param($name)
+                    ConvertToCIEMAttackPathRuleSlug -Name $name
+                }
+                $p.RemediationScriptPath | Should -Be "attack_path_remediation_scripts/$slug/remediate.ps1"
+                Join-Path $scriptRoot $p.RemediationScriptPath | Should -Exist
+            }
         }
     }
 
@@ -73,6 +96,16 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
         It 'StepCount is [int], not [string]' {
             $first = @(Get-CIEMAttackPathPattern)[0]
             $first.StepCount | Should -BeOfType [int]
+        }
+
+        It 'Remediation is [string], not an object or array' {
+            $first = @(Get-CIEMAttackPathPattern)[0]
+            $first.Remediation | Should -BeOfType [string]
+        }
+
+        It 'RemediationScriptPath is [string], not an object or array' {
+            $first = @(Get-CIEMAttackPathPattern)[0]
+            $first.RemediationScriptPath | Should -BeOfType [string]
         }
 
         It 'always returns an array (full catalog)' {
@@ -169,7 +202,29 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
                 $raw.severity    | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing severity"
                 $raw.category    | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing category"
                 $raw.description | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing description"
+                $raw.remediation | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing remediation"
+                $raw.remediation_script | Should -Not -BeNullOrEmpty -Because "pattern '$($raw.id)' missing remediation_script"
                 @($raw.steps).Count | Should -BeGreaterThan 0 -Because "pattern '$($raw.id)' has no steps"
+            }
+        }
+
+        It 'every remediation script template has no unknown replacement token format' {
+            $scriptRoot = InModuleScope Devolutions.CIEM { Join-Path $script:GraphRoot 'Data' }
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                $scriptPath = Join-Path $scriptRoot $raw.remediation_script
+                $scriptPath | Should -Exist -Because "pattern '$($raw.id)' references a missing remediation script template"
+                $content = Get-Content $scriptPath -Raw
+                $tokens = @([regex]::Matches($content, '{{([A-Z0-9_]+)}}') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+                foreach ($token in $tokens) {
+                    $token | Should -BeIn @(
+                        'PATTERN_NAME',
+                        'PATH_CHAIN',
+                        'ROLE_ASSIGNMENT_DELETE_COMMANDS',
+                        'NSG_RULE_DELETE_COMMANDS',
+                        'GROUP_MEMBER_REMOVE_COMMANDS'
+                    ) -Because "pattern '$($raw.id)' template uses unknown token '$token'"
+                }
             }
         }
     }

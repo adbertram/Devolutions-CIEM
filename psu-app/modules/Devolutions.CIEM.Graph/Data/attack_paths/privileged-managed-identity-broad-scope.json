@@ -4,6 +4,8 @@
   "severity": "critical",
   "category": "identity-privilege",
   "description": "A VM's managed identity holds a privileged role at subscription scope. Any compromise of the VM - via an application vulnerability, RDP credential theft, or insider access - hands the attacker a token that can act across the entire subscription. Managed identities attached to workloads should be granted least-privilege roles scoped to only the resources the workload actually needs.",
+  "remediation": "1. Identify the VM, managed identity, privileged role, and subscription scope shown in the path.\n2. Remove the subscription-level privileged role assignment from the managed identity.\n3. Assign the managed identity only the actions it needs, scoped to the specific resource or resource group.\n4. Validate the workload still functions with the narrower assignment before removing any temporary exception.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
+  "remediation_script": "attack_path_remediation_scripts/vm-with-managed-identity-holding-a-privileged-subscription-role/remediate.ps1",
   "steps": [
     { "kind": "AzureVM" },
     { "edge": "HasManagedIdentity", "direction": "outbound" },

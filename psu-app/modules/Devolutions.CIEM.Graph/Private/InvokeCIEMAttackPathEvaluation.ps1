@@ -152,8 +152,14 @@ WHERE e.source_id = @nodeId AND e.kind = @edgeKind
         $attackPath.PatternName = $Pattern.name
         $attackPath.Severity    = $Pattern.severity
         $attackPath.Category    = $Pattern.category
+        $attackPath.Remediation = $Pattern.remediation
         $attackPath.Path        = $pathNodes
         $attackPath.Edges       = $pathEdges
+        if ($Pattern.PSObject.Properties['remediation_script'] -and $Pattern.remediation_script) {
+            $script = ResolveCIEMAttackPathRemediationScript -Pattern $Pattern -AttackPath $attackPath
+            $attackPath.RemediationScript = $script.Content
+            $attackPath.RemediationScriptPath = $script.RelativePath
+        }
         $attackPath
     })
 }

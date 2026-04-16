@@ -4,6 +4,8 @@
   "severity": "critical",
   "category": "identity-privilege",
   "description": "An external guest account (B2B collaborator from another tenant) holds a privileged Azure role. Guests originate outside your identity boundary and cannot be governed by your internal onboarding or offboarding processes. Privileged access granted to guests should be rare, scoped, and time-limited via Entitlement Management or PIM.",
+  "remediation": "1. Confirm the guest user's business owner and the reason for privileged access.\n2. Remove the direct privileged role assignment from the guest account.\n3. If the guest still needs access, replace it with a narrowly scoped, time-bound assignment controlled by Entitlement Management or PIM.\n4. Review other assignments for the same guest before closing the remediation.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
+  "remediation_script": "attack_path_remediation_scripts/guest-user-holding-a-privileged-role/remediate.ps1",
   "steps": [
     { "kind": "EntraUser", "node_filter": { "property": "userType", "op": "eq", "value": "Guest" } },
     { "edge": "HasRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } }

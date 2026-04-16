@@ -243,9 +243,9 @@ Describe 'Attack Path Engine' {
             Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
 
             Save-CIEMGraphNode -Id '__internet__' -Kind 'Internet' -DisplayName 'Internet' -Provider 'global'
-            Save-CIEMGraphNode -Id '/subs/s1/rg/rg1/nsg/nsg1' -Kind 'AzureNSG' -DisplayName 'nsg1' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AzureNSG' -DisplayName 'nsg1' -Provider 'azure'
 
-            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subs/s1/rg/rg1/nsg/nsg1' -Kind 'AllowsInbound' `
+            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AllowsInbound' `
                 -Properties '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}' -Computed 1
         }
 
@@ -750,9 +750,9 @@ Describe 'Attack Path Engine' {
             Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
 
             Save-CIEMGraphNode -Id '__internet__' -Kind 'Internet' -DisplayName 'Internet' -Provider 'global'
-            Save-CIEMGraphNode -Id '/subs/s1/rg/rg1/nsg/nsg1' -Kind 'AzureNSG' -DisplayName 'nsg1' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AzureNSG' -DisplayName 'nsg1' -Provider 'azure'
 
-            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subs/s1/rg/rg1/nsg/nsg1' -Kind 'AllowsInbound' `
+            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AllowsInbound' `
                 -Properties '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}' -Computed 1
         }
 
@@ -770,6 +770,15 @@ Describe 'Attack Path Engine' {
             $r.Severity | Should -Be 'high'
             $r.PSObject.Properties.Name | Should -Contain 'Path'
             $r.PSObject.Properties.Name | Should -Contain 'Edges'
+            $r.PSObject.Properties.Name | Should -Contain 'Remediation'
+            $r.PSObject.Properties.Name | Should -Contain 'RemediationScript'
+            $r.PSObject.Properties.Name | Should -Contain 'RemediationScriptPath'
+            $r.Remediation | Should -Match 'Restrict or remove the inbound management rule'
+            $r.Remediation | Should -Match 'rerun Azure discovery'
+            $r.RemediationScriptPath | Should -Be 'attack_path_remediation_scripts/management-port-open-to-the-internet/remediate.ps1'
+            $r.RemediationScript | Should -Match 'az network nsg rule delete'
+            $r.RemediationScript | Should -Match '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft\.Network/networkSecurityGroups/nsg1/securityRules/AllowRDP'
+            $r.RemediationScript | Should -Not -Match '{{'
         }
 
         It 'Path contains ordered node objects matching the chain' {
@@ -801,11 +810,45 @@ Describe 'Attack Path Engine' {
         It 'Evaluates edge filter conditions correctly (non-management ports excluded)' {
             # Replace the edge with a non-management port (443)
             Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
-            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subs/s1/rg/rg1/nsg/nsg1' -Kind 'AllowsInbound' `
+            Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AllowsInbound' `
                 -Properties '{"open_ports":[{"port":443,"protocol":"TCP","rule_name":"AllowHTTPS"}]}' -Computed 1
 
             $results = @(Get-CIEMAttackPath -PatternId 'open-management-port')
             $results | Should -HaveCount 0
+        }
+    }
+
+    Context 'Get-CIEMAttackPath remediation scripts for identity remediation commands' {
+
+        BeforeEach {
+            Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
+        }
+
+        It 'renders a direct Azure RBAC role assignment delete command from the finding path' {
+            Save-CIEMGraphNode -Id 'disabled-user-1' -Kind 'EntraUser' -DisplayName 'Disabled User' -Provider 'azure' -Properties '{"accountEnabled":false}'
+            Save-CIEMGraphNode -Id '/subscriptions/sub-disabled-1' -Kind 'AzureSubscription' -DisplayName 'Disabled Test Subscription' -Provider 'azure'
+            Save-CIEMGraphEdge -SourceId 'disabled-user-1' -TargetId '/subscriptions/sub-disabled-1' -Kind 'HasRole' `
+                -Properties '{"role_name":"Contributor","role_definition_id":"/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","privileged":false}' -Computed 1
+
+            $result = @(Get-CIEMAttackPath -PatternId 'disabled-account-with-roles')[0]
+            $result.RemediationScript | Should -Match "az role assignment delete --assignee-object-id 'disabled-user-1'"
+            $result.RemediationScript | Should -Match "--role '/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role'"
+            $result.RemediationScript | Should -Match "--scope '/subscriptions/sub-disabled-1'"
+            $result.RemediationScript | Should -Not -Match '{{'
+        }
+
+        It 'renders a group membership remove command from the finding path' {
+            Save-CIEMGraphNode -Id 'guest-user-1' -Kind 'EntraUser' -DisplayName 'Guest User' -Provider 'azure' -Properties '{"userType":"Guest"}'
+            Save-CIEMGraphNode -Id 'privileged-group-1' -Kind 'EntraGroup' -DisplayName 'Privileged Group' -Provider 'azure'
+            Save-CIEMGraphNode -Id '/subscriptions/sub-guest-1' -Kind 'AzureSubscription' -DisplayName 'Guest Test Subscription' -Provider 'azure'
+            Save-CIEMGraphEdge -SourceId 'guest-user-1' -TargetId 'privileged-group-1' -Kind 'MemberOf' -Computed 1
+            Save-CIEMGraphEdge -SourceId 'privileged-group-1' -TargetId '/subscriptions/sub-guest-1' -Kind 'HasRole' `
+                -Properties '{"role_name":"Owner","role_definition_id":"/subscriptions/sub-guest-1/providers/Microsoft.Authorization/roleDefinitions/owner-role","privileged":true}' -Computed 1
+
+            $result = @(Get-CIEMAttackPath -PatternId 'guest-in-privileged-group')[0]
+            $result.RemediationScript | Should -Match "az ad group member remove --group 'privileged-group-1' --member-id 'guest-user-1'"
+            $result.RemediationScript | Should -Not -Match '{{'
         }
     }
 
@@ -827,7 +870,7 @@ Describe 'Attack Path Engine' {
             Save-CIEMGraphEdge -SourceId 'nsg-filter-1' -TargetId 'vm-filter-1' -Kind 'AttachedTo' -Computed 1
             Save-CIEMGraphEdge -SourceId 'vm-filter-1' -TargetId 'mi-filter-1' -Kind 'HasManagedIdentity'
             Save-CIEMGraphEdge -SourceId 'mi-filter-1' -TargetId '/subscriptions/sub-filter-1' -Kind 'HasRole' `
-                -Properties '{"roleName":"Owner","privileged":true}'
+                -Properties '{"role_name":"Owner","role_definition_id":"/subscriptions/sub-filter-1/providers/Microsoft.Authorization/roleDefinitions/owner-role","privileged":true}'
         }
 
         It 'Returns attack paths containing the specified principal' {

@@ -4,6 +4,8 @@
   "severity": "high",
   "category": "identity-privilege",
   "description": "A service principal has been granted the Owner role at subscription scope. Service principals authenticate with static secrets or certificates, which are routinely leaked into source code, CI logs, and developer workstations. Owner on a subscription allows modifying RBAC, so a compromised SP secret gives an attacker a path to escalate to tenant-wide control. Service principals should hold the least privilege required - typically Contributor or a custom role - and never Owner.",
+  "remediation": "1. Identify the service principal and subscription-level Owner assignment shown in the path.\n2. Remove the Owner role assignment from the service principal.\n3. Replace it with Contributor, Reader, or a custom least-privilege role scoped to the resources the application actually manages.\n4. Rotate the service principal secret or certificate if there is any chance the credential was exposed.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
+  "remediation_script": "attack_path_remediation_scripts/service-principal-holding-owner-role-on-a-subscription/remediate.ps1",
   "steps": [
     { "kind": "EntraServicePrincipal" },
     { "edge": "HasRole", "direction": "outbound", "filter": { "property": "role_name", "op": "eq", "value": "Owner" } },
