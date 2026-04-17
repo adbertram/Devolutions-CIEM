@@ -105,6 +105,18 @@ Describe 'Discovery Run CRUD' {
             $results[0].StartedAt | Should -Be '2026-01-03T00:00:00Z'
             $results[2].StartedAt | Should -Be '2026-01-01T00:00:00Z'
         }
+
+        It 'Applies -Status before -Last so running runs do not replace the latest completed run' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-01-01T00:00:00Z' -CompletedAt '2026-01-01T00:30:00Z'
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Running' -StartedAt '2026-01-02T00:00:00Z'
+
+            $results = @(Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1)
+
+            $results | Should -HaveCount 1
+            $results[0].Status | Should -Be 'Completed'
+            $results[0].CompletedAt | Should -Be '2026-01-01T00:30:00Z'
+        }
     }
 
     Context 'Update-CIEMAzureDiscoveryRun' {

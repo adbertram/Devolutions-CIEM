@@ -5,7 +5,8 @@ const {
   getTestArmResourceCount, getArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns,
-  seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
+  seedRunningDiscoveryRun, getRunningDiscoveryRunCount,
+  backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRunAt,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount
 } = require('../../_utils/cleanup');
 const {
@@ -62,10 +63,14 @@ test.describe('Environment Page', () => {
   // --- Discovery status banner: running discovery ---
 
   test.describe('when a discovery run is in progress', () => {
+    let backup = null;
     let seededRunId = null;
+    const completedAt = '2026-03-14T09:15:30Z';
+    const expectedTimestamp = '2026-03-14 09:15 UTC';
 
     test.beforeAll(() => {
-      clearStaleDiscoveryRuns();
+      backup = backupAndClearAllDiscoveryRuns();
+      seedCompletedDiscoveryRunAt(completedAt);
       seededRunId = seedRunningDiscoveryRun();
       const count = getRunningDiscoveryRunCount();
       if (count < 1) {
@@ -75,10 +80,7 @@ test.describe('Environment Page', () => {
     });
 
     test.afterAll(() => {
-      if (seededRunId) {
-        cleanupDiscoveryRun(seededRunId);
-      }
-      clearStaleDiscoveryRuns();
+      restoreDiscoveryRuns(backup);
     });
 
     test('should display the discovery status banner', async () => {
@@ -98,6 +100,16 @@ test.describe('Environment Page', () => {
       await envPage.waitForDiscoveryStatusBanner();
       const visible = await envPage.isCancelDiscoveryButtonVisible();
       expect(visible).toBe(true);
+    });
+
+    test('should keep the global last discovery timestamp box visible', async () => {
+      const header = envPage.page.locator('#ciemLastDiscoveryHeader');
+      await expect(header).toBeVisible({ timeout: 15000 });
+      await expect(header).toContainText('Last discovery generated');
+      await expect(header).toContainText(expectedTimestamp);
+
+      const psuErrorToast = envPage.page.locator('.iziToast:has-text("One or more errors occurred")');
+      await expect(psuErrorToast).toHaveCount(0);
     });
 
     test('should hide the banner after cancelling', async () => {

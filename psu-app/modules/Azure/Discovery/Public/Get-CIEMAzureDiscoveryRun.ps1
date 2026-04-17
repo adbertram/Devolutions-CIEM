@@ -17,25 +17,25 @@ function Get-CIEMAzureDiscoveryRun {
     $conditions = @()
     $parameters = @{}
 
-    if ($PSBoundParameters.ContainsKey('Last')) {
-        $rows = @(Invoke-CIEMQuery -Query "SELECT * FROM azure_discovery_runs ORDER BY started_at DESC LIMIT @last" -Parameters @{ last = $Last })
-    } else {
-        if ($PSBoundParameters.ContainsKey('Id')) {
-            $conditions += "id = @id"
-            $parameters.id = $Id
-        }
-        if ($PSBoundParameters.ContainsKey('Status')) {
-            $conditions += "status = @status"
-            $parameters.status = $Status
-        }
-
-        $query = "SELECT * FROM azure_discovery_runs"
-        if ($conditions.Count -gt 0) {
-            $query += "`nWHERE " + ($conditions -join ' AND ')
-        }
-
-        $rows = @(Invoke-CIEMQuery -Query $query -Parameters $parameters)
+    if ($PSBoundParameters.ContainsKey('Id')) {
+        $conditions += "id = @id"
+        $parameters.id = $Id
     }
+    if ($PSBoundParameters.ContainsKey('Status')) {
+        $conditions += "status = @status"
+        $parameters.status = $Status
+    }
+
+    $query = "SELECT * FROM azure_discovery_runs"
+    if ($conditions.Count -gt 0) {
+        $query += "`nWHERE " + ($conditions -join ' AND ')
+    }
+    if ($PSBoundParameters.ContainsKey('Last')) {
+        $query += "`nORDER BY started_at DESC LIMIT @last"
+        $parameters.last = $Last
+    }
+
+    $rows = @(Invoke-CIEMQuery -Query $query -Parameters $parameters)
 
     @(foreach ($row in $rows) {
         $obj = [CIEMAzureDiscoveryRun]::new()

@@ -81,6 +81,15 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
   2. Restart the PSU server only if needed
   3. Do not reset local PSU state without explicit user approval
 
+## Known Issues
+
+### 1. Discovery Last Query Must Preserve Filters
+**Symptom:** The global Last Discovery header can disappear and PSU can show `One or more errors occurred` while a discovery run is in progress.
+**Cause:** `Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 1` must apply `-Status` before `-Last`. If `-Last` ignores filters, a newer `Running` run with no `CompletedAt` is returned to `New-CIEMLastDiscoveryHeader`.
+**Fix:** Build the `WHERE` clause for `Id` and `Status` first in `psu-app/modules/Azure/Discovery/Public/Get-CIEMAzureDiscoveryRun.ps1`, then append `ORDER BY started_at DESC LIMIT @last` only when `-Last` is supplied.
+**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureDiscoveryRun.Tests.ps1 -Output Detailed"` and `cd psu-app/ui/e2e && npx playwright test pages/Environment/Environment.test.js -g "when a discovery run is in progress"`.
+**Recurrence Prevention:** Keep the Pester test named `Applies -Status before -Last so running runs do not replace the latest completed run` and the Environment E2E test named `should keep the global last discovery timestamp box visible`.
+
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
 - CIEM feature todos: `docs/ciem-feature-todos.md` - consult this when looking for new CIEM feature ideas. Discovery ideas are read-only by default; write/action ideas require explicit re-scoping before implementation.
