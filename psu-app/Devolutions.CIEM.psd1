@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Devolutions.CIEM.psm1'
-    ModuleVersion = '0.3.252'
+    ModuleVersion = '0.3.287'
     GUID                 = 'b8952107-9d81-4324-8605-4d5a1c216ec0'
     Author               = 'Adam Bertram'
     CompanyName          = 'Devolutions Inc.'
@@ -14,7 +14,7 @@
     AliasesToExport      = @()
     PrivateData          = @{
         PSData = @{
-            Tags       = @('CIEM', 'Cloud', 'Identity', 'Security', 'Azure', 'AWS', 'PowerShellUniversal', 'IAM', 'RBAC')
+            Tags       = @('CIEM', 'Cloud', 'Identities', 'Security', 'Azure', 'AWS', 'PowerShellUniversal', 'IAM', 'RBAC')
             ProjectUri = 'https://github.com/Devolutions/CIEM'
         }
     }

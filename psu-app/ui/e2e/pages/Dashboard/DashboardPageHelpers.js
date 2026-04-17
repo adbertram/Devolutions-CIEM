@@ -9,6 +9,8 @@ class DashboardPageHelpers extends BasePage {
       subtitle: "text=Cloud Infrastructure Entitlement Management",
       scanRunSelector: '#scanRunSelector',
       scanRunSelectorCombobox: '[role="combobox"][aria-labelledby="scanRunSelectorlabel"]',
+      lastDiscoveryHeader: '#ciemLastDiscoveryHeader',
+      localLastDiscoverySummary: '#lastDiscoverySummary',
       runNewScanBtn: "button:has-text('Run New Scan')",
       // Summary cards
       summaryCards: '.MuiGrid-container .MuiCard-root',
@@ -53,6 +55,14 @@ class DashboardPageHelpers extends BasePage {
 
   async isRunNewScanButtonVisible() {
     return await this.isElementVisible(this.selectors.runNewScanBtn);
+  }
+
+  async isLastDiscoveryHeaderVisible() {
+    return await this.isElementVisible(this.selectors.lastDiscoveryHeader);
+  }
+
+  async getLocalLastDiscoverySummaryCount() {
+    return await this.page.locator(this.selectors.localLastDiscoverySummary).count();
   }
 
   async getCardValue(cardSelector) {

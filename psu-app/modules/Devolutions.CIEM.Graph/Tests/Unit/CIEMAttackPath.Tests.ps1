@@ -17,9 +17,15 @@ BeforeAll {
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
     }
+
+    Sync-CIEMAttackPathRuleCatalog | Out-Null
 }
 
 Describe 'Attack Path Engine' {
+
+    BeforeEach {
+        Invoke-CIEMQuery -Query "DELETE FROM attack_paths"
+    }
 
     # =========================================================================
     # Private: ResolveCIEMAttackPathFilter
@@ -754,6 +760,8 @@ Describe 'Attack Path Engine' {
 
             Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AllowsInbound' `
                 -Properties '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}' -Computed 1
+
+            Update-CIEMAttackPath | Out-Null
         }
 
         It 'Returns attack path findings for matching patterns' {
@@ -765,6 +773,7 @@ Describe 'Attack Path Engine' {
         It 'Returns findings with PatternId, PatternName, Severity, Path, Edges properties' {
             $results = @(Get-CIEMAttackPath -PatternId 'open-management-port')
             $r = $results[0]
+            $r.GetType().Name | Should -Be 'CIEMAttackPath'
             $r.PatternId | Should -Be 'open-management-port'
             $r.PatternName | Should -Be 'Management port open to the internet'
             $r.Severity | Should -Be 'high'
@@ -773,12 +782,12 @@ Describe 'Attack Path Engine' {
             $r.PSObject.Properties.Name | Should -Contain 'Remediation'
             $r.PSObject.Properties.Name | Should -Contain 'RemediationScript'
             $r.PSObject.Properties.Name | Should -Contain 'RemediationScriptPath'
+            $r.PSObject.Properties.Name | Should -Contain 'PsuScriptName'
             $r.Remediation | Should -Match 'Restrict or remove the inbound management rule'
             $r.Remediation | Should -Match 'rerun Azure discovery'
-            $r.RemediationScriptPath | Should -Be 'attack_path_remediation_scripts/management-port-open-to-the-internet/remediate.ps1'
-            $r.RemediationScript | Should -Match 'az network nsg rule delete'
-            $r.RemediationScript | Should -Match '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft\.Network/networkSecurityGroups/nsg1/securityRules/AllowRDP'
-            $r.RemediationScript | Should -Not -Match '{{'
+            $r.RemediationScriptPath | Should -Be 'modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/management-port-open-to-the-internet.ps1'
+            $r.PsuScriptName | Should -Be 'management-port-open-to-the-internet'
+            $r.RemediationScript | Should -BeNullOrEmpty
         }
 
         It 'Path contains ordered node objects matching the chain' {
@@ -803,6 +812,8 @@ Describe 'Attack Path Engine' {
 
         It 'Returns empty array when no paths match' {
             Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
+            Update-CIEMAttackPath -PatternId 'open-management-port' | Out-Null
+
             $results = @(Get-CIEMAttackPath -PatternId 'open-management-port')
             $results | Should -HaveCount 0
         }
@@ -812,6 +823,7 @@ Describe 'Attack Path Engine' {
             Invoke-CIEMQuery -Query "DELETE FROM graph_edges"
             Save-CIEMGraphEdge -SourceId '__internet__' -TargetId '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1' -Kind 'AllowsInbound' `
                 -Properties '{"open_ports":[{"port":443,"protocol":"TCP","rule_name":"AllowHTTPS"}]}' -Computed 1
+            Update-CIEMAttackPath -PatternId 'open-management-port' | Out-Null
 
             $results = @(Get-CIEMAttackPath -PatternId 'open-management-port')
             $results | Should -HaveCount 0
@@ -826,29 +838,49 @@ Describe 'Attack Path Engine' {
         }
 
         It 'renders a direct Azure RBAC role assignment delete command from the finding path' {
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                [pscustomobject]@{
+                    Name    = $Name
+                    Content = '{{ROLE_ASSIGNMENT_DELETE_COMMANDS}}'
+                }
+            }
+
             Save-CIEMGraphNode -Id 'disabled-user-1' -Kind 'EntraUser' -DisplayName 'Disabled User' -Provider 'azure' -Properties '{"accountEnabled":false}'
             Save-CIEMGraphNode -Id '/subscriptions/sub-disabled-1' -Kind 'AzureSubscription' -DisplayName 'Disabled Test Subscription' -Provider 'azure'
             Save-CIEMGraphEdge -SourceId 'disabled-user-1' -TargetId '/subscriptions/sub-disabled-1' -Kind 'HasRole' `
                 -Properties '{"role_name":"Contributor","role_definition_id":"/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","privileged":false}' -Computed 1
+            Update-CIEMAttackPath -PatternId 'disabled-account-with-roles' | Out-Null
 
             $result = @(Get-CIEMAttackPath -PatternId 'disabled-account-with-roles')[0]
-            $result.RemediationScript | Should -Match "az role assignment delete --assignee-object-id 'disabled-user-1'"
-            $result.RemediationScript | Should -Match "--role '/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role'"
-            $result.RemediationScript | Should -Match "--scope '/subscriptions/sub-disabled-1'"
-            $result.RemediationScript | Should -Not -Match '{{'
+            $scriptText = Get-CIEMAttackPathRemediationScript -Id $result.Id
+
+            $scriptText | Should -Match "az role assignment delete --assignee-object-id 'disabled-user-1'"
+            $scriptText | Should -Match "--role '/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role'"
+            $scriptText | Should -Match "--scope '/subscriptions/sub-disabled-1'"
+            $scriptText | Should -Not -Match '{{'
         }
 
         It 'renders a group membership remove command from the finding path' {
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                [pscustomobject]@{
+                    Name    = $Name
+                    Content = '{{GROUP_MEMBER_REMOVE_COMMANDS}}'
+                }
+            }
+
             Save-CIEMGraphNode -Id 'guest-user-1' -Kind 'EntraUser' -DisplayName 'Guest User' -Provider 'azure' -Properties '{"userType":"Guest"}'
             Save-CIEMGraphNode -Id 'privileged-group-1' -Kind 'EntraGroup' -DisplayName 'Privileged Group' -Provider 'azure'
             Save-CIEMGraphNode -Id '/subscriptions/sub-guest-1' -Kind 'AzureSubscription' -DisplayName 'Guest Test Subscription' -Provider 'azure'
             Save-CIEMGraphEdge -SourceId 'guest-user-1' -TargetId 'privileged-group-1' -Kind 'MemberOf' -Computed 1
             Save-CIEMGraphEdge -SourceId 'privileged-group-1' -TargetId '/subscriptions/sub-guest-1' -Kind 'HasRole' `
                 -Properties '{"role_name":"Owner","role_definition_id":"/subscriptions/sub-guest-1/providers/Microsoft.Authorization/roleDefinitions/owner-role","privileged":true}' -Computed 1
+            Update-CIEMAttackPath -PatternId 'guest-in-privileged-group' | Out-Null
 
             $result = @(Get-CIEMAttackPath -PatternId 'guest-in-privileged-group')[0]
-            $result.RemediationScript | Should -Match "az ad group member remove --group 'privileged-group-1' --member-id 'guest-user-1'"
-            $result.RemediationScript | Should -Not -Match '{{'
+            $scriptText = Get-CIEMAttackPathRemediationScript -Id $result.Id
+
+            $scriptText | Should -Match "az ad group member remove --group 'privileged-group-1' --member-id 'guest-user-1'"
+            $scriptText | Should -Not -Match '{{'
         }
     }
 
@@ -871,6 +903,8 @@ Describe 'Attack Path Engine' {
             Save-CIEMGraphEdge -SourceId 'vm-filter-1' -TargetId 'mi-filter-1' -Kind 'HasManagedIdentity'
             Save-CIEMGraphEdge -SourceId 'mi-filter-1' -TargetId '/subscriptions/sub-filter-1' -Kind 'HasRole' `
                 -Properties '{"role_name":"Owner","role_definition_id":"/subscriptions/sub-filter-1/providers/Microsoft.Authorization/roleDefinitions/owner-role","privileged":true}'
+
+            Update-CIEMAttackPath | Out-Null
         }
 
         It 'Returns attack paths containing the specified principal' {

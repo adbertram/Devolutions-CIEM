@@ -221,7 +221,7 @@ function New-CIEMScanPage {
                         Devolutions.CIEM\Write-CIEMLog -Message "Launching CIEM Scan job for providers: $($selectedProviders -join ', ')..." -Severity INFO -Component 'PSU-ScanPage'
 
                         $scanRun = Devolutions.CIEM\Invoke-CIEMJobWithProgress `
-                            -ScriptName 'Devolutions.CIEM\New-CIEMScanRun' `
+                            -ScriptName 'Checks/New-CIEMScanRun' `
                             -ProgressElementId 'scanProgressArea' `
                             -DisableElementIds @('startScanBtn') `
                             -MaxPollSeconds 1800

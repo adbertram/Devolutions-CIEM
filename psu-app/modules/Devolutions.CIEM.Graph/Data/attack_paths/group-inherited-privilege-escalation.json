@@ -5,9 +5,10 @@
   "category": "identity-privilege",
   "description": "An identity holds a privileged role not through direct assignment but via group membership. Group-inherited privileges are harder to audit and can lead to unintended privilege escalation when group membership changes.",
   "remediation": "1. Identify the group that grants the inherited privileged role.\n2. Remove the identity from the privileged group when it does not need that role.\n3. If the identity needs access, create or use a narrower group with the minimum required role and scope.\n4. Review group owners and membership change controls so future additions do not inherit privileged access accidentally.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
-  "remediation_script": "attack_path_remediation_scripts/identity-inherits-privileged-role-through-group-membership/remediate.ps1",
+  "remediation_script": "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/identity-inherits-privileged-role-through-group-membership.ps1",
   "steps": [
     { "kind": ["EntraUser", "EntraServicePrincipal", "EntraManagedIdentity"] },
     { "edge": "InheritedRole", "direction": "outbound", "filter": { "property": "privileged", "op": "eq", "value": true } }
   ]
 }
+

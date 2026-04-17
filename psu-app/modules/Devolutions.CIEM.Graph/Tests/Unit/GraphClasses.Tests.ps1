@@ -90,4 +90,31 @@ Describe 'Graph Classes' {
             $obj.EdgeKind | Should -Be 'HasRole'
         }
     }
+
+    Context 'CIEMAttackPathRule class' {
+        It 'CIEMAttackPathRule stores database-backed rule metadata and PSU script references' {
+            $obj = InModuleScope Devolutions.CIEM { [CIEMAttackPathRule]::new() }
+            $props = $obj.PSObject.Properties.Name
+            $props | Should -Contain 'Id'
+            $props | Should -Contain 'Name'
+            $props | Should -Contain 'Severity'
+            $props | Should -Contain 'Category'
+            $props | Should -Contain 'Description'
+            $props | Should -Contain 'Remediation'
+            $props | Should -Contain 'RemediationScriptPath'
+            $props | Should -Contain 'PsuScriptName'
+            $props | Should -Contain 'Steps'
+            $props | Should -Contain 'StepCount'
+            $props | Should -Contain 'Disabled'
+            $props | Should -Contain 'UpdatedAt'
+        }
+
+        It 'CIEMAttackPathRule Steps defaults to an empty array' {
+            $obj = InModuleScope Devolutions.CIEM {
+                $rule = [CIEMAttackPathRule]::new()
+                @{ StepCount = @($rule.Steps).Count }
+            }
+            $obj.StepCount | Should -Be 0
+        }
+    }
 }

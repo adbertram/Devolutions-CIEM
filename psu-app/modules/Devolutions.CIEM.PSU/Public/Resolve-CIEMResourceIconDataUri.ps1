@@ -1,4 +1,6 @@
 function Get-CIEMResourceIconManifest {
+    $ErrorActionPreference = 'Stop'
+
     $manifestPath = Join-Path $PSScriptRoot '../Data/icons/resource-icon-map.json'
 
     if (-not $script:CIEMResourceIconManifest) {
@@ -23,6 +25,8 @@ function Get-CIEMResourceIconMapValue {
         [string]$Key
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $property = $Map.PSObject.Properties[$Key]
     if ($property) {
         return [string]$property.Value
@@ -36,6 +40,8 @@ function Get-CIEMResourceIconDataUri {
         [Parameter(Mandatory)]
         [string]$RelativePath
     )
+
+    $ErrorActionPreference = 'Stop'
 
     Get-CIEMResourceIconManifest | Out-Null
 
@@ -72,6 +78,8 @@ function Resolve-CIEMResourceIconDataUri {
         [AllowNull()]
         [string]$PropertiesJson
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $manifest = Get-CIEMResourceIconManifest
     $relativePath = $null

@@ -77,7 +77,7 @@ Describe 'Get-CIEMIdentityRiskSignals' {
         }
 
         It 'Returns object with expected properties' {
-            $script:result.PSObject.Properties.Name | Should -Contain 'Identity'
+            $script:result.PSObject.Properties.Name | Should -Contain 'Identities'
             $script:result.PSObject.Properties.Name | Should -Contain 'RoleAssignments'
             $script:result.PSObject.Properties.Name | Should -Contain 'RiskSignals'
             $script:result.PSObject.Properties.Name | Should -Contain 'InheritedRoles'

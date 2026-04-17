@@ -9,7 +9,8 @@ class NavigationPageHelpers extends BasePage {
       navDrawer: '.MuiDrawer-anchorLeft',
       navList: '.MuiDrawer-anchorLeft .MuiList-root',
       navItem: '.MuiDrawer-anchorLeft .MuiListItem-root',
-      navItemByLabel: (label) => `.MuiDrawer-anchorLeft .MuiListItem-root:has-text("${label}")`
+      navItemByLabel: (label) => `.MuiDrawer-anchorLeft .MuiListItem-root:has-text("${label}")`,
+      lastDiscoveryHeader: '#ciemLastDiscoveryHeader'
     };
     this.expectedNavItems = [
       { label: 'Dashboard', href: '/ciem' },
@@ -26,6 +27,10 @@ class NavigationPageHelpers extends BasePage {
 
   async navigateToDashboard() {
     await this.goto(testConfig.pages.dashboard);
+  }
+
+  async navigateToPage(path) {
+    await this.goto(path);
   }
 
   async isNavDrawerVisible() {
@@ -63,6 +68,36 @@ class NavigationPageHelpers extends BasePage {
     await item.click();
     await this.waitForNavigation();
     await this.waitForPSUReady();
+  }
+
+  async getLastDiscoveryHeaderText() {
+    await this.waitForSelector(this.selectors.lastDiscoveryHeader);
+    return (await this.page.locator(this.selectors.lastDiscoveryHeader).textContent()).trim();
+  }
+
+  async getLastDiscoveryHeaderRenderState() {
+    const header = this.page.locator(this.selectors.lastDiscoveryHeader);
+    await header.waitFor({ state: 'visible', timeout: 15000 });
+
+    const box = await header.boundingBox();
+    const viewport = this.page.viewportSize();
+    const text = (await header.textContent()).trim();
+    const styles = await header.evaluate((element) => {
+      const computedStyle = window.getComputedStyle(element);
+      return {
+        backgroundColor: computedStyle.backgroundColor,
+        borderTopColor: computedStyle.borderTopColor,
+        borderTopStyle: computedStyle.borderTopStyle,
+        borderTopWidth: computedStyle.borderTopWidth,
+        color: computedStyle.color
+      };
+    });
+
+    if (!box || !viewport) {
+      throw new Error('Unable to measure Last Discovery header render state');
+    }
+
+    return { box, viewport, text, styles };
   }
 }
 

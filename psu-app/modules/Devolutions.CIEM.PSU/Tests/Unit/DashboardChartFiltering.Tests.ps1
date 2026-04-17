@@ -18,3 +18,14 @@ Describe 'Dashboard chart provider filtering' {
         $script:PageSource | Should -Match '\$_\.Provider\s+-eq\s+\$chartProvider'
     }
 }
+
+Describe 'Dashboard last discovery ownership' {
+
+    It 'Does not render a page-local Last Discovery summary' {
+        $script:PageSource | Should -Not -Match 'lastDiscoverySummary'
+    }
+
+    It 'Does not query discovery runs from the Dashboard page' {
+        $script:PageSource | Should -Not -Match "Get-CIEMAzureDiscoveryRun\s+-Status 'Completed'\s+-Last 1"
+    }
+}

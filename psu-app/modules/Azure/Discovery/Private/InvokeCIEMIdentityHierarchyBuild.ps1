@@ -91,7 +91,7 @@ function InvokeCIEMIdentityHierarchyBuild {
             $identityNodeId = "identity:$principalId"
             $nodes.Add([PSCustomObject]@{
                 NodeId       = $identityNodeId
-                NodeType     = 'Identity'
+                NodeType     = 'Identities'
                 Depth        = 2
                 ParentNodeId = $typeNodeId
                 Relationship = 'HAS_ACCESS'

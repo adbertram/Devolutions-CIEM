@@ -1,6 +1,14 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const AttackPathsPageHelpers = require('./AttackPathsPageHelpers');
-const { seedAttackPathsPageData, cleanupAttackPathsPageData, getTestAttackPathNodeCount } = require('../../_utils/cleanup');
+const {
+  seedAttackPathsPageData,
+  seedAttackPathsRefreshGraphData,
+  backupAndClearAttackPathGraphData,
+  restoreAttackPathGraphData,
+  cleanupAttackPathsPageData,
+  getTestAttackPathNodeCount,
+  getTestAttackPathCount
+} = require('../../_utils/cleanup');
 
 test.describe('Attack Paths Page', () => {
   let attackPage;
@@ -38,6 +46,41 @@ test.describe('Attack Paths Page', () => {
     test('should display subtitle', async () => {
       const visible = await attackPage.isSubtitleVisible();
       expect(visible).toBe(true);
+    });
+
+    test('should display refresh button', async () => {
+      const visible = await attackPage.isRefreshButtonVisible();
+      expect(visible).toBe(true);
+    });
+  });
+
+  test.describe('when graph data exists without materialized attack paths', () => {
+    let graphBackup;
+
+    test.beforeAll(() => {
+      graphBackup = backupAndClearAttackPathGraphData();
+      seedAttackPathsRefreshGraphData();
+      const nodeCount = getTestAttackPathNodeCount();
+      if (nodeCount !== 1) {
+        throw new Error(`Expected 1 seeded attack path graph node, got ${nodeCount}`);
+      }
+      const attackPathCount = getTestAttackPathCount();
+      if (attackPathCount !== 0) {
+        throw new Error(`Expected no materialized test attack paths, got ${attackPathCount}`);
+      }
+      console.log('[setup:attack-paths-refresh] Seeded graph data without materialized attack paths');
+    });
+
+    test.afterAll(() => {
+      restoreAttackPathGraphData(graphBackup);
+      console.log('[teardown:attack-paths-refresh] Cleaned up refresh test graph data');
+    });
+
+    test('should materialize attack paths and reload the table when Refresh Attack Paths is clicked', async () => {
+      await attackPage.refreshAttackPaths();
+      await expect.poll(() => getTestAttackPathCount()).toBeGreaterThanOrEqual(1);
+      await expect.poll(async () => await attackPage.isRefreshSuccessToastVisible()).toBe(true);
+      await expect.poll(async () => await attackPage.hasAttackPathData()).toBe(true);
     });
   });
 

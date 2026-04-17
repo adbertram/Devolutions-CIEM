@@ -2,9 +2,32 @@ BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
+
+    New-CIEMDatabase -Path "$TestDrive/ciem.db"
+
+    $azureSchema = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Infrastructure' 'Data' 'azure_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $azureSchema -Raw)
+
+    $discoverySchema = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Discovery' 'Data' 'discovery_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
+
+    $graphSchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'graph_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $graphSchema -Raw)
+
+    InModuleScope Devolutions.CIEM {
+        $script:DatabasePath = "$TestDrive/ciem.db"
+    }
+
+    Sync-CIEMAttackPathRuleCatalog | Out-Null
 }
 
 Describe 'Get-CIEMAttackPathPattern — catalog projection' {
+
+    BeforeEach {
+        Invoke-CIEMQuery -Query 'DELETE FROM attack_paths'
+        Invoke-CIEMQuery -Query 'DELETE FROM attack_path_rules'
+        Sync-CIEMAttackPathRuleCatalog | Out-Null
+    }
 
     Context 'Command structure' {
         It 'is available as a public command' {
@@ -73,14 +96,14 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
         }
 
         It 'maps every shipped pattern to a rule-name slug remediation script folder' {
-            $scriptRoot = InModuleScope Devolutions.CIEM { Join-Path $script:GraphRoot 'Data' }
+            $scriptRoot = InModuleScope Devolutions.CIEM { $script:ModuleRoot }
             $results = @(Get-CIEMAttackPathPattern)
             foreach ($p in $results) {
                 $slug = InModuleScope Devolutions.CIEM -Parameters @{ name = $p.Name } {
                     param($name)
                     ConvertToCIEMAttackPathRuleSlug -Name $name
                 }
-                $p.RemediationScriptPath | Should -Be "attack_path_remediation_scripts/$slug/remediate.ps1"
+                $p.RemediationScriptPath | Should -Be "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/$slug.ps1"
                 Join-Path $scriptRoot $p.RemediationScriptPath | Should -Exist
             }
         }
@@ -88,9 +111,9 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
 
     Context 'Return shape' {
 
-        It 'applies PSTypeName CIEMAttackPathPattern' {
+        It 'returns typed CIEMAttackPathRule objects' {
             $first = @(Get-CIEMAttackPathPattern)[0]
-            $first.PSObject.TypeNames | Should -Contain 'CIEMAttackPathPattern'
+            $first.GetType().Name | Should -Be 'CIEMAttackPathRule'
         }
 
         It 'StepCount is [int], not [string]' {
@@ -209,7 +232,7 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
         }
 
         It 'every remediation script template has no unknown replacement token format' {
-            $scriptRoot = InModuleScope Devolutions.CIEM { Join-Path $script:GraphRoot 'Data' }
+            $scriptRoot = InModuleScope Devolutions.CIEM { $script:ModuleRoot }
             foreach ($file in $script:PatternFiles) {
                 $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
                 $scriptPath = Join-Path $scriptRoot $raw.remediation_script
@@ -222,87 +245,101 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
                         'PATH_CHAIN',
                         'ROLE_ASSIGNMENT_DELETE_COMMANDS',
                         'NSG_RULE_DELETE_COMMANDS',
-                        'GROUP_MEMBER_REMOVE_COMMANDS'
+                        'GROUP_MEMBER_REMOVE_COMMANDS',
+                        'AUTH_PROFILE_ID',
+                        'AUTH_PROFILE_NAME',
+                        'AUTH_PROFILE_METHOD',
+                        'TENANT_ID',
+                        'CLIENT_ID',
+                        'MANAGED_IDENTITY_CLIENT_ID',
+                        'PSU_ENVIRONMENT',
+                        'PSU_WEBSITE_NAME'
                     ) -Because "pattern '$($raw.id)' template uses unknown token '$token'"
                 }
             }
         }
     }
 
-    Context 'Error handling — isolated module state' {
+    Context 'Database-backed rule handling' {
 
-        BeforeEach {
-            $script:testRoot = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
-            New-Item -Path (Join-Path $script:testRoot 'Data' 'attack_paths') -ItemType Directory -Force | Out-Null
+        It 'returns caller-created active database rules as typed objects' {
+            Invoke-CIEMQuery -Query @'
+INSERT INTO attack_path_rules (
+    id, name, severity, category, description, remediation,
+    remediation_script_path, psu_script_name, steps_json, disabled, updated_at
+) VALUES (
+    @id, @name, @severity, @category, @description, @remediation,
+    @remediation_script_path, @psu_script_name, @steps_json, 0, @updated_at
+)
+'@ -Parameters @{
+                id                      = 'custom-db-rule'
+                name                    = 'Custom DB Rule'
+                severity                = 'low'
+                category                = 'custom'
+                description             = 'Custom rule from database'
+                remediation             = 'Fix the custom rule and rerun Azure discovery.'
+                remediation_script_path = 'modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/management-port-open-to-the-internet.ps1'
+                psu_script_name         = 'management-port-open-to-the-internet'
+                steps_json              = '[{"kind":"Internet"},{"edge":"AllowsInbound","direction":"outbound"},{"kind":"AzureNSG"}]'
+                updated_at              = '2026-04-17T00:00:00.0000000Z'
+            } -AsNonQuery | Out-Null
+
+            $rule = @(Get-CIEMAttackPathPattern | Where-Object Id -eq 'custom-db-rule')[0]
+
+            $rule.GetType().Name | Should -Be 'CIEMAttackPathRule'
+            $rule.Id | Should -Be 'custom-db-rule'
+            $rule.StepCount | Should -Be 3
+            $rule.PsuScriptName | Should -Be 'management-port-open-to-the-internet'
         }
 
-        It 'tolerates a malformed JSON file and returns valid siblings' {
-            $validPath = Join-Path $script:testRoot 'Data' 'attack_paths' 'valid.json'
-            @'
-{ "id": "valid-pattern", "name": "Valid", "severity": "low", "category": "test", "description": "test pattern", "steps": [{"kind":"EntraUser"}] }
-'@ | Set-Content -Path $validPath -Encoding UTF8
+        It 'excludes disabled database rules' {
+            Invoke-CIEMQuery -Query @'
+INSERT INTO attack_path_rules (
+    id, name, severity, category, description, remediation,
+    remediation_script_path, psu_script_name, steps_json, disabled, updated_at
+) VALUES (
+    @id, @name, @severity, @category, @description, @remediation,
+    @remediation_script_path, @psu_script_name, @steps_json, 1, @updated_at
+)
+'@ -Parameters @{
+                id                      = 'disabled-db-rule'
+                name                    = 'Disabled DB Rule'
+                severity                = 'low'
+                category                = 'custom'
+                description             = 'Disabled rule from database'
+                remediation             = 'Fix the custom rule and rerun Azure discovery.'
+                remediation_script_path = 'modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/management-port-open-to-the-internet.ps1'
+                psu_script_name         = 'management-port-open-to-the-internet'
+                steps_json              = '[{"kind":"Internet"},{"edge":"AllowsInbound","direction":"outbound"},{"kind":"AzureNSG"}]'
+                updated_at              = '2026-04-17T00:00:00.0000000Z'
+            } -AsNonQuery | Out-Null
 
-            $badPath = Join-Path $script:testRoot 'Data' 'attack_paths' 'broken.json'
-            '{ this is not valid json' | Set-Content -Path $badPath -Encoding UTF8
-
-            $capturedRoot = $script:testRoot
-            $results = InModuleScope Devolutions.CIEM -Parameters @{ capturedRoot = $capturedRoot } {
-                param($capturedRoot)
-                $originalRoot = $script:GraphRoot
-                try {
-                    $script:GraphRoot = $capturedRoot
-                    @(Get-CIEMAttackPathPattern)
-                } finally {
-                    $script:GraphRoot = $originalRoot
-                }
-            }
-
-            $results.Count | Should -Be 1
-            $results[0].Id | Should -Be 'valid-pattern'
-            Should -Invoke -ModuleName Devolutions.CIEM -CommandName Write-CIEMLog -ParameterFilter {
-                $Severity -eq 'ERROR' -and $Message -match 'broken\.json'
-            }
+            @(Get-CIEMAttackPathPattern | Where-Object Id -eq 'disabled-db-rule') | Should -HaveCount 0
         }
 
-        It 'null-guards StepCount when steps field is missing (returns 0, not 1)' {
-            $noStepsPath = Join-Path $script:testRoot 'Data' 'attack_paths' 'no-steps.json'
-            @'
-{ "id": "no-steps-pattern", "name": "NoSteps", "severity": "low", "category": "test", "description": "pattern with no steps" }
-'@ | Set-Content -Path $noStepsPath -Encoding UTF8
+        It 'throws when an active database rule has no PSU script reference' {
+            Invoke-CIEMQuery -Query @'
+INSERT INTO attack_path_rules (
+    id, name, severity, category, description, remediation,
+    remediation_script_path, psu_script_name, steps_json, disabled, updated_at
+) VALUES (
+    @id, @name, @severity, @category, @description, @remediation,
+    @remediation_script_path, @psu_script_name, @steps_json, 0, @updated_at
+)
+'@ -Parameters @{
+                id                      = 'missing-script-rule'
+                name                    = 'Missing Script Rule'
+                severity                = 'low'
+                category                = 'custom'
+                description             = 'Invalid active rule'
+                remediation             = 'Fix the custom rule and rerun Azure discovery.'
+                remediation_script_path = 'modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/management-port-open-to-the-internet.ps1'
+                psu_script_name         = ''
+                steps_json              = '[{"kind":"Internet"},{"edge":"AllowsInbound","direction":"outbound"},{"kind":"AzureNSG"}]'
+                updated_at              = '2026-04-17T00:00:00.0000000Z'
+            } -AsNonQuery | Out-Null
 
-            $capturedRoot = $script:testRoot
-            $results = InModuleScope Devolutions.CIEM -Parameters @{ capturedRoot = $capturedRoot } {
-                param($capturedRoot)
-                $originalRoot = $script:GraphRoot
-                try {
-                    $script:GraphRoot = $capturedRoot
-                    @(Get-CIEMAttackPathPattern)
-                } finally {
-                    $script:GraphRoot = $originalRoot
-                }
-            }
-
-            $results.Count | Should -Be 1
-            $results[0].StepCount | Should -Be 0
-            $results[0].StepCount | Should -BeOfType [int]
-        }
-
-        It 'throws when pattern directory does not exist (fail-fast)' {
-            $missingRoot = Join-Path $TestDrive 'missing-graph-root'
-            New-Item -Path $missingRoot -ItemType Directory -Force | Out-Null
-
-            {
-                InModuleScope Devolutions.CIEM -Parameters @{ missingRoot = $missingRoot } {
-                    param($missingRoot)
-                    $originalRoot = $script:GraphRoot
-                    try {
-                        $script:GraphRoot = $missingRoot
-                        Get-CIEMAttackPathPattern
-                    } finally {
-                        $script:GraphRoot = $originalRoot
-                    }
-                }
-            } | Should -Throw
+            { Get-CIEMAttackPathPattern } | Should -Throw '*PSU script reference*'
         }
     }
 }

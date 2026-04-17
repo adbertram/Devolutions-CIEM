@@ -44,7 +44,7 @@ function New-CIEMEnvironmentPage {
                 New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '180px' } } -Content {
                     New-UDSelect -Id 'envViewSelect' -Label 'View' -Option {
                         New-UDSelectOption -Name 'Infrastructure' -Value 'Infrastructure'
-                        New-UDSelectOption -Name 'Identity' -Value 'Identity'
+                        New-UDSelectOption -Name 'Identities' -Value 'Identities'
                     } -DefaultValue 'Infrastructure' -OnChange {
                         $Session:SelectedEnvView = $EventData
                         Sync-UDElement -Id 'envChartDynamic'
@@ -75,7 +75,7 @@ function New-CIEMEnvironmentPage {
 
                         # Progress is shown by the auto-refresh status banner above — no ProgressElementId needed
                         $run = Devolutions.CIEM\Invoke-CIEMJobWithProgress `
-                            -ScriptName 'Devolutions.CIEM\Start-CIEMAzureDiscovery' `
+                            -ScriptName 'Checks/Start-CIEMAzureDiscovery' `
                             -DisableElementIds @('startDiscoveryBtn') `
                             -MaxPollSeconds 600
 
@@ -181,7 +181,7 @@ function New-CIEMEnvironmentPage {
 
                     Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: view=$viewMode, orient=$orient" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-                    if ($viewMode -eq 'Identity') {
+                    if ($viewMode -eq 'Identities') {
                         # --- Identity View ---
                         $assignmentMode = $Session:SelectedEnvAssignmentMode
                         if (-not $assignmentMode) { $assignmentMode = 'Effective' }
@@ -204,7 +204,7 @@ function New-CIEMEnvironmentPage {
                         Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: got $($hierarchy.Count) identity hierarchy nodes" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                         # Identity-specific summary counts
-                        $identityCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Identity' }).Count
+                        $identityCount = @($hierarchy | Where-Object { $_.NodeType -eq 'Identities' }).Count
                         $roleCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'Role' }).Count
                         $scopeCount    = @($hierarchy | Where-Object { $_.NodeType -eq 'Scope' }).Count
                         $typeCount     = @($hierarchy | Where-Object { $_.NodeType -eq 'IdentityType' }).Count
@@ -276,7 +276,7 @@ function New-CIEMEnvironmentPage {
                     }
                     # Identity view node types
                     $nodeStyles['IdentityType'] = @{ Color = '#7b1fa2'; Size = 26 }
-                    $nodeStyles['Identity']     = @{ Color = '#1565c0'; Size = 22 }
+                    $nodeStyles['Identities']     = @{ Color = '#1565c0'; Size = 22 }
                     $nodeStyles['Role']         = @{ Color = '#00838f'; Size = 20 }
                     $nodeStyles['Scope']        = @{ Color = '#558b2f'; Size = 16 }
 
@@ -294,11 +294,11 @@ function New-CIEMEnvironmentPage {
 
                         $resType = if ($node.ResourceType) { $node.ResourceType } elseif ($node.Resource) { $node.Resource.Type } else { $null }
                         $entraType = $null
-                        if ($viewMode -eq 'Identity') {
+                        if ($viewMode -eq 'Identities') {
                             $identityTypeLabel = $null
                             if ($node.NodeType -eq 'IdentityType') {
                                 $identityTypeLabel = $node.Label
-                            } elseif ($node.NodeType -eq 'Identity' -and $node.ParentNodeId -and $nodeById.ContainsKey($node.ParentNodeId)) {
+                            } elseif ($node.NodeType -eq 'Identities' -and $node.ParentNodeId -and $nodeById.ContainsKey($node.ParentNodeId)) {
                                 $identityTypeLabel = $nodeById[$node.ParentNodeId].Label
                             }
                             if ($identityTypeLabel) {

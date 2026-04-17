@@ -40,7 +40,7 @@ test.describe('About Page', () => {
 
     test('should include identity and entitlement focused checks in features list', async () => {
       const features = await aboutPage.getFeatureTexts();
-      const identityFeature = features.find(f => f.includes('Identity') || f.includes('entitlement'));
+      const identityFeature = features.find(f => f.includes('Identities') || f.includes('entitlement'));
       expect(identityFeature).toBeTruthy();
     });
 

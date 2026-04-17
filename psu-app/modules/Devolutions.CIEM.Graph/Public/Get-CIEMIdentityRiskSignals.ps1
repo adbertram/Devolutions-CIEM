@@ -183,16 +183,19 @@ function Get-CIEMIdentityRiskSignals {
         }
     }
 
+    $identityOutput = [PSCustomObject]@{
+        Id                       = $identity.Id
+        DisplayName              = $identity.DisplayName
+        Type                     = $identity.Kind
+        AccountEnabled           = $accountEnabled
+        LastSignIn               = $lastSignIn
+        LastInteractiveSignIn    = $lastInteractiveSignIn
+        LastNonInteractiveSignIn = $lastNonInteractiveSignIn
+    }
+
     [PSCustomObject]@{
-        Identity        = [PSCustomObject]@{
-            Id                       = $identity.Id
-            DisplayName              = $identity.DisplayName
-            Type                     = $identity.Kind
-            AccountEnabled           = $accountEnabled
-            LastSignIn               = $lastSignIn
-            LastInteractiveSignIn    = $lastInteractiveSignIn
-            LastNonInteractiveSignIn = $lastNonInteractiveSignIn
-        }
+        Identity        = $identityOutput
+        Identities      = @($identityOutput)
         RoleAssignments = $roleAssignments
         RiskSignals     = $riskSignals
         InheritedRoles  = $inheritedRoles

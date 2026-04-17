@@ -23,7 +23,7 @@ Describe 'Discovery Classes' {
             $props = $obj.PSObject.Properties.Name
             $props | Should -Contain 'Kind'
             $props | Should -Contain 'Sku'
-            $props | Should -Contain 'Identity'
+            $props | Should -Contain 'Identities'
             $props | Should -Contain 'ManagedBy'
             $props | Should -Contain 'Plan'
             $props | Should -Contain 'Zones'

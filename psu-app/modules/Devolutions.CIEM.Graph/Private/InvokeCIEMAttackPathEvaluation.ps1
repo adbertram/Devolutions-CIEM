@@ -3,7 +3,7 @@ function InvokeCIEMAttackPathEvaluation {
     [OutputType('CIEMAttackPath')]
     param(
         [Parameter(Mandatory)]
-        [PSCustomObject]$Pattern,
+        [object]$Pattern,
 
         [Parameter()]
         [string]$SeedNodeId
@@ -148,18 +148,20 @@ WHERE e.source_id = @nodeId AND e.kind = @edgeKind
         $pathEdges = @($path | Where-Object { $_._type -eq 'edge' })
 
         $attackPath = [CIEMAttackPath]::new()
-        $attackPath.PatternId   = $Pattern.id
-        $attackPath.PatternName = $Pattern.name
-        $attackPath.Severity    = $Pattern.severity
-        $attackPath.Category    = $Pattern.category
-        $attackPath.Remediation = $Pattern.remediation
+        $attackPath.RuleId      = $Pattern.Id
+        $attackPath.PatternId   = $Pattern.Id
+        $attackPath.PatternName = $Pattern.Name
+        $attackPath.Severity    = $Pattern.Severity
+        $attackPath.Category    = $Pattern.Category
+        $attackPath.Remediation = $Pattern.Remediation
         $attackPath.Path        = $pathNodes
         $attackPath.Edges       = $pathEdges
-        if ($Pattern.PSObject.Properties['remediation_script'] -and $Pattern.remediation_script) {
-            $script = ResolveCIEMAttackPathRemediationScript -Pattern $Pattern -AttackPath $attackPath
-            $attackPath.RemediationScript = $script.Content
-            $attackPath.RemediationScriptPath = $script.RelativePath
+        $attackPath.PathChain   = GetCIEMAttackPathChainText -AttackPath $attackPath
+        if ($Pattern.PSObject.Properties['RemediationScriptPath'] -and $Pattern.RemediationScriptPath) {
+            $attackPath.RemediationScriptPath = [string]$Pattern.RemediationScriptPath
+            $attackPath.PsuScriptName = [string]$Pattern.PsuScriptName
         }
+        $attackPath.Id = ConvertToCIEMAttackPathId -PatternId $attackPath.PatternId -Path $attackPath.Path -Edges $attackPath.Edges
         $attackPath
     })
 }

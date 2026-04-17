@@ -17,6 +17,12 @@ function New-CIEMAttackPathsPage {
         New-UDTypography -Text 'Attack Paths' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Discovered attack paths evaluated against the security graph' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; opacity = 0.7 }
 
+        New-UDButton -Id 'refreshAttackPathsBtn' -Text 'Refresh Attack Paths' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
+            $attackPathCount = @(Devolutions.CIEM\Update-CIEMAttackPath -PassThru).Count
+            Sync-UDElement -Id 'attackPathsPanel'
+            Show-UDToast -Message "Attack paths refreshed: $attackPathCount findings" -Duration 5000 -BackgroundColor '#4caf50'
+        } -Style @{ marginBottom = '16px' }
+
         New-UDCard -Content {
             New-UDDynamic -Id 'attackPathsPanel' -Content {
 
@@ -37,14 +43,15 @@ function New-CIEMAttackPathsPage {
                                 $chainText = $chainLabels -join ' → '
 
                                 @{
-                                    id          = "$($_.PatternId)-$idx"
-                                    patternName = $_.PatternName
-                                    severity    = $_.Severity
-                                    category    = $_.Category
-                                    pathChain   = $chainText
-                                    steps       = @($_.Path).Count
-                                    remediation = $_.Remediation
-                                    remediationScript = $_.RemediationScript
+                                    id            = "$($_.PatternId)-$idx"
+                                    attackPathId  = $_.Id
+                                    patternName   = $_.PatternName
+                                    severity      = $_.Severity
+                                    category      = $_.Category
+                                    pathChain     = $chainText
+                                    steps         = @($_.Path).Count
+                                    remediation   = $_.Remediation
+                                    psuScriptName = $_.PsuScriptName
                                 }
                             }
                             @($gridData) | Out-UDDataGridData -Context $EventData -TotalRows @($gridData).Count
@@ -61,7 +68,8 @@ function New-CIEMAttackPathsPage {
                             New-UDDataGridColumn -Field 'steps' -HeaderName 'Steps' -Width 90 -Type 'number'
                         ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
                             $remediation = [string]$EventData.row.remediation
-                            $remediationScript = [string]$EventData.row.remediationScript
+                            $attackPathId = [string]$EventData.row.attackPathId
+                            $remediationScript = Devolutions.CIEM\Get-CIEMAttackPathRemediationScript -Id $attackPathId
                             New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '14px 18px'; display = 'grid'; gap = '14px' } } -Content {
                                 New-UDElement -Tag 'section' -Content {
                                     New-UDTypography -Text 'Remediation' -Variant 'subtitle2' -Style @{ fontWeight = '600'; marginBottom = '6px' }

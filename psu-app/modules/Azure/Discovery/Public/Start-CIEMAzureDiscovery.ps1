@@ -345,6 +345,16 @@ function Start-CIEMAzureDiscovery {
                 }
             }
 
+        $null = InvokeCIEMDiscoveryPhase `
+            -Name 'Attack path materialization' `
+            -ErrorMessages $errorMessages `
+            -WarningCounter $warningCounter `
+            -Action {
+                Sync-CIEMAttackPathRuleCatalog | Out-Null
+                $attackPathCount = @(Update-CIEMAttackPath -PassThru).Count
+                Write-CIEMLog "AttackPaths: $attackPathCount findings materialized" -Component 'Discovery'
+            }
+
         $allArmResources = $null
         $allEntraResources = $null
         $allRelationships = $null

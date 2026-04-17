@@ -264,7 +264,7 @@ test.describe('Environment Page', () => {
       expect(treeVisible).toBe(true);
 
       // 8. Identity view must render discovered identities and effective roles
-      await envPage.selectView('Identity');
+      await envPage.selectView('Identities');
       await envPage.waitForEnvironmentLoaded(30000);
 
       const identitySummaryVisible = await envPage.isIdentitySummaryCardVisible();
@@ -429,14 +429,14 @@ test.describe('Environment Page', () => {
     });
 
     test('should switch to Identity view and display identity summary card', async () => {
-      await envPage.selectView('Identity');
+      await envPage.selectView('Identities');
       await envPage.waitForEnvironmentLoaded();
       const identitySummary = await envPage.isIdentitySummaryCardVisible();
       expect(identitySummary).toBe(true);
     });
 
     test('should display identity-specific summary counts', async () => {
-      await envPage.selectView('Identity');
+      await envPage.selectView('Identities');
       await envPage.waitForEnvironmentLoaded();
       const identityCount = await envPage.getSummaryCount('Identities');
       expect(parseInt(identityCount)).toBeGreaterThanOrEqual(1);
@@ -445,21 +445,21 @@ test.describe('Environment Page', () => {
     });
 
     test('should render tree container in Identity view', async () => {
-      await envPage.selectView('Identity');
+      await envPage.selectView('Identities');
       await envPage.waitForEnvironmentLoaded();
       const treeVisible = await envPage.isTreeContainerVisible();
       expect(treeVisible).toBe(true);
     });
 
     test('should display assignment mode select in Identity view', async () => {
-      await envPage.selectView('Identity');
+      await envPage.selectView('Identities');
       await envPage.waitForEnvironmentLoaded();
       const visible = await envPage.isAssignmentModeSelectVisible();
       expect(visible).toBe(true);
     });
 
     test('should switch back to Infrastructure view', async () => {
-      await envPage.selectView('Identity');
+      await envPage.selectView('Identities');
       await envPage.waitForEnvironmentLoaded();
       await envPage.selectView('Infrastructure');
       await envPage.waitForEnvironmentLoaded();

@@ -17,6 +17,8 @@ class AttackPathsPageHelpers extends BasePage {
       remediationScriptCopyButton: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script-copy="true"] a',
       remediationScriptCopyIdle: '.MuiDataGrid-detailPanel [data-ciem-copy-idle="true"]',
       remediationScriptCopySuccess: '.MuiDataGrid-detailPanel [data-ciem-copy-success="true"]',
+      refreshButton: 'button:has-text("Refresh Attack Paths")',
+      refreshSuccessToast: '.iziToast:has-text("Attack paths refreshed")',
       pagination: '.MuiTablePagination-root',
       severityChip: '.MuiDataGrid-row .MuiChip-root',
       quickFilter: '.MuiDataGrid-toolbarQuickFilter input',
@@ -124,6 +126,18 @@ class AttackPathsPageHelpers extends BasePage {
 
   async getClipboardText() {
     return await this.page.evaluate(() => navigator.clipboard.readText());
+  }
+
+  async isRefreshButtonVisible() {
+    return await this.isElementVisible(this.selectors.refreshButton);
+  }
+
+  async refreshAttackPaths() {
+    await this.page.locator(this.selectors.refreshButton).click();
+  }
+
+  async isRefreshSuccessToastVisible() {
+    return await this.isElementVisible(this.selectors.refreshSuccessToast);
   }
 
   async isPaginationVisible() {

@@ -194,6 +194,23 @@ foreach ($schema in @(
     }
 }
 
+try {
+    UpdateCIEMAttackPathStorageSchema
+}
+catch {
+    Write-CIEMLog -Message "Attack path storage schema migration failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
+    throw
+}
+
+try {
+    $attackPathRuleSync = Sync-CIEMAttackPathRuleCatalog
+    Write-CIEMLog -Message "Attack path rules synced: $($attackPathRuleSync.RuleCount)" -Component 'ModuleInit'
+}
+catch {
+    Write-CIEMLog -Message "Attack path rule sync failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
+    throw
+}
+
 # --- Argument completers ---
 RegisterCIEMArgumentCompleters
 

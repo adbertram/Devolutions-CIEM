@@ -57,6 +57,13 @@ test.describe('Dashboard Page', () => {
       expect(visible).toBe(true);
     });
 
+    test('should use the global Last Discovery header without a page-local duplicate', async () => {
+      const visible = await dashPage.isLastDiscoveryHeaderVisible();
+      const localSummaryCount = await dashPage.getLocalLastDiscoverySummaryCount();
+      expect(visible).toBe(true);
+      expect(localSummaryCount).toBe(0);
+    });
+
     test('should display summary cards container', async () => {
       const totalVisible = await dashPage.isElementVisible(dashPage.selectors.totalResultsCard);
       const failedVisible = await dashPage.isElementVisible(dashPage.selectors.failedChecksCard);

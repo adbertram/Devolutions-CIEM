@@ -18,6 +18,8 @@ function cleanupTestData() {
     `DELETE FROM azure_arm_resources WHERE id LIKE '%${P}%'`,
     `DELETE FROM azure_entra_resources WHERE id LIKE '%${P}%'`,
     `DELETE FROM azure_effective_role_assignments WHERE principal_id LIKE '${P}%'`,
+    // Materialized attack paths
+    `DELETE FROM attack_paths WHERE id LIKE '${P}%' OR path_json LIKE '%${P}%' OR edges_json LIKE '%${P}%' OR path_chain LIKE '%${P}%'`,
     // Graph data (edges first — path-style IDs need leading %)
     `DELETE FROM graph_edges WHERE source_id LIKE '%${P}%' OR target_id LIKE '%${P}%'`,
     `DELETE FROM graph_nodes WHERE id LIKE '%${P}%'`,
@@ -302,7 +304,36 @@ function cleanupIdentityAttackPathData() {
 
 function seedAttackPathsPageData() {
   const now = new Date().toISOString();
+  const openManagementPathJson = JSON.stringify([
+    { id: '__internet__', kind: 'Internet', display_name: 'Internet', properties: null, _type: 'node' },
+    { id: `${P}ap-nsg-1`, kind: 'AzureNSG', display_name: 'E2E Attack Path NSG', properties: null, _type: 'node' }
+  ]);
+  const openManagementEdgesJson = JSON.stringify([
+    {
+      id: `${P}ap-edge-open-management`,
+      source_id: '__internet__',
+      target_id: `${P}ap-nsg-1`,
+      kind: 'AllowsInbound',
+      properties: '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}',
+      _type: 'edge'
+    }
+  ]);
+  const disabledAccountPathJson = JSON.stringify([
+    { id: `${P}ap-disabled-user`, kind: 'EntraUser', display_name: 'E2E Disabled User', properties: '{"accountEnabled":false}', _type: 'node' },
+    { id: `/subscriptions/${P}ap-sub-1`, kind: 'AzureSubscription', display_name: 'E2E Subscription', properties: null, _type: 'node' }
+  ]);
+  const disabledAccountEdgesJson = JSON.stringify([
+    {
+      id: `${P}ap-edge-disabled-role`,
+      source_id: `${P}ap-disabled-user`,
+      target_id: `/subscriptions/${P}ap-sub-1`,
+      kind: 'HasRole',
+      properties: `{"role_name":"Contributor","role_definition_id":"/subscriptions/${P}ap-sub-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","privileged":false}`,
+      _type: 'edge'
+    }
+  ]);
   sshNonQuery([
+    `DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'`,
     // Pattern 1: open-management-port
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('__internet__','Internet','Internet','global',null,'${now}')`,
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-nsg-1','AzureNSG','E2E Attack Path NSG','azure',null,'${now}')`,
@@ -311,17 +342,76 @@ function seedAttackPathsPageData() {
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-disabled-user','EntraUser','E2E Disabled User','azure','{"accountEnabled":false}','${now}')`,
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}ap-sub-1','AzureSubscription','E2E Subscription','azure',null,'${now}')`,
     `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ap-disabled-user','/subscriptions/${P}ap-sub-1','HasRole','{"role_name":"Contributor","role_definition_id":"/subscriptions/${P}ap-sub-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","privileged":false}',0,'${now}')`,
+    `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-open-management-port','open-management-port','Management port open to the internet','high','network-exposure','1. Restrict or remove the inbound management rule that allows internet access to SSH, RDP, or WinRM.\n2. Replace public management access with Azure Bastion, VPN, private endpoint access, or Just-in-Time VM access.\n3. If a management rule must remain, limit the source to approved administrative IP ranges and document the exception owner.\n4. Confirm attached resources no longer have public management exposure.\n5. rerun Azure discovery and confirm this attack path no longer appears.','management-port-open-to-the-internet',${sqlValue(openManagementPathJson)},${sqlValue(openManagementEdgesJson)},'Internet (Internet) -> E2E Attack Path NSG (AzureNSG)','${now}')`,
+    `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-disabled-account','disabled-account-with-roles','Disabled account still holding active role assignments','high','identity-hygiene','1. Open the disabled identity in Microsoft Entra ID and confirm it should remain disabled.\n2. In Azure RBAC, find every active role assignment for this identity at the listed scope.\n3. Remove active role assignments from the disabled identity.\n4. If access is still required, assign it to an active owner-approved identity instead of re-enabling the disabled account.\n5. rerun Azure discovery and confirm this attack path no longer appears.','disabled-account-still-holding-active-role-assignments',${sqlValue(disabledAccountPathJson)},${sqlValue(disabledAccountEdgesJson)},'E2E Disabled User (EntraUser) -> E2E Subscription (AzureSubscription)','${now}')`,
   ].join('; '));
-  console.log('[seed] Seeded graph data for Attack Paths page tests (2 patterns).');
+  console.log('[seed] Seeded graph and materialized attack path data for Attack Paths page tests (2 patterns).');
+}
+
+function seedAttackPathsRefreshGraphData() {
+  const now = new Date().toISOString();
+  sshNonQuery([
+    `DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'`,
+    `DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%' OR target_id = '/subscriptions/${P}ap-sub-1'`,
+    `DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('__internet__','Internet','Internet','global',null,'${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-nsg-1','AzureNSG','E2E Attack Path NSG','azure',null,'${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('__internet__','${P}ap-nsg-1','AllowsInbound','{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}',1,'${now}')`
+  ].join('; '));
+  console.log('[seed] Seeded graph-only attack path data for Attack Paths refresh tests.');
+}
+
+function backupAndClearAttackPathGraphData() {
+  const state = {
+    graphNodes: sshQuery('SELECT id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at FROM graph_nodes'),
+    graphEdges: sshQuery('SELECT id, source_id, target_id, kind, properties, computed, collected_at FROM graph_edges'),
+    attackPaths: sshQuery('SELECT id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at FROM attack_paths')
+  };
+  sshNonQuery('DELETE FROM attack_paths; DELETE FROM graph_edges; DELETE FROM graph_nodes');
+  console.log(`[setup] Backed up and cleared graph data (${state.graphNodes.length} nodes, ${state.graphEdges.length} edges, ${state.attackPaths.length} attack paths).`);
+  return state;
+}
+
+function restoreAttackPathGraphData(state) {
+  const stmts = [
+    'DELETE FROM attack_paths',
+    'DELETE FROM graph_edges',
+    'DELETE FROM graph_nodes'
+  ];
+
+  for (const row of state.graphNodes) {
+    const cols = ['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  for (const row of state.graphEdges) {
+    const cols = ['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  for (const row of state.attackPaths) {
+    const cols = ['id', 'rule_id', 'pattern_name', 'severity', 'category', 'remediation', 'psu_script_name', 'path_json', 'edges_json', 'path_chain', 'evaluated_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO attack_paths (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  sshNonQuery(stmts.join('; '));
+  console.log(`[teardown] Restored graph data (${state.graphNodes.length} nodes, ${state.graphEdges.length} edges, ${state.attackPaths.length} attack paths).`);
 }
 
 function cleanupAttackPathsPageData() {
-  sshNonQuery(`DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%' OR target_id = '/subscriptions/${P}ap-sub-1'; DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`);
+  sshNonQuery(`DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'; DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%' OR target_id = '/subscriptions/${P}ap-sub-1'; DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`);
   console.log('[cleanup] Attack Paths page graph data cleaned up.');
 }
 
 function getTestAttackPathNodeCount() {
   return sshQuery(`SELECT COUNT(*) as count FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`)[0].count;
+}
+
+function getTestAttackPathCount() {
+  return sshQuery(`SELECT COUNT(*) as count FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'`)[0].count;
 }
 
 function getCompletedDiscoveryRunCount() {
@@ -360,6 +450,17 @@ function seedCompletedDiscoveryRun() {
   return id;
 }
 
+function seedCompletedDiscoveryRunAt(completedAt) {
+  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (-2, 'All', 'Completed', '${completedAt}', '${completedAt}', 1, 1, 1, 1, 0, NULL)`);
+  const rows = sshQuery(`SELECT id, completed_at FROM azure_discovery_runs WHERE psu_job_id = -2 AND status = 'Completed' AND completed_at = '${completedAt}' ORDER BY id DESC LIMIT 1`);
+  if (rows.length !== 1) {
+    throw new Error('Seed verification failed: fixed completed discovery run was not inserted');
+  }
+  const id = rows[0].id;
+  console.log(`[seed] Seeded fixed completed discovery run id=${id}, completed_at=${completedAt}`);
+  return id;
+}
+
 function seedRunningDiscoveryRun() {
   const now = new Date().toISOString();
   sshNonQuery(`INSERT INTO azure_discovery_runs (scope, status, started_at) VALUES ('All', 'Running', '${now}')`);
@@ -386,10 +487,14 @@ module.exports = {
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns, getCompletedDiscoveryRunCount,
   backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
+  seedCompletedDiscoveryRunAt,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
   seedIdentitiesPageData, cleanupIdentitiesPageData, getTestIdentitiesGraphEdgeCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,
-  seedAttackPathsPageData, cleanupAttackPathsPageData, getTestAttackPathNodeCount,
+  seedAttackPathsPageData, seedAttackPathsRefreshGraphData,
+  backupAndClearAttackPathGraphData, restoreAttackPathGraphData,
+  cleanupAttackPathsPageData,
+  getTestAttackPathNodeCount, getTestAttackPathCount,
   TEST_PREFIX
 };

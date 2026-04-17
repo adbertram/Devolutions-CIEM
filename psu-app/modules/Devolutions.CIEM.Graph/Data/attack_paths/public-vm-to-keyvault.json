@@ -5,7 +5,7 @@
   "category": "identity-network-compound",
   "description": "A VM exposed to the internet has a managed identity with a role that grants access to an Azure Key Vault. An attacker could exploit the VM to steal secrets, keys, and certificates from the vault.",
   "remediation": "1. Identify the internet-facing VM, attached managed identity, and Key Vault access path.\n2. Remove public inbound exposure from the VM or restrict it to approved administrative sources.\n3. Remove Key Vault access from the managed identity unless the workload explicitly requires it.\n4. If access is required, scope it to the minimum secret, key, or certificate operations needed by the workload.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
-  "remediation_script": "attack_path_remediation_scripts/internet-exposed-vm-with-managed-identity-accessing-key-vault/remediate.ps1",
+  "remediation_script": "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/internet-exposed-vm-with-managed-identity-accessing-key-vault.ps1",
   "steps": [
     { "kind": "Internet" },
     { "edge": "AllowsInbound", "direction": "outbound" },
@@ -18,3 +18,4 @@
     { "kind": "AzureKeyVault" }
   ]
 }
+

@@ -1,11 +1,14 @@
 # Devolutions CIEM
 
+@/Users/adam/.claude/skills/testing-methodology/SKILL.md
+
 ## CRITICAL: Test-Driven Development (TDD) -- MANDATORY
 
-**YOUR FIRST ACTION on ANY code change request MUST be identifying and writing tests. Do NOT read source code, do NOT explore implementation, do NOT plan changes. Go directly to test files.**
+**YOUR FIRST ACTION on ANY code change request MUST be identifying and writing tests. Do NOT read source code, do NOT explore implementation, do NOT plan changes. Go directly to the relevant test files and test definitions first.**
 
-- **MUST** write tests BEFORE implementation code (red-green-refactor)
-- **MUST** cover all relevant test layers (Pester for PowerShell, Playwright for UI)
+- **MUST** include tests for every code change: Pester for PowerShell/module logic, Playwright E2E for PSU UI behavior, and both when a change crosses those boundaries
+- **MUST** write tests BEFORE implementation code or debugging (red-green-refactor)
+- **MUST** cover all scenarios where the issue could manifest -- not just the reported case
 - **MUST** run all relevant tests and confirm green before marking work complete
 - **MUST NOT** begin investigating or fixing code before writing failing tests
 - **MUST NOT** submit, commit, or declare any change "done" without passing tests
@@ -15,13 +18,16 @@
 
 **MANDATORY TDD workflow:**
 
-1. **Identify which tests are needed** (Pester unit tests and/or Playwright E2E)
-2. **Load the `testing-expert` skill BEFORE writing any test.** NEVER write a test file without loading it first.
-3. **Write ALL failing tests first** -- tests MUST exist and fail before ANY implementation
-4. **Then and ONLY then** begin implementation
-5. **Run ALL relevant test types** before declaring done:
-   - [ ] Pester tests (if PowerShell code changed): `pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"`
-   - [ ] Playwright tests (if UI pages changed): `cd psu-app/ui/e2e && npx playwright test`
+1. **Identify which tests are needed** (Pester unit/integration tests, Playwright E2E tests, or both)
+2. **Load the `testing-expert` skill BEFORE writing, reviewing, or running any test.** Load `pester-tests` as well for Pester-specific work. NEVER write a test file without loading the relevant skill first.
+3. **Write ALL failing tests first** -- tests MUST exist and fail before ANY implementation or debugging
+4. **Tests must cover all relevant scenarios** -- edge cases and related code paths where the same issue can manifest
+5. **Then and ONLY then** begin implementation or troubleshooting
+6. **Run ALL relevant test types** before declaring done:
+   - [ ] Pester tests (if PowerShell/module/data code changed): `pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"`
+   - [ ] Playwright E2E tests (if PSU UI pages/interactions changed): `cd psu-app/ui/e2e && npx playwright test`
+   - [ ] Both Pester and Playwright when module behavior is surfaced in the UI
+   - [ ] `Invoke-TestCommand` when PSU runtime context matters; this is additional validation, not a substitute for tests
 
 **CRITICAL FOR BUG FIXES:** Do NOT jump into the code to investigate. First, write failing tests that reproduce the bug. The tests define what "fixed" means.
 

@@ -1,11 +1,27 @@
 # AGENTS.md
 
+## Mandatory Testing Skill
+
+- **MUST** load `$test-methodology` before writing, changing, debugging, reviewing, or validating tests or behavior-changing code.
+- **MUST** load the `testing-expert` skill before writing, reviewing, or running any test.
+- **MUST** load `pester-tests` for Pester-specific work.
+- Pester tests are required for PowerShell/module/data changes.
+- Playwright E2E tests are required for PSU UI/page/interaction changes.
+- Both Pester and Playwright are required when module behavior is surfaced in the UI.
+- `Invoke-TestCommand` is required for PSU runtime validation when PSU context matters; it is additional validation, not a substitute for tests.
+
 ## Project Context
 - CIEM solution built on PowerShell Universal (PSU).
 - PSU is owned by Devolutions.
 - CIEM is distributed as a PSU Gallery add-on, not a standalone deployment.
 - CIEM is a free PSU Gallery add-on that identifies findings and routes users to Devolutions PAM for action.
 - The product direction is **identity-first CIEM**, not generic CSPM. Prioritize entitlements, dormant permissions, role right-sizing, and control relationships. Prowler-ported CSPM checks are secondary.
+
+## Global Blocker Ownership
+- A blocker report is a progress update, not task completion.
+- Autonomously remediate blockers as part of the requested work.
+- Ask for user intervention only when the next step needs explicit approval, unavailable credentials, or a destructive decision.
+- When reporting blockers, include the concrete remediation actions already in progress.
 
 ## Mandatory PSU Delegation
 - Any PSU feature, API, config, publishing, restart, troubleshooting, or other PSU-specific question or operation must go through the `psu-expert` agent.
@@ -15,7 +31,7 @@
 ### Local PSU
 - "Local" means the always-on PSU instance on `adam-server`, not the MacBook.
 - Normal workflow is edit on MacBook, then `Publish-PSUModule -LocalOnly` pushes via SSH/rsync to adam-server.
-- LAN URL: `http://192.168.86.30:5001` (set as `LOCAL_PSU_URL` in `.env`)
+- LAN URL: `http://192.168.86.36:5001` (set as `LOCAL_PSU_URL` in `.env`)
 - `Connect-PSU -Local` reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`.
 - PSU Repository on adam-server: `/Users/adam/psu/Repository` (pushed via SSH, not Dropbox-synced).
 
@@ -44,6 +60,7 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 
 ## Testing and Validation
 - Use `Invoke-TestCommand` to validate CIEM code inside PSU instead of publish-debug-publish cycles.
+- `Invoke-TestCommand` validates PSU runtime behavior after tests are in place; it does not replace Pester or Playwright tests.
 
 ```powershell
 Import-Module ./Devolutions.CIEM.Admin

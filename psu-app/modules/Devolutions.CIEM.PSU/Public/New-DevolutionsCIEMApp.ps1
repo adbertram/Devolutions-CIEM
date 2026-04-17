@@ -13,12 +13,14 @@ function New-DevolutionsCIEMApp {
         This function is exported for PSU to invoke via New-PSUApp -Module -Command.
     #>
     [CmdletBinding()]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Creates in-memory PSU dashboard object, no system state change')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'PSU invokes this as an app factory; script registration is delegated to Import-CIEMScript')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidReturnStatement', '', Justification = 'Return statements required for early exit in PSU OnClick handlers')]
     param()
 
     process {
         $ErrorActionPreference = 'Stop'
+        Import-CIEMScript | Out-Null
+
         $Navigation = New-CIEMNavigation
 
         New-UDApp -Title 'Devolutions CIEM' -Pages @(
@@ -32,6 +34,10 @@ function New-DevolutionsCIEMApp {
             New-CIEMEnvironmentPage -Navigation $Navigation
             New-CIEMConfigPage -Navigation $Navigation
             New-CIEMAboutPage -Navigation $Navigation
-        ) -DefaultTheme 'Light'
+        ) -DefaultTheme 'Light' -HeaderContent {
+            New-UDDynamic -Id 'ciemLastDiscoveryHeaderRegion' -Content {
+                Devolutions.CIEM\New-CIEMLastDiscoveryHeader
+            } -AutoRefresh -AutoRefreshInterval 60
+        }
     }
 }

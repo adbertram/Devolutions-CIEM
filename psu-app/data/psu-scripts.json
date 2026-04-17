@@ -1,0 +1,32 @@
+{
+  "folders": [
+    "Checks",
+    "Identities",
+    "Identities/AttackPaths"
+  ],
+  "scripts": [
+    {
+      "name": "Checks/New-CIEMScanRun",
+      "path": "Checks/New-CIEMScanRun.ps1",
+      "description": "Run a CIEM security scan against configured cloud providers",
+      "status": "Published",
+      "timeout": 30
+    },
+    {
+      "name": "Checks/Start-CIEMAzureDiscovery",
+      "path": "Checks/Start-CIEMAzureDiscovery.ps1",
+      "description": "Discover Azure ARM and Entra resources and store in the local database",
+      "status": "Published",
+      "timeout": 600
+    }
+  ],
+  "remediationTemplates": {
+    "path": "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts",
+    "templatePath": "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_script_template.ps1",
+    "namePrefix": "",
+    "description": "Tokenized remediation template for CIEM attack paths",
+    "status": "Published",
+    "timeout": 30,
+    "disableManualInvocation": true
+  }
+}

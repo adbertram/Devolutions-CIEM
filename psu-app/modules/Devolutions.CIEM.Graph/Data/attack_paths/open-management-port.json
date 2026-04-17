@@ -5,10 +5,11 @@
   "category": "network-exposure",
   "description": "A network security group allows inbound traffic from the internet on a management port (RDP, SSH, WinRM). This exposes attached resources to brute-force and credential-based attacks.",
   "remediation": "1. Restrict or remove the inbound management rule that allows internet access to SSH, RDP, or WinRM.\n2. Replace public management access with Azure Bastion, VPN, private endpoint access, or Just-in-Time VM access.\n3. If a management rule must remain, limit the source to approved administrative IP ranges and document the exception owner.\n4. Confirm attached resources no longer have public management exposure.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
-  "remediation_script": "attack_path_remediation_scripts/management-port-open-to-the-internet/remediate.ps1",
+  "remediation_script": "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/management-port-open-to-the-internet.ps1",
   "steps": [
     { "kind": "Internet" },
     { "edge": "AllowsInbound", "direction": "outbound", "filter": { "property": "open_ports", "op": "contains_port", "value": [22, 3389, 5985, 5986] } },
     { "kind": "AzureNSG" }
   ]
 }
+

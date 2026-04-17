@@ -187,13 +187,13 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
         }
 
         It 'Contains Identity nodes at Depth 2' {
-            $identities = @($script:effectiveResult | Where-Object { $_.NodeType -eq 'Identity' })
+            $identities = @($script:effectiveResult | Where-Object { $_.NodeType -eq 'Identities' })
             $identities | Should -Not -BeNullOrEmpty
             $identities | ForEach-Object { $_.Depth | Should -Be 2 }
         }
 
         It 'Contains 3 distinct identities (John Smith, Jane Doe, Cloud Admins)' {
-            $identities = @($script:effectiveResult | Where-Object { $_.NodeType -eq 'Identity' })
+            $identities = @($script:effectiveResult | Where-Object { $_.NodeType -eq 'Identities' })
             $identities | Should -HaveCount 3
             $labels = $identities | Select-Object -ExpandProperty Label
             $labels | Should -Contain 'John Smith'
@@ -215,7 +215,7 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
 
         It 'Annotates inherited assignments with group name' {
             # User1 has Owner via group1-id (Cloud Admins) — scope label should contain "via"
-            $user1Identity = $script:effectiveResult | Where-Object { $_.NodeType -eq 'Identity' -and $_.Label -eq 'John Smith' }
+            $user1Identity = $script:effectiveResult | Where-Object { $_.NodeType -eq 'Identities' -and $_.Label -eq 'John Smith' }
             $user1NodeId = $user1Identity.NodeId
             $user1Roles = @($script:effectiveResult | Where-Object { $_.NodeType -eq 'Role' -and $_.ParentNodeId -eq $user1NodeId })
             $ownerRole = $user1Roles | Where-Object { $_.Label -match 'Owner' }
@@ -226,7 +226,7 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
 
         It 'Does not annotate direct assignments' {
             # User1 has direct Contributor — no "via" in scope label
-            $user1Identity = $script:effectiveResult | Where-Object { $_.NodeType -eq 'Identity' -and $_.Label -eq 'John Smith' }
+            $user1Identity = $script:effectiveResult | Where-Object { $_.NodeType -eq 'Identities' -and $_.Label -eq 'John Smith' }
             $user1NodeId = $user1Identity.NodeId
             $user1Roles = @($script:effectiveResult | Where-Object { $_.NodeType -eq 'Role' -and $_.ParentNodeId -eq $user1NodeId })
             $contributorRole = $user1Roles | Where-Object { $_.Label -match 'Contributor' }
@@ -312,7 +312,7 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
         }
 
         It 'Contains the GitHub Actions SP identity node' {
-            $identities = @($script:directResult | Where-Object { $_.NodeType -eq 'Identity' })
+            $identities = @($script:directResult | Where-Object { $_.NodeType -eq 'Identities' })
             $identities.Label | Should -Contain 'GitHub Actions SP'
         }
 
@@ -366,7 +366,7 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
 
         It 'Returns only identities with scopes matching the specified subscription' {
             $result = @(Get-CIEMAzureIdentityHierarchy -Mode Effective -SubscriptionId 'subA')
-            $identities = @($result | Where-Object { $_.NodeType -eq 'Identity' })
+            $identities = @($result | Where-Object { $_.NodeType -eq 'Identities' })
             $identities | Should -HaveCount 1
             $identities[0].Label | Should -Be 'User A'
         }

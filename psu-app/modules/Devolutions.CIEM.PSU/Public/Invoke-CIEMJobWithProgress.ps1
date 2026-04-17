@@ -7,7 +7,7 @@ function Invoke-CIEMJobWithProgress {
         While running, it renders a progress card (indeterminate or determinate) into ProgressElementId.
         On completion it returns the pipeline output; on failure it throws.
     .PARAMETER ScriptName
-        The registered PSU script name (e.g. 'Devolutions.CIEM\Start-CIEMAzureDiscovery').
+        The registered PSU script name (e.g. 'Checks/Start-CIEMAzureDiscovery').
     .PARAMETER ProgressElementId
         The HTML element ID where progress UI will be rendered via Set-UDElement.
     .PARAMETER DisableElementIds

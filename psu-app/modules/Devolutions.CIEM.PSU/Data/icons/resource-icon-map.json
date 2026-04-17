@@ -20,7 +20,7 @@
     "ResourceGroup": "resources/azure-resource-group.svg",
     "Category": "resources/azure-resource-group.svg",
     "IdentityType": "resources/entra-id.svg",
-    "Identity": "resources/entra-user.svg",
+    "Identities": "resources/entra-user.svg",
     "Role": "resources/azure-role-assignment.svg",
     "Scope": "resources/azure-resource-group.svg"
   },
