@@ -6,6 +6,10 @@ const {
   seedTestData,
   getScanResultCount,
   getScanHistoryCounts,
+  seedIdentityViewData,
+  backupAndClearDashboardIdentityData,
+  restoreDashboardIdentityData,
+  getDashboardIdentityCounts,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
 
@@ -31,20 +35,28 @@ test.describe('Dashboard Page', () => {
 
   test.describe('when seeded scan history exists in the database', () => {
     let backup = null;
+    let identityBackup = null;
 
     test.beforeAll(() => {
       backup = backupAndClearAllScanHistory();
+      identityBackup = backupAndClearDashboardIdentityData();
       seedTestData();
+      seedIdentityViewData();
       const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
       const run2Count = getScanResultCount(`${TEST_PREFIX}scan_run_2`);
       if (run1Count !== 5 || run2Count !== 3) {
         throw new Error(`Seed verification failed: scan_run_1 has ${run1Count} results (expected 5), scan_run_2 has ${run2Count} (expected 3)`);
+      }
+      const identityCounts = getDashboardIdentityCounts();
+      if (identityCounts.identityCount !== 3 || identityCounts.entitlementCount !== 4) {
+        throw new Error(`Seed verification failed: dashboard identity data has ${identityCounts.identityCount} identities (expected 3) and ${identityCounts.entitlementCount} entitlements (expected 4)`);
       }
       console.log(`[setup:dashboard] Verified ${run1Count} + ${run2Count} seeded scan results.`);
     });
 
     test.afterAll(() => {
       restoreScanHistory(backup);
+      restoreDashboardIdentityData(identityBackup);
     });
 
     test('should display scan run selector dropdown', async () => {
@@ -73,6 +85,58 @@ test.describe('Dashboard Page', () => {
       expect(failedVisible).toBe(true);
       expect(passedVisible).toBe(true);
       expect(criticalVisible).toBe(true);
+    });
+
+    test('should separate Prowler checks and scans from identity stats', async () => {
+      expect(await dashPage.isElementVisible(dashPage.selectors.sectionPanelGroup)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.scanPanel)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.identityPanel)).toBe(true);
+      expect(await dashPage.isScanSectionVisible()).toBe(true);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+      expect(await dashPage.isScanSectionHideable()).toBe(true);
+      expect(await dashPage.isIdentitySectionHideable()).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.scanSectionHeading)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.identitySectionHeading)).toBe(true);
+      expect(await dashPage.isScanRunSelectorInsideScanSection()).toBe(true);
+      expect(await dashPage.isRunNewScanButtonInsideScanSection()).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.scanSectionTotalResultsCard)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.scanSectionFailedChecksCard)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.identityCountCard)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.entitlementsCard)).toBe(true);
+      expect(await dashPage.isScanRunSelectorInsideIdentitySection()).toBe(false);
+    });
+
+    test('should collapse and expand the Prowler checks and scans panel', async () => {
+      expect(await dashPage.isScanSectionVisible()).toBe(true);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+
+      await dashPage.clickScanPanelHeader();
+      expect(await dashPage.isScanSectionVisible()).toBe(false);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+
+      await dashPage.clickScanPanelHeader();
+      expect(await dashPage.isScanSectionVisible()).toBe(true);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+    });
+
+    test('should collapse and expand the identity stats panel', async () => {
+      expect(await dashPage.isScanSectionVisible()).toBe(true);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+
+      await dashPage.clickIdentityPanelHeader();
+      expect(await dashPage.isScanSectionVisible()).toBe(true);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(false);
+
+      await dashPage.clickIdentityPanelHeader();
+      expect(await dashPage.isScanSectionVisible()).toBe(true);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+    });
+
+    test('should display identity stats from identity data', async () => {
+      const identityCount = await dashPage.getIdentityCount();
+      const entitlementCount = await dashPage.getEntitlementsCount();
+      expect(identityCount).toBe(3);
+      expect(entitlementCount).toBe(4);
     });
 
     test('should show Total Results card with count greater than 0', async () => {

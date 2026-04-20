@@ -224,6 +224,70 @@ function getTestEffectiveRoleAssignmentCount() {
   return sshQuery(`SELECT COUNT(*) as count FROM azure_effective_role_assignments WHERE principal_id LIKE '${P}%'`)[0].count;
 }
 
+function backupAndClearDashboardIdentityData() {
+  const state = {
+    graphNodes: sshQuery('SELECT id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at FROM graph_nodes'),
+    graphEdges: sshQuery('SELECT id, source_id, target_id, kind, properties, computed, collected_at FROM graph_edges'),
+    entraResources: sshQuery('SELECT id, type, display_name, parent_id, properties, collected_at, last_seen_at FROM azure_entra_resources'),
+    armResources: sshQuery('SELECT id, type, name, location, resource_group, subscription_id, tenant_id, kind, sku, identity, managed_by, plan, zones, tags, properties, collected_at, last_seen_at FROM azure_arm_resources'),
+    effectiveRoleAssignments: sshQuery('SELECT id, principal_id, principal_type, principal_display_name, original_principal_id, original_principal_type, role_definition_id, role_name, scope, permissions_json, computed_at FROM azure_effective_role_assignments')
+  };
+  sshNonQuery('DELETE FROM graph_edges; DELETE FROM graph_nodes; DELETE FROM azure_effective_role_assignments; DELETE FROM azure_entra_resources; DELETE FROM azure_arm_resources');
+  console.log(`[setup] Backed up and cleared dashboard identity data (${state.graphNodes.length} graph nodes, ${state.effectiveRoleAssignments.length} role assignments).`);
+  return state;
+}
+
+function restoreDashboardIdentityData(state) {
+  const stmts = [
+    'DELETE FROM graph_edges',
+    'DELETE FROM graph_nodes',
+    'DELETE FROM azure_effective_role_assignments',
+    'DELETE FROM azure_entra_resources',
+    'DELETE FROM azure_arm_resources'
+  ];
+
+  for (const row of state.armResources) {
+    const cols = ['id', 'type', 'name', 'location', 'resource_group', 'subscription_id', 'tenant_id', 'kind', 'sku', 'identity', 'managed_by', 'plan', 'zones', 'tags', 'properties', 'collected_at', 'last_seen_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO azure_arm_resources (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  for (const row of state.entraResources) {
+    const cols = ['id', 'type', 'display_name', 'parent_id', 'properties', 'collected_at', 'last_seen_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO azure_entra_resources (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  for (const row of state.graphNodes) {
+    const cols = ['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  for (const row of state.effectiveRoleAssignments) {
+    const cols = ['id', 'principal_id', 'principal_type', 'principal_display_name', 'original_principal_id', 'original_principal_type', 'role_definition_id', 'role_name', 'scope', 'permissions_json', 'computed_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO azure_effective_role_assignments (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  for (const row of state.graphEdges) {
+    const cols = ['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];
+    const vals = cols.map(c => sqlValue(row[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);
+  }
+
+  sshNonQuery(stmts.join('; '));
+  console.log(`[teardown] Restored dashboard identity data (${state.graphNodes.length} graph nodes, ${state.effectiveRoleAssignments.length} role assignments).`);
+}
+
+function getDashboardIdentityCounts() {
+  return sshQuery(`
+    SELECT
+      (SELECT COUNT(*) FROM graph_nodes WHERE kind IN ('EntraUser','EntraServicePrincipal','EntraGroup')) as identityCount,
+      (SELECT COUNT(*) FROM azure_effective_role_assignments) as entitlementCount
+  `)[0];
+}
+
 function seedIdentitiesPageData() {
   const now = new Date().toISOString();
   const keyVaultPermissionsJson = JSON.stringify([
@@ -490,6 +554,7 @@ module.exports = {
   seedCompletedDiscoveryRunAt,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
+  backupAndClearDashboardIdentityData, restoreDashboardIdentityData, getDashboardIdentityCounts,
   seedIdentitiesPageData, cleanupIdentitiesPageData, getTestIdentitiesGraphEdgeCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,
   seedAttackPathsPageData, seedAttackPathsRefreshGraphData,

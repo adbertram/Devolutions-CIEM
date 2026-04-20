@@ -12,12 +12,23 @@ class DashboardPageHelpers extends BasePage {
       lastDiscoveryHeader: '#ciemLastDiscoveryHeader',
       localLastDiscoverySummary: '#lastDiscoverySummary',
       runNewScanBtn: "button:has-text('Run New Scan')",
+      sectionPanelGroup: '#dashboardSectionPanels',
+      scanPanel: '#dashboardScanPanel',
+      identityPanel: '#dashboardIdentityPanel',
+      scanSection: '#dashboardScanSection',
+      identitySection: '#dashboardIdentitySection',
+      scanSectionHeading: "#dashboardScanPanel:has-text('Prowler Checks & Scans')",
+      identitySectionHeading: "#dashboardIdentityPanel:has-text('Identity Stats')",
       // Summary cards
       summaryCards: '.MuiGrid-container .MuiCard-root',
       totalResultsCard: ".MuiCard-root:has-text('Total Results')",
       failedChecksCard: ".MuiCard-root:has-text('Failed Checks')",
       passedChecksCard: ".MuiCard-root:has-text('Passed Checks')",
       criticalIssuesCard: ".MuiCard-root:has-text('Critical Issues')",
+      scanSectionTotalResultsCard: "#dashboardScanSection .MuiCard-root:has-text('Total Results')",
+      scanSectionFailedChecksCard: "#dashboardScanSection .MuiCard-root:has-text('Failed Checks')",
+      identityCountCard: "#dashboardIdentitySection .MuiCard-root:has-text('Identities')",
+      entitlementsCard: "#dashboardIdentitySection .MuiCard-root:has-text('Entitlements')",
       // Charts
       severityChartCard: ".MuiCard-root:has-text('Results by Severity')",
       serviceChartCard: ".MuiCard-root:has-text('Results by Service')",
@@ -57,6 +68,44 @@ class DashboardPageHelpers extends BasePage {
     return await this.isElementVisible(this.selectors.runNewScanBtn);
   }
 
+  async isScanSectionVisible() {
+    return await this.isElementVisible(this.selectors.scanSection);
+  }
+
+  async isIdentitySectionVisible() {
+    return await this.isElementVisible(this.selectors.identitySection);
+  }
+
+  async isScanSectionHideable() {
+    return await this.page.locator(this.selectors.scanSection).getAttribute('data-hideable') === 'true';
+  }
+
+  async isIdentitySectionHideable() {
+    return await this.page.locator(this.selectors.identitySection).getAttribute('data-hideable') === 'true';
+  }
+
+  async clickScanPanelHeader() {
+    await this.page.locator(this.selectors.scanPanel).getByText('Prowler Checks & Scans').first().click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  async clickIdentityPanelHeader() {
+    await this.page.locator(this.selectors.identityPanel).getByText('Identity Stats').first().click();
+    await this.page.waitForTimeout(1000);
+  }
+
+  async isScanRunSelectorInsideScanSection() {
+    return await this.isElementVisible(`${this.selectors.scanSection} ${this.selectors.scanRunSelectorCombobox}`);
+  }
+
+  async isRunNewScanButtonInsideScanSection() {
+    return await this.isElementVisible(`${this.selectors.scanSection} button:has-text('Run New Scan')`);
+  }
+
+  async isScanRunSelectorInsideIdentitySection() {
+    return await this.isElementVisible(`${this.selectors.identitySection} ${this.selectors.scanRunSelectorCombobox}`);
+  }
+
   async isLastDiscoveryHeaderVisible() {
     return await this.isElementVisible(this.selectors.lastDiscoveryHeader);
   }
@@ -86,6 +135,14 @@ class DashboardPageHelpers extends BasePage {
 
   async getCriticalIssuesCount() {
     return parseInt(await this.getCardValue(this.selectors.criticalIssuesCard));
+  }
+
+  async getIdentityCount() {
+    return parseInt(await this.getCardValue(this.selectors.identityCountCard));
+  }
+
+  async getEntitlementsCount() {
+    return parseInt(await this.getCardValue(this.selectors.entitlementsCard));
   }
 
   async clickRunNewScan() {
