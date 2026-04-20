@@ -185,6 +185,7 @@ psu-app/data/ciem.log
 # Agent workspaces and test results (runtime artifacts)
 agent_workspaces/
 test-results/
+.agents/skills/status-reports/reports/
 
 # Claude Code local config (skills, commands, agents, hooks)
 .claude/
