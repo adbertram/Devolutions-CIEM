@@ -70,6 +70,29 @@ function New-CIEMAttackPathsPage {
                             $remediation = [string]$EventData.row.remediation
                             $attackPathId = [string]$EventData.row.attackPathId
                             $remediationScript = Devolutions.CIEM\Get-CIEMAttackPathRemediationScript -Id $attackPathId
+                            $executionKey = [guid]::NewGuid().ToString('N')
+                            $executionStreamsId = "ciemAttackPathExecutionStreams_$executionKey"
+                            $executionWarningId = "ciemAttackPathExecutionWarning_$executionKey"
+                            $scriptActionButtonStyle = @{
+                                width           = '112px'
+                                minWidth        = '112px'
+                                height          = '32px'
+                                display         = 'inline-flex'
+                                alignItems      = 'center'
+                                justifyContent  = 'center'
+                                padding         = '0'
+                                backgroundColor = '#ffffff'
+                                border          = '1px solid #d0d7de'
+                                borderRadius    = '6px'
+                                color           = '#57606a'
+                                cursor          = 'pointer'
+                                textDecoration  = 'none'
+                                fontSize        = '12px'
+                                fontWeight      = '600'
+                                fontFamily      = 'inherit'
+                                lineHeight      = '1'
+                                textTransform   = 'none'
+                            }
                             New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '14px 18px'; display = 'grid'; gap = '14px' } } -Content {
                                 New-UDElement -Tag 'section' -Content {
                                     New-UDTypography -Text 'Remediation' -Variant 'subtitle2' -Style @{ fontWeight = '600'; marginBottom = '6px' }
@@ -97,56 +120,224 @@ function New-CIEMAttackPathsPage {
                                     New-UDTypography -Text 'Remediation Script' -Variant 'subtitle2' -Style @{ fontWeight = '600'; marginBottom = '6px' }
                                     New-UDElement -Tag 'div' -Attributes @{ style = @{ position = 'relative' } } -Content {
                                         New-UDElement -Tag 'div' -Attributes @{
-                                            'data-ciem-attack-path-remediation-script-copy' = 'true'
-                                            style = @{ position = 'absolute'; top = '8px'; right = '8px'; zIndex = 2 }
+                                            'data-ciem-attack-path-remediation-script-actions' = 'true'
+                                            style = @{
+                                                position   = 'absolute'
+                                                top        = '8px'
+                                                right      = '8px'
+                                                zIndex     = 2
+                                                display    = 'flex'
+                                                alignItems = 'center'
+                                                gap        = '8px'
+                                            }
                                         } -Content {
-                                            New-UDElement -Tag 'a' -Attributes @{
-                                                href = @'
+                                            New-UDElement -Tag 'div' -Attributes @{
+                                                'data-ciem-attack-path-remediation-script-copy' = 'true'
+                                            } -Content {
+                                                New-UDElement -Tag 'a' -Attributes @{
+                                                    href = @'
 javascript:(()=>{const control=document.activeElement;const panel=control.closest(".MuiDataGrid-detailPanel");const scriptBlock=panel.querySelector("[data-ciem-attack-path-remediation-script='true']");const textArea=document.createElement("textarea");textArea.value=scriptBlock.textContent.trim();textArea.setAttribute("readonly","");textArea.style.position="fixed";textArea.style.top="-1000px";textArea.style.left="-1000px";document.body.appendChild(textArea);textArea.focus();textArea.select();document.execCommand("copy");document.body.removeChild(textArea);const idle=control.querySelector("[data-ciem-copy-idle='true']");const success=control.querySelector("[data-ciem-copy-success='true']");idle.style.display="none";success.style.display="inline-flex";control.style.borderColor="#2da44e";control.style.color="#1a7f37";control.title="Copied";control.setAttribute("aria-label","Copied remediation script");window.clearTimeout(control.__ciemCopyTimer);control.__ciemCopyTimer=window.setTimeout(()=>{idle.style.display="inline-flex";success.style.display="none";control.style.borderColor="#d0d7de";control.style.color="#57606a";control.title="Copy script";control.setAttribute("aria-label","Copy remediation script");},1800);})()
 '@
-                                                role = 'button'
-                                                title = 'Copy script'
-                                                'aria-label' = 'Copy remediation script'
-                                                style = @{
-                                                    width = '82px'
-                                                    height = '32px'
-                                                    display = 'inline-flex'
-                                                    alignItems = 'center'
-                                                    justifyContent = 'center'
-                                                    padding = '0'
-                                                    backgroundColor = '#ffffff'
-                                                    border = '1px solid #d0d7de'
-                                                    borderRadius = '6px'
-                                                    color = '#57606a'
-                                                    cursor = 'pointer'
-                                                    textDecoration = 'none'
-                                                    fontSize = '12px'
-                                                    fontWeight = '600'
-                                                    fontFamily = 'inherit'
-                                                    lineHeight = '1'
-                                                }
-                                            } -Content {
-                                                New-UDElement -Tag 'span' -Attributes @{
-                                                    'data-ciem-copy-idle' = 'true'
-                                                    style = @{ display = 'inline-flex'; alignItems = 'center'; gap = '6px' }
+                                                    role = 'button'
+                                                    title = 'Copy script'
+                                                    'aria-label' = 'Copy remediation script'
+                                                    style = $scriptActionButtonStyle
                                                 } -Content {
-                                                    New-UDIcon -Icon 'Copy' -Size 'sm'
-                                                    New-UDElement -Tag 'span' -Content { 'Copy' }
-                                                }
-                                                New-UDElement -Tag 'span' -Attributes @{
-                                                    'data-ciem-copy-success' = 'true'
-                                                    style = @{ display = 'none'; alignItems = 'center'; gap = '6px' }
-                                                } -Content {
-                                                    New-UDIcon -Icon 'CheckCircle' -Size 'sm'
-                                                    New-UDElement -Tag 'span' -Content { 'Copied' }
+                                                    New-UDElement -Tag 'span' -Attributes @{
+                                                        'data-ciem-copy-idle' = 'true'
+                                                        style = @{ display = 'inline-flex'; alignItems = 'center'; gap = '6px' }
+                                                    } -Content {
+                                                        New-UDIcon -Icon 'Copy' -Size 'sm'
+                                                        New-UDElement -Tag 'span' -Content { 'Copy' }
+                                                    }
+                                                    New-UDElement -Tag 'span' -Attributes @{
+                                                        'data-ciem-copy-success' = 'true'
+                                                        style = @{ display = 'none'; alignItems = 'center'; gap = '6px' }
+                                                    } -Content {
+                                                        New-UDIcon -Icon 'CheckCircle' -Size 'sm'
+                                                        New-UDElement -Tag 'span' -Content { 'Copied' }
+                                                    }
                                                 }
                                             }
+                                            New-UDElement -Tag 'div' -Attributes @{
+                                                'data-ciem-attack-path-remediation-script-execute' = 'true'
+                                            } -Content {
+                                                New-UDButton -Text 'Execute' -Variant 'outlined' -Color 'secondary' -Size 'small' -Icon (New-UDIcon -Icon 'Play' -Size 'sm') -Style $scriptActionButtonStyle -OnClick {
+                                                $job = Invoke-PSUScript -Name 'Checks/Invoke-CIEMAttackPathRemediation' -Integrated -Parameters @{ AttackPathId = $attackPathId }
+                                                $Session:CIEMAttackPathExecution = @{
+                                                    JobId        = [int64]$job.Id
+                                                    Script       = $remediationScript
+                                                    Status       = [string]$job.Status
+                                                    IsRunning    = $true
+                                                    CloseWarning = $false
+                                                }
+
+                                                Show-UDModal -Persistent -FullWidth -MaxWidth 'lg' -Header {
+                                                    New-UDTypography -Text 'Execute Remediation Script' -Variant 'h6'
+                                                } -Content {
+                                                    New-UDElement -Tag 'div' -Attributes @{
+                                                        'data-ciem-attack-path-execution-dialog' = 'true'
+                                                        style = @{ display = 'grid'; gap = '14px' }
+                                                    } -Content {
+                                                        New-UDTypography -Text 'Script' -Variant 'subtitle2' -Style @{ fontWeight = '600' }
+                                                        New-UDElement -Tag 'pre' -Attributes @{
+                                                            'data-ciem-attack-path-execution-script' = 'true'
+                                                            style = @{
+                                                                margin = '0'
+                                                                padding = '12px'
+                                                                border = '1px solid #d0d7de'
+                                                                borderRadius = '6px'
+                                                                backgroundColor = '#ffffff'
+                                                                whiteSpace = 'pre-wrap'
+                                                                overflowWrap = 'anywhere'
+                                                                fontFamily = 'monospace'
+                                                                fontSize = '13px'
+                                                                lineHeight = '1.45'
+                                                                maxHeight = '220px'
+                                                                overflow = 'auto'
+                                                            }
+                                                        } -Content {
+                                                            $Session:CIEMAttackPathExecution['Script']
+                                                        }
+                                                        New-UDTypography -Text 'Streams' -Variant 'subtitle2' -Style @{ fontWeight = '600' }
+                                                        New-UDDynamic -Id $executionStreamsId -AutoRefresh -AutoRefreshInterval 1 -Content {
+                                                            $executionState = $Session:CIEMAttackPathExecution
+                                                            if ($null -eq $executionState) {
+                                                                throw 'Cannot render attack path remediation execution because execution state is missing.'
+                                                            }
+
+                                                            $jobId = [int64]$executionState['JobId']
+                                                            $job = Get-PSUJob -Id $jobId -Integrated
+                                                            $streamLines = [System.Collections.Generic.List[string]]::new()
+                                                            $streamLines.Add("Execution started. Job $jobId.")
+
+                                                            foreach ($message in @(Devolutions.CIEM\Get-CIEMPSUJobOutput -Job $job -Integrated)) {
+                                                                $streamLines.Add("[stream] $message")
+                                                            }
+
+                                                            $isRunning = @('Queued', 'Running') -contains [string]$job.Status
+                                                            if (-not $isRunning) {
+                                                                $streamLines.Add("Execution $($job.Status).")
+                                                            }
+
+                                                            $streamText = $streamLines -join [Environment]::NewLine
+                                                            $executionState['Status'] = [string]$job.Status
+                                                            $executionState['IsRunning'] = $isRunning
+                                                            $executionState['Streams'] = $streamText
+                                                            $Session:CIEMAttackPathExecution = $executionState
+
+                                                            New-UDElement -Tag 'div' -Attributes @{
+                                                                'data-ciem-attack-path-execution-streams' = 'true'
+                                                            } -Content {
+                                                                New-UDTextbox -Multiline -Rows 14 -FullWidth -Disabled -Value $streamText
+                                                            }
+                                                        }
+                                                        New-UDDynamic -Id $executionWarningId -Content {
+                                                            $executionState = $Session:CIEMAttackPathExecution
+                                                            if ($null -eq $executionState) {
+                                                                throw 'Cannot render attack path remediation close warning because execution state is missing.'
+                                                            }
+
+                                                            if ([bool]$executionState['CloseWarning']) {
+                                                                New-UDElement -Tag 'div' -Attributes @{
+                                                                    'data-ciem-attack-path-execution-close-warning' = 'true'
+                                                                    style = @{ display = 'grid'; gap = '10px' }
+                                                                } -Content {
+                                                                    New-UDAlert -Severity 'warning' -Title 'Script still running' -Text 'Terminate it now or leave it running in the background.'
+                                                                    New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; gap = '8px' } } -Content {
+                                                                        New-UDElement -Tag 'div' -Attributes @{
+                                                                            'data-ciem-attack-path-execution-terminate' = 'true'
+                                                                            'data-ciem-attack-path-execution-warning-terminate' = 'true'
+                                                                        } -Content {
+                                                                            New-UDButton -Text 'Terminate' -Variant 'contained' -Color 'error' -OnClick {
+                                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                                if ($null -eq $executionState) {
+                                                                                    throw 'Cannot terminate attack path remediation because execution state is missing.'
+                                                                                }
+
+                                                                                $jobId = [int64]$executionState['JobId']
+                                                                                $job = Get-PSUJob -Id $jobId -Integrated
+                                                                                if (@('Queued', 'Running') -contains [string]$job.Status) {
+                                                                                    Stop-PSUJob -Id $jobId -Integrated | Out-Null
+                                                                                }
+                                                                                Hide-UDModal
+                                                                            }
+                                                                        }
+                                                                        New-UDElement -Tag 'div' -Attributes @{
+                                                                            'data-ciem-attack-path-execution-leave-running' = 'true'
+                                                                        } -Content {
+                                                                            New-UDButton -Text 'Leave Running' -Variant 'outlined' -Color 'secondary' -OnClick {
+                                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                                if ($null -eq $executionState) {
+                                                                                    throw 'Cannot leave attack path remediation running because execution state is missing.'
+                                                                                }
+
+                                                                                $executionState['CloseWarning'] = $false
+                                                                                $Session:CIEMAttackPathExecution = $executionState
+                                                                                Hide-UDModal
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } -Footer {
+                                                    New-UDElement -Tag 'div' -Attributes @{
+                                                        style = @{ display = 'flex'; gap = '8px'; justifyContent = 'flex-end'; width = '100%' }
+                                                    } -Content {
+                                                        New-UDElement -Tag 'div' -Attributes @{
+                                                            'data-ciem-attack-path-execution-terminate' = 'true'
+                                                        } -Content {
+                                                            New-UDButton -Text 'Terminate' -Variant 'outlined' -Color 'error' -OnClick {
+                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                if ($null -eq $executionState) {
+                                                                    throw 'Cannot terminate attack path remediation because execution state is missing.'
+                                                                }
+
+                                                                $jobId = [int64]$executionState['JobId']
+                                                                $job = Get-PSUJob -Id $jobId -Integrated
+                                                                if (@('Queued', 'Running') -contains [string]$job.Status) {
+                                                                    Stop-PSUJob -Id $jobId -Integrated | Out-Null
+                                                                }
+                                                                Hide-UDModal
+                                                            }
+                                                        }
+                                                        New-UDElement -Tag 'div' -Attributes @{
+                                                            'data-ciem-attack-path-execution-close' = 'true'
+                                                        } -Content {
+                                                            New-UDButton -Text 'Close' -Variant 'contained' -Color 'primary' -OnClick {
+                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                if ($null -eq $executionState) {
+                                                                    throw 'Cannot close attack path remediation execution because execution state is missing.'
+                                                                }
+
+                                                                $jobId = [int64]$executionState['JobId']
+                                                                $job = Get-PSUJob -Id $jobId -Integrated
+                                                                $isRunning = @('Queued', 'Running') -contains [string]$job.Status
+                                                                $executionState['Status'] = [string]$job.Status
+                                                                $executionState['IsRunning'] = $isRunning
+
+                                                                if ($isRunning) {
+                                                                    $executionState['CloseWarning'] = $true
+                                                                    $Session:CIEMAttackPathExecution = $executionState
+                                                                    Sync-UDElement -Id $executionWarningId
+                                                                }
+                                                                else {
+                                                                    Hide-UDModal
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                         }
                                         New-UDElement -Tag 'pre' -Attributes @{
                                             'data-ciem-attack-path-remediation-script' = 'true'
                                             style = @{
                                                 margin = '0'
-                                                padding = '12px 100px 12px 12px'
+                                                padding = '12px 260px 12px 12px'
                                                 border = '1px solid #d0d7de'
                                                 borderRadius = '6px'
                                                 backgroundColor = '#ffffff'

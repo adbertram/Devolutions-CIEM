@@ -1,7 +1,7 @@
 BeforeAll {
     $script:PagesRoot = Join-Path $PSScriptRoot '..' '..' 'Pages'
     $script:PageFiles = Get-ChildItem -Path $script:PagesRoot -Filter '*.ps1' | Sort-Object Name
-    $script:ModuleCommandPattern = '^(Write-CIEMLog|Get-SeverityColor|Get-StatusColor|Get-PSUInstalledEnvironment|Invoke-CIEMJobWithProgress|New-CIEM(?:ErrorContent|InfoContent|SuccessContent)|Connect-CIEM|Set-CIEMSecret|Save-CIEMAzureAuthenticationProfile|Set-CIEMAzureAuthenticationProfileActive|Update-CIEMProvider|Invoke-CIEMQuery|Get-CIEM(?:AzureArmHierarchy|AzureAuthenticationProfile|AzureDiscoveryRun|AzureIdentityHierarchy|AttackPath|AttackPathRemediationScript|Check|Config|IdentityRiskSignals|IdentityRiskSummary|Provider|ProviderAuthMethod|ScanRun|Secret))$'
+    $script:ModuleCommandPattern = '^(Write-CIEMLog|Get-SeverityColor|Get-StatusColor|Get-PSUInstalledEnvironment|Invoke-CIEMJobWithProgress|New-CIEM(?:ErrorContent|InfoContent|SuccessContent)|Connect-CIEM|Set-CIEMSecret|Save-CIEMAzureAuthenticationProfile|Set-CIEMAzureAuthenticationProfileActive|Update-CIEMProvider|Invoke-CIEMQuery|Get-CIEM(?:AzureArmHierarchy|AzureAuthenticationProfile|AzureDiscoveryRun|AzureIdentityHierarchy|AttackPath|AttackPathRemediationScript|Check|Config|IdentityRiskSignals|IdentityRiskSummary|PSUJobOutput|Provider|ProviderAuthMethod|ScanRun|Secret))$'
     $script:UnqualifiedCommands = foreach ($pageFile in $script:PageFiles) {
         $tokens = $null
         $parseErrors = $null

@@ -14,9 +14,19 @@ class AttackPathsPageHelpers extends BasePage {
       detailPanel: '.MuiDataGrid-detailPanel',
       remediationBlock: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation="true"]',
       remediationScriptBlock: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script="true"]',
+      remediationScriptActions: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script-actions="true"]',
       remediationScriptCopyButton: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script-copy="true"] a',
+      remediationScriptExecuteButton: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation-script-execute="true"] button',
       remediationScriptCopyIdle: '.MuiDataGrid-detailPanel [data-ciem-copy-idle="true"]',
       remediationScriptCopySuccess: '.MuiDataGrid-detailPanel [data-ciem-copy-success="true"]',
+      executionDialog: '[data-ciem-attack-path-execution-dialog="true"]',
+      executionScript: '[data-ciem-attack-path-execution-script="true"]',
+      executionStreams: '[data-ciem-attack-path-execution-streams="true"] textarea:not([aria-hidden="true"])',
+      executionCloseButton: '[data-ciem-attack-path-execution-close="true"] button',
+      executionTerminateButton: '[data-ciem-attack-path-execution-terminate="true"] button',
+      executionCloseWarning: '[data-ciem-attack-path-execution-close-warning="true"]',
+      executionWarningTerminateButton: '[data-ciem-attack-path-execution-warning-terminate="true"] button',
+      executionLeaveRunningButton: '[data-ciem-attack-path-execution-leave-running="true"] button',
       refreshButton: 'button:has-text("Refresh Attack Paths")',
       refreshSuccessToast: '.iziToast:has-text("Attack paths refreshed")',
       pagination: '.MuiTablePagination-root',
@@ -90,6 +100,34 @@ class AttackPathsPageHelpers extends BasePage {
     await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });
     await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });
     await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });
+    await this.page.waitForFunction((selector) => {
+      const element = document.querySelector(selector);
+      return element && element.textContent.trim().length > 0;
+    }, this.selectors.remediationScriptBlock);
+  }
+
+  async clickAttackPath(patternName) {
+    await this.waitForElement(this.selectors.dataGrid);
+    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();
+    await row.waitFor({ state: 'visible' });
+    await row.getByRole('gridcell', { name: patternName }).click();
+    await row.getByRole('button', { name: /^Expand$/i }).click();
+
+    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });
+    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });
+    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });
+    await this.page.waitForFunction((selector) => {
+      const element = document.querySelector(selector);
+      return element && element.textContent.trim().length > 0;
+    }, this.selectors.remediationScriptBlock);
+  }
+
+  async isDetailHeadingVisible(heading) {
+    return await this.page.locator(this.selectors.detailPanel).getByText(heading, { exact: true }).isVisible();
+  }
+
+  async getDetailPanelText() {
+    return (await this.page.locator(this.selectors.detailPanel).textContent()).trim();
   }
 
   async isRemediationBlockVisible() {
@@ -122,6 +160,112 @@ class AttackPathsPageHelpers extends BasePage {
 
   async copyRemediationScriptToClipboard() {
     await this.page.locator(this.selectors.remediationScriptCopyButton).click();
+  }
+
+  async getRemediationScriptActionButtonMetrics() {
+    return await this.page.evaluate(({ actionsSelector, copySelector, executeSelector }) => {
+      const actions = document.querySelector(actionsSelector);
+      const copy = document.querySelector(copySelector);
+      const execute = document.querySelector(executeSelector);
+      if (!actions || !copy || !execute) {
+        throw new Error('Remediation script action buttons were not rendered.');
+      }
+
+      const actionsBox = actions.getBoundingClientRect();
+      const copyBox = copy.getBoundingClientRect();
+      const executeBox = execute.getBoundingClientRect();
+      const actionsStyle = window.getComputedStyle(actions);
+      const copyStyle = window.getComputedStyle(copy);
+      const executeStyle = window.getComputedStyle(execute);
+
+      return {
+        actions: {
+          display: actionsStyle.getPropertyValue('display'),
+          alignItems: actionsStyle.getPropertyValue('align-items'),
+          gap: actionsStyle.getPropertyValue('gap'),
+          y: actionsBox.y,
+          height: actionsBox.height
+        },
+        copy: {
+          x: copyBox.x,
+          y: copyBox.y,
+          width: copyBox.width,
+          height: copyBox.height,
+          borderRadius: copyStyle.borderRadius,
+          borderTopWidth: copyStyle.borderTopWidth,
+          borderTopStyle: copyStyle.borderTopStyle,
+          backgroundColor: copyStyle.backgroundColor,
+          color: copyStyle.color,
+          fontSize: copyStyle.fontSize,
+          fontWeight: copyStyle.fontWeight
+        },
+        execute: {
+          x: executeBox.x,
+          y: executeBox.y,
+          width: executeBox.width,
+          height: executeBox.height,
+          borderRadius: executeStyle.borderRadius,
+          borderTopWidth: executeStyle.borderTopWidth,
+          borderTopStyle: executeStyle.borderTopStyle,
+          backgroundColor: executeStyle.backgroundColor,
+          color: executeStyle.color,
+          fontSize: executeStyle.fontSize,
+          fontWeight: executeStyle.fontWeight
+        }
+      };
+    }, {
+      actionsSelector: this.selectors.remediationScriptActions,
+      copySelector: this.selectors.remediationScriptCopyButton,
+      executeSelector: this.selectors.remediationScriptExecuteButton
+    });
+  }
+
+  async isRemediationScriptExecuteButtonVisible() {
+    return await this.isElementVisible(this.selectors.remediationScriptExecuteButton);
+  }
+
+  async executeRemediationScript() {
+    await this.page.locator(this.selectors.remediationScriptExecuteButton).click();
+  }
+
+  async isExecutionDialogVisible() {
+    return await this.isElementVisible(this.selectors.executionDialog);
+  }
+
+  async getExecutionScriptText() {
+    return (await this.page.locator(this.selectors.executionScript).textContent()).trim();
+  }
+
+  async isExecutionStreamsVisible() {
+    return await this.isElementVisible(this.selectors.executionStreams);
+  }
+
+  async getExecutionStreamsText() {
+    return await this.page.locator(this.selectors.executionStreams).inputValue();
+  }
+
+  async closeExecutionDialog() {
+    await this.page.locator(this.selectors.executionCloseButton).click();
+  }
+
+  async terminateExecution() {
+    await this.page.locator(this.selectors.executionTerminateButton).click();
+  }
+
+  async terminateExecutionFromWarning() {
+    await this.page.locator(this.selectors.executionWarningTerminateButton).click();
+  }
+
+  async isExecutionCloseWarningVisible() {
+    return await this.isElementVisible(this.selectors.executionCloseWarning);
+  }
+
+  async isExecutionLeaveRunningButtonVisible() {
+    return await this.isElementVisible(this.selectors.executionLeaveRunningButton);
+  }
+
+  async leaveExecutionRunning() {
+    await this.page.locator(this.selectors.executionLeaveRunningButton).click();
   }
 
   async getClipboardText() {
