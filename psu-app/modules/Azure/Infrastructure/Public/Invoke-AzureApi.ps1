@@ -353,6 +353,44 @@ function Invoke-AzureApi {
         $Body | ConvertTo-Json -Depth 20 -Compress
     }
 
+    function AssertSuccessfulAzureResponse {
+        param(
+            [Parameter(Mandatory)]
+            [object]$Response,
+            [Parameter(Mandatory)]
+            [string]$FriendlyName
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        $statusCode = [int]$Response.StatusCode
+        if ($statusCode -ge 200 -and $statusCode -lt 300) {
+            return
+        }
+
+        if ($statusCode -eq 401) {
+            throw "Unauthorized loading $FriendlyName - invalid or expired token"
+        }
+        if ($statusCode -eq 403) {
+            throw "Access denied loading $FriendlyName - missing permissions"
+        }
+        if ($statusCode -eq 404) {
+            throw "Resource not found: $FriendlyName"
+        }
+        if ($statusCode -eq 0) {
+            $detail = GetParsedErrorMessage -Body $Response.Body
+            if (-not $detail) { $detail = 'Unknown error' }
+            throw "Failed to load $FriendlyName - $detail"
+        }
+
+        $detail = GetParsedErrorMessage -Body $Response.Body
+        $msg = "Failed to load $FriendlyName - Status: $statusCode"
+        if ($detail) {
+            $msg += " - $detail"
+        }
+        throw $msg
+    }
+
     function ConvertToSkipTokenBody {
         # Takes the previous POST body (hashtable or pscustomobject) and returns
         # a fresh hashtable with $skipToken appended, suitable for re-serialization.
@@ -605,12 +643,13 @@ function Invoke-AzureApi {
     try {
         while ($currentUri) {
             $currentResponse = InvokeAzureRequestWithRetry -RequestUri $currentUri -RequestHeaders $headers -RequestMethod $currentMethod -JsonBody $currentJsonBody -FriendlyName $ResourceName
+            AssertSuccessfulAzureResponse -Response $currentResponse -FriendlyName $ResourceName
 
             if ($Raw) {
                 return $currentResponse
             }
 
-            $statusCode = $currentResponse.StatusCode
+            $statusCode = [int]$currentResponse.StatusCode
 
             if ($statusCode -eq 200) {
                 $content = $currentResponse.Body
@@ -680,28 +719,7 @@ function Invoke-AzureApi {
                 continue
             }
 
-            # Non-200 status — all fail-fast by throw.
-            if ($statusCode -eq 401) {
-                throw "Unauthorized loading $ResourceName - invalid or expired token"
-            }
-            if ($statusCode -eq 403) {
-                throw "Access denied loading $ResourceName - missing permissions"
-            }
-            if ($statusCode -eq 404) {
-                throw "Resource not found: $ResourceName"
-            }
-            if ($statusCode -eq 0) {
-                $detail = GetParsedErrorMessage -Body $currentResponse.Body
-                if (-not $detail) { $detail = 'Unknown error' }
-                throw "Failed to load $ResourceName - $detail"
-            }
-
-            $detail = GetParsedErrorMessage -Body $currentResponse.Body
-            $msg = "Failed to load $ResourceName - Status: $statusCode"
-            if ($detail) {
-                $msg += " - $detail"
-            }
-            throw $msg
+            $currentUri = $null
         }
     }
     finally {

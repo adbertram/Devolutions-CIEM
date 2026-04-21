@@ -889,6 +889,7 @@ Describe 'Graph Builder Functions' {
 
                 $edgeProps = $edges[0].Properties | ConvertFrom-Json
                 $edgeProps.role_name | Should -Be 'Reader'
+                $edgeProps.role_assignment_id | Should -Be '/subscriptions/sub1/providers/Microsoft.Authorization/roleAssignments/ra-1'
             }
         }
 

@@ -153,6 +153,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
         $edgePropsHash = @{
             role_name          = $roleName
             role_definition_id = $roleDefinitionId
+            role_assignment_id = $ra.Id
             permissions_json   = $permissionsJson
             privileged         = $isPrivileged
             principal_type     = $principalType
@@ -178,6 +179,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $inheritedPropsHash = @{
                             role_name          = $roleName
                             role_definition_id = $roleDefinitionId
+                            role_assignment_id = $ra.Id
                             permissions_json   = $permissionsJson
                             privileged         = $isPrivileged
                             principal_type     = $member.Type

@@ -200,6 +200,20 @@ Describe 'Invoke-AzureApi retry handling' {
         Assert-MockCalled InvokeCIEMAzureSleep -ModuleName Devolutions.CIEM -Times 0 -Exactly
     }
 
+    It 'Throws failed raw responses before returning the raw envelope' {
+        $forbiddenError = New-HttpErrorRecord -StatusCode 403 -Body '{"error":{"message":"assignment delete denied"}}'
+
+        Mock -ModuleName Devolutions.CIEM Invoke-RestMethod {
+            throw $forbiddenError
+        }
+
+        {
+            Invoke-AzureApi -Api ARM -Uri 'https://management.azure.com/subscriptions/sub-1/providers/Microsoft.Authorization/roleAssignments/role-1?api-version=2022-04-01' -Method DELETE -ResourceName 'Azure RBAC role assignment role-1' -Raw -ErrorAction Stop
+        } | Should -Throw '*Access denied loading Azure RBAC role assignment role-1*'
+
+        Assert-MockCalled InvokeCIEMAzureSleep -ModuleName Devolutions.CIEM -Times 0 -Exactly
+    }
+
     It 'Caps the exponential backoff delay at 60 seconds' {
         # 2^(retry-1) exceeds 60 starting at retry 7 (2^6 = 64). Make the stub fail
         # through the full 5 retries and assert none of the sleep calls exceed 60s.

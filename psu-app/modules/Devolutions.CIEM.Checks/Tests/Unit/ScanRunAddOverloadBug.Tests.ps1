@@ -20,30 +20,30 @@ Describe 'No module-class-typed generic collections in psu-app/modules' {
     }
 
     It 'no [List[CIEM*]] or [List[object[CIEM*]]] variable assignments in any .ps1' {
-        $psFiles = @(Get-ChildItem -Path $script:ModulesRoot -Include '*.ps1' -Recurse -ErrorAction SilentlyContinue)
-        $matches = @()
+        $psFiles = @(Get-ChildItem -Path $script:ModulesRoot -Include '*.ps1' -Recurse -ErrorAction Stop)
+        $violatingFiles = @()
 
         foreach ($file in $psFiles) {
-            $source = Get-Content -Path $file.FullName -Raw -ErrorAction SilentlyContinue
+            $source = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
             if ($source -match '\$\w+\s*=\s*\[(System\.Collections\.Generic\.)?List\[CIEM[A-Za-z]+\]\]') {
-                $matches += $file.FullName
+                $violatingFiles += $file.FullName
             }
         }
 
-        $matches | Should -HaveCount 0 -Because "module-class-typed lists cause PSU assembly mismatch failures; use [List[object]] or plain arrays instead"
+        $violatingFiles | Should -HaveCount 0 -Because "module-class-typed lists cause PSU assembly mismatch failures; use [List[object]] or plain arrays instead"
     }
 
     It 'no [Dictionary[*,CIEM*]] variable assignments in any .ps1' {
-        $psFiles = @(Get-ChildItem -Path $script:ModulesRoot -Include '*.ps1' -Recurse -ErrorAction SilentlyContinue)
-        $matches = @()
+        $psFiles = @(Get-ChildItem -Path $script:ModulesRoot -Include '*.ps1' -Recurse -ErrorAction Stop)
+        $violatingFiles = @()
 
         foreach ($file in $psFiles) {
-            $source = Get-Content -Path $file.FullName -Raw -ErrorAction SilentlyContinue
+            $source = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
             if ($source -match '\$\w+\s*=\s*\[(System\.Collections\.Generic\.)?Dictionary\[[^\]]*,\s*CIEM[A-Za-z]+\]\]') {
-                $matches += $file.FullName
+                $violatingFiles += $file.FullName
             }
         }
 
-        $matches | Should -HaveCount 0 -Because "same root cause as List; use [Dictionary[string,object]] instead"
+        $violatingFiles | Should -HaveCount 0 -Because "same root cause as List; use [Dictionary[string,object]] instead"
     }
 }
