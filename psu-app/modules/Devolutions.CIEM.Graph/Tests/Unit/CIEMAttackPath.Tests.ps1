@@ -2,6 +2,7 @@ BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
+    $script:RemediationTemplateContent = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Data' 'attack_path_remediation_script_template.ps1') -Raw
 
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
 
@@ -837,7 +838,12 @@ Describe 'Attack Path Engine' {
             Invoke-CIEMQuery -Query "DELETE FROM graph_nodes"
         }
 
-        It 'renders a direct Azure RBAC role assignment delete command from the finding path' {
+        It 'Writes the remediation completion notice to the information stream instead of pipeline output' {
+            $script:RemediationTemplateContent | Should -Match "Write-Information 'Remediation commands completed\. Rerun Azure discovery in CIEM\.'"
+            $script:RemediationTemplateContent | Should -Not -Match "Write-Output 'Remediation commands completed\. Rerun Azure discovery in CIEM\.'"
+        }
+
+        It 'renders a direct Azure RBAC role assignment REST delete command from the finding path' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 [pscustomobject]@{
                     Name    = $Name
@@ -848,19 +854,22 @@ Describe 'Attack Path Engine' {
             Save-CIEMGraphNode -Id 'disabled-user-1' -Kind 'EntraUser' -DisplayName 'Disabled User' -Provider 'azure' -Properties '{"accountEnabled":false}'
             Save-CIEMGraphNode -Id '/subscriptions/sub-disabled-1' -Kind 'AzureSubscription' -DisplayName 'Disabled Test Subscription' -Provider 'azure'
             Save-CIEMGraphEdge -SourceId 'disabled-user-1' -TargetId '/subscriptions/sub-disabled-1' -Kind 'HasRole' `
-                -Properties '{"role_name":"Contributor","role_definition_id":"/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","privileged":false}' -Computed 1
+                -Properties '{"role_name":"Contributor","role_definition_id":"/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","role_assignment_id":"/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleAssignments/ra-disabled-1","privileged":false}' -Computed 1
             Update-CIEMAttackPath -PatternId 'disabled-account-with-roles' | Out-Null
 
             $result = @(Get-CIEMAttackPath -PatternId 'disabled-account-with-roles')[0]
             $scriptText = Get-CIEMAttackPathRemediationScript -Id $result.Id
 
-            $scriptText | Should -Match "az role assignment delete --assignee-object-id 'disabled-user-1'"
-            $scriptText | Should -Match "--role '/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role'"
-            $scriptText | Should -Match "--scope '/subscriptions/sub-disabled-1'"
+            $expectedUri = [regex]::Escape('https://management.azure.com/subscriptions/sub-disabled-1/providers/Microsoft.Authorization/roleAssignments/ra-disabled-1?api-version=2022-04-01')
+            $scriptText | Should -Match 'Devolutions\.CIEM\\Invoke-AzureApi'
+            $scriptText | Should -Match '-Api ARM'
+            $scriptText | Should -Match '-Method DELETE'
+            $scriptText | Should -Match $expectedUri
+            $scriptText | Should -Not -Match '\baz\b'
             $scriptText | Should -Not -Match '{{'
         }
 
-        It 'renders a group membership remove command from the finding path' {
+        It 'renders a group membership REST delete command from the finding path' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 [pscustomobject]@{
                     Name    = $Name
@@ -879,7 +888,12 @@ Describe 'Attack Path Engine' {
             $result = @(Get-CIEMAttackPath -PatternId 'guest-in-privileged-group')[0]
             $scriptText = Get-CIEMAttackPathRemediationScript -Id $result.Id
 
-            $scriptText | Should -Match "az ad group member remove --group 'privileged-group-1' --member-id 'guest-user-1'"
+            $expectedUri = [regex]::Escape('https://graph.microsoft.com/v1.0/groups/privileged-group-1/members/guest-user-1/$ref')
+            $scriptText | Should -Match 'Devolutions\.CIEM\\Invoke-AzureApi'
+            $scriptText | Should -Match '-Api Graph'
+            $scriptText | Should -Match '-Method DELETE'
+            $scriptText | Should -Match $expectedUri
+            $scriptText | Should -Not -Match '\baz\b'
             $scriptText | Should -Not -Match '{{'
         }
     }

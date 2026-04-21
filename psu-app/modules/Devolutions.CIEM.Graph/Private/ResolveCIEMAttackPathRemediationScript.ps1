@@ -75,13 +75,32 @@ function MergeCIEMAttackPathRemediationScriptTemplate {
         throw "Cannot create attack path remediation script '$ScriptName' because the script body is empty."
     }
 
+    $helpPlaceholder = '{{CIEM_ATTACK_PATH_SCRIPT_HELP}}'
     $bodyPlaceholder = '{{CIEM_ATTACK_PATH_SCRIPT_BODY}}'
-    $placeholderCount = [regex]::Matches($TemplateContent, [regex]::Escape($bodyPlaceholder)).Count
-    if ($placeholderCount -ne 1) {
+
+    $helpPlaceholderCount = [regex]::Matches($TemplateContent, [regex]::Escape($helpPlaceholder)).Count
+    if ($helpPlaceholderCount -ne 1) {
+        throw "Cannot create attack path remediation script '$ScriptName' because the shared template must contain exactly one $helpPlaceholder placeholder."
+    }
+
+    $bodyPlaceholderCount = [regex]::Matches($TemplateContent, [regex]::Escape($bodyPlaceholder)).Count
+    if ($bodyPlaceholderCount -ne 1) {
         throw "Cannot create attack path remediation script '$ScriptName' because the shared template must contain exactly one $bodyPlaceholder placeholder."
     }
 
-    $TemplateContent.Replace($bodyPlaceholder, $ScriptBodyContent.Trim()).TrimEnd()
+    $scriptBodyContent = $ScriptBodyContent.Trim()
+    $commentMatch = [regex]::Match($scriptBodyContent, '^(?<comment><#[\s\S]*?#>)\s*(?<body>[\s\S]*)$')
+    if (-not $commentMatch.Success) {
+        throw "Cannot create attack path remediation script '$ScriptName' because the script body must start with a PowerShell comment-help block."
+    }
+
+    $scriptHelpContent = $commentMatch.Groups['comment'].Value.TrimEnd()
+    $scriptBodyOnly = $commentMatch.Groups['body'].Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($scriptBodyOnly)) {
+        throw "Cannot create attack path remediation script '$ScriptName' because the script body has no executable commands after the comment-help block."
+    }
+
+    $TemplateContent.Replace($helpPlaceholder, $scriptHelpContent).Replace($bodyPlaceholder, $scriptBodyOnly).TrimEnd()
 }
 
 function ConvertToCIEMPowerShellSingleQuotedString {
@@ -102,6 +121,44 @@ function ConvertToCIEMPowerShellSingleQuotedString {
     }
 
     "'$($Value.Replace("'", "''"))'"
+}
+
+function ConvertToCIEMUriPathSegment {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Value,
+
+        [Parameter(Mandatory)]
+        [string]$Name
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "Cannot render remediation script because '$Name' is empty."
+    }
+
+    [uri]::EscapeDataString($Value)
+}
+
+function NewCIEMAzureRestDeleteCommand {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('ARM', 'Graph')]
+        [string]$Api,
+
+        [Parameter(Mandatory)]
+        [string]$Uri,
+
+        [Parameter(Mandatory)]
+        [string]$ResourceName
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    "Devolutions.CIEM\Invoke-AzureApi -Api $Api -Method DELETE -Uri $(ConvertToCIEMPowerShellSingleQuotedString -Value $Uri -Name 'URI') -ResourceName $(ConvertToCIEMPowerShellSingleQuotedString -Value $ResourceName -Name 'resource name') -Raw | Out-Null"
 }
 
 function ConvertFromCIEMAttackPathProperties {
@@ -168,12 +225,11 @@ function NewCIEMRoleAssignmentDeleteCommandBlock {
 
     $commands = [System.Collections.Generic.List[string]]::new()
     foreach ($edge in @($AttackPath.Edges | Where-Object { $_.kind -eq 'HasRole' })) {
-        $principalId = GetCIEMRequiredObjectValue -Object $edge -PropertyName 'source_id' -Context 'HasRole edge'
-        $scope = GetCIEMRequiredObjectValue -Object $edge -PropertyName 'target_id' -Context 'HasRole edge'
         $props = ConvertFromCIEMAttackPathProperties -PropertiesJson $edge.properties -Context 'HasRole edge'
-        $roleDefinitionId = GetCIEMRequiredObjectValue -Object $props -PropertyName 'role_definition_id' -Context 'HasRole edge properties'
+        $roleAssignmentId = GetCIEMRequiredObjectValue -Object $props -PropertyName 'role_assignment_id' -Context 'HasRole edge properties'
+        $uri = "https://management.azure.com${roleAssignmentId}?api-version=2022-04-01"
 
-        $commands.Add("az role assignment delete --assignee-object-id $(ConvertToCIEMPowerShellSingleQuotedString -Value $principalId -Name 'principal id') --role $(ConvertToCIEMPowerShellSingleQuotedString -Value $roleDefinitionId -Name 'role definition id') --scope $(ConvertToCIEMPowerShellSingleQuotedString -Value $scope -Name 'scope') --only-show-errors")
+        $commands.Add((NewCIEMAzureRestDeleteCommand -Api ARM -Uri $uri -ResourceName "Azure RBAC role assignment $roleAssignmentId"))
     }
 
     if ($commands.Count -eq 0) {
@@ -206,7 +262,8 @@ function NewCIEMNsgRuleDeleteCommandBlock {
             $ruleId = "$nsgId/securityRules/$ruleName"
             if (-not $seenRuleIds.ContainsKey($ruleId)) {
                 $seenRuleIds[$ruleId] = $true
-                $commands.Add("az network nsg rule delete --ids $(ConvertToCIEMPowerShellSingleQuotedString -Value $ruleId -Name 'NSG rule id') --only-show-errors")
+                $uri = "https://management.azure.com${ruleId}?api-version=2023-09-01"
+                $commands.Add((NewCIEMAzureRestDeleteCommand -Api ARM -Uri $uri -ResourceName "Azure NSG rule $ruleId"))
             }
         }
     }
@@ -236,7 +293,8 @@ function NewCIEMGroupMemberRemoveCommandBlock {
         $membershipKey = "$groupId|$memberId"
         if (-not $seenMemberships.ContainsKey($membershipKey)) {
             $seenMemberships[$membershipKey] = $true
-            $commands.Add("az ad group member remove --group $(ConvertToCIEMPowerShellSingleQuotedString -Value $groupId -Name 'group id') --member-id $(ConvertToCIEMPowerShellSingleQuotedString -Value $memberId -Name 'member id') --only-show-errors")
+            $uri = 'https://graph.microsoft.com/v1.0/groups/{0}/members/{1}/$ref' -f (ConvertToCIEMUriPathSegment -Value $groupId -Name 'group id'), (ConvertToCIEMUriPathSegment -Value $memberId -Name 'member id')
+            $commands.Add((NewCIEMAzureRestDeleteCommand -Api Graph -Uri $uri -ResourceName "Microsoft Graph group member $groupId/$memberId"))
         }
     }
 
@@ -247,7 +305,8 @@ function NewCIEMGroupMemberRemoveCommandBlock {
         $membershipKey = "$groupId|$memberId"
         if (-not $seenMemberships.ContainsKey($membershipKey)) {
             $seenMemberships[$membershipKey] = $true
-            $commands.Add("az ad group member remove --group $(ConvertToCIEMPowerShellSingleQuotedString -Value $groupId -Name 'group id') --member-id $(ConvertToCIEMPowerShellSingleQuotedString -Value $memberId -Name 'member id') --only-show-errors")
+            $uri = 'https://graph.microsoft.com/v1.0/groups/{0}/members/{1}/$ref' -f (ConvertToCIEMUriPathSegment -Value $groupId -Name 'group id'), (ConvertToCIEMUriPathSegment -Value $memberId -Name 'member id')
+            $commands.Add((NewCIEMAzureRestDeleteCommand -Api Graph -Uri $uri -ResourceName "Microsoft Graph group member $groupId/$memberId"))
         }
     }
 

@@ -258,6 +258,25 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
                 }
             }
         }
+
+        It 'every remediation script template starts with detailed comment help explaining the script behavior' {
+            $scriptRoot = InModuleScope Devolutions.CIEM { $script:ModuleRoot }
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                $scriptPath = Join-Path $scriptRoot $raw.remediation_script
+                $content = Get-Content $scriptPath -Raw
+                $topComment = [regex]::Match($content, '^\s*<#(?<body>[\s\S]*?)#>')
+                $commentBody = $topComment.Groups['body'].Value
+
+                $topComment.Success | Should -BeTrue -Because "pattern '$($raw.id)' remediation script must start with a PowerShell comment-help block"
+                $commentBody | Should -Match '(?m)^\s*\.SYNOPSIS\s*$' -Because "pattern '$($raw.id)' remediation script must explain its purpose"
+                $commentBody | Should -Match '(?m)^\s*\.DESCRIPTION\s*$' -Because "pattern '$($raw.id)' remediation script must explain its behavior in detail"
+                $commentBody | Should -Match '\{\{PATTERN_NAME\}\}' -Because "pattern '$($raw.id)' remediation script help must identify the attack path pattern"
+                $commentBody | Should -Match '\{\{PATH_CHAIN\}\}' -Because "pattern '$($raw.id)' remediation script help must identify the specific path chain"
+                $commentBody | Should -Match 'authentication profile' -Because "pattern '$($raw.id)' remediation script help must explain the authentication context"
+                $commentBody | Should -Match 'Azure REST API' -Because "pattern '$($raw.id)' remediation script help must explain how remediation commands are executed"
+            }
+        }
     }
 
     Context 'Database-backed rule handling' {

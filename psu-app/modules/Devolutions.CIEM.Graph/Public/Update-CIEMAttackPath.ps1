@@ -37,7 +37,7 @@ function Update-CIEMAttackPath {
     }
 
     $evaluatedAt = (Get-Date).ToString('o')
-    $findings = [System.Collections.Generic.List[CIEMAttackPath]]::new()
+    $findings = [System.Collections.Generic.List[object]]::new()
 
     foreach ($pattern in $patterns) {
         foreach ($attackPath in @(InvokeCIEMAttackPathEvaluation -Pattern $pattern)) {

@@ -75,6 +75,36 @@ Describe 'Attack Path persistence' {
             $pattern.PsuScriptName | Should -Be 'management-port-open-to-the-internet'
             $pattern.RemediationScriptPath | Should -Be 'modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/management-port-open-to-the-internet.ps1'
         }
+
+        It 'preserves materialized attack paths when syncing an existing rule' {
+            Sync-CIEMAttackPathRuleCatalog | Out-Null
+            Invoke-CIEMQuery -Query @"
+INSERT INTO attack_paths (
+    id, rule_id, pattern_name, severity, category, remediation, psu_script_name,
+    path_json, edges_json, path_chain, evaluated_at
+) VALUES (
+    @id, @rule_id, @pattern_name, @severity, @category, @remediation, @psu_script_name,
+    @path_json, @edges_json, @path_chain, @evaluated_at
+)
+"@ -Parameters @{
+                id              = 'stored-open-management-port'
+                rule_id         = 'open-management-port'
+                pattern_name    = 'Management port open to the internet'
+                severity        = 'high'
+                category        = 'network-exposure'
+                remediation     = 'Remediate and rerun Azure discovery.'
+                psu_script_name = 'management-port-open-to-the-internet'
+                path_json       = '[{"id":"__internet__","kind":"Internet"}]'
+                edges_json      = '[]'
+                path_chain      = 'Internet (Internet)'
+                evaluated_at    = (Get-Date).ToString('o')
+            } -AsNonQuery | Out-Null
+
+            Sync-CIEMAttackPathRuleCatalog | Out-Null
+
+            $stored = Invoke-CIEMQuery -Query 'SELECT COUNT(*) as count FROM attack_paths WHERE id = @id' -Parameters @{ id = 'stored-open-management-port' }
+            $stored.count | Should -Be 1
+        }
     }
 
     Context 'attack path materialization' {
@@ -187,11 +217,62 @@ Describe 'Attack Path persistence' {
             $scriptText | Should -Match '# mi-client-1'
             $scriptText | Should -Match '# AzureWebApp'
             $scriptText | Should -Match '# ciem-prod'
-            $scriptText | Should -Match 'az network nsg rule delete'
+            $expectedUri = [regex]::Escape('https://management.azure.com/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1/securityRules/AllowRDP?api-version=2023-09-01')
+            $scriptText | Should -Match 'Devolutions\.CIEM\\Invoke-AzureApi'
+            $scriptText | Should -Match '-Api ARM'
+            $scriptText | Should -Match '-Method DELETE'
+            $scriptText | Should -Match $expectedUri
+            $scriptText | Should -Not -Match '\baz\b'
             $scriptText | Should -Not -Match '{{'
             Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
                 $Name -eq 'management-port-open-to-the-internet' -and $Integrated
             }
+        }
+
+        It 'preserves leading template comment help when rendering attack path placeholders' {
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                [pscustomobject]@{
+                    Name    = $Name
+                    Content = @'
+<#
+.SYNOPSIS
+Remediates the attack path finding "{{PATTERN_NAME}}".
+
+.DESCRIPTION
+This generated remediation script targets the specific attack path chain below:
+{{PATH_CHAIN}}
+
+It runs Azure REST API commands with the selected CIEM authentication profile context.
+#>
+
+{{NSG_RULE_DELETE_COMMANDS}}
+'@
+                }
+            }
+            Mock -ModuleName Devolutions.CIEM Get-CIEMAzureAuthenticationProfile {
+                [pscustomobject]@{
+                    Id                      = 'profile-1'
+                    Name                    = 'Production'
+                    Method                  = 'ServicePrincipalSecret'
+                    TenantId                = 'tenant-1'
+                    ClientId                = 'client-1'
+                    ManagedIdentityClientId = 'mi-client-1'
+                }
+            }
+            Mock -ModuleName Devolutions.CIEM Get-PSUInstalledEnvironment {
+                [pscustomobject]@{
+                    Environment             = 'AzureWebApp'
+                    SupportsManagedIdentity = $true
+                    WebsiteName             = 'ciem-prod'
+                }
+            }
+
+            $scriptText = Get-CIEMAttackPathRemediationScript -Id $script:StoredAttackPath.Id
+
+            $scriptText | Should -Match '^<#'
+            $scriptText | Should -Match 'Remediates the attack path finding "Management port open to the internet"'
+            $scriptText | Should -Match 'Internet \(Internet\)'
+            $scriptText | Should -Not -Match '{{'
         }
     }
 }

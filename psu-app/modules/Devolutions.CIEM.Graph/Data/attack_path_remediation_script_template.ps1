@@ -1,7 +1,6 @@
-# Attack path: {{PATTERN_NAME}}
-# Finding: {{PATH_CHAIN}}
+{{CIEM_ATTACK_PATH_SCRIPT_HELP}}
+
 $ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $true
 
 function Assert-CIEMAttackPathRemediationScriptResolved {
     [CmdletBinding()]
@@ -20,8 +19,8 @@ function Assert-CIEMAttackPathRemediationScriptResolved {
 
 Assert-CIEMAttackPathRemediationScriptResolved -ScriptBlock $MyInvocation.MyCommand.ScriptBlock
 
-az account show --only-show-errors | Out-Null
+Devolutions.CIEM\Connect-CIEMAzure | Out-Null
 
 {{CIEM_ATTACK_PATH_SCRIPT_BODY}}
 
-Write-Output 'Remediation commands completed. Rerun Azure discovery in CIEM.'
+Write-Information 'Remediation commands completed. Rerun Azure discovery in CIEM.' -InformationAction Continue

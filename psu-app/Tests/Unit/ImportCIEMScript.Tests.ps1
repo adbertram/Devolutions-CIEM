@@ -234,9 +234,12 @@ Describe 'Import-CIEMScript registration model' {
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
                 $Name -eq 'management-port-open-to-the-internet' -and
                 $Path -eq 'Identities/AttackPaths/management-port-open-to-the-internet.ps1' -and
+                $ScriptBlock.ToString() -match '^<#' -and
+                $ScriptBlock.ToString().IndexOf('#>') -lt $ScriptBlock.ToString().IndexOf('$ErrorActionPreference') -and
                 $ScriptBlock.ToString() -match 'function Assert-CIEMAttackPathRemediationScriptResolved' -and
                 $ScriptBlock.ToString() -match 'Assert-CIEMAttackPathRemediationScriptResolved -ScriptBlock \$MyInvocation\.MyCommand\.ScriptBlock' -and
                 $ScriptBlock.ToString() -match '\{\{NSG_RULE_DELETE_COMMANDS\}\}' -and
+                $ScriptBlock.ToString() -notmatch '\{\{CIEM_ATTACK_PATH_SCRIPT_HELP\}\}' -and
                 $ScriptBlock.ToString() -notmatch '\{\{CIEM_ATTACK_PATH_SCRIPT_BODY\}\}'
             }
         }
@@ -289,13 +292,18 @@ Describe 'Import-CIEMScript registration model' {
         It 'Provides a shared runtime wrapper for attack path script bodies' {
             $script:RemediationScriptTemplatePath | Should -Exist
             $content = Get-Content -Path $script:RemediationScriptTemplatePath -Raw
-            $content | Should -Match '# Attack path: \{\{PATTERN_NAME\}\}'
+            $content | Should -Match '\{\{CIEM_ATTACK_PATH_SCRIPT_HELP\}\}'
             $content | Should -Match '\{\{CIEM_ATTACK_PATH_SCRIPT_BODY\}\}'
             $content | Should -Match 'function Assert-CIEMAttackPathRemediationScriptResolved'
             $content | Should -Match 'Assert-CIEMAttackPathRemediationScriptResolved -ScriptBlock \$MyInvocation\.MyCommand\.ScriptBlock'
+            $content | Should -Not -Match '# Attack path: \{\{PATTERN_NAME\}\}'
             $content | Should -Not -Match '(?m)^\$__ciemTemplateContent\s*='
             $content | Should -Not -Match '(?m)^\$__ciemUnresolvedTokens\s*='
-            $content | Should -Match 'Write-Output'
+            $content | Should -Match 'Devolutions\.CIEM\\Connect-CIEMAzure'
+            $content | Should -Not -Match 'az account show'
+            $content | Should -Not -Match 'Azure CLI'
+            $content | Should -Match 'Write-Information'
+            $content | Should -Not -Match 'Write-Output'
             $content | Should -Not -Match 'Write-Host'
         }
 

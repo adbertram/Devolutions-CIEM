@@ -18,6 +18,14 @@
       "description": "Discover Azure ARM and Entra resources and store in the local database",
       "status": "Published",
       "timeout": 600
+    },
+    {
+      "name": "Checks/Invoke-CIEMAttackPathRemediation",
+      "path": "Checks/Invoke-CIEMAttackPathRemediation.ps1",
+      "description": "Execute the resolved remediation script for a CIEM attack path",
+      "status": "Published",
+      "timeout": 600,
+      "disableManualInvocation": true
     }
   ],
   "remediationTemplates": {

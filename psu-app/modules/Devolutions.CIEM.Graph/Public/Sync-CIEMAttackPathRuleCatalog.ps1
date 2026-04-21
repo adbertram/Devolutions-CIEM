@@ -46,13 +46,24 @@ function Sync-CIEMAttackPathRuleCatalog {
         $ruleIds.Add([string]$rule.id)
 
         Invoke-CIEMQuery -Query @"
-INSERT OR REPLACE INTO attack_path_rules (
+INSERT INTO attack_path_rules (
     id, name, severity, category, description, remediation,
     remediation_script_path, psu_script_name, steps_json, disabled, updated_at
 ) VALUES (
     @id, @name, @severity, @category, @description, @remediation,
     @remediation_script_path, @psu_script_name, @steps_json, 0, @updated_at
 )
+ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    severity = excluded.severity,
+    category = excluded.category,
+    description = excluded.description,
+    remediation = excluded.remediation,
+    remediation_script_path = excluded.remediation_script_path,
+    psu_script_name = excluded.psu_script_name,
+    steps_json = excluded.steps_json,
+    disabled = excluded.disabled,
+    updated_at = excluded.updated_at
 "@ -Parameters @{
             id                      = [string]$rule.id
             name                    = [string]$rule.name
