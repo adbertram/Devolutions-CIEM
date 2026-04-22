@@ -3,9 +3,8 @@ function Invoke-CIEMQuery {
     .SYNOPSIS
         Executes a SQL query against the CIEM SQLite database.
     .DESCRIPTION
-        Wraps Invoke-PSUSQLiteQuery with automatic database path resolution.
-        If $script:DatabasePath is not set, lazy-initializes the database via
-        New-CIEMDatabase.
+        Wraps Invoke-PSUSQLiteQuery with explicit database path resolution.
+        The database must already be initialized before queries run.
 
         For transaction support, pass an existing connection from
         Open-PSUSQLiteConnection via the -Connection parameter.
@@ -37,9 +36,9 @@ function Invoke-CIEMQuery {
 
     $ErrorActionPreference = 'Stop'
 
-    # Lazy-init: resolve database path if not already set
-    if (-not $script:DatabasePath) {
-        $script:DatabasePath = New-CIEMDatabase -PassThru
+    $databasePath = Get-CIEMDatabasePath
+    if (-not (Test-Path $databasePath)) {
+        throw "CIEM database is not initialized at '$databasePath'. Open Configuration and initialize the database before running queries."
     }
 
     $invokeParams = @{
@@ -50,7 +49,7 @@ function Invoke-CIEMQuery {
         $invokeParams.Connection = $Connection
     } else {
         # Open a connection with foreign keys enabled (PRAGMAs are per-connection in SQLite)
-        $ownConn = Open-PSUSQLiteConnection -Database $script:DatabasePath
+        $ownConn = Open-PSUSQLiteConnection -Database $databasePath
         Invoke-PSUSQLiteQuery -Connection $ownConn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
         $invokeParams.Connection = $ownConn
     }

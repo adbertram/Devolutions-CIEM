@@ -24,6 +24,11 @@ test.describe('Configuration Page', () => {
       const visible = await configPage.isAuthCardVisible();
       expect(visible).toBe(true);
     });
+
+    test('should display CIEM Database card with explicit initializer action', async () => {
+      expect(await configPage.isDatabaseCardVisible()).toBe(true);
+      expect(await configPage.isDatabaseInitializerVisible()).toBe(true);
+    });
   });
 
   test.describe('when running on a local on-premises PSU instance', () => {

@@ -7,6 +7,8 @@ class ConfigurationPageHelpers extends BasePage {
     this.selectors = {
       pageTitle: "h4:has-text('Configuration')",
       subtitle: "text=Configure cloud provider authentication for CIEM security scans",
+      databaseCard: ".MuiCard-root:has-text('CIEM Database')",
+      initializeDatabaseBtn: '#initializeCiemDatabaseBtn',
       authCard: ".MuiCard-root:has-text('Cloud Provider Authentication')",
       // Provider and auth dropdowns (MUI renders hidden input + visible combobox)
       cloudProvider: '#cloudProvider',
@@ -38,7 +40,7 @@ class ConfigurationPageHelpers extends BasePage {
       resetConfigBtn: '#resetConfigBtn',
       getPermissionsBtn: "button:has-text('Get Required Permissions')",
       // Environment chip
-      environmentChip: '.MuiChip-root',
+      environmentChip: ".MuiCard-root:has-text('Cloud Provider Authentication') .MuiChip-root",
       // Managed identity warning
       managedIdentityWarning: ".MuiAlert-root:has-text('Managed Identity will not work')",
       // Modal
@@ -67,8 +69,22 @@ class ConfigurationPageHelpers extends BasePage {
 
   async selectAuthMethod(value) {
     await this.selectMUIOption('authMethod', value);
-    // Brief wait for PSU server-side re-render of auth fields
-    await this.page.waitForTimeout(1000);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'authMethod', expectedValue: value }
+    );
+
+    const expectedRenderedField = {
+      ServicePrincipalSecret: this.selectors.azSpClientSecret,
+      ServicePrincipalCertificate: this.selectors.azCertClientId,
+      CurrentProfile: this.selectors.awsProfile,
+      AccessKey: this.selectors.awsAccessKeyId,
+      ManagedIdentity: this.selectors.managedIdentityWarning
+    }[value];
+
+    if (expectedRenderedField) {
+      await this.waitForElement(expectedRenderedField);
+    }
   }
 
   async getSelectedProvider() {
@@ -174,6 +190,14 @@ class ConfigurationPageHelpers extends BasePage {
 
   async isAuthCardVisible() {
     return await this.isElementVisible(this.selectors.authCard);
+  }
+
+  async isDatabaseCardVisible() {
+    return await this.isElementVisible(this.selectors.databaseCard);
+  }
+
+  async isDatabaseInitializerVisible() {
+    return await this.isElementVisible(this.selectors.initializeDatabaseBtn);
   }
 
   async isAuthMethodHelpTextVisible() {

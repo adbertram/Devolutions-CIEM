@@ -1,6 +1,6 @@
 @{
     RootModule           = 'Devolutions.CIEM.psm1'
-    ModuleVersion = '0.10.6'
+    ModuleVersion = '1.0.0'
     GUID                 = 'b8952107-9d81-4324-8605-4d5a1c216ec0'
     Author               = 'Adam Bertram'
     CompanyName          = 'Devolutions Inc.'

@@ -151,66 +151,6 @@ $script:CIEMSqlBatchSize = 500
 $script:CIEMGraphBatchSize = 20
 $script:CIEMGraphBatchWallClockSeconds = 300
 
-# --- Initialize database (base + provider schemas) ---
-Write-CIEMLog -Message "Initializing database..." -Component 'ModuleInit'
-try {
-    New-CIEMDatabase
-    Write-CIEMLog -Message "Database initialized at: $(Get-CIEMDatabasePath)" -Component 'ModuleInit'
-}
-catch {
-    Write-CIEMLog -Message "Database initialization failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
-    throw
-}
-
-# Apply provider-specific schemas
-foreach ($schema in @(
-    @{ Path = Join-Path $script:AzureRoot          'Data/azure_schema.sql';         Label = 'Azure' }
-    @{ Path = Join-Path $script:AzureDiscoveryRoot 'Data/discovery_schema.sql';     Label = 'AzureDiscovery' }
-    @{ Path = Join-Path $script:GraphRoot          'Data/graph_schema.sql';         Label = 'Graph' }
-)) {
-    try {
-        $dbPath = Get-CIEMDatabasePath
-        if (-not $dbPath) {
-            throw "Database path not resolved for $($schema.Label) schema."
-        }
-        if (-not (Test-Path $schema.Path)) {
-            throw "Schema file not found: $($schema.Path)"
-        }
-
-        $conn = Open-PSUSQLiteConnection -Database $dbPath
-        try {
-            $schemaSql = Get-Content -Path $schema.Path -Raw
-            foreach ($statement in ($schemaSql -split ';\s*\n' | Where-Object { $_.Trim() })) {
-                Invoke-PSUSQLiteQuery -Connection $conn -Query $statement.Trim() -AsNonQuery | Out-Null
-            }
-        }
-        finally {
-            $conn.Dispose()
-        }
-    }
-    catch {
-        Write-CIEMLog -Message "$($schema.Label) schema failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
-        throw
-    }
-}
-
-try {
-    UpdateCIEMAttackPathStorageSchema
-}
-catch {
-    Write-CIEMLog -Message "Attack path storage schema migration failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
-    throw
-}
-
-try {
-    $attackPathRuleSync = Sync-CIEMAttackPathRuleCatalog
-    Write-CIEMLog -Message "Attack path rules synced: $($attackPathRuleSync.RuleCount)" -Component 'ModuleInit'
-}
-catch {
-    Write-CIEMLog -Message "Attack path rule sync failed: $($_.Exception.Message)" -Severity ERROR -Component 'ModuleInit'
-    throw
-}
-
 # --- Argument completers ---
 RegisterCIEMArgumentCompleters
 

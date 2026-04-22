@@ -3,9 +3,8 @@ function Get-CIEMDatabasePath {
     .SYNOPSIS
         Returns the resolved path to the CIEM SQLite database.
     .DESCRIPTION
-        Exposes the module-scoped database path, triggering lazy-init via
-        New-CIEMDatabase if not yet resolved. Used by other modules that need
-        direct database access for transactions.
+        Exposes the module-scoped database path. This function only resolves
+        the expected path; it does not create the database.
     .OUTPUTS
         [string] Absolute path to the ciem.db file.
     .EXAMPLE
@@ -18,7 +17,10 @@ function Get-CIEMDatabasePath {
     $ErrorActionPreference = 'Stop'
 
     if (-not $script:DatabasePath) {
-        $script:DatabasePath = New-CIEMDatabase -PassThru
+        if (-not $script:DataRoot) {
+            throw 'Get-CIEMDatabasePath: $script:DataRoot is not set. Module not loaded correctly.'
+        }
+        $script:DatabasePath = Join-Path $script:DataRoot 'ciem.db'
     }
     $script:DatabasePath
 }

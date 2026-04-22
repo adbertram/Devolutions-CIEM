@@ -3,9 +3,9 @@ function New-CIEMDatabase {
     .SYNOPSIS
         Creates and initializes the CIEM SQLite database.
     .DESCRIPTION
-        Creates the CIEM database file using the schema.sql definition with all
-        19 tables. Safe to call multiple times — all CREATE statements use
-        IF NOT EXISTS.
+        Creates the CIEM database file, applies provider schemas, and syncs
+        static database catalogs. Safe to call multiple times because schema
+        creation uses idempotent SQL and catalog sync upserts current data.
 
         The database is stored inside the psu-app package root at data/ciem.db.
     .PARAMETER Path
@@ -86,13 +86,36 @@ function New-CIEMDatabase {
     # Store path in module scope for other functions
     $script:DatabasePath = $Path
 
-    $modulesDir = Join-Path $script:ModuleRoot 'modules'
-    foreach ($providerName in @('Azure', 'AWS')) {
-        $catalogFile = Join-Path $modulesDir "$providerName/Checks/check_catalog.json"
-        if (Test-Path $catalogFile) {
-            SyncCIEMCheckCatalog -Provider $providerName
+    foreach ($schema in @(
+        @{ Path = Join-Path $script:AzureRoot          'Data/azure_schema.sql';     Label = 'Azure' }
+        @{ Path = Join-Path $script:AzureDiscoveryRoot 'Data/discovery_schema.sql'; Label = 'AzureDiscovery' }
+        @{ Path = Join-Path $script:GraphRoot          'Data/graph_schema.sql';     Label = 'Graph' }
+    )) {
+        $dbPath = Get-CIEMDatabasePath
+        if (-not $dbPath) {
+            throw "Database path not resolved for $($schema.Label) schema."
+        }
+        if (-not (Test-Path $schema.Path)) {
+            throw "Schema file not found: $($schema.Path)"
+        }
+
+        $providerSchemaSql = Get-Content -Path $schema.Path -Raw
+        $providerSchemaConnection = Open-PSUSQLiteConnection -Database $dbPath
+        try {
+            foreach ($statement in ($providerSchemaSql -split ';\s*\n' | Where-Object { $_.Trim() })) {
+                Invoke-PSUSQLiteQuery -Connection $providerSchemaConnection -Query $statement.Trim() -AsNonQuery | Out-Null
+            }
+        }
+        finally {
+            $providerSchemaConnection.Dispose()
         }
     }
+
+    UpdateCIEMAttackPathStorageSchema
+    $attackPathRuleSync = Sync-CIEMAttackPathRuleCatalog
+    Write-Verbose "CIEM DB: Synced $($attackPathRuleSync.RuleCount) attack path rules"
+
+    SyncCIEMCheckCatalog -Provider 'Azure'
 
     if ($PassThru) {
         $Path

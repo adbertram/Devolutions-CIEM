@@ -1,6 +1,11 @@
 BeforeAll {
-    $script:Psm1Content = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psm1') -Raw
+    $repoRoot = Join-Path $PSScriptRoot '..' '..'
+    $script:Psm1Content = Get-Content (Join-Path $repoRoot 'Devolutions.CIEM.psm1') -Raw
     $script:Psm1Ast = [System.Management.Automation.Language.Parser]::ParseInput($script:Psm1Content, [ref]$null, [ref]$null)
+    $script:NewDatabaseContent = Get-Content (Join-Path $repoRoot 'Public' 'New-CIEMDatabase.ps1') -Raw
+    $script:GetDatabasePathContent = Get-Content (Join-Path $repoRoot 'Public' 'Get-CIEMDatabasePath.ps1') -Raw
+    $script:InvokeQueryContent = Get-Content (Join-Path $repoRoot 'Public' 'Invoke-CIEMQuery.ps1') -Raw
+    $script:ConfigPageContent = Get-Content (Join-Path $repoRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
 }
 
 Describe 'Devolutions.CIEM.psm1 Structure' {
@@ -38,12 +43,26 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
     }
 
     Context 'Schema application' {
-        It 'Contains discovery_schema.sql in schema loop' {
-            $script:Psm1Content | Should -Match 'discovery_schema\.sql'
+        It 'Does not initialize the database during module import' {
+            $script:Psm1Content | Should -Not -Match 'New-CIEMDatabase'
+            $script:Psm1Content | Should -Not -Match 'Initializing database'
         }
 
-        It 'Contains AzureDiscovery label' {
-            $script:Psm1Content | Should -Match "Label\s*=\s*'AzureDiscovery'"
+        It 'Does not apply provider schemas during module import' {
+            $script:Psm1Content | Should -Not -Match 'discovery_schema\.sql'
+            $script:Psm1Content | Should -Not -Match "Label\s*=\s*'AzureDiscovery'"
+        }
+
+        It 'Does not sync attack path storage or rule catalogs during module import' {
+            $script:Psm1Content | Should -Not -Match 'UpdateCIEMAttackPathStorageSchema'
+            $script:Psm1Content | Should -Not -Match 'Sync-CIEMAttackPathRuleCatalog'
+        }
+
+        It 'Explicit database initialization applies provider schemas and catalogs' {
+            $script:NewDatabaseContent | Should -Match 'discovery_schema\.sql'
+            $script:NewDatabaseContent | Should -Match "Label\s*=\s*'AzureDiscovery'"
+            $script:NewDatabaseContent | Should -Match 'UpdateCIEMAttackPathStorageSchema'
+            $script:NewDatabaseContent | Should -Match 'Sync-CIEMAttackPathRuleCatalog'
         }
     }
 
@@ -99,11 +118,29 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
 
     Context 'Schema application fail-fast behavior' {
         It 'Throws when an expected provider schema path is missing' {
-            $script:Psm1Content | Should -Match 'Schema file not found'
+            $script:NewDatabaseContent | Should -Match 'Schema file not found'
         }
 
         It 'Throws when the module database path is unavailable before schema application' {
-            $script:Psm1Content | Should -Match 'Database path not resolved'
+            $script:NewDatabaseContent | Should -Match 'Database path not resolved'
+        }
+    }
+
+    Context 'Explicit database initialization' {
+        It 'Does not lazy-create the database from Get-CIEMDatabasePath' {
+            $script:GetDatabasePathContent | Should -Not -Match 'New-CIEMDatabase'
+            $script:GetDatabasePathContent | Should -Match "Join-Path\s+.*DataRoot\s+'ciem\.db'"
+        }
+
+        It 'Does not lazy-create the database from Invoke-CIEMQuery' {
+            $script:InvokeQueryContent | Should -Not -Match 'New-CIEMDatabase'
+            $script:InvokeQueryContent | Should -Match 'CIEM database is not initialized'
+        }
+
+        It 'Configuration page exposes the database initializer before provider queries' {
+            $script:ConfigPageContent | Should -Match 'initializeCiemDatabaseBtn'
+            $script:ConfigPageContent | Should -Match 'Devolutions\.CIEM\\New-CIEMDatabase'
+            $script:ConfigPageContent | Should -Match 'Invoke-UDRedirect\s+''/ciem/config'''
         }
     }
 

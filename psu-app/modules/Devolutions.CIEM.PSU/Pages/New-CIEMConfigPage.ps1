@@ -20,13 +20,55 @@ function New-CIEMConfigPage {
         # Get PSU environment
         $envInfo = Devolutions.CIEM\Get-PSUInstalledEnvironment
 
+        $databasePath = Devolutions.CIEM\Get-CIEMDatabasePath
+        $databaseExists = Test-Path $databasePath
+
+        New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
+        New-UDTypography -Text 'Configure cloud provider authentication for CIEM security scans' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
+
+        New-UDCard -Title 'CIEM Database' -Content {
+            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                if ($databaseExists) {
+                    New-UDChip -Label 'Initialized' -Icon (New-UDIcon -Icon 'CheckCircle') -Size 'small' -Style @{
+                        backgroundColor = '#4caf50'
+                        color = 'white'
+                    }
+                }
+                else {
+                    New-UDChip -Label 'Not Initialized' -Icon (New-UDIcon -Icon 'Warning') -Size 'small' -Style @{
+                        backgroundColor = '#ff9800'
+                        color = 'white'
+                    }
+                }
+
+                New-UDTypography -Text $databasePath -Variant 'body2' -Style @{ color = '#666' }
+            }
+
+            if (-not $databaseExists) {
+                New-UDAlert -Severity 'warning' -Text 'Initialize the CIEM database before configuring providers or running scans.' -Style @{ marginTop = '16px'; marginBottom = '16px' }
+            }
+
+            $databaseButtonText = if ($databaseExists) { 'Update Database Schema' } else { 'Initialize Database' }
+            New-UDButton -Id 'initializeCiemDatabaseBtn' -Text $databaseButtonText -Icon (New-UDIcon -Icon 'Storage') -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
+                try {
+                    $initializedPath = Devolutions.CIEM\New-CIEMDatabase -PassThru
+                    Show-UDToast -Message "CIEM database initialized at $initializedPath" -Duration 5000 -BackgroundColor '#4caf50'
+                    Invoke-UDRedirect '/ciem/config'
+                }
+                catch {
+                    Show-UDToast -Message "Database initialization failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
+                }
+            }
+        }
+
+        if (-not $databaseExists) {
+            return
+        }
+
         # Get available providers from database
         $providers = @(Devolutions.CIEM\Get-CIEMProvider)
         $currentProvider = ($providers | Where-Object Enabled | Select-Object -First 1).Name
         if (-not $currentProvider) { $currentProvider = 'Azure' }
-
-        New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
-        New-UDTypography -Text 'Configure cloud provider authentication for CIEM security scans' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
         New-UDCard -Title 'Cloud Provider Authentication' -Content {
             # Environment detection indicator (integrated into auth card)
