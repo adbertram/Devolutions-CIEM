@@ -90,6 +90,34 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 **Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureDiscoveryRun.Tests.ps1 -Output Detailed"` and `cd psu-app/ui/e2e && npx playwright test pages/Environment/Environment.test.js -g "when a discovery run is in progress"`.
 **Recurrence Prevention:** Keep the Pester test named `Applies -Status before -Last so running runs do not replace the latest completed run` and the Environment E2E test named `should keep the global last discovery timestamp box visible`.
 
+### 2. Azure PSU App Startup Must Not Register Scripts
+**Symptom:** Azure `/ciem` can return HTTP 200 while the page body says `App is not running`. PSU logs can show `Failed to get dashboard. Specify a computer name or use the Connect-PSUServer command.` or `StatusCode="Cancelled"` gRPC timeout errors.
+**Cause:** `New-DevolutionsCIEMApp.ps1` ran `Import-CIEMScript` from the dashboard/app startup path. PSU app startup is the dashboard render path and cannot reliably perform PSU management cmdlets such as `Get-PSUFolder`, `New-PSUFolder`, `Get-PSUScript`, or `New-PSUScript`; in Azure this fails unauthenticated or times out.
+**Fix:** Keep the dashboard factory pure. Do not call `Import-CIEMScript` from `psu-app/modules/Devolutions.CIEM.PSU/Public/New-DevolutionsCIEMApp.ps1`. Run `Import-CIEMScript` as an explicit PSU management operation after `Connect-PSU`; use `Import-CIEMScript -Integrated` only from a PSU process where integrated cmdlets are verified to work.
+**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester psu-app/Tests/Unit/ImportCIEMScript.Tests.ps1 -Output Detailed"`, run `Import-CIEMScript` after `Connect-PSU`, and run a Playwright browser check against `https://devolutions-ciem-psu.azurewebsites.net/ciem`; the page must show CIEM dashboard content and must not contain `App is not running`.
+**Recurrence Prevention:** Keep the Pester assertion that the generated app startup script does not contain `Import-CIEMScript`. Do not add PSU management cmdlets to the app factory/startup path.
+
+### 3. Azure PSU App Tokens Can Be Lost During Recovery
+**Symptom:** `Connect-PSU` against Azure fails with HTTP 401 while `/api/v1/alive` is healthy. Publishing can succeed to PowerShell Gallery but fail during Azure import because the stored `AZURE_PSU_TOKEN` is invalid.
+**Cause:** The Azure PSU database can contain zero app tokens after a recovery/reset event, invalidating the token in `.env`.
+**Fix:** On the supported Azure image, set non-default `PSUDefaultAdminName` and `PSUDefaultAdminPassword` app settings from `.env`, restart the web app, wait for `/api/v1/alive` to report `loading=false`, sign in with those local admin credentials, grant a new app token, and update `.env` `AZURE_PSU_TOKEN` without printing it. Use `ResetAdminAccount=true` only as a temporary lockout recovery setting and remove it immediately after token recovery.
+**Verification:** `Connect-PSU` succeeds, `Get-PSUModule` returns `Devolutions.CIEM` with the installed version, publishing can import the module into Azure, and the non-default admin credentials from `.env` can grant an app token.
+**Recurrence Prevention:** If Azure `Connect-PSU` returns 401, inspect app token state before republishing. Keep `PSUDefaultAdminName` and `PSUDefaultAdminPassword` set on Azure, and do not leave `ResetAdminAccount=true` configured.
+
+### 4. Azure PSU Get-PSUScript Name Lookup Cancels on Missing Scripts
+**Symptom:** `Import-CIEMScript` can fail on Azure with `Status(StatusCode="Cancelled", Detail="No message returned from method.")` when calling `Get-PSUScript -Name` for a CIEM script that has not been registered yet.
+**Cause:** Azure PSU 2026.1.5 cancels `Get-PSUScript -Name` when the script name is absent, including names such as `New-CIEMScanRun`, `DoesNotExist.ps1`, and folder-style names such as `Checks/New-CIEMScanRun`.
+**Fix:** Do not use `Get-PSUScript -Name` in CIEM registration. Query `Get-PSUScript` once and match locally by normalized script name or repository path.
+**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester psu-app/Tests/Unit/ImportCIEMScript.Tests.ps1 -Output Detailed"` and confirm the test asserts `Get-PSUScript` is not called with `-Name`. On Azure, `Import-CIEMScript` must return `Status = Registered` with `TotalScripts = 13`.
+**Recurrence Prevention:** Keep the no-`-Name` Pester assertion in `ImportCIEMScript.Tests.ps1`; do not reintroduce named script lookups for CIEM registration.
+
+### 5. Azure PSU 2026.1.5 Image Is Not a Supported Recovery Target
+**Symptom:** A rebuilt Azure PSU instance on `ironmansoftware/universal:2026.1.5-azure` can show only a Devolutions Login first-run screen. Local admin bootstrap can return 401 for `/api/v1/accessible` and `/api/v1/apptoken/grant`, and adding `.universal/authentication.ps1` with `Set-PSUAuthenticationMethod -Type Form` can crash the container with exit code 139.
+**Cause:** The 2026.1.5 Azure image changes first-run/auth behavior in a way that is not covered by the local PSU docs and blocks the documented CIEM bootstrap flow.
+**Fix:** Keep the Azure CIEM PSU instance on `ironmansoftware/universal:5.5.4-azure`. If Azure keeps pulling 2026.1.5 after `linuxFxVersion` is changed, recreate the Web App with 5.5.4 as the initial image. Use `az webapp delete --keep-empty-plan` to preserve the App Service Plan; if the plan was deleted, recreate `devolutions-ciem-psu-asp` as Linux S1 in West US 2.
+**Verification:** Docker logs must show `Pulling image docker.io/ironmansoftware/universal:5.5.4-azure`, `/api/v1/alive` must report `loading=false`, and `/login` must render the 5.5-era page without `?v=2026.1.5` assets.
+**Recurrence Prevention:** Do not upgrade the Azure PSU container image past 5.5.4 until first-run, local-admin token grant, and CIEM module import have been tested in a separate throwaway Web App.
+
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
 - CIEM feature todos: `docs/ciem-feature-todos.md` - consult this when looking for new CIEM feature ideas. Discovery ideas are read-only by default; write/action ideas require explicit re-scoping before implementation.
