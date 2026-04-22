@@ -11,28 +11,35 @@ Auto-detects the framework based on file path and applies the correct convention
 
 <quick_start>
 
-**Playwright E2E tests:**
-```bash
-# All E2E tests
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test
+**Standard runner:**
+```powershell
+# All unit tests
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite Unit
 
-# Single page
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test pages/Environment/
+# One Pester file or directory
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite Unit -Path /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureArmResource.Tests.ps1
 
-# Debug mode (headed browser)
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test --headed
+# PSU-backed E2E against local or Azure
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment local
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment azure
+
+# E2E runtime command against the selected PSU target
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment local -Command 'Get-CIEMProvider'
 ```
 
-**Pester unit tests:**
+**Playwright UI tests:**
 ```bash
-# All unit tests
-pwsh -NoProfile -Command "Invoke-Pester /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ -Output Detailed"
+# All local UI tests
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test
 
-# Single file
-pwsh -NoProfile -Command "Invoke-Pester /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureArmResource.Tests.ps1 -Output Detailed"
+# All Azure UI tests
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=azure npx playwright test
 
-# By tag
-pwsh -NoProfile -Command "Invoke-Pester /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ -Tag 'CRUD' -Output Detailed"
+# Single page
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test pages/Environment/
+
+# Debug mode (headed browser)
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test --headed
 ```
 
 </quick_start>
@@ -57,7 +64,24 @@ pwsh -NoProfile -Command "Invoke-Pester /Users/adam/Dropbox/GitRepos/Devolutions
 
 ---
 
+## Standardized Test Invocation
+
+Use `scripts/invoke-ciem-tests.ps1` or `Invoke-CIEMTest` for project test runs. Do not call `Invoke-Pester` directly from ad hoc shell commands; the runner centralizes discovery, Pester isolation, environment selection, runtime validation, and consistent result objects.
+
+| Suite | Environment | Purpose |
+|---|---|---|
+| `Unit` | none | Pester unit tests across `Devolutions.CIEM.Admin`, `psu-app/Tests/Unit`, and module `Tests/Unit` directories. |
+| `E2E` | `local` or `azure` | PSU-backed Pester E2E tests by default. With `-Command` or `-ScriptBlock`, runs an explicit PSU runtime command through `Invoke-TestCommand`. |
+| `Playwright` | `local` or `azure` | Browser UI tests. The selected environment points Playwright at `LOCAL_PSU_URL` or `AZURE_PSU_URL`. |
+
+Environment source:
+- Pass `-Environment local` or `-Environment azure` when the suite targets PSU.
+- `CIEM_TEST_ENVIRONMENT` is honored by E2E and Playwright helpers.
+- Local targets use `LOCAL_PSU_URL`, `LOCAL_PSU_TOKEN`, `PUBLISH_POINT_SSH`, and `PUBLISH_POINT_PSU_PATH` from `.env`.
+- Azure targets use `AZURE_PSU_URL` and `AZURE_PSU_TOKEN` from `.env`.
+
 # REQUIREMENTS REFERENCE
+
 
 ## Universal Requirements (Both Frameworks)
 
@@ -172,18 +196,19 @@ For any page or function, identify the independent state axes that affect behavi
 
 ## Database Path (CRITICAL)
 
-PSU uses the **publish point's database**, NOT the development source:
-- Correct: `/Users/adam/psu/data/ciem.db` (on adam-server, accessed via SSH)
-- Wrong: `psu-app/data/ciem.db`
-- `test-config.js` uses `resolvePsuDatabasePath()` to find it
-- All DB seeding goes to the PSU module's DB
+Playwright data setup targets the selected PSU environment, NOT the development source:
+- Local correct path: publish-point DB from `PUBLISH_POINT_PSU_PATH` on adam-server.
+- Azure correct path: no filesystem path; data setup runs through the PSU API executor against `AZURE_PSU_URL`.
+- Wrong: `psu-app/data/ciem.db`.
+- All DB seeding goes to the selected PSU runtime database.
 
 ## SQLite WAL Cross-Process Visibility (CRITICAL)
 
-When seeding data via `better-sqlite3` (Node.js) for PSU (`Microsoft.Data.Sqlite`) to read:
+When seeding local data through sqlite for PSU (`Microsoft.Data.Sqlite`) to read:
 - You MUST call `db.pragma('wal_checkpoint(TRUNCATE)')` after writes
 - Without checkpoint, PSU's separate process may not see WAL entries
 - Apply checkpoint after BOTH seeds AND cleanups
+- Azure seeding uses `Invoke-CIEMQuery` through the PSU API executor and does not use local WAL files
 
 ```javascript
 // CORRECT — always checkpoint after writes
@@ -281,7 +306,8 @@ psu-app/ui/e2e/
 │   ├── global-setup.js      # Runs before all tests (PSU health, seed)
 │   ├── global-teardown.js   # Runs after all tests (cleanup, close DB)
 │   ├── psu-helpers.js       # PSU server helpers (health, start, runPSUCommand, auth profile mgmt)
-│   └── test-config.js       # URLs, paths, timeouts (resolves PSU DB path dynamically)
+│   ├── test-config.js       # URLs, paths, timeouts
+│   └── test-environment.js  # local/Azure environment resolver
 ├── pages/
 │   └── PageName/
 │       ├── PageName.test.js
@@ -296,6 +322,7 @@ psu-app/ui/e2e/
 - `expect.timeout: 15000` (15s for assertions)
 - `globalSetup` ensures PSU is running and data is seeded
 - `globalTeardown` cleans test data
+- `CIEM_TEST_ENVIRONMENT=local|azure` selects which PSU web app and token Playwright uses
 
 ## Playwright Test Template
 
@@ -743,30 +770,50 @@ BLOCKING ISSUES:
 <a id="run-workflow"></a>
 ## Run Workflow
 
+### Standard Runner
+
+```powershell
+# Unit tests
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite Unit
+
+# One file or directory
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite Unit -Path /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/Tests/Unit/PSUIntegration.Tests.ps1
+
+# PSU-backed E2E
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment local
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment azure
+
+# Runtime validation through Invoke-TestCommand under E2E
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment azure -Command 'Get-CIEMProvider'
+```
+
 ### Playwright
 
 ```bash
-# All E2E tests (never pipe through grep/tail/head)
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test
+# All local E2E tests (never pipe through grep/tail/head)
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test
+
+# All Azure E2E tests
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=azure npx playwright test
 
 # Single page
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test pages/PageName/
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test pages/PageName/
 
 # Debug (headed)
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test --headed
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test --headed
 
 # With trace
-cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && npx playwright test --trace on
+cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test --trace on
 ```
 
 ### Pester
 
 ```bash
-# All tests
-pwsh -NoProfile -Command "Invoke-Pester /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ -Output Detailed"
+# Use the standard runner, not direct Invoke-Pester
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite Unit
 
 # Diagnostic (max verbosity for debugging)
-pwsh -NoProfile -Command "Invoke-Pester path/to/test.Tests.ps1 -Output Diagnostic"
+pwsh -NoProfile -File /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/scripts/invoke-ciem-tests.ps1 -Suite Unit -Path /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/path/to/test.Tests.ps1 -Output Diagnostic
 ```
 
 ### Interpreting Results
@@ -779,7 +826,7 @@ pwsh -NoProfile -Command "Invoke-Pester path/to/test.Tests.ps1 -Output Diagnosti
 ### Troubleshooting
 
 1. **Check CIEM boot log:** `tail -50 psu-app/data/ciem.log`
-2. **Check PSU health:** `curl -s http://localhost:5001/api/v1/alive | jq`
+2. **Check PSU health:** use `LOCAL_PSU_URL` or `AZURE_PSU_URL` from `.env`
 3. **Verify DB schema (Pester):** `Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='table'"`
 4. **Check module exports:** `Get-Command -Module Devolutions.CIEM | Sort-Object Name`
 5. **Fix implementation, not test** — after 2 failed fixes, STOP and present options
@@ -787,7 +834,7 @@ pwsh -NoProfile -Command "Invoke-Pester path/to/test.Tests.ps1 -Output Diagnosti
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Container failed (Pester) | BeforeAll threw | Check module import path, schema files |
-| Connection refused (Playwright) | PSU not running | Start local PSU |
+| Connection refused (Playwright) | Target PSU not reachable | Start local PSU or verify `AZURE_PSU_URL` |
 | Type not found (Pester) | Class not in scope | Use `InModuleScope Devolutions.CIEM` |
 | Table not found (Pester) | Missing schema | Apply provider-specific `.sql` after `New-CIEMDatabase` |
 | Classes break (Pester) | `Import-Module -Force` | Use `Remove-Module -Force` then `Import-Module` (no `-Force`) |
@@ -820,10 +867,10 @@ For each page:
 - **Module**: `Devolutions.CIEM` — single module with dot-sourced sub-folders
 - **Module root**: `psu-app/`
 - **Database (dev)**: `psu-app/data/ciem.db`
-- **Database (PSU runtime)**: `/Users/adam/psu/data/ciem.db` (on adam-server)
+- **Database (PSU runtime)**: local uses the publish-point DB from `PUBLISH_POINT_PSU_PATH`; Azure uses the PSU API executor against `AZURE_PSU_URL`
 - **Pester framework**: Pester 5.x, PowerShell 7.5+
 - **Playwright framework**: Playwright (Node.js), Chromium only
-- **PSU URL**: `http://localhost:5001` (local), double-path `/ciem/ciem/[page]`
+- **PSU URLs**: `LOCAL_PSU_URL` and `AZURE_PSU_URL` from `.env`, double-path `/ciem/ciem/[page]`
 - **E2E test data prefix**: `_E2E_TEST_`
 
 <success_criteria>

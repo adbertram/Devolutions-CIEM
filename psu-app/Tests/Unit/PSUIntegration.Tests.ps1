@@ -32,8 +32,8 @@ Describe 'PSU Integration Changes' {
             $script:ScriptsPath | Should -Not -Exist
         }
 
-        It 'Registers PSU scripts from the app startup path' {
-            $script:AppContent | Should -Match 'Import-CIEMScript'
+        It 'Does not register PSU scripts from the app startup path' {
+            $script:AppContent | Should -Not -Match 'Import-CIEMScript'
         }
 
     }

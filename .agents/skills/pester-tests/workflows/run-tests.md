@@ -6,29 +6,29 @@
 
 ### Run All Unit Tests
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit
 ```
 
 ### Run Specific Area
 ```bash
 # Discovery tests
-pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Discovery/Tests/Unit/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path psu-app/modules/Azure/Discovery/Tests/Unit/
 
 # Infrastructure tests
-pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Infrastructure/Tests/Unit/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path psu-app/modules/Azure/Infrastructure/Tests/Unit/
 
 # Module-level tests
-pwsh -NoProfile -Command "Invoke-Pester psu-app/Tests/Unit/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path psu-app/Tests/Unit/
 ```
 
 ### Run Single Test File
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureArmResource.Tests.ps1 -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureArmResource.Tests.ps1
 ```
 
 ### Run by Tag
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Tag 'CRUD' -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Tag 'CRUD'
 ```
 
 ### Output Levels
@@ -40,11 +40,13 @@ pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Tag 'CRUD' -Output Detailed"
 
 ### E2E Tests (Require Running PSU)
 ```bash
-# Pester E2E (requires local PSU at http://localhost:5001)
-pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Infrastructure/Tests/E2E/ -Output Detailed"
+# Pester E2E against local or Azure PSU
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment local
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment azure
 
 # Playwright E2E
-cd psu-app/ui/e2e && npx playwright test
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Playwright -Environment local
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Playwright -Environment azure
 ```
 
 ## Interpreting Results
@@ -67,7 +69,7 @@ grep -i "error\|exception\|fail" psu-app/data/ciem.log
 
 ### 2. Run with Diagnostic Output
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester path/to/test.Tests.ps1 -Output Diagnostic"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path path/to/test.Tests.ps1 -Output Diagnostic
 ```
 
 ### 3. Verify Database Schema

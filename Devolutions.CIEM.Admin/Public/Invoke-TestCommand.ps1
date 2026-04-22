@@ -42,19 +42,14 @@ function Invoke-TestCommand {
 
     $ErrorActionPreference = 'Stop'
 
-    switch ($Environment) {
-        'local' {
-            Write-Verbose "[local] Connecting to local PSU..."
-            Connect-PSU -Local
-            Write-Verbose "[local] Executing on local PSU..."
-            Invoke-CIEMCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
-        }
-
-        'azure' {
-            Write-Verbose "[azure] Connecting to Azure PSU..."
-            Connect-PSU
-            Write-Verbose "[azure] Executing on Azure PSU..."
-            Invoke-CIEMCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
-        }
+    $connectCommands = @{
+        local = { Connect-PSU -Local }
+        azure = { Connect-PSU }
     }
+
+    Write-Verbose "[$Environment] Connecting to PSU..."
+    & $connectCommands[$Environment] | Out-Null
+
+    Write-Verbose "[$Environment] Executing on PSU..."
+    Invoke-CIEMCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
 }

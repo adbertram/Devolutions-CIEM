@@ -1,10 +1,11 @@
-const path = require('path');
+const { resolveTestEnvironment } = require('./test-environment');
 
-require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
+const testEnvironment = resolveTestEnvironment();
 
 const testConfig = {
+  environment: testEnvironment,
   urls: {
-    psu: process.env.LOCAL_PSU_URL || 'http://localhost:5001'
+    psu: testEnvironment.psuUrl
   },
   pages: {
     dashboard: '/ciem/ciem/',
@@ -19,7 +20,8 @@ const testConfig = {
     attackPathPatterns: '/ciem/ciem/attack-path-patterns'
   },
   psu: {
-    healthEndpoint: '/api/v1/alive'
+    healthEndpoint: testEnvironment.healthEndpoint,
+    token: testEnvironment.psuToken
   },
   timeouts: {
     pageLoad: 30000,

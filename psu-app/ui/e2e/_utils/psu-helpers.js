@@ -1,5 +1,9 @@
-const { execSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 const { testConfig } = require('./test-config');
+
+const PSU_STATUS = { Queued: 0, Running: 1, Completed: 2, Failed: 3, Canceled: 5, TimedOut: 9, Warning: 10, WarningOutput: 11 };
+const PSU_STATUS_NAMES = Object.fromEntries(Object.entries(PSU_STATUS).map(([k, v]) => [v, k]));
+const PSU_TERMINAL_STATUSES = [PSU_STATUS.Completed, PSU_STATUS.Failed, PSU_STATUS.Canceled, PSU_STATUS.TimedOut, PSU_STATUS.Warning, PSU_STATUS.WarningOutput];
 
 async function isPSUReady() {
   try {
@@ -14,8 +18,10 @@ async function isPSUReady() {
 }
 
 function startPSU() {
+  assertPublishPointDatabaseAccess();
+  const sshHost = testConfig.environment.publishPointSsh;
   console.log('[psu] Starting PSU server via launchctl...');
-  execSync('sudo launchctl kickstart -k system/com.psu.server', {
+  execSync(`ssh ${sshHost} "sudo launchctl kickstart -k system/com.psu.server"`, {
     stdio: 'inherit',
     timeout: 30000
   });
@@ -41,9 +47,7 @@ async function waitForPSU(timeoutMs = testConfig.timeouts.serverStart) {
  * Get the local PSU app token from the LOCAL_PSU_TOKEN environment variable.
  */
 function getPSUToken() {
-  const token = process.env.LOCAL_PSU_TOKEN;
-  if (!token) throw new Error('LOCAL_PSU_TOKEN environment variable is not set');
-  return token;
+  return testConfig.psu.token;
 }
 
 /**
@@ -51,7 +55,6 @@ function getPSUToken() {
  */
 function getPSUHeaders() {
   const token = getPSUToken();
-  if (!token) throw new Error('No PSU token available (LOCAL_PSU_TOKEN not set)');
   return {
     'Authorization': `Bearer ${token}`,
     'Accept': 'application/json',
@@ -84,10 +87,6 @@ async function cancelRunningPSUJobs() {
 
   return { cancelled, running: running.length, queued: queued.length };
 }
-
-const PSU_STATUS = { Queued: 0, Running: 1, Completed: 2, Failed: 3, Canceled: 5, TimedOut: 9, Warning: 10, WarningOutput: 11 };
-const PSU_STATUS_NAMES = Object.fromEntries(Object.entries(PSU_STATUS).map(([k, v]) => [v, k]));
-const PSU_TERMINAL_STATUSES = [PSU_STATUS.Completed, PSU_STATUS.Failed, PSU_STATUS.Canceled, PSU_STATUS.TimedOut, PSU_STATUS.Warning, PSU_STATUS.WarningOutput];
 
 /**
  * Run a PowerShell command inside PSU via the CIEMExecutor script.
@@ -149,6 +148,78 @@ async function runPSUCommand(command, timeoutMs = 30000) {
 
   const pipelineRes = await fetch(`${baseUrl}/api/v1/job/${jobId}/pipelineOutput`, { headers });
   const pipeline = await pipelineRes.json().catch(() => null);
+  let pipelineOutput = null;
+  if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {
+    pipelineOutput = JSON.parse(pipeline[0].jsonData);
+  }
+
+  return {
+    jobId,
+    status: PSU_STATUS_NAMES[job.status] || `Unknown(${job.status})`,
+    statusCode: job.status,
+    startTime: job.startTime,
+    endTime: job.endTime,
+    output,
+    pipelineOutput
+  };
+}
+
+function curlJson(args, timeoutMs = 30000) {
+  const output = execFileSync('curl', ['-sS', '--fail', ...args], {
+    encoding: 'utf8',
+    timeout: timeoutMs,
+    maxBuffer: 256 * 1024 * 1024
+  }).trim();
+
+  if (!output) return null;
+  return JSON.parse(output);
+}
+
+function runPSUCommandSync(command, timeoutMs = 30000) {
+  const baseUrl = testConfig.urls.psu;
+  const headers = getPSUHeaders();
+  const headerArgs = Object.entries(headers).flatMap(([key, value]) => ['-H', `${key}: ${value}`]);
+
+  const scripts = curlJson([...headerArgs, `${baseUrl}/api/v1/script`], timeoutMs);
+  let executor = scripts.find(s => s.name === 'CIEMExecutor.ps1');
+
+  if (!executor) {
+    executor = curlJson([
+      ...headerArgs,
+      '-X', 'POST',
+      '--data', JSON.stringify({
+        name: 'CIEMExecutor.ps1',
+        fullPath: 'CIEMExecutor.ps1',
+        content: 'param([string]$ScriptContent)\n& ([scriptblock]::Create($ScriptContent))',
+        description: 'Persistent executor for E2E tests',
+        maxHistory: 100
+      }),
+      `${baseUrl}/api/v1/script`
+    ], timeoutMs);
+  }
+
+  const jobResponse = curlJson([
+    ...headerArgs,
+    '-X', 'POST',
+    '--data', '{}',
+    `${baseUrl}/api/v1/script/${executor.id}?ScriptContent=${encodeURIComponent(command)}`
+  ], timeoutMs);
+  const jobId = typeof jobResponse === 'number' ? jobResponse : jobResponse.id;
+
+  const start = Date.now();
+  let job = null;
+  while (Date.now() - start < timeoutMs) {
+    job = curlJson([...headerArgs, `${baseUrl}/api/v1/job/${jobId}`], timeoutMs);
+    if (PSU_TERMINAL_STATUSES.includes(job.status)) break;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+  }
+
+  if (!job || !PSU_TERMINAL_STATUSES.includes(job.status)) {
+    return { jobId, status: 'TimedOut', statusCode: -1, elapsedMs: Date.now() - start };
+  }
+
+  const output = curlJson([...headerArgs, `${baseUrl}/api/v1/job/${jobId}/output`], timeoutMs) || [];
+  const pipeline = curlJson([...headerArgs, `${baseUrl}/api/v1/job/${jobId}/pipelineOutput`], timeoutMs) || null;
   let pipelineOutput = null;
   if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {
     pipelineOutput = JSON.parse(pipeline[0].jsonData);
@@ -248,21 +319,61 @@ async function runPSUNonQuery(command, timeoutMs = 30000) {
   }
 }
 
-// SSH database path on adam-server (publish point)
-const REMOTE_DB_PATH = '/Users/adam/psu/data/ciem.db';
-const SSH_HOST = 'adam-server';
+function assertPublishPointDatabaseAccess() {
+  if (!testConfig.environment.usesPublishPointDatabase) {
+    throw new Error(`Environment '${testConfig.environment.name}' does not expose the publish-point database over SSH.`);
+  }
+}
+
+function getPipelineValue(result) {
+  if (result.statusCode === -1) {
+    throw new Error(`PSU SQL command failed: ${result.status}`);
+  }
+  if (result.statusCode !== PSU_STATUS.Completed && result.statusCode !== PSU_STATUS.WarningOutput && result.statusCode !== PSU_STATUS.Warning) {
+    throw new Error(`PSU SQL command returned status ${result.status} for job ${result.jobId}.`);
+  }
+
+  const pipelineItems = result.pipelineOutput || [];
+  if (pipelineItems.length === 0) return null;
+  return pipelineItems[pipelineItems.length - 1].value;
+}
+
+function psuSqlCommand(sql, returnRows) {
+  const encodedSql = Buffer.from(sql, 'utf8').toString('base64');
+  const operation = returnRows
+    ? '$rows = Invoke-CIEMQuery -Query $query'
+    : '$rows = Invoke-CIEMQuery -Query $query -AsNonQuery';
+  return `
+$ErrorActionPreference = 'Stop'
+$query = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedSql}'))
+${operation}
+if ($null -eq $rows) {
+    '[]'
+}
+else {
+    @($rows) | ConvertTo-Json -Depth 30 -Compress
+}
+`;
+}
 
 /**
- * Execute a SQL query against the CIEM database on adam-server via SSH + sqlite3 CLI.
- * Bypasses PSU's Microsoft.Data.Sqlite connections entirely — reads directly from the
- * database file. Use for verification reads in E2E test beforeAll/afterAll where
- * PSU cross-job WAL visibility is unreliable.
+ * Execute a SQL query against the selected CIEM test target.
+ * Local uses SSH + sqlite3 against the publish point DB; Azure uses the PSU
+ * executor so Playwright can target the Azure web app without filesystem access.
  *
  * Returns: for SELECT — parsed JSON array of rows; for scalar — the raw string value.
  */
 function sshQuery(sql) {
+  if (!testConfig.environment.usesPublishPointDatabase) {
+    const value = getPipelineValue(runPSUCommandSync(psuSqlCommand(sql, true), 120000));
+    if (value === null) return [];
+    return JSON.parse(value);
+  }
+
+  const sshHost = testConfig.environment.publishPointSsh;
+  const databasePath = testConfig.environment.databasePath;
   const result = execSync(
-    `ssh ${SSH_HOST} "sqlite3 -json '${REMOTE_DB_PATH}' \\"${sql.replace(/"/g, '\\\\\\"')}\\""`,
+    `ssh ${sshHost} "sqlite3 -json '${databasePath}' \\"${sql.replace(/"/g, '\\\\\\"')}\\""`,
     { encoding: 'utf8', timeout: 30000, maxBuffer: 256 * 1024 * 1024 }
   ).trim();
   if (!result) return [];
@@ -270,15 +381,22 @@ function sshQuery(sql) {
 }
 
 /**
- * Execute a non-query SQL statement on adam-server via SSH + sqlite3 CLI.
- * Appends a WAL checkpoint so writes are immediately visible to PSU page reads.
+ * Execute a non-query SQL statement against the selected CIEM test target.
+ * Local appends a WAL checkpoint so writes are immediately visible to PSU page reads.
  */
 function sshNonQuery(sql) {
+  if (!testConfig.environment.usesPublishPointDatabase) {
+    getPipelineValue(runPSUCommandSync(psuSqlCommand(sql, false), 120000));
+    return;
+  }
+
+  const sshHost = testConfig.environment.publishPointSsh;
+  const databasePath = testConfig.environment.databasePath;
   // Pipe SQL via stdin so large statement batches don't hit ARG_MAX (E2BIG).
   // sqlite3 reads SQL commands from stdin when no command argument is supplied.
   const fullSql = `${sql};\nPRAGMA wal_checkpoint(TRUNCATE);\n`;
   execSync(
-    `ssh ${SSH_HOST} "sqlite3 '${REMOTE_DB_PATH}'"`,
+    `ssh ${sshHost} "sqlite3 '${databasePath}'"`,
     { encoding: 'utf8', timeout: 60000, maxBuffer: 256 * 1024 * 1024, input: fullSql }
   );
 }

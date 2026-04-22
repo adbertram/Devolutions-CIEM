@@ -91,16 +91,16 @@ Unit tests MUST NOT:
 
 ```bash
 # All tests
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit
 
 # Specific file
-pwsh -NoProfile -Command "Invoke-Pester path/to/test.Tests.ps1 -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path path/to/test.Tests.ps1
 
 # By tag
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Tag 'CRUD' -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Tag 'CRUD'
 
 # Diagnostic (max verbosity)
-pwsh -NoProfile -Command "Invoke-Pester path/to/test.Tests.ps1 -Output Diagnostic"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path path/to/test.Tests.ps1 -Output Diagnostic
 ```
 
 ## Troubleshooting

@@ -13,17 +13,23 @@ module (`Devolutions.CIEM`) with dot-sourced sub-folders and SQLite-backed CRUD.
 
 Run all unit tests:
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit
 ```
 
 Run a specific test file:
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureArmResource.Tests.ps1 -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path psu-app/modules/Azure/Discovery/Tests/Unit/CIEMAzureArmResource.Tests.ps1
 ```
 
 Run tests by tag:
 ```bash
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Tag 'CRUD' -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Tag 'CRUD'
+```
+
+Run PSU-backed E2E tests:
+```bash
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment local
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment azure
 ```
 
 </quick_start>

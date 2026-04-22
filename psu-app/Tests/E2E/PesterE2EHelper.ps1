@@ -8,35 +8,58 @@
 function script:Initialize-PesterE2E {
     param(
         [Parameter(Mandatory)][string]$ProjectRoot,
+        [ValidateSet('local', 'azure')]
+        [string]$Environment = $(if ($env:CIEM_TEST_ENVIRONMENT) { $env:CIEM_TEST_ENVIRONMENT } else { 'local' }),
         [int]$TimeoutSeconds = 120
     )
 
-    Import-Module (Join-Path $ProjectRoot 'Devolutions.CIEM.Admin' 'Devolutions.CIEM.Admin.psd1') -Force
+    Remove-Module Devolutions.CIEM.Admin -Force -ErrorAction SilentlyContinue
+    Import-Module (Join-Path $ProjectRoot 'Devolutions.CIEM.Admin' 'Devolutions.CIEM.Admin.psd1')
 
-    # Read LOCAL_PSU_URL from .env
+    $script:PesterE2EEnvironment = $Environment
+
+    $urlVariableByEnvironment = @{
+        local = 'LOCAL_PSU_URL'
+        azure = 'AZURE_PSU_URL'
+    }
+    $urlVariable = $urlVariableByEnvironment[$Environment]
+
+    # Read the target PSU URL from .env.
     $envFile = Join-Path $ProjectRoot '.env'
     $psuUrl = $null
+    $publishPointSsh = $null
     if (Test-Path $envFile) {
         Get-Content $envFile | ForEach-Object {
-            if ($_ -match '^LOCAL_PSU_URL=(.+)$') {
+            if ($_ -match "^$urlVariable=(.+)$") {
                 $psuUrl = $matches[1].Trim()
+            }
+            if ($_ -match '^PUBLISH_POINT_SSH=(.+)$') {
+                $publishPointSsh = $matches[1].Trim()
             }
         }
     }
-    if (-not $psuUrl) { throw "LOCAL_PSU_URL not found in $envFile" }
+    if (-not $psuUrl) { throw "$urlVariable not found in $envFile" }
     $healthUrl = "$psuUrl/api/v1/alive"
     $isReady = $false
+    $lastHealthError = $null
 
     try {
         $response = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 5 -ErrorAction Stop
         $isReady = $response.loading -eq $false
     } catch {
+        $lastHealthError = $_.Exception.Message
         $isReady = $false
     }
 
     if (-not $isReady) {
-        Write-Host '[pester-e2e] PSU not ready, starting via launchctl...'
-        & sudo launchctl kickstart -k system/com.psu.server
+        if ($Environment -eq 'azure') {
+            throw "Azure PSU is not ready at $healthUrl. Last health error: $lastHealthError"
+        }
+
+        if (-not $publishPointSsh) { throw "PUBLISH_POINT_SSH not found in $envFile" }
+
+        Write-Host "[pester-e2e] Local PSU not ready, starting via $publishPointSsh..."
+        & ssh $publishPointSsh "sudo launchctl kickstart -k system/com.psu.server"
 
         $startTime = Get-Date
         $deadline = $startTime.AddSeconds($TimeoutSeconds)
@@ -50,18 +73,25 @@ function script:Initialize-PesterE2E {
                     $isReady = $true
                     break
                 }
-            } catch {}
+            } catch {
+                $lastHealthError = $_.Exception.Message
+            }
             Start-Sleep -Seconds 2
         }
 
         if (-not $isReady) {
-            throw "PSU server did not become ready within ${TimeoutSeconds}s"
+            throw "PSU server did not become ready within ${TimeoutSeconds}s. Last health error: $lastHealthError"
         }
     } else {
-        Write-Host '[pester-e2e] PSU is already running.'
+        Write-Host "[pester-e2e] $Environment PSU is already running."
     }
 
-    Connect-PSU -Local | Out-Null
+    if ($Environment -eq 'local') {
+        Connect-PSU -Local | Out-Null
+    }
+    else {
+        Connect-PSU | Out-Null
+    }
 }
 
 function script:Run-OnPSU {
@@ -75,7 +105,7 @@ function script:Run-OnPSU {
 `$__result = & { $Command }
 if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
 "@
-    $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -TimeoutSeconds $TimeoutSeconds)
+    $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -Environment $script:PesterE2EEnvironment -TimeoutSeconds $TimeoutSeconds)
     $jobResult = $allOutput | Where-Object { $_.PSObject.Properties.Name -contains 'JobId' } | Select-Object -Last 1
 
     if (-not $jobResult) { throw "PSU command returned no job result." }

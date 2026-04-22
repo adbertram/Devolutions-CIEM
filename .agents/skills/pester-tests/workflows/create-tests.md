@@ -152,13 +152,13 @@ Read-only Contexts can use `BeforeAll` for seeding.
 
 ```bash
 # Run the new test file
-pwsh -NoProfile -Command "Invoke-Pester path/to/NewTest.Tests.ps1 -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path path/to/NewTest.Tests.ps1
 
 # Run the full area suite
-pwsh -NoProfile -Command "Invoke-Pester psu-app/modules/Azure/Discovery/Tests/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path psu-app/modules/Azure/Discovery/Tests/
 
 # Run the full module suite
-pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"
+pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit
 ```
 
 </process>

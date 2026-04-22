@@ -8,9 +8,12 @@ const { testConfig } = require('./test-config');
 module.exports = async function globalSetup() {
   console.log('[setup] Running global test setup...');
 
-  // 1. Health check PSU — start if not ready
+  // 1. Health check PSU — start local if not ready; remote targets must already be available
   const ready = await isPSUReady();
   if (!ready) {
+    if (!testConfig.environment.usesPublishPointDatabase) {
+      throw new Error(`${testConfig.environment.name} PSU is not ready at ${testConfig.urls.psu}${testConfig.psu.healthEndpoint}`);
+    }
     console.log('[setup] PSU not ready, starting...');
     startPSU();
     await waitForPSU();
@@ -66,7 +69,7 @@ module.exports = async function globalSetup() {
     process.env._E2E_AUTH_PROFILES_BACKUP = '[]';
   }
 
-  // 5. Clean stale test data and seed fresh data (all via SSH+sqlite3)
+  // 5. Clean stale test data and seed fresh data in the selected PSU target
   cleanupTestData();
   seedChecks();
   seedTestData();

@@ -1,9 +1,7 @@
 const { defineConfig, devices } = require('@playwright/test');
-const path = require('path');
+const { testConfig } = require('./_utils/test-config');
 
-require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
-
-const baseURL = process.env.LOCAL_PSU_URL || 'http://localhost:5001';
+const baseURL = testConfig.urls.psu;
 
 module.exports = defineConfig({
   testDir: './pages',
