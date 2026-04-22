@@ -13,13 +13,11 @@ function New-DevolutionsCIEMApp {
         This function is exported for PSU to invoke via New-PSUApp -Module -Command.
     #>
     [CmdletBinding()]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'PSU invokes this as an app factory; script registration is delegated to Import-CIEMScript')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidReturnStatement', '', Justification = 'Return statements required for early exit in PSU OnClick handlers')]
     param()
 
     process {
         $ErrorActionPreference = 'Stop'
-        Import-CIEMScript | Out-Null
 
         $Navigation = New-CIEMNavigation
 

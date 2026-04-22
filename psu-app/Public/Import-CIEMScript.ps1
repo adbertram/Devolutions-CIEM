@@ -9,7 +9,10 @@ function Import-CIEMScript {
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([pscustomobject])]
-    param()
+    param(
+        [Parameter()]
+        [switch]$Integrated
+    )
 
     $ErrorActionPreference = 'Stop'
 
@@ -25,6 +28,10 @@ function Import-CIEMScript {
     $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json -Depth 10
 
     $managedScriptNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json'
+    $psuConnectionParameters = @{}
+    if ($Integrated) {
+        $psuConnectionParameters.Integrated = $true
+    }
     $legacyScriptExactNames = @(
         'Devolutions.CIEM'
         'Devolutions.CIEM/New-CIEMScanRun'
@@ -264,7 +271,7 @@ function Import-CIEMScript {
 
         foreach ($folderPath in $folderPaths) {
             $folderName = @($folderPath -split '/')[-1]
-            $matchingFolders = @(Get-PSUFolder -Name $folderName | Where-Object {
+            $matchingFolders = @(Get-PSUFolder -Name $folderName @psuConnectionParameters | Where-Object {
                     $pathProperty = $_.PSObject.Properties['Path']
                     $nameProperty = $_.PSObject.Properties['Name']
                     $existingFolderPath = if ($pathProperty -and -not [string]::IsNullOrWhiteSpace([string]$pathProperty.Value)) {
@@ -288,7 +295,7 @@ function Import-CIEMScript {
             }
 
             if ($PSCmdlet.ShouldProcess($folderPath, 'Create PSU script folder')) {
-                New-PSUFolder -Path $folderPath -Type Script | Out-Null
+                New-PSUFolder -Path $folderPath -Type Script @psuConnectionParameters | Out-Null
             }
             $syncedFolders++
         }
@@ -298,7 +305,7 @@ function Import-CIEMScript {
     $getScriptCommand = Get-Command -Name 'Get-PSUScript' -ErrorAction SilentlyContinue
     $removeScriptCommand = Get-Command -Name 'Remove-PSUScript' -ErrorAction SilentlyContinue
     if ($getScriptCommand -and $removeScriptCommand) {
-        foreach ($existingScript in @(Get-PSUScript)) {
+        foreach ($existingScript in @(Get-PSUScript @psuConnectionParameters)) {
             $existingName = [string]$existingScript.Name
             if ([string]::IsNullOrWhiteSpace($existingName)) {
                 continue
@@ -350,7 +357,7 @@ function Import-CIEMScript {
             }
 
             if ($PSCmdlet.ShouldProcess($normalizedExistingName, 'Remove stale CIEM PSU script')) {
-                Remove-PSUScript -Script $existingScript | Out-Null
+                Remove-PSUScript -Script $existingScript @psuConnectionParameters | Out-Null
             }
 
             $prunedScripts++
@@ -360,6 +367,11 @@ function Import-CIEMScript {
     $coreScripts = 0
     $attackPathScripts = 0
     $setScriptCommand = Get-Command -Name 'Set-PSUScript' -ErrorAction SilentlyContinue
+    $existingScripts = @()
+    if ($getScriptCommand) {
+        $existingScripts = @(Get-PSUScript @psuConnectionParameters)
+    }
+
     foreach ($scriptDef in $scriptDefinitions) {
         $sourceContent = Get-Content -Path $scriptDef.AbsolutePath -Raw
         if ($scriptDef.Type -eq 'AttackPath') {
@@ -377,17 +389,19 @@ function Import-CIEMScript {
 
         $existingMatches = @()
         if ($getScriptCommand) {
-            $existingMatches = @(Get-PSUScript -Name $scriptDef.Name | Where-Object {
+            $expectedRepositoryPath = [string]$scriptDef.RepositoryPath
+            $existingMatches = @($existingScripts | Where-Object {
                     if ($null -eq $_) {
                         return $false
                     }
 
-                    if ([string]::IsNullOrWhiteSpace([string]$scriptDef.RepositoryPath)) {
-                        return $true
+                    if (-not [string]::IsNullOrWhiteSpace($expectedRepositoryPath)) {
+                        $existingRepositoryPath = & $getExistingScriptPath -Script $_
+                        return $existingRepositoryPath -eq $expectedRepositoryPath
                     }
 
-                    $existingRepositoryPath = & $getExistingScriptPath -Script $_
-                    [string]::IsNullOrWhiteSpace($existingRepositoryPath) -or $existingRepositoryPath -eq [string]$scriptDef.RepositoryPath
+                    $existingScriptName = & $normalizeScriptName -Name ([string]$_.Name)
+                    $existingScriptName -eq [string]$scriptDef.Name
                 })
         }
 
@@ -407,7 +421,8 @@ function Import-CIEMScript {
                     -Status $scriptDef.Status `
                     -TimeOut $scriptDef.Timeout `
                     -DisableManualInvocation ([bool]$scriptDef.DisableManualInvocation) `
-                    -Notes $managedScriptNotes | Out-Null
+                    -Notes $managedScriptNotes `
+                    @psuConnectionParameters | Out-Null
             }
         } else {
             if ($PSCmdlet.ShouldProcess($scriptDef.Name, 'Register PSU script')) {
@@ -422,6 +437,9 @@ function Import-CIEMScript {
                 }
                 if (-not [string]::IsNullOrWhiteSpace([string]$scriptDef.RepositoryPath)) {
                     $newScriptParams.Path = [string]$scriptDef.RepositoryPath
+                }
+                if ($Integrated) {
+                    $newScriptParams.Integrated = $true
                 }
 
                 New-PSUScript @newScriptParams | Out-Null

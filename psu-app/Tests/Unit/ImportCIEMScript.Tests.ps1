@@ -64,8 +64,8 @@ Describe 'Import-CIEMScript registration model' {
             $script:UniversalScriptsPath | Should -Not -Exist
         }
 
-        It 'Registers PSU automation scripts from the app startup path' {
-            $script:AppScriptContent | Should -Match 'Import-CIEMScript'
+        It 'Does not run PSU management script registration from the app startup path' {
+            $script:AppScriptContent | Should -Not -Match 'Import-CIEMScript'
         }
     }
 
@@ -167,7 +167,7 @@ Describe 'Import-CIEMScript registration model' {
             Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Path -eq 'Identities' -and [string]$Type -eq 'Script' }
             Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Path -eq 'Identities/AttackPaths' -and [string]$Type -eq 'Script' }
             Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $Path -eq 'Devolutions.CIEM' }
-            Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times (@($script:Manifest.scripts).Count + @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count)
+            Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times (@($script:Manifest.scripts).Count + @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count - 1)
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count -ParameterFilter {
                 $Name -notmatch '/' -and $Path -match '^Identities/AttackPaths/[^/]+\.ps1$'
             }
@@ -175,10 +175,18 @@ Describe 'Import-CIEMScript registration model' {
                 $Name -eq 'disabled-account-still-holding-active-role-assignments' -and
                 $Path -eq 'Identities/AttackPaths/disabled-account-still-holding-active-role-assignments.ps1'
             }
-            Should -Invoke -CommandName Set-PSUScript -ModuleName Devolutions.CIEM -Times 0
+            Should -Invoke -CommandName Set-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
+                $Script.Name -eq 'Checks/New-CIEMScanRun'
+            }
+            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $PSBoundParameters.ContainsKey('Name') }
+            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 3 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
+            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
+            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Name') -and -not $PSBoundParameters.ContainsKey('Integrated') }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 5 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
+            Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times ($result.TotalScripts - 1) -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
         }
 
-        It 'Creates scripts when Get-PSUScript returns a null named lookup result' {
+        It 'Uses integrated PSU cmdlets only when requested' {
             Mock -ModuleName Devolutions.CIEM Get-Command {
                 [pscustomobject]@{
                     Name = $Name
@@ -193,9 +201,33 @@ Describe 'Import-CIEMScript registration model' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 param($Name)
                 if ($PSBoundParameters.ContainsKey('Name')) {
-                    return $null
+                    return @()
                 }
 
+                return @()
+            }
+
+            $result = Import-CIEMScript -Integrated
+
+            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 3 -ParameterFilter { $Integrated.IsPresent }
+            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 3 -ParameterFilter { $Integrated.IsPresent }
+            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { $Integrated.IsPresent -and -not $PSBoundParameters.ContainsKey('Name') }
+            Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times $result.TotalScripts -ParameterFilter { $Integrated.IsPresent }
+        }
+
+        It 'Creates scripts when no existing scripts are returned' {
+            Mock -ModuleName Devolutions.CIEM Get-Command {
+                [pscustomobject]@{
+                    Name = $Name
+                }
+            } -ParameterFilter { $Name -in @('New-PSUScript', 'Get-PSUScript', 'Remove-PSUScript', 'Set-PSUScript', 'Get-PSUFolder', 'New-PSUFolder') }
+
+            Mock -ModuleName Devolutions.CIEM New-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Remove-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Set-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM New-PSUFolder {}
+            Mock -ModuleName Devolutions.CIEM Get-PSUFolder { return @() }
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 return @()
             }
 
