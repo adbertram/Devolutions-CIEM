@@ -101,7 +101,7 @@ function script:Run-OnPSU {
     )
 
     $wrappedCommand = @"
-`$ErrorActionPreference = 'Continue'
+`$ErrorActionPreference = 'Stop'
 `$__result = & { $Command }
 if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
 "@
@@ -113,7 +113,7 @@ if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } el
         $errMsgs = @($jobResult.Output) | Where-Object { $_.type -eq 4 } | ForEach-Object { $_.message }
         throw "PSU command failed: $($errMsgs -join '; ')"
     }
-    if ($jobResult.Status -notin @('Completed', 'Warning')) {
+    if ($jobResult.Status -notin @('Completed', 'Warning', 'WarningOutput')) {
         throw "PSU job $($jobResult.JobId) did not complete. Status: $($jobResult.Status)"
     }
 

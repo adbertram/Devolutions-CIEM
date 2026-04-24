@@ -49,14 +49,14 @@ function Start-CIEMAzureDiscovery {
         }
     }
 
-    if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
-        Write-CIEMLog 'Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure...' -Severity INFO -Component 'Discovery'
-        Connect-CIEMAzure | Out-Null
-    }
-
     $runningRuns = @(Get-CIEMAzureDiscoveryRun -Status 'Running')
     if ($runningRuns.Count -gt 0) {
         throw "A discovery run is already in progress (Id=$($runningRuns[0].Id)). Wait for it to complete or clear stale runs."
+    }
+
+    if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
+        Write-CIEMLog 'Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure...' -Severity INFO -Component 'Discovery'
+        Connect-CIEMAzure | Out-Null
     }
 
     $run = New-CIEMAzureDiscoveryRun -Scope $Scope -Status 'Running' -StartedAt (Get-Date).ToString('o')

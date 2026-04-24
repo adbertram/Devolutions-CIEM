@@ -134,6 +134,91 @@ Describe 'Invoke-CIEMCommand' {
         }
     }
 
+    Context 'when PSU returns WarningOutput terminal status' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM.Admin {
+                $script:PSUConnection.Url = 'https://fake.ngrok-free.app'
+                $script:PSUConnection.Token = 'fake-token'
+                $script:PSUConnection.IsAzure = $false
+            }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod {
+                switch -Regex ($Uri) {
+                    '/api/v1/script$' {
+                        return @(
+                            [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
+                        )
+                    }
+                    '/api/v1/script/\d+\?' { return 43 }
+                    '/api/v1/job/43/output' { return @('warning output') }
+                    '/api/v1/job/43/pipelineOutput' { return @('mock pipeline') }
+                    '/api/v1/job/43' {
+                        return [PSCustomObject]@{
+                            id        = 43
+                            status    = 11
+                            startTime = (Get-Date)
+                            endTime   = (Get-Date)
+                        }
+                    }
+                }
+            }
+        }
+
+        It 'returns WarningOutput instead of polling until timeout' {
+            $result = Invoke-CIEMCommand -Command 'Write-Warning "done"' -TimeoutSeconds 0
+            $result.Status | Should -Be 'WarningOutput'
+        }
+    }
+
+    Context 'when the PSU job endpoint returns a transient 401' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM.Admin {
+                $script:PSUConnection.Url = 'https://fake.ngrok-free.app'
+                $script:PSUConnection.Token = 'valid-token'
+                $script:PSUConnection.IsAzure = $true
+            }
+
+            $script:jobPollCount = 0
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod {
+                switch -Regex ($Uri) {
+                    '/api/v1/script$' {
+                        return @(
+                            [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
+                        )
+                    }
+                    '/api/v1/script/\d+\?' { return 44 }
+                    '/api/v1/job/44/output' { return @('after reconnect') }
+                    '/api/v1/job/44/pipelineOutput' { return @() }
+                    '/api/v1/job/44$' {
+                        $script:jobPollCount++
+                        if ($script:jobPollCount -eq 1) {
+                            throw 'Response status code does not indicate success: 401 (Unauthorized).'
+                        }
+
+                        if ($Headers['Authorization'] -ne 'Bearer valid-token') {
+                            throw "Expected the original bearer token, got '$($Headers['Authorization'])'."
+                        }
+
+                        return [PSCustomObject]@{
+                            id        = 44
+                            status    = 2
+                            startTime = (Get-Date)
+                            endTime   = (Get-Date)
+                        }
+                    }
+                }
+            }
+        }
+
+        It 'retries the job poll once without reconnecting to PSU' {
+            $result = Invoke-CIEMCommand -Command 'Get-Date' -TimeoutSeconds 5
+
+            $result.Status | Should -Be 'Completed'
+            $script:jobPollCount | Should -Be 2
+        }
+    }
+
     Context 'when talking to an ngrok-fronted PSU over HTTPS' {
         BeforeAll {
             $script:ngrokCalls = [System.Collections.Generic.List[object]]::new()

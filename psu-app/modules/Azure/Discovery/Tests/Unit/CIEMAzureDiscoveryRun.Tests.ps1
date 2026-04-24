@@ -61,6 +61,27 @@ Describe 'Discovery Run CRUD' {
             $result.Scope | Should -Be 'Entra'
         }
 
+        It 'Resolves the database path when module-scope DatabasePath is empty' {
+            $env:CIEM_TEST_DISCOVERY_DATA_ROOT = Split-Path "$TestDrive/ciem.db" -Parent
+
+            $result = InModuleScope Devolutions.CIEM {
+                $oldDatabasePath = $script:DatabasePath
+                $oldDataRoot = $script:DataRoot
+                try {
+                    $script:DatabasePath = $null
+                    $script:DataRoot = $env:CIEM_TEST_DISCOVERY_DATA_ROOT
+                    New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Running' -StartedAt (Get-Date).ToString('o')
+                }
+                finally {
+                    $script:DatabasePath = $oldDatabasePath
+                    $script:DataRoot = $oldDataRoot
+                }
+            }
+
+            $result.Id | Should -BeGreaterThan 0
+            Remove-Item Env:\CIEM_TEST_DISCOVERY_DATA_ROOT -ErrorAction SilentlyContinue
+        }
+
         It 'Mandatory params: -Scope, -Status, -StartedAt' {
             { New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Running' -StartedAt (Get-Date).ToString('o') } | Should -Not -Throw
             # Missing mandatory should throw (ParameterBindingException)

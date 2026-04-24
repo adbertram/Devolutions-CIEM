@@ -76,7 +76,7 @@ function New-CIEMAzureDiscoveryRun {
 
         # INSERT and last_insert_rowid() MUST share the same connection —
         # last_insert_rowid() is per-connection in SQLite and returns 0 on a new connection.
-        $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
+        $conn = Open-PSUSQLiteConnection -Database (Get-CIEMDatabasePath)
         try {
             Invoke-CIEMQuery -Query @"
 INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message)

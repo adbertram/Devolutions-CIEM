@@ -74,6 +74,17 @@ Describe 'Start-CIEMAzureDiscovery' {
                 { Start-CIEMAzureDiscovery } | Should -Throw '*already in progress*'
             }
         }
+
+        It 'Checks for a Running discovery run before connecting to Azure' {
+            Mock -ModuleName Devolutions.CIEM Connect-CIEMAzure { throw 'Connect-CIEMAzure should not be called before the concurrency guard.' }
+
+            InModuleScope Devolutions.CIEM {
+                $script:AzureAuthContext = $null
+                { Start-CIEMAzureDiscovery } | Should -Throw '*already in progress*'
+            }
+
+            Should -Invoke -CommandName Connect-CIEMAzure -ModuleName Devolutions.CIEM -Times 0 -Exactly
+        }
     }
 
     Context 'Phase array refactor' {

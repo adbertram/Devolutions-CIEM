@@ -15,4 +15,12 @@ Describe 'PesterE2EHelper environment routing' {
     It 'connects to Azure without the local PSU switch' {
         $script:helperSource | Should -Match "else \{[\s\S]+Connect-PSU \| Out-Null"
     }
+
+    It 'accepts WarningOutput as a terminal successful PSU job status' {
+        $script:helperSource | Should -Match "'Completed', 'Warning', 'WarningOutput'"
+    }
+
+    It 'runs remote commands with ErrorActionPreference Stop' {
+        $script:helperSource | Should -Match "\`$ErrorActionPreference = 'Stop'"
+    }
 }

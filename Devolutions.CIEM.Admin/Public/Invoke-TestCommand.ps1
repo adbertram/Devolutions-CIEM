@@ -50,6 +50,15 @@ function Invoke-TestCommand {
     Write-Verbose "[$Environment] Connecting to PSU..."
     & $connectCommands[$Environment] | Out-Null
 
+    $wrappedScript = @"
+if (-not (Get-Module -Name Devolutions.CIEM)) {
+    Import-Module Devolutions.CIEM
+}
+& {
+$($ScriptBlock.ToString())
+}
+"@
+
     Write-Verbose "[$Environment] Executing on PSU..."
-    Invoke-CIEMCommand -ScriptBlock $ScriptBlock -TimeoutSeconds $TimeoutSeconds
+    Invoke-CIEMCommand -ScriptBlock ([scriptblock]::Create($wrappedScript)) -TimeoutSeconds $TimeoutSeconds
 }

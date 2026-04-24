@@ -65,6 +65,62 @@ function Invoke-CIEMCommand {
 
     $baseUrl = $script:PSUConnection.Url
 
+    function InvokePSURestRequest {
+        param(
+            [Parameter(Mandatory)]
+            [string]$Uri,
+
+            [Parameter(Mandatory)]
+            [string]$Method,
+
+            [Parameter()]
+            [object]$Body
+        )
+
+        $restParams = @{
+            Uri         = $Uri
+            Headers     = $headers
+            Method      = $Method
+            ErrorAction = 'Stop'
+        }
+        if ($PSBoundParameters.ContainsKey('Body')) {
+            $restParams.Body = $Body
+        }
+
+        for ($attempt = 1; $attempt -le 2; $attempt++) {
+            try {
+                return Invoke-RestMethod @restParams
+            }
+            catch {
+                $statusCode = $null
+                if ($_.Exception.Message -match '401 \(Unauthorized\)') {
+                    $statusCode = 401
+                }
+                elseif ($_.Exception.Response -and $null -ne $_.Exception.Response.StatusCode) {
+                    try {
+                        $statusCode = [int]$_.Exception.Response.StatusCode.value__
+                    }
+                    catch {
+                        try {
+                            $statusCode = [int]$_.Exception.Response.StatusCode
+                        }
+                        catch {
+                            $statusCode = $null
+                        }
+                    }
+                }
+
+                if ($statusCode -eq 401 -and $attempt -eq 1) {
+                    Write-Verbose "Received transient 401 from PSU API. Retrying the same request once."
+                    Start-Sleep -Milliseconds 500
+                    continue
+                }
+
+                throw
+            }
+        }
+    }
+
     # --- Ensure persistent executor script exists ---
     $executorName = 'CIEMExecutor.ps1'
     $executorContent = @'
@@ -73,7 +129,7 @@ param([string]$ScriptContent)
 '@
 
     # Check if executor already exists
-    $scripts = Invoke-RestMethod -Uri "$baseUrl/api/v1/script" -Headers $headers -Method Get -ErrorAction Stop
+    $scripts = InvokePSURestRequest -Uri "$baseUrl/api/v1/script" -Method Get
     $executor = $scripts | Where-Object { $_.name -eq $executorName }
 
     if (-not $executor) {
@@ -86,7 +142,7 @@ param([string]$ScriptContent)
             maxHistory  = 100
         } | ConvertTo-Json -Depth 10
 
-        $executor = Invoke-RestMethod -Uri "$baseUrl/api/v1/script" -Headers $headers -Method Post -Body $scriptBody -ErrorAction Stop
+        $executor = InvokePSURestRequest -Uri "$baseUrl/api/v1/script" -Method Post -Body $scriptBody
         Write-Verbose "Created executor script with ID: $($executor.id)"
     }
 
@@ -101,7 +157,7 @@ param([string]$ScriptContent)
         $invokeUri += "&Environment=$([System.Uri]::EscapeDataString($Environment))"
     }
 
-    $jobResponse = Invoke-RestMethod -Uri $invokeUri -Headers $headers -Method Post -Body '{}' -ErrorAction Stop
+    $jobResponse = InvokePSURestRequest -Uri $invokeUri -Method Post -Body '{}'
 
     $jobId = if ($jobResponse -is [int] -or $jobResponse -is [long]) {
         $jobResponse
@@ -118,7 +174,7 @@ param([string]$ScriptContent)
 
     $startTime = Get-Date
     $jobStatus = $null
-    $terminalStatuses = @(2, 3, 5, 9, 10)  # Completed, Failed, Canceled, TimedOut, Warning
+    $terminalStatuses = @(2, 3, 5, 9, 10, 11)  # Completed, Failed, Canceled, TimedOut, Warning, WarningOutput
     $statusNames = @{
         0  = 'Queued'
         1  = 'Running'
@@ -131,18 +187,19 @@ param([string]$ScriptContent)
         8  = 'Active'
         9  = 'TimedOut'
         10 = 'Warning'
+        11 = 'WarningOutput'
     }
 
     do {
         Start-Sleep -Milliseconds 500
 
         $jobUri = "$baseUrl/api/v1/job/$jobId"
-        $jobDetails = Invoke-RestMethod -Uri $jobUri -Headers $headers -Method Get -ErrorAction Stop
+        $jobDetails = InvokePSURestRequest -Uri $jobUri -Method Get
         $jobStatus = [int]$jobDetails.status
         $statusName = $statusNames[$jobStatus]
 
         $elapsed = (Get-Date) - $startTime
-        if ($elapsed.TotalSeconds -ge $TimeoutSeconds) {
+        if ($jobStatus -notin $terminalStatuses -and $elapsed.TotalSeconds -ge $TimeoutSeconds) {
             throw "Job timed out after ${TimeoutSeconds}s. Status: $statusName"
         }
 
@@ -155,12 +212,12 @@ param([string]$ScriptContent)
 
     # --- Get job output ---
     $outputUri = "$baseUrl/api/v1/job/$jobId/output"
-    $output = Invoke-RestMethod -Uri $outputUri -Headers $headers -Method Get -ErrorAction Stop
+    $output = InvokePSURestRequest -Uri $outputUri -Method Get
 
     $pipelineUri = "$baseUrl/api/v1/job/$jobId/pipelineOutput"
     $pipelineOutput = $null
     try {
-        $pipelineOutput = Invoke-RestMethod -Uri $pipelineUri -Headers $headers -Method Get -ErrorAction SilentlyContinue
+        $pipelineOutput = InvokePSURestRequest -Uri $pipelineUri -Method Get
     }
     catch {
         Write-Verbose "No pipeline output available or error retrieving it."
