@@ -300,37 +300,61 @@ inp.click();
                 New-UDStack -Direction 'row' -Spacing 2 -Content {
                     New-UDButton -Text 'Get Required Permissions' -Variant 'outlined' -Color 'primary' -OnClick {
                         try {
-                            $rows = @(Devolutions.CIEM\Invoke-CIEMQuery -Query "SELECT permissions FROM azure_provider_apis WHERE permissions IS NOT NULL")
-                            $graphPerms = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-                            $azureRoles = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-                            foreach ($row in $rows) {
-                                $perms = $row.permissions | ConvertFrom-Json -AsHashtable
-                                if ($perms.Graph) { foreach ($p in $perms.Graph) { $null = $graphPerms.Add($p) } }
-                                if ($perms.AzureRoles) { foreach ($r in $perms.AzureRoles) { $null = $azureRoles.Add($r) } }
-                            }
+                            $requiredPermissions = Devolutions.CIEM\Get-CIEMRequiredPermission -Provider 'Azure'
+                            $discoveryPermissions = $requiredPermissions.Discovery
+                            $remediationPermissions = $requiredPermissions.Remediation
 
                             Show-UDModal -Header {
-                                New-UDTypography -Text 'Required Permissions for Azure Discovery' -Variant 'h6'
+                                New-UDTypography -Text 'Required Permissions for Azure Discovery and Remediation' -Variant 'h6'
                             } -Content {
                                 New-UDElement -Tag 'div' -Content {
-                                    New-UDTypography -Text "The following permissions are required for Azure discovery ($($rows.Count) endpoints):" -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                    New-UDTypography -Text 'Discovery Permissions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold' }
+                                    New-UDTypography -Text "The following permissions are required for Azure discovery ($($discoveryPermissions.DiscoveryEndpointCount) endpoints):" -Variant 'body2' -Style @{ marginBottom = '16px' }
 
-                                    if ($graphPerms.Count -gt 0) {
+                                    if ($discoveryPermissions.Graph.Count -gt 0) {
                                         New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
                                         New-UDTypography -Text 'Grant these in Azure Portal > App Registrations > API Permissions > Add > Microsoft Graph > Application permissions' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
                                         New-UDList -Content {
-                                            foreach ($perm in ($graphPerms | Sort-Object)) {
+                                            foreach ($perm in $discoveryPermissions.Graph) {
                                                 New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Key' -Size 'sm')
                                             }
                                         }
                                     }
 
-                                    if ($azureRoles.Count -gt 0) {
+                                    if ($discoveryPermissions.AzureRoles.Count -gt 0) {
                                         New-UDTypography -Text 'Azure RBAC Roles' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
                                         New-UDTypography -Text 'Assign these roles at the subscription or management group level.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
                                         New-UDList -Content {
-                                            foreach ($role in ($azureRoles | Sort-Object)) {
+                                            foreach ($role in $discoveryPermissions.AzureRoles) {
                                                 New-UDListItem -Label $role -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
+                                            }
+                                        }
+                                    }
+
+                                    if ($remediationPermissions.Graph.Count -gt 0 -or $remediationPermissions.AzureRoles.Count -gt 0) {
+                                        New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '20px'; marginBottom = '20px' } } -Content {
+                                            New-UDDivider
+                                        }
+                                        New-UDTypography -Text 'Remediation Permissions' -Variant 'subtitle1' -Style @{ fontWeight = 'bold' }
+                                        New-UDTypography -Text "The following additional permissions are required for the supported Azure remediation actions across $($remediationPermissions.TemplateCount) remediation template(s):" -Variant 'body2' -Style @{ marginBottom = '16px' }
+
+                                        if ($remediationPermissions.Graph.Count -gt 0) {
+                                            New-UDTypography -Text 'Microsoft Graph API Permissions (Application)' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                            New-UDTypography -Text 'Grant these in Azure Portal > App Registrations > API Permissions > Add > Microsoft Graph > Application permissions' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                            New-UDList -Content {
+                                                foreach ($perm in $remediationPermissions.Graph) {
+                                                    New-UDListItem -Label $perm -Icon (New-UDIcon -Icon 'Key' -Size 'sm')
+                                                }
+                                            }
+                                        }
+
+                                        if ($remediationPermissions.AzureRoles.Count -gt 0) {
+                                            New-UDTypography -Text 'Azure RBAC Roles' -Variant 'subtitle1' -Style @{ fontWeight = 'bold'; marginTop = '16px' }
+                                            New-UDTypography -Text 'Assign these roles at the subscription or management group level.' -Variant 'caption' -Style @{ color = '#666'; marginBottom = '8px' }
+                                            New-UDList -Content {
+                                                foreach ($role in $remediationPermissions.AzureRoles) {
+                                                    New-UDListItem -Label $role -Icon (New-UDIcon -Icon 'Shield' -Size 'sm')
+                                                }
                                             }
                                         }
                                     }

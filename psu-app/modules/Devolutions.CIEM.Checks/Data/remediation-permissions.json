@@ -1,0 +1,21 @@
+{
+  "Azure": {
+    "RemediationTokens": {
+      "NSG_RULE_DELETE_COMMANDS": {
+        "AzureRoles": [
+          "Network Contributor"
+        ]
+      },
+      "ROLE_ASSIGNMENT_DELETE_COMMANDS": {
+        "AzureRoles": [
+          "User Access Administrator"
+        ]
+      },
+      "GROUP_MEMBER_REMOVE_COMMANDS": {
+        "Graph": [
+          "GroupMember.ReadWrite.All"
+        ]
+      }
+    }
+  }
+}

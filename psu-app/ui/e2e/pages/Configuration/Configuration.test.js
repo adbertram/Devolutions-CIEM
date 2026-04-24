@@ -1,5 +1,20 @@
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const ConfigurationPageHelpers = require('./ConfigurationPageHelpers');
+
+const remediationPermissionCatalog = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, '..', '..', '..', '..', 'modules', 'Devolutions.CIEM.Checks', 'Data', 'remediation-permissions.json'),
+    'utf8'
+  )
+);
+const expectedRemediationGraphPermissions = [...new Set(
+  Object.values(remediationPermissionCatalog.Azure.RemediationTokens).flatMap(token => token.Graph || [])
+)].sort();
+const expectedRemediationAzureRoles = [...new Set(
+  Object.values(remediationPermissionCatalog.Azure.RemediationTokens).flatMap(token => token.AzureRoles || [])
+)].sort();
 
 test.describe('Configuration Page', () => {
   let configPage;
@@ -244,12 +259,12 @@ test.describe('Configuration Page', () => {
   });
 
   test.describe('when the user opens the Required Permissions modal', () => {
-    test('should display modal with Azure Discovery title', async () => {
+    test('should display modal with Azure discovery and remediation title', async () => {
       await configPage.clickGetPermissions();
       const modalVisible = await configPage.isPermissionsModalVisible();
       expect(modalVisible).toBe(true);
       const title = await configPage.getPermissionsModalTitle();
-      expect(title).toContain('Azure Discovery');
+      expect(title).toContain('Azure Discovery and Remediation');
     });
 
     test('should display endpoint count in modal description', async () => {
@@ -266,22 +281,19 @@ test.describe('Configuration Page', () => {
       expect(bodyText).not.toMatch(/\bcheck/i);
     });
 
-    test('should display Microsoft Graph API Permissions section', async () => {
+    test('should separate discovery and remediation permissions into their own sections', async () => {
       await configPage.clickGetPermissions();
       const bodyText = await configPage.getPermissionsModalBodyText();
-      expect(bodyText).toContain('Microsoft Graph API Permissions');
+      expect(bodyText).toContain('Discovery Permissions');
+      expect(bodyText).toContain('Remediation Permissions');
     });
 
-    test('should list AuditLog.Read.All as a required Graph permission', async () => {
+    test('should list remediation Graph permissions from the shared catalog', async () => {
       await configPage.clickGetPermissions();
       const bodyText = await configPage.getPermissionsModalBodyText();
-      expect(bodyText).toContain('AuditLog.Read.All');
-    });
-
-    test('should list Directory.Read.All as a required Graph permission', async () => {
-      await configPage.clickGetPermissions();
-      const bodyText = await configPage.getPermissionsModalBodyText();
-      expect(bodyText).toContain('Directory.Read.All');
+      for (const permission of expectedRemediationGraphPermissions) {
+        expect(bodyText).toContain(permission);
+      }
     });
 
     test('should display Azure RBAC Roles section with Reader role', async () => {
@@ -291,11 +303,19 @@ test.describe('Configuration Page', () => {
       expect(bodyText).toContain('Reader');
     });
 
-    test('should not display ARM actions or KeyVault sections', async () => {
+    test('should display remediation Azure RBAC roles from the shared catalog', async () => {
       await configPage.clickGetPermissions();
       const bodyText = await configPage.getPermissionsModalBodyText();
-      expect(bodyText).not.toContain('Resource Manager RBAC Actions');
-      expect(bodyText).not.toContain('Key Vault');
+      for (const role of expectedRemediationAzureRoles) {
+        expect(bodyText).toContain(role);
+      }
+    });
+
+    test('should not display separate ARM or Key Vault permission sections', async () => {
+      await configPage.clickGetPermissions();
+      const bodyText = await configPage.getPermissionsModalBodyText();
+      expect(bodyText).not.toContain('Azure Resource Manager RBAC Actions');
+      expect(bodyText).not.toContain('Key Vault Data Plane Permissions');
     });
 
     test('should close modal when Close button is clicked', async () => {

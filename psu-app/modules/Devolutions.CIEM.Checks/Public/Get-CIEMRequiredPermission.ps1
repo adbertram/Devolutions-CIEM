@@ -1,12 +1,14 @@
 function Get-CIEMRequiredPermission {
     <#
     .SYNOPSIS
-        Gets the required permissions for running CIEM security checks and discovery endpoints.
+        Gets the required permissions for running CIEM security checks, discovery endpoints, and Azure remediations.
 
     .DESCRIPTION
         Aggregates all unique permissions required across all enabled checks and discovery
-        endpoints registered in azure_provider_apis. Returns permissions grouped by type,
-        depending on the provider:
+        endpoints registered in azure_provider_apis. For Azure without service or check
+        filters, it also derives remediation permissions from the shared remediation token
+        catalog and the attack path remediation templates. Returns permissions grouped by
+        type, depending on the provider:
         - Azure: Microsoft Graph API, Azure Resource Manager RBAC, Key Vault data plane, Azure Roles
         - AWS: IAM actions (e.g., iam:ListUsers, s3:GetBucketPolicy)
 
@@ -24,12 +26,12 @@ function Get-CIEMRequiredPermission {
 
     .OUTPUTS
         [PSCustomObject] Object containing provider-appropriate permission properties:
-        Azure: Graph, ARM, KeyVaultDataPlane, AzureRoles, CheckCount, DiscoveryEndpointCount, Summary
+        Azure: Graph, ARM, KeyVaultDataPlane, AzureRoles, CheckCount, DiscoveryEndpointCount, Summary, Discovery, Remediation
         AWS: IAM, CheckCount, Summary
 
     .EXAMPLE
         Get-CIEMRequiredPermission -Provider Azure
-        # Returns all Azure permissions required for Azure checks and discovery endpoints
+        # Returns all Azure discovery and remediation permissions for Azure
 
     .EXAMPLE
         Get-CIEMRequiredPermission -Provider AWS
@@ -55,6 +57,86 @@ function Get-CIEMRequiredPermission {
 
     $ErrorActionPreference = 'Stop'
 
+    function GetCIEMRemediationPermissionCatalog {
+        $ErrorActionPreference = 'Stop'
+
+        $catalogPath = Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.Checks' 'Data' 'remediation-permissions.json'
+        if (-not (Test-Path $catalogPath)) {
+            throw "CIEM remediation permission catalog not found: $catalogPath"
+        }
+
+        $catalog = Get-Content $catalogPath -Raw | ConvertFrom-Json -AsHashtable
+        if ($null -eq $catalog.Azure -or $null -eq $catalog.Azure.RemediationTokens) {
+            throw "CIEM remediation permission catalog is missing Azure.RemediationTokens: $catalogPath"
+        }
+
+        $catalog
+    }
+
+    function GetCIEMAzureRemediationPermissionSection {
+        param(
+            [Parameter(Mandatory)]
+            [hashtable]$Catalog
+        )
+
+        $ErrorActionPreference = 'Stop'
+
+        $templateRoot = Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.Graph' 'Data' 'attack_path_remediation_scripts'
+        if (-not (Test-Path $templateRoot)) {
+            throw "CIEM attack path remediation script folder not found: $templateRoot"
+        }
+
+        $tokenMap = $Catalog.Azure.RemediationTokens
+        $graphPermissions = [System.Collections.Generic.List[string]]::new()
+        $azureRoles = [System.Collections.Generic.List[string]]::new()
+        $matchedTemplateCount = 0
+
+        foreach ($template in @(Get-ChildItem $templateRoot -File)) {
+            $content = Get-Content $template.FullName -Raw
+            $tokens = @(
+                [regex]::Matches($content, '{{([A-Z0-9_]+)}}') |
+                    ForEach-Object { $_.Groups[1].Value } |
+                    Select-Object -Unique
+            )
+
+            $matchedTemplate = $false
+            foreach ($token in $tokens) {
+                if (-not $tokenMap.ContainsKey($token)) {
+                    continue
+                }
+
+                $matchedTemplate = $true
+                $requirements = $tokenMap[$token]
+
+                foreach ($permission in @($requirements.Graph)) {
+                    if ([string]::IsNullOrWhiteSpace([string]$permission)) {
+                        continue
+                    }
+
+                    $graphPermissions.Add([string]$permission)
+                }
+
+                foreach ($role in @($requirements.AzureRoles)) {
+                    if ([string]::IsNullOrWhiteSpace([string]$role)) {
+                        continue
+                    }
+
+                    $azureRoles.Add([string]$role)
+                }
+            }
+
+            if ($matchedTemplate) {
+                $matchedTemplateCount++
+            }
+        }
+
+        [PSCustomObject]@{
+            Graph         = @($graphPermissions | Select-Object -Unique | Sort-Object)
+            AzureRoles    = @($azureRoles | Select-Object -Unique | Sort-Object)
+            TemplateCount = $matchedTemplateCount
+        }
+    }
+
     # Get checks based on filters
     $getCheckParams = @{}
     if ($Provider) { $getCheckParams.Provider = $Provider }
@@ -72,6 +154,11 @@ function Get-CIEMRequiredPermission {
     $kvPermissions = [System.Collections.Generic.List[string]]::new()
     $iamPermissions = [System.Collections.Generic.List[string]]::new()
     $endpointAzureRoles = [System.Collections.Generic.List[string]]::new()
+    $remediationSection = [PSCustomObject]@{
+        Graph         = @()
+        AzureRoles    = @()
+        TemplateCount = 0
+    }
 
     # Aggregate from checks
     $checkCount = 0
@@ -119,7 +206,13 @@ function Get-CIEMRequiredPermission {
         }
     }
 
-    if (-not $checks -and $discoveryEndpointCount -eq 0) {
+    $includeAzureRemediation = ($Provider -ne 'AWS' -and -not $PSBoundParameters.ContainsKey('Service') -and -not $PSBoundParameters.ContainsKey('CheckId'))
+    if ($includeAzureRemediation) {
+        $remediationSection = GetCIEMAzureRemediationPermissionSection -Catalog (GetCIEMRemediationPermissionCatalog)
+    }
+
+    $hasRemediationPermissions = ($remediationSection.Graph.Count -gt 0 -or $remediationSection.AzureRoles.Count -gt 0)
+    if (-not $checks -and $discoveryEndpointCount -eq 0 -and -not $hasRemediationPermissions) {
         Write-Warning "No checks or discovery endpoints found matching the specified criteria."
         return [PSCustomObject]@{
             Graph                  = @()
@@ -129,6 +222,15 @@ function Get-CIEMRequiredPermission {
             IAM                    = @()
             CheckCount             = 0
             DiscoveryEndpointCount = 0
+            Discovery              = [PSCustomObject]@{
+                Graph                  = @()
+                ARM                    = @()
+                KeyVaultDataPlane      = @()
+                AzureRoles             = @()
+                CheckCount             = 0
+                DiscoveryEndpointCount = 0
+            }
+            Remediation            = $remediationSection
             Summary                = "No checks or discovery endpoints found."
         }
     }
@@ -221,6 +323,15 @@ function Get-CIEMRequiredPermission {
         }
     }
 
+    $discoverySection = [PSCustomObject]@{
+        Graph                  = @($graphPermissions)
+        ARM                    = @($armPermissions)
+        KeyVaultDataPlane      = @($kvPermissions)
+        AzureRoles             = @($azureRoles)
+        CheckCount             = $checkCount
+        DiscoveryEndpointCount = $discoveryEndpointCount
+    }
+
     [PSCustomObject]@{
         Graph                  = @($graphPermissions)
         ARM                    = @($armPermissions)
@@ -229,6 +340,8 @@ function Get-CIEMRequiredPermission {
         IAM                    = @($iamPermissions)
         CheckCount             = $checkCount
         DiscoveryEndpointCount = $discoveryEndpointCount
+        Discovery              = $discoverySection
+        Remediation            = $remediationSection
         Summary                = $summaryParts -join "`n"
     }
 }
