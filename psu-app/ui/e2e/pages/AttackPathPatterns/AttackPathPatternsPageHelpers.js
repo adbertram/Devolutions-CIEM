@@ -10,6 +10,8 @@ class AttackPathPatternsPageHelpers extends BasePage {
       dataGrid: '.MuiDataGrid-root',
       dataGridRows: '.MuiDataGrid-row',
       dataGridColumnHeaders: '.MuiDataGrid-columnHeader',
+      detailPanel: '.MuiDataGrid-detailPanel',
+      descriptionBlock: '.MuiDataGrid-detailPanel [data-ciem-attack-path-pattern-description="true"]',
       pagination: '.MuiTablePagination-root',
       severityChip: '.MuiDataGrid-row .MuiChip-root',
       quickFilter: '.MuiDataGrid-toolbarQuickFilter input',
@@ -72,6 +74,30 @@ class AttackPathPatternsPageHelpers extends BasePage {
     const row = rows.nth(rowIndex);
     const chip = row.locator('.MuiChip-root').first();
     return (await chip.textContent()).trim();
+  }
+
+  async getPatternRowText(patternName) {
+    await this.waitForElement(this.selectors.dataGrid);
+    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();
+    await row.waitFor({ state: 'visible' });
+    return (await row.textContent()).trim();
+  }
+
+  async expandPattern(patternName) {
+    await this.waitForElement(this.selectors.dataGrid);
+    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();
+    await row.waitFor({ state: 'visible' });
+    await row.getByRole('button', { name: /^Expand$/i }).click();
+    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });
+    await this.page.locator(this.selectors.descriptionBlock).waitFor({ state: 'visible' });
+  }
+
+  async isDetailHeadingVisible(heading) {
+    return await this.page.locator(this.selectors.detailPanel).getByText(heading, { exact: true }).isVisible();
+  }
+
+  async getDescriptionText() {
+    return (await this.page.locator(this.selectors.descriptionBlock).textContent()).trim();
   }
 
   async isPaginationVisible() {

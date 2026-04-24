@@ -231,6 +231,25 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
             }
         }
 
+        It 'uses exact threshold and port values in descriptions when pattern filters are value-specific' {
+            $dormantPattern = Get-Content (Join-Path $script:PatternDir 'dormant-privileged-subscription-access.json') -Raw | ConvertFrom-Json
+            $dormantPattern.description | Should -Match 'within 90 days' -Because "dormant privileged access is driven by a 90-day daysSinceSignIn threshold"
+            $dormantPattern.description | Should -Match 'no recorded sign-in activity' -Because 'gt_or_null also matches identities with no sign-in evidence'
+
+            $managementPortPattern = Get-Content (Join-Path $script:PatternDir 'open-management-port.json') -Raw | ConvertFrom-Json
+            $managementPortPattern.description | Should -Match '\b22\b' -Because 'open management port matching includes SSH port 22'
+            $managementPortPattern.description | Should -Match '\b3389\b' -Because 'open management port matching includes RDP port 3389'
+            $managementPortPattern.description | Should -Match '\b5985\b' -Because 'open management port matching includes WinRM HTTP port 5985'
+            $managementPortPattern.description | Should -Match '\b5986\b' -Because 'open management port matching includes WinRM HTTPS port 5986'
+        }
+
+        It 'does not use vague recentness wording in shipped descriptions' {
+            foreach ($file in $script:PatternFiles) {
+                $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
+                $raw.description | Should -Not -Match '\brecently\b' -Because "pattern '$($raw.id)' must state concrete thresholds when recency matters"
+            }
+        }
+
         It 'every remediation script template has no unknown replacement token format' {
             $scriptRoot = InModuleScope Devolutions.CIEM { $script:ModuleRoot }
             foreach ($file in $script:PatternFiles) {

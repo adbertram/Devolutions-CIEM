@@ -33,8 +33,21 @@ test.describe('Attack Path Patterns Page', () => {
       expect(headers).toContain('Name');
       expect(headers).toContain('Severity');
       expect(headers).toContain('Category');
-      expect(headers).toContain('Description');
       expect(headers).toContain('Steps');
+      expect(headers).not.toContain('Description');
+    });
+
+    test('should display description only in the expanded row detail panel', async () => {
+      const patternName = 'Management port open to the internet';
+      const expectedDescription = 'This exposes attached resources to brute-force and credential-based attacks.';
+
+      const rowText = await patternsPage.getPatternRowText(patternName);
+      expect(rowText).not.toContain(expectedDescription);
+
+      await patternsPage.expandPattern(patternName);
+      expect(await patternsPage.isDetailHeadingVisible('Description')).toBe(true);
+      const description = await patternsPage.getDescriptionText();
+      expect(description).toContain(expectedDescription);
     });
 
     test('should display severity chips with valid levels', async () => {

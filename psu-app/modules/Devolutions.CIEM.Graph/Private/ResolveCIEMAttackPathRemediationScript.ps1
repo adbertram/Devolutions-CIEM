@@ -218,7 +218,7 @@ function NewCIEMRoleAssignmentDeleteCommandBlock {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [CIEMAttackPath]$AttackPath
+        [object]$AttackPath
     )
 
     $ErrorActionPreference = 'Stop'
@@ -243,7 +243,7 @@ function NewCIEMNsgRuleDeleteCommandBlock {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [CIEMAttackPath]$AttackPath
+        [object]$AttackPath
     )
 
     $ErrorActionPreference = 'Stop'
@@ -279,7 +279,7 @@ function NewCIEMGroupMemberRemoveCommandBlock {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [CIEMAttackPath]$AttackPath
+        [object]$AttackPath
     )
 
     $ErrorActionPreference = 'Stop'
@@ -321,7 +321,7 @@ function GetCIEMAttackPathChainText {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [CIEMAttackPath]$AttackPath
+        [object]$AttackPath
     )
 
     $ErrorActionPreference = 'Stop'
@@ -430,7 +430,7 @@ function ResolveCIEMAttackPathScriptContent {
         [object]$Pattern,
 
         [Parameter(Mandatory)]
-        [CIEMAttackPath]$AttackPath,
+        [object]$AttackPath,
 
         [Parameter(Mandatory)]
         [string]$ScriptContent
@@ -513,7 +513,7 @@ function ResolveCIEMAttackPathRemediationScript {
         [object]$Pattern,
 
         [Parameter(Mandatory)]
-        [CIEMAttackPath]$AttackPath
+        [object]$AttackPath
     )
 
     $ErrorActionPreference = 'Stop'

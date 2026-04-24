@@ -3,7 +3,7 @@
   "name": "Dormant identity with privileged subscription-level role",
   "severity": "critical",
   "category": "identity-hygiene",
-  "description": "An identity holds a privileged role at subscription scope but has not signed in recently. Dormant privileged accounts are prime targets for credential theft or compromise.",
+  "description": "An identity holds a privileged role at subscription scope but has not signed in within 90 days, or has no recorded sign-in activity. Dormant privileged accounts are prime targets for credential theft or compromise.",
   "remediation": "1. Confirm the identity owner and validate whether the identity still needs privileged subscription access.\n2. If access is no longer required, remove the privileged role assignment at the subscription scope.\n3. If access is required, replace standing access with PIM eligibility or a time-bound approval process.\n4. Review recent credentials, secrets, certificates, and sign-in evidence before restoring privileged access.\n5. rerun Azure discovery and confirm this attack path no longer appears.",
   "remediation_script": "modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/dormant-identity-with-privileged-subscription-level-role.ps1",
   "steps": [
@@ -12,4 +12,3 @@
     { "kind": "AzureSubscription" }
   ]
 }
-

@@ -55,11 +55,33 @@ function New-CIEMAttackPathPatternsPage {
                                 New-UDChip -Label $EventData.severity -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
                             }
                             New-UDDataGridColumn -Field 'category' -HeaderName 'Category' -Width 200
-                            New-UDDataGridColumn -Field 'description' -HeaderName 'Description' -Flex 2 -Render {
-                                New-UDTypography -Text $EventData.description -Variant 'body2' -Truncate -Style @{ opacity = 0.8 }
-                            }
                             New-UDDataGridColumn -Field 'steps' -HeaderName 'Steps' -Width 90 -Type 'number'
-                        ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter
+                        ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
+                            New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '14px 18px'; display = 'grid'; gap = '14px' } } -Content {
+                                New-UDElement -Tag 'section' -Content {
+                                    New-UDTypography -Text 'Description' -Variant 'subtitle2' -Style @{ fontWeight = '600'; marginBottom = '6px' }
+                                    New-UDElement -Tag 'pre' -Attributes @{
+                                        'data-ciem-attack-path-pattern-description' = 'true'
+                                        style = @{
+                                            margin = '0'
+                                            padding = '12px'
+                                            border = '1px solid #d0d7de'
+                                            borderRadius = '6px'
+                                            backgroundColor = '#ffffff'
+                                            whiteSpace = 'pre-wrap'
+                                            overflowWrap = 'anywhere'
+                                            fontFamily = 'inherit'
+                                            fontSize = '14px'
+                                            lineHeight = '1.45'
+                                            maxHeight = '220px'
+                                            overflow = 'auto'
+                                        }
+                                    } -Content {
+                                        $EventData.row.description
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 catch {

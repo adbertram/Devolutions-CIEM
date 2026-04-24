@@ -274,5 +274,54 @@ It runs Azure REST API commands with the selected CIEM authentication profile co
             $scriptText | Should -Match 'Internet \(Internet\)'
             $scriptText | Should -Not -Match '{{'
         }
+
+        It 'renders remediation content from CIEMAttackPath instances created from a different PowerShell class assembly' {
+            $cloneModule = New-Module -ScriptBlock {
+                class CIEMAttackPath {
+                    [string]$PatternId
+                    [string]$PsuScriptName
+                    [object[]]$Path
+                    [object[]]$Edges
+                }
+
+                function New-CIEMAttackPathClone {
+                    param([object]$Source)
+
+                    $item = [CIEMAttackPath]::new()
+                    $item.PatternId = [string]$Source.PatternId
+                    $item.PsuScriptName = [string]$Source.PsuScriptName
+                    $item.Path = @($Source.Path)
+                    $item.Edges = @($Source.Edges)
+                    $item
+                }
+
+                Export-ModuleMember -Function New-CIEMAttackPathClone
+            }
+            Import-Module $cloneModule
+
+            try {
+                $attackPathLike = New-CIEMAttackPathClone -Source $script:StoredAttackPath
+            }
+            finally {
+                Remove-Module $cloneModule -Force -ErrorAction SilentlyContinue
+            }
+
+            $pattern = [pscustomobject]@{
+                Name = $script:StoredAttackPath.PatternName
+            }
+
+            $scriptText = InModuleScope Devolutions.CIEM -Parameters @{
+                AttackPath = $attackPathLike
+                Pattern    = $pattern
+            } {
+                param($AttackPath, $Pattern)
+                ResolveCIEMAttackPathScriptContent -Pattern $Pattern -AttackPath $AttackPath -ScriptContent "{{PATH_CHAIN}}`n{{NSG_RULE_DELETE_COMMANDS}}"
+            }
+
+            $scriptText | Should -Match 'Internet \(Internet\)'
+            $scriptText | Should -Match 'Devolutions\.CIEM\\Invoke-AzureApi'
+            $scriptText | Should -Match '-Method DELETE'
+            $scriptText | Should -Not -Match '{{'
+        }
     }
 }
