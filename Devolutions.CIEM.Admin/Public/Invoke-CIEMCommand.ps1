@@ -77,6 +77,8 @@ function Invoke-CIEMCommand {
             [object]$Body
         )
 
+        $ErrorActionPreference = 'Stop'
+
         $restParams = @{
             Uri         = $Uri
             Headers     = $headers
