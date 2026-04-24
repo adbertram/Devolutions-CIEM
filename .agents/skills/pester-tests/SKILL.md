@@ -32,6 +32,9 @@ pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment loca
 pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite E2E -Environment azure
 ```
 
+If the Azure target itself looks unhealthy, route through `azure-psu-instance`
+before rerunning broad Azure E2E suites.
+
 </quick_start>
 
 <essential_principles>

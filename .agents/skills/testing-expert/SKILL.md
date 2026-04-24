@@ -42,6 +42,10 @@ cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENV
 cd /Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/ui/e2e && CIEM_TEST_ENVIRONMENT=local npx playwright test --headed
 ```
 
+Before broad Azure reruns, Azure auth troubleshooting, or "the app was cold"
+type failures, preflight the instance with `azure-psu-instance` and
+`scripts/azure-psu-diagnostics.ps1`.
+
 </quick_start>
 
 <intake>

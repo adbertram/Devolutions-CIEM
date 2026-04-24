@@ -19,6 +19,7 @@ target-specific `Publish-PSUModule` flow, then confirm the app restart.
 3. Run the matching `Publish-PSUModule` command from the repository root with an explicit `-BumpVersion`.
 4. Confirm publish status, module version, and app restart output.
 5. If restart is not confirmed, run the target-specific restart command below.
+6. If Azure import, restart, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
 </quick_start>
 
 <target_selection>
