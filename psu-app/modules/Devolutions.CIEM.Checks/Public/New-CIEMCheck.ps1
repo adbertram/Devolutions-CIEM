@@ -40,19 +40,6 @@ function New-CIEMCheck {
     )
     process {
         $ErrorActionPreference = 'Stop'
-        if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
-            foreach ($item in $InputObject) {
-                $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $item.Id }
-                if ($existing) { throw "Check '$($item.Id)' already exists. Use Update-CIEMCheck or Save-CIEMCheck." }
-                Save-CIEMCheck -InputObject $item
-                Get-CIEMCheck -CheckId $item.Id
-            }
-        } else {
-            $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $Id }
-            if ($existing) { throw "Check '$Id' already exists. Use Update-CIEMCheck or Save-CIEMCheck." }
-            # Forward all bound parameters to Save-CIEMCheck (excluding InputObject which is a different param set)
-            Save-CIEMCheck @PSBoundParameters
-            Get-CIEMCheck -CheckId $Id
-        }
+        throw "Static check metadata is defined in provider catalogs. Add or update the provider check catalog instead of calling New-CIEMCheck."
     }
 }

@@ -1,11 +1,11 @@
 function Get-CIEMCheckMetadata {
     <#
     .SYNOPSIS
-        Returns check metadata records from the database.
+        Returns check metadata records from provider catalogs.
 
     .DESCRIPTION
-        Queries the checks table for metadata records. Returns raw PSCustomObjects
-        with column values (no JSON parsing). Use Get-CIEMCheck for fully hydrated objects.
+        Static metadata is catalog-owned. This command is kept as a compatibility
+        wrapper around Get-CIEMCheck and no longer reads metadata from SQLite.
 
     .PARAMETER Id
         Filter to a specific check by ID.
@@ -30,23 +30,9 @@ function Get-CIEMCheckMetadata {
 
     $ErrorActionPreference = 'Stop'
 
-    $conditions = @()
     $params = @{}
+    if ($Id) { $params.CheckId = $Id }
+    if ($Provider) { $params.Provider = $Provider }
 
-    if ($Id) {
-        $conditions += "id = @id"
-        $params.id = $Id
-    }
-
-    if ($Provider) {
-        $conditions += "provider = @provider"
-        $params.provider = $Provider
-    }
-
-    $query = "SELECT * FROM checks"
-    if ($conditions.Count -gt 0) {
-        $query += " WHERE " + ($conditions -join ' AND ')
-    }
-
-    Invoke-CIEMQuery -Query $query -Parameters $params
+    Get-CIEMCheck @params
 }

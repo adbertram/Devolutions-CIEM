@@ -42,6 +42,10 @@ class CIEMCheck {
     [CIEMCheckRemediation]$Remediation
     [string]$RelatedUrl
     [string]$CheckScript
+    [string]$ExecutionMode
+    [string]$ManualReason
+    [string]$Evaluator
+    [string]$EvaluatorConfig
     [string[]]$DependsOn
     [string[]]$DataNeeds
     [CIEMCheckPermissions]$Permissions

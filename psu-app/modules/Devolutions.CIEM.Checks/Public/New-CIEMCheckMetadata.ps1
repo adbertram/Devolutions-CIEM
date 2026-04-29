@@ -1,11 +1,11 @@
 function New-CIEMCheckMetadata {
     <#
     .SYNOPSIS
-        Creates a check metadata record in the database if it doesn't already exist.
+        Rejects database-backed check metadata creation.
 
     .DESCRIPTION
-        Inserts a record into the checks table. Skips silently if a record with
-        the same ID already exists (idempotent).
+        Static check metadata is provider-catalog-owned. The SQLite checks table
+        stores only mutable enable/disable state.
 
     .PARAMETER Id
         The check identifier (e.g., 'entra_security_defaults_enabled').
@@ -51,12 +51,5 @@ function New-CIEMCheckMetadata {
 
     $ErrorActionPreference = 'Stop'
 
-    $existing = Invoke-CIEMQuery -Query "SELECT id FROM checks WHERE id = @id" -Parameters @{ id = $Id }
-    if ($existing) {
-        Write-Verbose "Check metadata '$Id' already exists, skipping."
-        return
-    }
-
-    Save-CIEMCheck @PSBoundParameters
-    Write-Verbose "Created check metadata '$Id' in database."
+    throw "Static check metadata is defined in provider catalogs. Add or update the provider check catalog instead of calling New-CIEMCheckMetadata."
 }

@@ -3,36 +3,21 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
-    # Create isolated test DB with base schema
-    New-CIEMDatabase -Path "$TestDrive/ciem.db"
     InModuleScope Devolutions.CIEM {
-        $script:DatabasePath = "$TestDrive/ciem.db"
+        $script:testCheck = [CIEMCheck]::new()
+        $script:testCheck.Id = 'test-check-001'
+        $script:testCheck.Title = 'Test Check'
+        $script:testCheck.Service = 'TestService'
+        $script:testCheck.Severity = [CIEMCheckSeverity]::high
+        $script:testCheck.CheckScript = 'Test-Check001'
+        $script:testCheck.Description = 'A test check'
+        $script:testCheck.Risk = 'Test risk'
+        $script:testCheck.Provider = 'Azure'
+        $script:testCheck.Disabled = $false
     }
 }
 
 Describe 'InvokeCIEMCheck' {
-
-    BeforeAll {
-        # Seed a test check in the DB
-        InModuleScope Devolutions.CIEM {
-            $checkParams = @{
-                Id              = 'test-check-001'
-                Title           = 'Test Check'
-                Service         = 'TestService'
-                Severity        = 'High'
-                CheckScript     = 'Test-Check001'
-                Description     = 'A test check'
-                Risk            = 'Test risk'
-                RemediationText = 'Test remediation'
-                Provider        = 'Azure'
-                Disabled        = $false
-            }
-            Save-CIEMCheck @checkParams
-
-            $script:testCheck = Get-CIEMCheck -CheckId 'test-check-001'
-        }
-    }
-
     Context 'when check throws and config requests continueOnError' {
 
         BeforeAll {

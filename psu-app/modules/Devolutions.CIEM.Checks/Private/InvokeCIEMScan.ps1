@@ -62,6 +62,10 @@ function InvokeCIEMScan {
         $check.Severity = [CIEMCheckSeverity]$CheckData.Severity
         $check.RelatedUrl = $CheckData.RelatedUrl
         $check.CheckScript = $CheckData.CheckScript
+        $check.ExecutionMode = $CheckData.ExecutionMode
+        $check.ManualReason = $CheckData.ManualReason
+        $check.Evaluator = $CheckData.Evaluator
+        $check.EvaluatorConfig = $CheckData.EvaluatorConfig
         $check.DependsOn = @($CheckData.DependsOn)
         $check.DataNeeds = @($CheckData.DataNeeds)
         $check.Disabled = [bool]$CheckData.Disabled
@@ -265,11 +269,6 @@ function InvokeCIEMScan {
         $checkScriptsPath = Join-Path $providerModuleRoot 'Checks'
         $checkScripts = @(Get-ChildItem -Path "$checkScriptsPath/*.ps1" -ErrorAction SilentlyContinue)
 
-        if ($checkScripts.Count -eq 0) {
-            Write-Warning "[$providerName] No check scripts found in $checkScriptsPath — skipping provider."
-            continue
-        }
-
         foreach ($scriptFile in $checkScripts) {
             . $scriptFile.FullName
         }
@@ -295,6 +294,7 @@ function InvokeCIEMScan {
         # PSU's long-lived runspace accumulates versions, causing [List[CIEMCheck v_X]]
         # to reject items from [CIEMCheck v_Y], failing overload resolution.
         # Solution: accumulate via pipeline instead, which yields a plain object[].
+        $directResults = @()
         $selectedChecks = @(
             foreach ($dbCheck in $dbChecks) {
                 if ($CheckId -and $CheckId -notcontains $dbCheck.Id) {
@@ -306,6 +306,44 @@ function InvokeCIEMScan {
                 if ($dbCheck.Disabled) {
                     Write-Verbose "[$providerName] Skipping disabled check: $($dbCheck.Id)"
                     continue
+                }
+
+                $executionMode = [string]$dbCheck.ExecutionMode
+                if ([string]::IsNullOrWhiteSpace($executionMode)) {
+                    throw "[$providerName] Check '$($dbCheck.Id)' is missing execution mode metadata."
+                }
+
+                try {
+                    $null = [CIEMCheckSeverity]$dbCheck.Severity
+                }
+                catch {
+                    throw "[$providerName] Check '$($dbCheck.Id)' has invalid severity '$($dbCheck.Severity)': $($_.Exception.Message)"
+                }
+
+                $checkObject = ConvertToCIEMCheckObject -CheckData $dbCheck
+
+                if ($executionMode -eq 'manual') {
+                    if ([string]::IsNullOrWhiteSpace($dbCheck.ManualReason)) {
+                        throw "[$providerName] Manual check '$($dbCheck.Id)' is missing ManualReason."
+                    }
+                    $directResults += [CIEMScanResult]::Create($checkObject, 'MANUAL', $dbCheck.ManualReason, 'N/A', $dbCheck.Title)
+                    continue
+                }
+
+                if ($executionMode -eq 'notImplemented') {
+                    if ([string]::IsNullOrWhiteSpace($dbCheck.ManualReason)) {
+                        throw "[$providerName] Not implemented check '$($dbCheck.Id)' is missing ManualReason."
+                    }
+                    $directResults += [CIEMScanResult]::Create($checkObject, 'SKIPPED', $dbCheck.ManualReason, 'N/A', $dbCheck.Title)
+                    continue
+                }
+
+                if ($executionMode -eq 'rule') {
+                    throw "[$providerName] Rule execution mode is not implemented for check '$($dbCheck.Id)'."
+                }
+
+                if ($executionMode -ne 'script') {
+                    throw "[$providerName] Check '$($dbCheck.Id)' declares invalid execution mode '$executionMode'."
                 }
 
                 $scriptPath = Join-Path $checkScriptsPath $dbCheck.CheckScript
@@ -331,18 +369,13 @@ function InvokeCIEMScan {
                     }
                 }
 
-                # Pre-validate severity BEFORE parallel dispatch. The cast must succeed on
-                # the main thread so we get a meaningful error, not a cross-runspace failure.
-                try {
-                    $null = [CIEMCheckSeverity]$dbCheck.Severity
-                }
-                catch {
-                    throw "[$providerName] Check '$($dbCheck.Id)' has invalid severity '$($dbCheck.Severity)': $($_.Exception.Message)"
-                }
-
-                ConvertToCIEMCheckObject -CheckData $dbCheck
+                $checkObject
             }
         )
+
+        foreach ($directResult in $directResults) {
+            $directResult
+        }
 
         if ($selectedChecks.Count -eq 0) {
             Write-Verbose "[$providerName] No checks to execute after filtering; skipping provider."
@@ -413,7 +446,7 @@ function InvokeCIEMScan {
             param($workItem)
 
             $check = [CIEMCheck]::new()
-            foreach ($property in 'Id', 'Provider', 'Service', 'Title', 'Description', 'Risk', 'RelatedUrl', 'CheckScript', 'DependsOn', 'DataNeeds', 'Disabled') {
+            foreach ($property in 'Id', 'Provider', 'Service', 'Title', 'Description', 'Risk', 'RelatedUrl', 'CheckScript', 'ExecutionMode', 'ManualReason', 'Evaluator', 'EvaluatorConfig', 'DependsOn', 'DataNeeds', 'Disabled') {
                 if ($workItem.Check.PSObject.Properties.Name -contains $property) {
                     $check.$property = $workItem.Check.$property
                 }

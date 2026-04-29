@@ -13,7 +13,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AisearchServiceNotPubliclyAccessible.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -21,7 +21,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "aks_cluster_rbac_enabled",
@@ -37,7 +39,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AksClusterRbacEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -45,7 +47,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "aks_clusters_created_with_private_nodes",
@@ -61,7 +65,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AksClustersCreatedWithPrivateNodes.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -69,7 +73,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "aks_clusters_public_access_disabled",
@@ -85,7 +91,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AksClustersPublicAccessDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -93,7 +99,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "aks_network_policy_enabled",
@@ -109,7 +117,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AksNetworkPolicyEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -117,7 +125,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "apim_threat_detection_llm_jacking",
@@ -133,7 +143,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-ApimThreatDetectionLlmJacking.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -141,7 +151,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_client_certificates_on",
@@ -157,7 +169,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppClientCertificatesOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -165,7 +177,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ensure_auth_is_set_up",
@@ -181,7 +195,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppEnsureAuthIsSetUp.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -189,7 +203,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ensure_http_is_redirected_to_https",
@@ -205,7 +221,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppEnsureHttpIsRedirectedToHttps.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -213,7 +229,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ensure_java_version_is_latest",
@@ -229,7 +247,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppEnsureJavaVersionIsLatest.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -237,7 +255,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ensure_php_version_is_latest",
@@ -253,7 +273,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppEnsurePhpVersionIsLatest.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -261,7 +281,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ensure_python_version_is_latest",
@@ -277,7 +299,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppEnsurePythonVersionIsLatest.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -285,7 +307,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ensure_using_http20",
@@ -301,7 +325,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppEnsureUsingHttp20.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -309,7 +333,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_ftp_deployment_disabled",
@@ -325,7 +351,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFtpDeploymentDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -333,7 +359,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_access_keys_configured",
@@ -349,7 +377,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionAccessKeysConfigured.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -357,7 +385,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_application_insights_enabled",
@@ -373,7 +403,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionApplicationInsightsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -381,7 +411,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_ftps_deployment_disabled",
@@ -397,7 +429,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionFtpsDeploymentDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -405,7 +437,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_identity_is_configured",
@@ -421,7 +455,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionIdentityIsConfigured.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -429,7 +463,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_identity_without_admin_privileges",
@@ -445,7 +481,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionIdentityWithoutAdminPrivileges.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -453,7 +489,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_latest_runtime_version",
@@ -469,7 +507,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionLatestRuntimeVersion.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -477,7 +515,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_not_publicly_accessible",
@@ -493,7 +533,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionNotPubliclyAccessible.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -501,7 +541,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_function_vnet_integration_enabled",
@@ -517,7 +559,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppFunctionVnetIntegrationEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -525,7 +567,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_http_logs_enabled",
@@ -541,7 +585,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppHttpLogsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -549,7 +593,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "appinsights_ensure_is_configured",
@@ -565,7 +611,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppinsightsEnsureIsConfigured.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -573,7 +619,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_minimum_tls_version_12",
@@ -589,7 +637,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppMinimumTlsVersion12.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -597,7 +645,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "app_register_with_identity",
@@ -613,7 +663,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-AppRegisterWithIdentity.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -621,7 +671,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "containerregistry_admin_user_disabled",
@@ -637,7 +689,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-ContainerregistryAdminUserDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -645,7 +697,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "containerregistry_not_publicly_accessible",
@@ -661,7 +715,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-ContainerregistryNotPubliclyAccessible.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -669,7 +723,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "containerregistry_uses_private_link",
@@ -685,7 +741,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-ContainerregistryUsesPrivateLink.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -693,7 +749,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "cosmosdb_account_firewall_use_selected_networks",
@@ -709,7 +767,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-CosmosdbAccountFirewallUseSelectedNetworks.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -717,7 +775,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "cosmosdb_account_use_aad_and_rbac",
@@ -733,7 +793,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-CosmosdbAccountUseAadAndRbac.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -741,7 +801,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "cosmosdb_account_use_private_endpoints",
@@ -757,7 +819,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-CosmosdbAccountUsePrivateEndpoints.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -765,7 +827,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "databricks_workspace_cmk_encryption_enabled",
@@ -781,7 +845,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DatabricksWorkspaceCmkEncryptionEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -789,7 +853,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "databricks_workspace_vnet_injection_enabled",
@@ -805,7 +871,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DatabricksWorkspaceVnetInjectionEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -813,7 +879,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_additional_email_configured_with_a_security_contact",
@@ -829,7 +897,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderAdditionalEmailConfiguredWithASecurityContact.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -837,7 +905,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_assessments_vm_endpoint_protection_installed",
@@ -853,7 +923,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderAssessmentsVmEndpointProtectionInstalled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -861,7 +931,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_attack_path_notifications_properly_configured",
@@ -877,7 +949,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderAttackPathNotificationsProperlyConfigured.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -885,7 +957,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_auto_provisioning_log_analytics_agent_vms_on",
@@ -901,7 +975,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderAutoProvisioningLogAnalyticsAgentVmsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -909,7 +983,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_auto_provisioning_vulnerabilty_assessments_machines_on",
@@ -925,7 +1001,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderAutoProvisioningVulnerabiltyAssessmentsMachinesOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -933,7 +1009,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_container_images_resolved_vulnerabilities",
@@ -949,7 +1027,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderContainerImagesResolvedVulnerabilities.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -957,7 +1035,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_container_images_scan_enabled",
@@ -973,7 +1053,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderContainerImagesScanEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -981,7 +1061,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_app_services_is_on",
@@ -997,7 +1079,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForAppServicesIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1005,7 +1087,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_arm_is_on",
@@ -1021,7 +1105,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForArmIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1029,7 +1113,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_azure_sql_databases_is_on",
@@ -1045,7 +1131,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForAzureSqlDatabasesIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1053,7 +1139,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_containers_is_on",
@@ -1069,7 +1157,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForContainersIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1077,7 +1165,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_cosmosdb_is_on",
@@ -1093,7 +1183,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForCosmosdbIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1101,7 +1191,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_databases_is_on",
@@ -1117,7 +1209,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForDatabasesIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1125,7 +1217,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_dns_is_on",
@@ -1141,7 +1235,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForDnsIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1149,7 +1243,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_keyvault_is_on",
@@ -1165,7 +1261,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForKeyvaultIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1173,7 +1269,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_os_relational_databases_is_on",
@@ -1189,7 +1287,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForOsRelationalDatabasesIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1197,7 +1295,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_server_is_on",
@@ -1213,7 +1313,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForServerIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1221,7 +1321,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_sql_servers_is_on",
@@ -1237,7 +1339,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForSqlServersIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1245,7 +1347,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_defender_for_storage_is_on",
@@ -1261,7 +1365,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureDefenderForStorageIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1269,7 +1373,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_iot_hub_defender_is_on",
@@ -1285,7 +1391,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureIotHubDefenderIsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1293,7 +1399,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_mcas_is_enabled",
@@ -1309,7 +1417,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureMcasIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1317,7 +1425,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_notify_alerts_severity_is_high",
@@ -1333,7 +1443,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureNotifyAlertsSeverityIsHigh.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1341,7 +1451,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_notify_emails_to_owners",
@@ -1357,7 +1469,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureNotifyEmailsToOwners.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1365,7 +1477,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_system_updates_are_applied",
@@ -1381,7 +1495,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureSystemUpdatesAreApplied.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1389,7 +1503,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "defender_ensure_wdatp_is_enabled",
@@ -1405,7 +1521,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-DefenderEnsureWdatpIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -1413,7 +1529,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_conditional_access_policy_require_mfa_for_management_api",
@@ -1439,7 +1557,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:conditionalaccesspolicies"
+    "DataNeeds": "entra:conditionalaccesspolicies",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_global_admin_count_within_limit",
@@ -1470,7 +1590,9 @@
     "DataNeeds": [
       "entra:directoryroles",
       "entra:directoryrolemembers"
-    ]
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_global_admin_in_less_than_five_users",
@@ -1486,7 +1608,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraGlobalAdminInLessThanFiveUsers.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1498,7 +1620,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_non_privileged_user_has_mfa",
@@ -1531,7 +1655,9 @@
       "entra:users",
       "entra:directoryrolemembers",
       "entra:usermfastatus"
-    ]
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_default_user_cannot_create_security_group",
@@ -1559,7 +1685,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_default_users_cannot_create_security_groups",
@@ -1575,7 +1703,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyDefaultUsersCannotCreateSecurityGroups.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1587,7 +1715,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_policy_ensure_default_user_cannot_create_app",
@@ -1615,7 +1745,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_ensure_default_user_cannot_create_apps",
@@ -1631,7 +1763,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyEnsureDefaultUserCannotCreateApps.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1643,7 +1775,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_policy_ensure_default_user_cannot_create_tenant",
@@ -1671,7 +1805,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_ensure_default_user_cannot_create_tenants",
@@ -1687,7 +1823,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyEnsureDefaultUserCannotCreateTenants.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1699,7 +1835,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_policy_guest_invite_only_for_admin_role",
@@ -1727,7 +1865,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_guest_invite_only_for_admin_roles",
@@ -1743,7 +1883,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyGuestInviteOnlyForAdminRoles.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1755,7 +1895,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_policy_guest_user_access_restriction",
@@ -1783,7 +1925,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_guest_users_access_restrictions",
@@ -1799,7 +1943,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyGuestUsersAccessRestrictions.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1811,7 +1955,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_policy_restricts_user_consent_for_apps",
@@ -1827,7 +1973,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyRestrictsUserConsentForApps.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1839,7 +1985,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_policy_restrict_user_consent_for_app",
@@ -1867,7 +2015,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_user_consent_for_verified_app",
@@ -1895,7 +2045,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:authorizationpolicy"
+    "DataNeeds": "entra:authorizationpolicy",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_policy_user_consent_for_verified_apps",
@@ -1911,7 +2063,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraPolicyUserConsentForVerifiedApps.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -1923,7 +2075,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_privileged_user_has_mfa",
@@ -1956,7 +2110,9 @@
       "entra:directoryroles",
       "entra:directoryrolemembers",
       "entra:usermfastatus"
-    ]
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_security_defaults_enabled",
@@ -1980,7 +2136,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:securitydefaults"
+    "DataNeeds": "entra:securitydefaults",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_trusted_named_location_exist",
@@ -2004,7 +2162,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:namedlocations"
+    "DataNeeds": "entra:namedlocations",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_trusted_named_locations_exists",
@@ -2020,7 +2180,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraTrustedNamedLocationsExists.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2028,7 +2188,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_user_cannot_create_microsoft_365_group",
@@ -2053,7 +2215,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "entra:groupsettings"
+    "DataNeeds": "entra:groupsettings",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "entra_users_cannot_create_microsoft_365_groups",
@@ -2069,7 +2233,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-EntraUsersCannotCreateMicrosoft365Groups.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2078,7 +2242,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "entra_user_with_vm_access_has_mfa",
@@ -2109,7 +2275,9 @@
     "DataNeeds": [
       "entra:usermfastatus",
       "iam:roleassignments"
-    ]
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "iam_custom_role_has_permissions_to_administer_resource_locks",
@@ -2125,7 +2293,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-IamCustomRoleHasPermissionsToAdministerResourceLocks.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2133,7 +2301,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "iam_custom_role_has_permission_to_administer_resource_lock",
@@ -2157,7 +2327,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "iam:roledefinitions"
+    "DataNeeds": "iam:roledefinitions",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "iam_role_user_access_admin_restricted",
@@ -2184,7 +2356,9 @@
     "DataNeeds": [
       "iam:roleassignments",
       "iam:roledefinitions"
-    ]
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "iam_subscription_roles_owner_custom_not_created",
@@ -2208,7 +2382,9 @@
       ]
     },
     "Disabled": false,
-    "DataNeeds": "iam:roledefinitions"
+    "DataNeeds": "iam:roledefinitions",
+    "ExecutionMode": "script",
+    "ManualReason": null
   },
   {
     "Id": "keyvault_access_only_through_private_endpoints",
@@ -2224,7 +2400,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultAccessOnlyThroughPrivateEndpoints.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2232,7 +2408,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_key_expiration_set_in_non_rbac",
@@ -2248,7 +2426,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultKeyExpirationSetInNonRbac.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "keyvaultDataPlane": [
@@ -2259,7 +2437,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_key_rotation_enabled",
@@ -2275,7 +2455,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultKeyRotationEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "keyvaultDataPlane": [
@@ -2286,7 +2466,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_logging_enabled",
@@ -2302,7 +2484,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultLoggingEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2311,7 +2493,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_non_rbac_secret_expiration_set",
@@ -2327,7 +2511,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultNonRbacSecretExpirationSet.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "keyvaultDataPlane": [
@@ -2338,7 +2522,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_private_endpoints",
@@ -2354,7 +2540,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultPrivateEndpoints.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2362,7 +2548,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_rbac_enabled",
@@ -2378,7 +2566,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultRbacEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2386,7 +2574,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_rbac_key_expiration_set",
@@ -2402,7 +2592,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultRbacKeyExpirationSet.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "keyvaultDataPlane": [
@@ -2413,7 +2603,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_rbac_secret_expiration_set",
@@ -2429,7 +2621,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultRbacSecretExpirationSet.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "keyvaultDataPlane": [
@@ -2440,7 +2632,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "keyvault_recoverable",
@@ -2456,7 +2650,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-KeyvaultRecoverable.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2464,7 +2658,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_create_policy_assignment",
@@ -2480,7 +2676,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertCreatePolicyAssignment.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2488,7 +2684,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_create_update_nsg",
@@ -2504,7 +2702,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertCreateUpdateNsg.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2512,7 +2710,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_create_update_public_ip_address_rule",
@@ -2528,7 +2728,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertCreateUpdatePublicIpAddressRule.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2536,7 +2736,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_create_update_security_solution",
@@ -2552,7 +2754,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertCreateUpdateSecuritySolution.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2560,7 +2762,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_create_update_sqlserver_fr",
@@ -2576,7 +2780,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertCreateUpdateSqlserverFr.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2584,7 +2788,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_delete_nsg",
@@ -2600,7 +2806,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertDeleteNsg.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2608,7 +2814,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_delete_policy_assignment",
@@ -2624,7 +2832,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertDeletePolicyAssignment.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2632,7 +2840,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_delete_public_ip_address_rule",
@@ -2648,7 +2858,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertDeletePublicIpAddressRule.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2656,7 +2866,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_delete_security_solution",
@@ -2672,7 +2884,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertDeleteSecuritySolution.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2680,7 +2892,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_delete_sqlserver_fr",
@@ -2696,7 +2910,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertDeleteSqlserverFr.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2704,7 +2918,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_alert_service_health_exists",
@@ -2720,7 +2936,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorAlertServiceHealthExists.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2728,7 +2944,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_diagnostic_settings_exists",
@@ -2744,7 +2962,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorDiagnosticSettingsExists.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2752,7 +2970,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_diagnostic_setting_with_appropriate_categories",
@@ -2768,7 +2988,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorDiagnosticSettingWithAppropriateCategories.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2776,7 +2996,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_storage_account_with_activity_logs_cmk_encrypted",
@@ -2792,7 +3014,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorStorageAccountWithActivityLogsCmkEncrypted.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2801,7 +3023,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "monitor_storage_account_with_activity_logs_is_private",
@@ -2817,7 +3041,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MonitorStorageAccountWithActivityLogsIsPrivate.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -2826,7 +3050,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "mysql_flexible_server_audit_log_connection_activated",
@@ -2842,7 +3068,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MysqlFlexibleServerAuditLogConnectionActivated.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2850,7 +3076,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "mysql_flexible_server_audit_log_enabled",
@@ -2866,7 +3094,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MysqlFlexibleServerAuditLogEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2874,7 +3102,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "mysql_flexible_server_minimum_tls_version_12",
@@ -2890,7 +3120,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MysqlFlexibleServerMinimumTlsVersion12.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2898,7 +3128,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "mysql_flexible_server_ssl_connection_enabled",
@@ -2914,7 +3146,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-MysqlFlexibleServerSslConnectionEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2922,7 +3154,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_bastion_host_exists",
@@ -2938,7 +3172,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkBastionHostExists.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2946,7 +3180,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_flow_log_captured_sent",
@@ -2962,7 +3198,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkFlowLogCapturedSent.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2970,7 +3206,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_flow_log_more_than_90_days",
@@ -2986,7 +3224,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkFlowLogMoreThan90Days.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -2994,7 +3232,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_http_internet_access_restricted",
@@ -3010,7 +3250,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkHttpInternetAccessRestricted.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3018,7 +3258,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_public_ip_shodan",
@@ -3034,7 +3276,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkPublicIpShodan.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3042,7 +3284,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_rdp_internet_access_restricted",
@@ -3058,7 +3302,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkRdpInternetAccessRestricted.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3066,7 +3310,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_ssh_internet_access_restricted",
@@ -3082,7 +3328,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkSshInternetAccessRestricted.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3090,7 +3336,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_udp_internet_access_restricted",
@@ -3106,7 +3354,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkUdpInternetAccessRestricted.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3114,7 +3362,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "network_watcher_enabled",
@@ -3130,7 +3380,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-NetworkWatcherEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3138,7 +3388,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "policy_ensure_asc_enforcement_enabled",
@@ -3154,7 +3406,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PolicyEnsureAscEnforcementEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3162,7 +3414,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_allow_access_services_disabled",
@@ -3178,7 +3432,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerAllowAccessServicesDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3186,7 +3440,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_connection_throttling_on",
@@ -3202,7 +3458,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerConnectionThrottlingOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3210,7 +3466,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_enforce_ssl_enabled",
@@ -3226,7 +3484,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerEnforceSslEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3234,7 +3492,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_entra_id_authentication_enabled",
@@ -3250,7 +3510,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerEntraIdAuthenticationEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3258,7 +3518,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_log_checkpoints_on",
@@ -3274,7 +3536,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerLogCheckpointsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3282,7 +3544,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_log_connections_on",
@@ -3298,7 +3562,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerLogConnectionsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3306,7 +3570,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_log_disconnections_on",
@@ -3322,7 +3588,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerLogDisconnectionsOn.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3330,7 +3596,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "postgresql_flexible_server_log_retention_days_greater_3",
@@ -3346,7 +3614,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-PostgresqlFlexibleServerLogRetentionDaysGreater3.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3354,7 +3622,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_auditing_enabled",
@@ -3370,7 +3640,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverAuditingEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3378,7 +3648,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_auditing_retention_90_days",
@@ -3394,7 +3666,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverAuditingRetention90Days.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3402,7 +3674,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_azuread_administrator_enabled",
@@ -3418,7 +3692,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverAzureadAdministratorEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3426,7 +3700,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_microsoft_defender_enabled",
@@ -3442,7 +3718,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverMicrosoftDefenderEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3450,7 +3726,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_recommended_minimal_tls_version",
@@ -3466,7 +3744,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverRecommendedMinimalTlsVersion.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3474,7 +3752,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_tde_encrypted_with_cmk",
@@ -3490,7 +3770,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverTdeEncryptedWithCmk.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3498,7 +3778,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_tde_encryption_enabled",
@@ -3514,7 +3796,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverTdeEncryptionEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3522,7 +3804,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_unrestricted_inbound_access",
@@ -3538,7 +3822,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverUnrestrictedInboundAccess.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -3546,7 +3830,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_va_emails_notifications_admins_enabled",
@@ -3562,7 +3848,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverVaEmailsNotificationsAdminsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3570,7 +3856,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_va_periodic_recurring_scans_enabled",
@@ -3586,7 +3874,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverVaPeriodicRecurringScansEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3594,7 +3882,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_va_scan_reports_configured",
@@ -3610,7 +3900,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverVaScanReportsConfigured.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3618,7 +3908,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "sqlserver_vulnerability_assessment_enabled",
@@ -3634,7 +3926,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-SqlserverVulnerabilityAssessmentEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3642,7 +3934,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_account_key_access_disabled",
@@ -3658,7 +3952,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageAccountKeyAccessDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3666,7 +3960,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_blob_public_access_level_is_disabled",
@@ -3682,7 +3978,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageBlobPublicAccessLevelIsDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3690,7 +3986,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_blob_versioning_is_enabled",
@@ -3706,7 +4004,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageBlobVersioningIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3714,7 +4012,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_cross_tenant_replication_disabled",
@@ -3730,7 +4030,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageCrossTenantReplicationDisabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3738,7 +4038,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_default_network_access_rule_is_denied",
@@ -3754,7 +4056,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageDefaultNetworkAccessRuleIsDenied.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3762,7 +4064,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_default_to_entra_authorization_enabled",
@@ -3778,7 +4082,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageDefaultToEntraAuthorizationEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3786,7 +4090,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_ensure_azure_services_are_trusted_to_access_is_enabled",
@@ -3802,7 +4108,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageEnsureAzureServicesAreTrustedToAccessIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3810,7 +4116,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_ensure_encryption_with_customer_managed_keys",
@@ -3826,7 +4134,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageEnsureEncryptionWithCustomerManagedKeys.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3835,7 +4143,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_ensure_file_shares_soft_delete_is_enabled",
@@ -3851,7 +4161,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageEnsureFileSharesSoftDeleteIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3859,7 +4169,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_ensure_minimum_tls_version_12",
@@ -3875,7 +4187,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageEnsureMinimumTlsVersion12.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3883,7 +4195,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_ensure_private_endpoints_in_storage_accounts",
@@ -3899,7 +4213,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageEnsurePrivateEndpointsInStorageAccounts.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3907,7 +4221,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_ensure_soft_delete_is_enabled",
@@ -3923,7 +4239,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageEnsureSoftDeleteIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3931,7 +4247,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_geo_redundant_enabled",
@@ -3947,7 +4265,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageGeoRedundantEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3955,7 +4273,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_infrastructure_encryption_is_enabled",
@@ -3971,7 +4291,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageInfrastructureEncryptionIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -3979,7 +4299,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_key_rotation_90_days",
@@ -3995,7 +4317,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageKeyRotation90Days.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -4003,7 +4325,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_secure_transfer_required_is_enabled",
@@ -4019,7 +4343,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageSecureTransferRequiredIsEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -4027,7 +4351,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_smb_channel_encryption_with_secure_algorithm",
@@ -4043,7 +4369,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageSmbChannelEncryptionWithSecureAlgorithm.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -4051,7 +4377,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "storage_smb_protocol_version_is_latest",
@@ -4067,7 +4395,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-StorageSmbProtocolVersionIsLatest.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -4075,7 +4403,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_backup_enabled",
@@ -4091,7 +4421,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmBackupEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4099,7 +4429,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_desired_sku_size",
@@ -4115,7 +4447,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmDesiredSkuSize.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4123,7 +4455,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_ensure_attached_disks_encrypted_with_cmk",
@@ -4139,7 +4473,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmEnsureAttachedDisksEncryptedWithCmk.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4147,7 +4481,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_ensure_unattached_disks_encrypted_with_cmk",
@@ -4163,7 +4499,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmEnsureUnattachedDisksEncryptedWithCmk.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4171,7 +4507,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_ensure_using_approved_images",
@@ -4187,7 +4525,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmEnsureUsingApprovedImages.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4195,7 +4533,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_ensure_using_managed_disks",
@@ -4211,7 +4551,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmEnsureUsingManagedDisks.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "arm": [
@@ -4219,7 +4559,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_jit_access_enabled",
@@ -4235,7 +4577,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmJitAccessEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4243,7 +4585,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_linux_enforce_ssh_authentication",
@@ -4259,7 +4603,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmLinuxEnforceSshAuthentication.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4267,7 +4611,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_scaleset_associated_with_load_balancer",
@@ -4283,7 +4629,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmScalesetAssociatedWithLoadBalancer.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4291,7 +4637,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_scaleset_not_empty",
@@ -4307,7 +4655,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmScalesetNotEmpty.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4315,7 +4663,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_sufficient_daily_backup_retention_period",
@@ -4331,7 +4681,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmSufficientDailyBackupRetentionPeriod.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4339,7 +4689,9 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   },
   {
     "Id": "vm_trusted_launch_enabled",
@@ -4355,7 +4707,7 @@
       "Url": "https://devolutions.net/pam"
     },
     "RelatedUrl": "",
-    "CheckScript": "Test-VmTrustedLaunchEnabled.ps1",
+    "CheckScript": null,
     "DependsOn": [],
     "Permissions": {
       "graph": [
@@ -4363,6 +4715,8 @@
       ]
     },
     "Disabled": true,
-    "DataNeeds": null
+    "DataNeeds": null,
+    "ExecutionMode": "notImplemented",
+    "ManualReason": "Automated execution has not been implemented for this catalog check."
   }
 ]

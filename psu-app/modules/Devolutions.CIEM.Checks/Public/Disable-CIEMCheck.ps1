@@ -35,17 +35,17 @@ function Disable-CIEMCheck {
 
     process {
         foreach ($id in $CheckId) {
-            $existing = Invoke-CIEMQuery -Query "SELECT id, disabled FROM checks WHERE id = @id" -Parameters @{ id = $id }
-            if (-not $existing) {
+            $existing = @(Get-CIEMCheck -CheckId $id)
+            if ($existing.Count -eq 0) {
                 Write-Error "Check '$id' not found."
                 continue
             }
-            if ($existing.disabled) {
+            if ($existing[0].Disabled) {
                 Write-Verbose "Check '$id' is already disabled"
                 continue
             }
             if ($PSCmdlet.ShouldProcess($id, 'Disable CIEM check')) {
-                Invoke-CIEMQuery -Query "UPDATE checks SET disabled = 1 WHERE id = @id" -Parameters @{ id = $id } -AsNonQuery | Out-Null
+                SetCIEMCheckState -Id $id -Disabled $true
                 Write-Verbose "Disabled check '$id'"
             }
         }

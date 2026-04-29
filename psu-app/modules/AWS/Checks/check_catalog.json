@@ -1,0 +1,117 @@
+[
+  {
+    "Id": "iam_no_root_access_key",
+    "SourceCheckId": "iam_no_root_access_key",
+    "Provider": "AWS",
+    "Service": "IAM",
+    "Title": "Root account has no active access keys",
+    "Description": "Checks the AWS credential report for active access keys on the root account.",
+    "Risk": "Active root access keys provide unrestricted programmatic access to the AWS account and can be abused without console MFA.",
+    "Severity": "critical",
+    "Remediation": {
+      "Text": "Delete root access keys and use IAM roles with temporary credentials for automation.",
+      "Url": "https://hub.prowler.com/check/iam_no_root_access_key"
+    },
+    "RelatedUrl": "",
+    "CheckScript": "Test-IamNoRootAccessKey.ps1",
+    "DependsOn": [],
+    "Permissions": {
+      "iam": [
+        "iam:GenerateCredentialReport",
+        "iam:GetCredentialReport"
+      ]
+    },
+    "Disabled": true,
+    "DataNeeds": [
+      "iam:credentialreport"
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
+  },
+  {
+    "Id": "iam_password_policy_lowercase",
+    "SourceCheckId": "iam_password_policy_lowercase",
+    "Provider": "AWS",
+    "Service": "IAM",
+    "Title": "IAM password policy requires at least one lowercase letter",
+    "Description": "Checks whether the AWS account password policy requires lowercase characters.",
+    "Risk": "A weaker password policy reduces password entropy for IAM users with console access.",
+    "Severity": "low",
+    "Remediation": {
+      "Text": "Enable the lowercase-character requirement in the IAM account password policy.",
+      "Url": "https://hub.prowler.com/check/iam_password_policy_lowercase"
+    },
+    "RelatedUrl": "",
+    "CheckScript": "Test-IamPasswordPolicyLowercase.ps1",
+    "DependsOn": [],
+    "Permissions": {
+      "iam": [
+        "iam:GetAccountPasswordPolicy"
+      ]
+    },
+    "Disabled": true,
+    "DataNeeds": [
+      "iam:passwordpolicy"
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
+  },
+  {
+    "Id": "iam_root_mfa_enabled",
+    "SourceCheckId": "iam_root_mfa_enabled",
+    "Provider": "AWS",
+    "Service": "IAM",
+    "Title": "Root account has MFA enabled",
+    "Description": "Checks the AWS credential report for root account MFA status.",
+    "Risk": "Without MFA, compromise of root credentials can lead to complete AWS account takeover.",
+    "Severity": "critical",
+    "Remediation": {
+      "Text": "Enable MFA for the root account and remove root access keys.",
+      "Url": "https://hub.prowler.com/check/iam_root_mfa_enabled"
+    },
+    "RelatedUrl": "",
+    "CheckScript": "Test-IamRootMfaEnabled.ps1",
+    "DependsOn": [],
+    "Permissions": {
+      "iam": [
+        "iam:GenerateCredentialReport",
+        "iam:GetCredentialReport"
+      ]
+    },
+    "Disabled": true,
+    "DataNeeds": [
+      "iam:credentialreport"
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
+  },
+  {
+    "Id": "iam_user_mfa_enabled_console_access",
+    "SourceCheckId": "iam_user_mfa_enabled_console_access",
+    "Provider": "AWS",
+    "Service": "IAM",
+    "Title": "IAM users with console access have MFA enabled",
+    "Description": "Checks IAM users in the AWS credential report and flags console users without MFA.",
+    "Risk": "Console-capable IAM users without MFA are exposed to password theft, brute force, and password spraying attacks.",
+    "Severity": "high",
+    "Remediation": {
+      "Text": "Require MFA for IAM users with console passwords, or remove console passwords for users that do not need console access.",
+      "Url": "https://hub.prowler.com/check/iam_user_mfa_enabled_console_access"
+    },
+    "RelatedUrl": "",
+    "CheckScript": "Test-IamUserMfaEnabledConsoleAccess.ps1",
+    "DependsOn": [],
+    "Permissions": {
+      "iam": [
+        "iam:GenerateCredentialReport",
+        "iam:GetCredentialReport"
+      ]
+    },
+    "Disabled": true,
+    "DataNeeds": [
+      "iam:credentialreport"
+    ],
+    "ExecutionMode": "script",
+    "ManualReason": null
+  }
+]

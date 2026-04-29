@@ -4,10 +4,11 @@ function Get-CIEMCheck {
         Lists available CIEM security checks.
 
     .DESCRIPTION
-        Reads check metadata exclusively from the SQLite database (checks table).
+        Reads static check metadata from provider catalogs and overlays mutable
+        disabled state from the SQLite checks table.
 
-        Returns PSCustomObjects (not class instances) to ensure compatibility
-        with PSU runspaces where PowerShell class types may not be available.
+	        Returns PSCustomObjects (not class instances) to ensure compatibility
+	        with PSU runspaces where PowerShell class types may not be available.
 
     .PARAMETER Provider
         Filter checks by cloud provider (Azure, AWS).
@@ -23,8 +24,9 @@ function Get-CIEMCheck {
 
     .OUTPUTS
         [PSCustomObject[]] Array of check objects with properties:
-        Id, Provider, Service, Title, Description, Risk, Severity,
-        Remediation, RelatedUrl, CheckScript, DependsOn, DataNeeds, Permissions.
+	        Id, Provider, Service, Title, Description, Risk, Severity,
+	        Remediation, RelatedUrl, CheckScript, ExecutionMode, ManualReason,
+	        Evaluator, EvaluatorConfig, DependsOn, DataNeeds, Permissions.
 
     .EXAMPLE
         Get-CIEMCheck
@@ -60,106 +62,46 @@ function Get-CIEMCheck {
 
     $ErrorActionPreference = 'Stop'
 
-    # Build parameterized query with filters
-    $conditions = @()
-    $params = @{}
-
-    if ($PSBoundParameters.ContainsKey('Provider')) {
-        $conditions += "provider = @provider"
-        $params.provider = $Provider
+    $catalogRows = @(GetCIEMCheckCatalog -Provider $Provider)
+    $stateRows = @(Invoke-CIEMQuery -Query 'SELECT id, disabled FROM checks')
+    $stateById = @{}
+    foreach ($stateRow in $stateRows) {
+        $stateById[$stateRow.id] = [bool]$stateRow.disabled
     }
 
-    if ($Service) {
-        $conditions += "service = @service"
-        $params.service = $Service
-    }
-
-    if ($Severity) {
-        $conditions += "severity = @severity"
-        $params.severity = $Severity
-    }
-
-    if ($CheckId) {
-        if ($CheckId.Count -eq 1) {
-            $conditions += "id = @id"
-            $params.id = $CheckId[0]
-        } else {
-            $placeholders = @()
-            for ($i = 0; $i -lt $CheckId.Count; $i++) {
-                $placeholders += "@id$i"
-                $params["id$i"] = $CheckId[$i]
-            }
-            $conditions += "id IN ($($placeholders -join ', '))"
+    $checks = @(foreach ($row in $catalogRows) {
+        if ($Service -and $row.Service -ne $Service) {
+            continue
         }
-    }
-
-    $query = "SELECT * FROM checks"
-    if ($conditions.Count -gt 0) {
-        $query += " WHERE " + ($conditions -join ' AND ')
-    }
-
-    $rows = @(Invoke-CIEMQuery -Query $query -Parameters $params)
-
-    # Convert rows to the expected PSCustomObject shape
-    $checks = @(foreach ($row in $rows) {
-        # Parse permissions JSON
-        $permissionsObj = & {
-            $p = @{ Graph = @(); ARM = @(); KeyVaultDataPlane = @(); IAM = @() }
-            if ($row.permissions) {
-                try {
-                    $raw = $row.permissions | ConvertFrom-Json
-                    foreach ($prop in $raw.PSObject.Properties) {
-                        switch ($prop.Name.ToLower()) {
-                            'graph'             { $p.Graph = @($prop.Value) }
-                            'arm'               { $p.ARM = @($prop.Value) }
-                            'keyvaultdataplane' { $p.KeyVaultDataPlane = @($prop.Value) }
-                            'iam'               { $p.IAM = @($prop.Value) }
-                        }
-                    }
-                } catch {
-                    Write-Verbose "Failed to parse permissions JSON for check $($row.id): $_"
-                }
-            }
-            [PSCustomObject]$p
+        if ($Severity -and $row.Severity -ne $Severity) {
+            continue
         }
-
-        # Parse depends_on JSON
-        $dependsOnArr = @()
-        if ($row.depends_on) {
-            try {
-                $dependsOnArr = @($row.depends_on | ConvertFrom-Json)
-            } catch {
-                Write-Verbose "Failed to parse depends_on JSON for check $($row.id): $_"
-            }
-        }
-
-        $dataNeedsArr = $null
-        if ($row.data_needs) {
-            try {
-                $dataNeedsArr = @($row.data_needs | ConvertFrom-Json)
-            } catch {
-                Write-Verbose "Failed to parse data_needs JSON for check $($row.id): $_"
-            }
+        if ($CheckId -and $CheckId -notcontains $row.Id) {
+            continue
         }
 
         [PSCustomObject]@{
-            Id          = $row.id
-            Provider    = $row.provider
-            Service     = $row.service
-            Title       = $row.title
-            Description = $row.description
-            Risk        = $row.risk
-            Severity    = $row.severity
+            Id          = $row.Id
+            Provider    = $row.Provider
+            Service     = $row.Service
+            Title       = $row.Title
+            Description = $row.Description
+            Risk        = $row.Risk
+            Severity    = $row.Severity
             Remediation = [PSCustomObject]@{
-                Text = $row.remediation_text
-                Url  = $row.remediation_url
+                Text = $row.Remediation.Text
+                Url  = $row.Remediation.Url
             }
-            RelatedUrl  = $row.related_url
-            CheckScript = $row.check_script
-            DependsOn   = $dependsOnArr
-            DataNeeds   = $dataNeedsArr
-            Disabled    = [bool]$row.disabled
-            Permissions = $permissionsObj
+            RelatedUrl      = $row.RelatedUrl
+            CheckScript     = $row.CheckScript
+            ExecutionMode   = $row.ExecutionMode
+            ManualReason    = $row.ManualReason
+            Evaluator       = $row.Evaluator
+            EvaluatorConfig = $row.EvaluatorConfig
+            DependsOn       = @($row.DependsOn)
+            DataNeeds       = if ($null -ne $row.DataNeeds) { @($row.DataNeeds) } else { $null }
+            Disabled        = if ($stateById.ContainsKey($row.Id)) { $stateById[$row.Id] } else { [bool]$row.Disabled }
+            Permissions     = $row.Permissions
         }
     })
 

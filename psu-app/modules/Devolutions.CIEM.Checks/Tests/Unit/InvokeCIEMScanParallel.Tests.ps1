@@ -40,26 +40,13 @@ Describe 'InvokeCIEMScan parallel execution' {
             @()
         }
 
-        Save-CIEMCheck -Id 'parallel_a' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Parallel A' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:securitydefaults')
-
-        Save-CIEMCheck -Id 'parallel_b' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Parallel B' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraTrustedNamedLocationExist.ps1' `
-            -DataNeeds @('entra:namedlocations')
+        Update-CIEMCheck -Id 'entra_security_defaults_enabled' -Disabled $false
+        Update-CIEMCheck -Id 'entra_trusted_named_location_exist' -Disabled $false
 
         InModuleScope Devolutions.CIEM {
             InvokeCIEMScan -Provider Azure -CheckId @(
-                'parallel_a',
-                'parallel_b'
+                'entra_security_defaults_enabled',
+                'entra_trusted_named_location_exist'
             ) | Out-Null
         }
 
@@ -85,16 +72,8 @@ Describe 'InvokeCIEMScan parallel execution' {
             )
         }
 
-        Save-CIEMCheck -Id 'parallel_failure' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Parallel Failure' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:securitydefaults')
-
         InModuleScope Devolutions.CIEM {
-            { InvokeCIEMScan -Provider Azure -CheckId 'parallel_failure' | Out-Null } | Should -Throw "*Check 'entra_security_defaults_enabled' failed: boom*"
+            { InvokeCIEMScan -Provider Azure -CheckId 'entra_security_defaults_enabled' | Out-Null } | Should -Throw "*Check 'entra_security_defaults_enabled' failed: boom*"
         }
     }
 
@@ -140,16 +119,8 @@ Describe 'InvokeCIEMScan parallel execution' {
             )
         }
 
-        Save-CIEMCheck -Id 'parallel_result' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Parallel Result' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:securitydefaults')
-
         $result = InModuleScope Devolutions.CIEM {
-            InvokeCIEMScan -Provider Azure -CheckId 'parallel_result'
+            InvokeCIEMScan -Provider Azure -CheckId 'entra_security_defaults_enabled'
         }
 
         $result | Should -HaveCount 1

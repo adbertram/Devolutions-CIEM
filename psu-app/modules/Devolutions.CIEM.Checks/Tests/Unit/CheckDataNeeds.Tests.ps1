@@ -1,6 +1,52 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+
+    function New-TestCheckObject {
+        param(
+            [Parameter(Mandatory)]
+            [string]$Id,
+
+            [Parameter(Mandatory)]
+            [string]$CheckScript,
+
+            [Parameter()]
+            [string]$Service = 'Entra',
+
+            [Parameter()]
+            [AllowNull()]
+            [string[]]$DataNeeds
+        )
+
+        [PSCustomObject]@{
+            Id              = $Id
+            Provider        = 'Azure'
+            Service         = $Service
+            Title           = $Id
+            Description     = 'test'
+            Risk            = 'test'
+            Severity        = 'medium'
+            RelatedUrl      = ''
+            CheckScript     = $CheckScript
+            ExecutionMode   = 'script'
+            ManualReason    = $null
+            Evaluator       = $null
+            EvaluatorConfig = $null
+            DependsOn       = @()
+            DataNeeds       = $DataNeeds
+            Disabled        = $false
+            Remediation     = [PSCustomObject]@{
+                Text = 'test'
+                Url  = ''
+            }
+            Permissions     = [PSCustomObject]@{
+                Graph             = @()
+                ARM               = @()
+                KeyVaultDataPlane = @()
+                IAM               = @()
+            }
+        }
+    }
 }
 
 Describe 'Check data_needs' {
@@ -42,11 +88,14 @@ Describe 'Check data_needs' {
         Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
     }
 
-    It 'Seeds Azure metadata for every local script' {
-        $scriptCount = @(Get-ChildItem (Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Checks') -Filter '*.ps1').Count
+    It 'Seeds Azure metadata for every catalog row' {
+        $catalog = @(
+            Get-Content (Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Checks' 'check_catalog.json') -Raw |
+                ConvertFrom-Json
+        )
         $checks = @(Get-CIEMCheck -Provider Azure)
 
-        $checks.Count | Should -Be $scriptCount
+        $checks.Count | Should -Be $catalog.Count
     }
 
     It 'Preserves user disabled state when the catalog syncs' {
@@ -70,55 +119,33 @@ Describe 'Check data_needs' {
         $check.DataNeeds | Should -BeNullOrEmpty
     }
 
-    It 'Save-CIEMCheck round-trips data_needs' {
-        Save-CIEMCheck -Id 'data_needs_roundtrip' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Roundtrip' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:users', 'iam:roleassignments')
-
-        $check = Get-CIEMCheck -CheckId 'data_needs_roundtrip'
-
-        $check | Should -Not -BeNullOrEmpty
-        @($check.DataNeeds) | Should -HaveCount 2
-        $check.DataNeeds[0] | Should -Be 'entra:users'
-        $check.DataNeeds[1] | Should -Be 'iam:roleassignments'
+    It 'Save-CIEMCheck rejects static data_needs metadata writes' {
+        {
+            Save-CIEMCheck -InputObject ([PSCustomObject]@{
+                Id        = 'entra_security_defaults_enabled'
+                DataNeeds = @()
+            })
+        } | Should -Throw '*Only disabled state can be updated*'
     }
 
-    It 'Update-CIEMCheck persists changed title and data_needs' {
-        Update-CIEMCheck -Id 'entra_security_defaults_enabled' `
-            -Title 'changed title' `
-            -DataNeeds @('entra:users', 'iam:roleassignments')
+    It 'Update-CIEMCheck rejects changed title and data_needs metadata' {
+        {
+            Update-CIEMCheck -Id 'entra_security_defaults_enabled' `
+                -Title 'changed title' `
+                -DataNeeds @('entra:users', 'iam:roleassignments')
+        } | Should -Throw '*Only disabled state can be updated*'
 
         $check = Get-CIEMCheck -CheckId 'entra_security_defaults_enabled'
 
-        $check.Title | Should -Be 'changed title'
-        @($check.DataNeeds) | Should -Be @('entra:users', 'iam:roleassignments')
-    }
-
-    It 'Empty data_needs array throws at registration' {
-        {
-            Save-CIEMCheck -Id 'empty_data_needs' `
-                -Provider 'Azure' `
-                -Service 'Entra' `
-                -Title 'Empty' `
-                -Severity 'medium' `
-                -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-                -DataNeeds @()
-        } | Should -Throw '*must declare at least one data need*'
+        $check.Title | Should -Be 'Microsoft Entra ID tenant has Security Defaults enabled'
+        @($check.DataNeeds) | Should -Be @('entra:securitydefaults')
     }
 
     It 'Missing data_needs throws at scan planning' {
         Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
-
-        Save-CIEMCheck -Id 'scan_missing_data_needs' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Missing' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1'
+        Mock -ModuleName Devolutions.CIEM Get-CIEMCheck {
+            New-TestCheckObject -Id 'scan_missing_data_needs' -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' -DataNeeds $null
+        }
 
         InModuleScope Devolutions.CIEM {
             { InvokeCIEMScan -Provider Azure -CheckId 'scan_missing_data_needs' } | Should -Throw '*missing data_needs*'
@@ -147,30 +174,13 @@ Describe 'Check data_needs' {
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureEntraResource { @() }
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureArmResource { @() }
         Mock -ModuleName Devolutions.CIEM InvokeCIEMParallelForEach { @() }
-
-        Save-CIEMCheck -Id 'union_a' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Union A' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:users', 'entra:authorizationpolicy')
-
-        Save-CIEMCheck -Id 'union_b' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Union B' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraPolicyGuestUserAccessRestriction.ps1' `
-            -DataNeeds @('entra:authorizationpolicy')
-
-        Save-CIEMCheck -Id 'union_c' `
-            -Provider 'Azure' `
-            -Service 'IAM' `
-            -Title 'Union C' `
-            -Severity 'medium' `
-            -CheckScript 'Test-IamSubscriptionRolesOwnerCustomNotCreated.ps1' `
-            -DataNeeds @('iam:roleassignments')
+        Mock -ModuleName Devolutions.CIEM Get-CIEMCheck {
+            @(
+                New-TestCheckObject -Id 'union_a' -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' -DataNeeds @('entra:users', 'entra:authorizationpolicy')
+                New-TestCheckObject -Id 'union_b' -CheckScript 'Test-EntraPolicyGuestUserAccessRestriction.ps1' -DataNeeds @('entra:authorizationpolicy')
+                New-TestCheckObject -Id 'union_c' -Service 'IAM' -CheckScript 'Test-IamSubscriptionRolesOwnerCustomNotCreated.ps1' -DataNeeds @('iam:roleassignments')
+            )
+        }
 
         InModuleScope Devolutions.CIEM {
             InvokeCIEMScan -Provider Azure -CheckId @(
@@ -190,14 +200,9 @@ Describe 'Check data_needs' {
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureDiscoveryRun {
             [pscustomobject]@{ Id = 1; Status = 'Completed' }
         }
-
-        Save-CIEMCheck -Id 'unknown_need' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Unknown Need' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:bogus')
+        Mock -ModuleName Devolutions.CIEM Get-CIEMCheck {
+            New-TestCheckObject -Id 'unknown_need' -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' -DataNeeds @('entra:bogus')
+        }
 
         InModuleScope Devolutions.CIEM {
             { InvokeCIEMScan -Provider Azure -CheckId 'unknown_need' } | Should -Throw "*Unknown data need 'entra:bogus'*"
@@ -206,14 +211,9 @@ Describe 'Check data_needs' {
 
     It 'Data needs must use lowercase canonical form' {
         Mock -ModuleName Devolutions.CIEM SyncCIEMCheckCatalog {}
-
-        Save-CIEMCheck -Id 'noncanonical_need' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Noncanonical Need' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('Entra:Users')
+        Mock -ModuleName Devolutions.CIEM Get-CIEMCheck {
+            New-TestCheckObject -Id 'noncanonical_need' -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' -DataNeeds @('Entra:Users')
+        }
 
         InModuleScope Devolutions.CIEM {
             { InvokeCIEMScan -Provider Azure -CheckId 'noncanonical_need' } | Should -Throw "*declares non-canonical data need 'Entra:Users'*"
@@ -227,14 +227,9 @@ Describe 'Check data_needs' {
         }
         Mock -ModuleName Devolutions.CIEM Get-CIEMAzureEntraResource { @() }
         Mock -ModuleName Devolutions.CIEM InvokeCIEMParallelForEach { @() }
-
-        Save-CIEMCheck -Id 'targeted_accessor' `
-            -Provider 'Azure' `
-            -Service 'Entra' `
-            -Title 'Targeted Accessor' `
-            -Severity 'medium' `
-            -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' `
-            -DataNeeds @('entra:users')
+        Mock -ModuleName Devolutions.CIEM Get-CIEMCheck {
+            New-TestCheckObject -Id 'targeted_accessor' -CheckScript 'Test-EntraSecurityDefaultsEnabled.ps1' -DataNeeds @('entra:users')
+        }
 
         InModuleScope Devolutions.CIEM {
             InvokeCIEMScan -Provider Azure -CheckId 'targeted_accessor' | Out-Null

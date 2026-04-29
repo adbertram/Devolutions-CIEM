@@ -1,10 +1,10 @@
 function Get-CIEMProviderService {
     <#
     .SYNOPSIS
-        Lists unique services from the CIEM checks database.
+        Lists unique services from provider check catalogs.
 
     .DESCRIPTION
-        Queries the checks table for unique service names per provider.
+        Reads provider check catalogs for unique service names per provider.
         Returns PSCustomObjects for compatibility with PSU runspaces.
 
     .PARAMETER Provider
@@ -29,16 +29,16 @@ function Get-CIEMProviderService {
 
     $ErrorActionPreference = 'Stop'
 
-    if ($Provider) {
-        $rows = Invoke-CIEMQuery -Query "SELECT DISTINCT service, provider FROM checks WHERE provider = @provider ORDER BY provider, service" -Parameters @{ provider = $Provider }
-    } else {
-        $rows = Invoke-CIEMQuery -Query "SELECT DISTINCT service, provider FROM checks ORDER BY provider, service"
-    }
+    $services = @(
+        Get-CIEMCheck -Provider $Provider |
+            Select-Object -Property Service, Provider -Unique |
+            Sort-Object -Property Provider, Service
+    )
 
-    foreach ($row in $rows) {
+    foreach ($row in $services) {
         [PSCustomObject]@{
-            Name     = $row.service
-            Provider = $row.provider
+            Name     = $row.Service
+            Provider = $row.Provider
         }
     }
 }

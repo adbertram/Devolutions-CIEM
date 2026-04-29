@@ -3,8 +3,8 @@ function Get-CIEMScanResult {
     .SYNOPSIS
         Retrieves scan results for a specific ScanRun from the database.
     .DESCRIPTION
-        Retrieves the scan results for a given ScanRunId by joining scan_results
-        with checks to reconstruct the full result objects.
+        Retrieves the scan results for a given ScanRunId and reconstructs check
+        metadata from provider catalogs.
     .PARAMETER ScanRunId
         The ID of the ScanRun to get results for (required).
     .EXAMPLE
@@ -25,11 +25,8 @@ function Get-CIEMScanResult {
 
     $rows = @(Invoke-CIEMQuery -Query @"
 SELECT sr.status, sr.status_extended, sr.resource_id, sr.resource_name, sr.location,
-       c.id AS check_id, c.provider, c.service, c.title, c.description, c.risk, c.severity,
-       c.remediation_text, c.remediation_url, c.related_url, c.check_script, c.disabled,
-       c.permissions, c.depends_on, c.data_needs
+       sr.check_id
 FROM scan_results sr
-JOIN checks c ON sr.check_id = c.id
 WHERE sr.scan_run_id = @scan_run_id
 "@ -Parameters @{ scan_run_id = $ScanRunId })
 
@@ -39,55 +36,34 @@ WHERE sr.scan_run_id = @scan_run_id
     }
 
     $results = @(foreach ($row in $rows) {
-        # Parse permissions JSON
-        $permissionsObj = & {
-            $p = @{ Graph = @(); ARM = @(); KeyVaultDataPlane = @(); IAM = @() }
-            if ($row.permissions) {
-                try {
-                    $raw = $row.permissions | ConvertFrom-Json
-                    foreach ($prop in $raw.PSObject.Properties) {
-                        switch ($prop.Name.ToLower()) {
-                            'graph'             { $p.Graph = @($prop.Value) }
-                            'arm'               { $p.ARM = @($prop.Value) }
-                            'keyvaultdataplane' { $p.KeyVaultDataPlane = @($prop.Value) }
-                            'iam'               { $p.IAM = @($prop.Value) }
-                        }
-                    }
-                } catch {}
-            }
-            [PSCustomObject]$p
-        }
-
-        # Parse depends_on JSON
-        $dependsOnArr = @()
-        if ($row.depends_on) {
-            try { $dependsOnArr = @($row.depends_on | ConvertFrom-Json) } catch {}
-        }
-
-        $dataNeedsArr = $null
-        if ($row.data_needs) {
-            try { $dataNeedsArr = @($row.data_needs | ConvertFrom-Json) } catch {}
+        $check = @(Get-CIEMCheck -CheckId $row.check_id)
+        if ($check.Count -eq 0) {
+            throw "Scan result references unknown catalog check '$($row.check_id)'."
         }
 
         [PSCustomObject]@{
             Check = [PSCustomObject]@{
-                Id          = $row.check_id
-                Provider    = $row.provider
-                Service     = $row.service
-                Title       = $row.title
-                Description = $row.description
-                Risk        = $row.risk
-                Severity    = $row.severity
+                Id          = $check[0].Id
+                Provider    = $check[0].Provider
+                Service     = $check[0].Service
+                Title       = $check[0].Title
+                Description = $check[0].Description
+                Risk        = $check[0].Risk
+                Severity    = $check[0].Severity
                 Remediation = [PSCustomObject]@{
-                    Text = $row.remediation_text
-                    Url  = $row.remediation_url
+                    Text = $check[0].Remediation.Text
+                    Url  = $check[0].Remediation.Url
                 }
-                RelatedUrl  = $row.related_url
-                CheckScript = $row.check_script
-                DependsOn   = $dependsOnArr
-                DataNeeds   = $dataNeedsArr
-                Disabled    = [bool]$row.disabled
-                Permissions = $permissionsObj
+                RelatedUrl      = $check[0].RelatedUrl
+                CheckScript     = $check[0].CheckScript
+                ExecutionMode   = $check[0].ExecutionMode
+                ManualReason    = $check[0].ManualReason
+                Evaluator       = $check[0].Evaluator
+                EvaluatorConfig = $check[0].EvaluatorConfig
+                DependsOn       = @($check[0].DependsOn)
+                DataNeeds       = if ($null -ne $check[0].DataNeeds) { @($check[0].DataNeeds) } else { $null }
+                Disabled        = [bool]$check[0].Disabled
+                Permissions     = $check[0].Permissions
             }
             Status         = $row.status
             StatusExtended = $row.status_extended
