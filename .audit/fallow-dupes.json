@@ -1,0 +1,2149 @@
+{
+  "schema_version": 3,
+  "version": "2.33.0",
+  "elapsed_ms": 20,
+  "clone_groups": [
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 62,
+          "end_line": 105,
+          "start_col": 16,
+          "end_col": 1,
+          "fragment": "['DELETE FROM checks'];\n  for (const r of rows) {\n    const vals = cols.map(c => sqlValue(r[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO checks (${cols.join(', ')}) VALUES (${vals})`);\n  }\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored ${rows.length} checks.`);\n}\n\nfunction seedTestData() {\n  seedChecks();\n\n  const provider = sshQuery(\"SELECT id FROM providers WHERE name = 'Azure' COLLATE NOCASE LIMIT 1\")[0];\n  if (!provider) { console.log('[seed] No providers -- skipping.'); return; }\n  const checks = sshQuery(`SELECT id, severity FROM checks WHERE id LIKE '${P}check_%' ORDER BY CASE UPPER(severity) WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, id`);\n  if (checks.length === 0) { console.log('[seed] No checks -- skipping.'); return; }\n\n  const now = new Date().toISOString();\n  const critHigh = checks.filter(c => ['CRITICAL','HIGH'].includes((c.severity||'').toUpperCase()));\n  const other = checks.filter(c => !['CRITICAL','HIGH'].includes((c.severity||'').toUpperCase()));\n  const ordered = [...critHigh, ...other].slice(0, 5);\n  const failCount = Math.min(2, ordered.length);\n  const passCount = ordered.length - failCount;\n\n  const stmts = [];\n  // Scan Run 1 (most recent): 5 results, includes CRITICAL/HIGH failures\n  stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES ('${P}scan_run_1', '${provider.id}', 'Completed', '${now}', '${now}', 42.5, ${ordered.length}, ${failCount}, ${passCount})`);\n  const statuses = ['FAIL','FAIL','PASS','PASS','PASS'];\n  const descs = ['Security defaults are not enabled','MFA is not enforced','Key vault access is properly configured','Storage encryption is enabled','NSGs are configured correctly'];\n  for (let i = 0; i < ordered.length; i++) {\n    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES ('${P}scan_run_1', '${ordered[i].id}', '${statuses[i]}', '${descs[i]}', '${P}resource_${i}', 'Test Resource ${i}')`);\n  }\n\n  // Scan Run 2 (older): 3 results, all passed\n  const olderDate = new Date(Date.now() - 86400000).toISOString();\n  const run2Checks = checks.slice(0, 3);\n  stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES ('${P}scan_run_2', '${provider.id}', 'Completed', '${olderDate}', '${olderDate}', 18.2, ${run2Checks.length}, 0, ${run2Checks.length})`);\n  for (let i = 0; i < run2Checks.length; i++) {\n    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES ('${P}scan_run_2', '${run2Checks[i].id}', 'PASS', 'Check passed successfully', '${P}resource_old_${i}', 'Old Test Resource ${i}')`);\n  }\n\n  sshNonQuery(stmts.join('; '));\n  console.log(`[seed] Seeded scan run 1 (${ordered.length} results, ${failCount} FAIL) and scan run 2 (${run2Checks.length} results, 0 FAIL).`);\n}"
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 496,
+          "end_line": 515,
+          "start_col": 16,
+          "end_col": 1,
+          "fragment": "['DELETE FROM azure_discovery_runs'];\n  for (const r of rows) {\n    const vals = cols.map(c => sqlValue(r[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_discovery_runs (${cols.join(', ')}) VALUES (${vals})`);\n  }\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored ${rows.length} discovery runs.`);\n}\n\nfunction seedCompletedDiscoveryRun() {\n  const now = new Date().toISOString();\n  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (-1, 'All', 'Completed', '${now}', '${now}', 1, 1, 1, 1, 0, NULL)`);\n  const rows = sshQuery(\"SELECT id FROM azure_discovery_runs WHERE psu_job_id = -1 AND status = 'Completed' ORDER BY id DESC LIMIT 1\");\n  if (rows.length !== 1) {\n    throw new Error('Seed verification failed: completed discovery run was not inserted');\n  }\n  const id = rows[0].id;\n  console.log(`[seed] Seeded completed discovery run id=${id}`);\n  return id;\n}"
+        }
+      ],
+      "token_count": 83,
+      "line_count": 44,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (44 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 250,
+          "end_line": 255,
+          "start_col": 168,
+          "end_col": 26,
+          "fragment": "'properties', 'collected_at', 'last_seen_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_arm_resources (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 256,
+          "end_line": 261,
+          "start_col": 61,
+          "end_col": 26,
+          "fragment": "'properties', 'collected_at', 'last_seen_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_entra_resources (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+        }
+      ],
+      "token_count": 61,
+      "line_count": 6,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (6 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 261,
+          "end_line": 267,
+          "start_col": 2,
+          "end_col": 26,
+          "fragment": "for (const row of state.graphNodes) {\n    const cols = ['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 446,
+          "end_line": 452,
+          "start_col": 2,
+          "end_col": 26,
+          "fragment": "for (const row of state.graphNodes) {\n    const cols = ['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+        }
+      ],
+      "token_count": 81,
+      "line_count": 7,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (7 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 262,
+          "end_line": 267,
+          "start_col": 111,
+          "end_col": 26,
+          "fragment": "'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 453,
+          "end_line": 458,
+          "start_col": 84,
+          "end_col": 26,
+          "fragment": "'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+        }
+      ],
+      "token_count": 59,
+      "line_count": 6,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (6 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 268,
+          "end_line": 277,
+          "start_col": 17,
+          "end_col": 3,
+          "fragment": "['id', 'principal_id', 'principal_type', 'principal_display_name', 'original_principal_id', 'original_principal_type', 'role_definition_id', 'role_name', 'scope', 'permissions_json', 'computed_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_effective_role_assignments (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state.graphEdges) {\n    const cols = ['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }"
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 447,
+          "end_line": 456,
+          "start_col": 17,
+          "end_col": 3,
+          "fragment": "['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state.graphEdges) {\n    const cols = ['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }"
+        }
+      ],
+      "token_count": 122,
+      "line_count": 10,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (10 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 274,
+          "end_line": 280,
+          "start_col": 17,
+          "end_col": 108,
+          "fragment": "['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored dashboard identity data (${state.graphNodes.length} graph nodes, ${state."
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/cleanup.js",
+          "start_line": 459,
+          "end_line": 465,
+          "start_col": 17,
+          "end_col": 89,
+          "fragment": "['id', 'rule_id', 'pattern_name', 'severity', 'category', 'remediation', 'psu_script_name', 'path_json', 'edges_json', 'path_chain', 'evaluated_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO attack_paths (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored graph data (${state.graphNodes.length} nodes, ${state."
+        }
+      ],
+      "token_count": 74,
+      "line_count": 7,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (7 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/_utils/psu-helpers.js",
+          "start_line": 150,
+          "end_line": 164,
+          "start_col": 8,
+          "end_col": 3,
+          "fragment": "pipeline = await pipelineRes.json().catch(() => null);\n  let pipelineOutput = null;\n  if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {\n    pipelineOutput = JSON.parse(pipeline[0].jsonData);\n  }\n\n  return {\n    jobId,\n    status: PSU_STATUS_NAMES[job.status] || `Unknown(${job.status})`,\n    statusCode: job.status,\n    startTime: job.startTime,\n    endTime: job.endTime,\n    output,\n    pipelineOutput\n  }"
+        },
+        {
+          "file": "psu-app/ui/e2e/_utils/psu-helpers.js",
+          "start_line": 222,
+          "end_line": 236,
+          "start_col": 8,
+          "end_col": 3,
+          "fragment": "pipeline = curlJson([...headerArgs, `${baseUrl}/api/v1/job/${jobId}/pipelineOutput`], timeoutMs) || null;\n  let pipelineOutput = null;\n  if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {\n    pipelineOutput = JSON.parse(pipeline[0].jsonData);\n  }\n\n  return {\n    jobId,\n    status: PSU_STATUS_NAMES[job.status] || `Unknown(${job.status})`,\n    statusCode: job.status,\n    startTime: job.startTime,\n    endTime: job.endTime,\n    output,\n    pipelineOutput\n  }"
+        }
+      ],
+      "token_count": 73,
+      "line_count": 15,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (15 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatterns.test.js",
+          "start_line": 54,
+          "end_line": 60,
+          "start_col": 42,
+          "end_col": 9,
+          "fragment": ".getSeverityChipTexts();\n      const validLevels = ['critical', 'high', 'medium', 'low'];\n      const hasValidChip = chipTexts.some(t => validLevels.includes(t));\n      expect(hasValidChip).toBe(true);\n    });\n\n    test("
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPaths.test.js",
+          "start_line": 127,
+          "end_line": 133,
+          "start_col": 40,
+          "end_col": 9,
+          "fragment": ".getSeverityChipTexts();\n      const validLevels = ['critical', 'high', 'medium', 'low'];\n      const hasValidChip = chipTexts.some(t => validLevels.includes(t));\n      expect(hasValidChip).toBe(true);\n    });\n\n    test("
+        }
+      ],
+      "token_count": 56,
+      "line_count": 7,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (7 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+          "start_line": 23,
+          "end_line": 52,
+          "start_col": 55,
+          "end_col": 71,
+          "fragment": ");\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle);\n  }\n\n  async isDataGridVisible() {\n    return await this.isElementVisible(this.selectors.dataGrid);\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts;\n  }\n\n  async getRowCount() {\n    await this.waitForElement(this.selectors.dataGrid);\n    return await this.page.locator(this.selectors.dataGridRows).count()"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 40,
+          "end_line": 69,
+          "start_col": 48,
+          "end_col": 71,
+          "fragment": ");\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle);\n  }\n\n  async isDataGridVisible() {\n    return await this.isElementVisible(this.selectors.dataGrid);\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts;\n  }\n\n  async getRowCount() {\n    await this.waitForElement(this.selectors.dataGrid);\n    return await this.page.locator(this.selectors.dataGridRows).count()"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 32,
+          "end_line": 62,
+          "start_col": 44,
+          "end_col": 71,
+          "fragment": ");\n    // Wait for dynamic content to load\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle);\n  }\n\n  async isDataGridVisible() {\n    return await this.isElementVisible(this.selectors.dataGrid);\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts;\n  }\n\n  async getRowCount() {\n    await this.waitForElement(this.selectors.dataGrid);\n    return await this.page.locator(this.selectors.dataGridRows).count()"
+        }
+      ],
+      "token_count": 196,
+      "line_count": 31,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (31 lines, 3 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+          "start_line": 36,
+          "end_line": 47,
+          "start_col": 62,
+          "end_col": 16,
+          "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 53,
+          "end_line": 64,
+          "start_col": 62,
+          "end_col": 16,
+          "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+          "start_line": 94,
+          "end_line": 105,
+          "start_col": 70,
+          "end_col": 16,
+          "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 46,
+          "end_line": 57,
+          "start_col": 62,
+          "end_col": 16,
+          "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        }
+      ],
+      "token_count": 92,
+      "line_count": 12,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (12 lines, 4 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+          "start_line": 52,
+          "end_line": 58,
+          "start_col": 70,
+          "end_col": 77,
+          "fragment": ");\n  }\n\n  async hasData() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    return (await this.page.locator(this.selectors.dataGridRows).count()) > 0"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+          "start_line": 29,
+          "end_line": 35,
+          "start_col": 54,
+          "end_col": 77,
+          "fragment": ");\n  }\n\n  async hasData() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    return (await this.page.locator(this.selectors.dataGridRows).count()) > 0"
+        }
+      ],
+      "token_count": 50,
+      "line_count": 7,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (7 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+          "start_line": 58,
+          "end_line": 68,
+          "start_col": 11,
+          "end_col": 16,
+          "fragment": "(await this.page.locator(this.selectors.dataGridRows).count()) > 0;\n  }\n\n  async getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 76,
+          "end_line": 86,
+          "start_col": 11,
+          "end_col": 16,
+          "fragment": "rowCount > 0;\n  }\n\n  async getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        }
+      ],
+      "token_count": 80,
+      "line_count": 11,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (11 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+          "start_line": 86,
+          "end_line": 90,
+          "start_col": 21,
+          "end_col": 24,
+          "fragment": "(patternName) {\n    await this.waitForElement(this.selectors.dataGrid);\n    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();\n    await row.waitFor({ state: 'visible' });\n    await row.getByRole("
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 109,
+          "end_line": 113,
+          "start_col": 23,
+          "end_col": 24,
+          "fragment": "(patternName) {\n    await this.waitForElement(this.selectors.dataGrid);\n    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();\n    await row.waitFor({ state: 'visible' });\n    await row.getByRole("
+        }
+      ],
+      "token_count": 67,
+      "line_count": 5,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (5 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+          "start_line": 89,
+          "end_line": 92,
+          "start_col": 42,
+          "end_col": 43,
+          "fragment": ");\n    await row.getByRole('button', { name: /^Expand$/i }).click();\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 113,
+          "end_line": 117,
+          "start_col": 65,
+          "end_col": 43,
+          "fragment": ");\n    await row.getByRole('button', { name: /^Expand$/i }).click();\n\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+        }
+      ],
+      "token_count": 55,
+      "line_count": 5,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (5 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 72,
+          "end_line": 76,
+          "start_col": 25,
+          "end_col": 23,
+          "fragment": "() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    const rowCount = await this.page.locator(this.selectors.dataGridRows).count();\n    return rowCount > 0"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 152,
+          "end_line": 156,
+          "start_col": 19,
+          "end_col": 23,
+          "fragment": "() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    const rowCount = await this.page.locator(this.selectors.dataGridRows).count();\n    return rowCount > 0"
+        }
+      ],
+      "token_count": 53,
+      "line_count": 5,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (5 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 79,
+          "end_line": 86,
+          "start_col": 8,
+          "end_col": 16,
+          "fragment": "getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+          "start_line": 119,
+          "end_line": 126,
+          "start_col": 8,
+          "end_col": 16,
+          "fragment": "getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        }
+      ],
+      "token_count": 78,
+      "line_count": 8,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (8 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 91,
+          "end_line": 101,
+          "start_col": 69,
+          "end_col": 43,
+          "fragment": ");\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      await row.click();\n    }\n\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+          "start_line": 77,
+          "end_line": 86,
+          "start_col": 42,
+          "end_col": 43,
+          "fragment": ");\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      await row.click();\n    }\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+        }
+      ],
+      "token_count": 87,
+      "line_count": 11,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (11 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 100,
+          "end_line": 106,
+          "start_col": 4,
+          "end_col": 46,
+          "fragment": "await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });\n    await this.page.waitForFunction((selector) => {\n      const element = document.querySelector(selector);\n      return element && element.textContent.trim().length > 0;\n    }, this.selectors.remediationScriptBlock);"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+          "start_line": 116,
+          "end_line": 122,
+          "start_col": 4,
+          "end_col": 46,
+          "fragment": "await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });\n    await this.page.waitForFunction((selector) => {\n      const element = document.querySelector(selector);\n      return element && element.textContent.trim().length > 0;\n    }, this.selectors.remediationScriptBlock);"
+        }
+      ],
+      "token_count": 119,
+      "line_count": 7,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (7 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Configuration/Configuration.test.js",
+          "start_line": 366,
+          "end_line": 371,
+          "start_col": 36,
+          "end_col": 7,
+          "fragment": "();\n      // Wait for either success or failure toast (test will fail without valid creds, but toast should appear)\n      const toast = configPage.page.locator('.iziToast');\n      await toast.first().waitFor({ state: 'visible', timeout: 30000 });\n      expect(await toast.first().isVisible()).toBe(true);\n    });"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Configuration/Configuration.test.js",
+          "start_line": 385,
+          "end_line": 390,
+          "start_col": 32,
+          "end_col": 7,
+          "fragment": "();\n      // Wait for a toast (success or error)\n      const toast = configPage.page.locator('.iziToast');\n      await toast.first().waitFor({ state: 'visible', timeout: 30000 });\n      expect(await toast.first().isVisible()).toBe(true);\n    });"
+        }
+      ],
+      "token_count": 58,
+      "line_count": 6,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (6 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Dashboard/DashboardPageHelpers.js",
+          "start_line": 50,
+          "end_line": 60,
+          "start_col": 46,
+          "end_col": 63,
+          "fragment": ");\n    // Wait for dynamic content to load\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle)"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+          "start_line": 48,
+          "end_line": 60,
+          "start_col": 48,
+          "end_col": 63,
+          "fragment": ");\n    // Wait for PSU dynamic content to render\n    await this.page.waitForTimeout(3000);\n  }\n\n  // --- Page header ---\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle)"
+        }
+      ],
+      "token_count": 50,
+      "line_count": 13,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (13 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+          "start_line": 202,
+          "end_line": 207,
+          "start_col": 4,
+          "end_col": 41,
+          "fragment": "await this.page.waitForFunction(() => {\n      const container = document.getElementById('ciemEnvTreeContainer');\n      return window.echarts && container && window.echarts.getInstanceByDom(container);\n    });\n\n    return await this.page.evaluate((name"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+          "start_line": 224,
+          "end_line": 229,
+          "start_col": 4,
+          "end_col": 43,
+          "fragment": "await this.page.waitForFunction(() => {\n      const container = document.getElementById('ciemEnvTreeContainer');\n      return window.echarts && container && window.echarts.getInstanceByDom(container);\n    });\n\n    return await this.page.evaluate(({ name"
+        }
+      ],
+      "token_count": 50,
+      "line_count": 6,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (6 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+          "start_line": 38,
+          "end_line": 46,
+          "start_col": 8,
+          "end_col": 16,
+          "fragment": "getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+          "start_line": 97,
+          "end_line": 105,
+          "start_col": 8,
+          "end_col": 16,
+          "fragment": "getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        }
+      ],
+      "token_count": 91,
+      "line_count": 9,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (9 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+          "start_line": 77,
+          "end_line": 85,
+          "start_col": 42,
+          "end_col": 20,
+          "fragment": ");\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      await row.click();\n    }\n    await this.page."
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 78,
+          "end_line": 89,
+          "start_col": 75,
+          "end_col": 20,
+          "fragment": ");\n    // Try the detail panel toggle button first\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      // Fallback: click the row itself\n      await row.click();\n    }\n    // Wait for detail panel to render (server-side content load)\n    await this.page."
+        }
+      ],
+      "token_count": 58,
+      "line_count": 12,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (12 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+          "start_line": 98,
+          "end_line": 105,
+          "start_col": 74,
+          "end_col": 16,
+          "fragment": ");\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 111,
+          "end_line": 118,
+          "start_col": 74,
+          "end_col": 16,
+          "fragment": ");\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+        }
+      ],
+      "token_count": 72,
+      "line_count": 8,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (8 lines, 2 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "instances": [
+        {
+          "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+          "start_line": 175,
+          "end_line": 181,
+          "start_col": 67,
+          "end_col": 16,
+          "fragment": ");\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 67,
+          "end_line": 73,
+          "start_col": 45,
+          "end_col": 16,
+          "fragment": ");\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        },
+        {
+          "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+          "start_line": 97,
+          "end_line": 103,
+          "start_col": 69,
+          "end_col": 16,
+          "fragment": ");\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+        }
+      ],
+      "token_count": 59,
+      "line_count": 7,
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract duplicated code (7 lines, 3 instances) into a shared function"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    }
+  ],
+  "clone_families": [
+    {
+      "files": [
+        "psu-app/ui/e2e/_utils/cleanup.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 62,
+              "end_line": 105,
+              "start_col": 16,
+              "end_col": 1,
+              "fragment": "['DELETE FROM checks'];\n  for (const r of rows) {\n    const vals = cols.map(c => sqlValue(r[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO checks (${cols.join(', ')}) VALUES (${vals})`);\n  }\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored ${rows.length} checks.`);\n}\n\nfunction seedTestData() {\n  seedChecks();\n\n  const provider = sshQuery(\"SELECT id FROM providers WHERE name = 'Azure' COLLATE NOCASE LIMIT 1\")[0];\n  if (!provider) { console.log('[seed] No providers -- skipping.'); return; }\n  const checks = sshQuery(`SELECT id, severity FROM checks WHERE id LIKE '${P}check_%' ORDER BY CASE UPPER(severity) WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, id`);\n  if (checks.length === 0) { console.log('[seed] No checks -- skipping.'); return; }\n\n  const now = new Date().toISOString();\n  const critHigh = checks.filter(c => ['CRITICAL','HIGH'].includes((c.severity||'').toUpperCase()));\n  const other = checks.filter(c => !['CRITICAL','HIGH'].includes((c.severity||'').toUpperCase()));\n  const ordered = [...critHigh, ...other].slice(0, 5);\n  const failCount = Math.min(2, ordered.length);\n  const passCount = ordered.length - failCount;\n\n  const stmts = [];\n  // Scan Run 1 (most recent): 5 results, includes CRITICAL/HIGH failures\n  stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES ('${P}scan_run_1', '${provider.id}', 'Completed', '${now}', '${now}', 42.5, ${ordered.length}, ${failCount}, ${passCount})`);\n  const statuses = ['FAIL','FAIL','PASS','PASS','PASS'];\n  const descs = ['Security defaults are not enabled','MFA is not enforced','Key vault access is properly configured','Storage encryption is enabled','NSGs are configured correctly'];\n  for (let i = 0; i < ordered.length; i++) {\n    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES ('${P}scan_run_1', '${ordered[i].id}', '${statuses[i]}', '${descs[i]}', '${P}resource_${i}', 'Test Resource ${i}')`);\n  }\n\n  // Scan Run 2 (older): 3 results, all passed\n  const olderDate = new Date(Date.now() - 86400000).toISOString();\n  const run2Checks = checks.slice(0, 3);\n  stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES ('${P}scan_run_2', '${provider.id}', 'Completed', '${olderDate}', '${olderDate}', 18.2, ${run2Checks.length}, 0, ${run2Checks.length})`);\n  for (let i = 0; i < run2Checks.length; i++) {\n    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES ('${P}scan_run_2', '${run2Checks[i].id}', 'PASS', 'Check passed successfully', '${P}resource_old_${i}', 'Old Test Resource ${i}')`);\n  }\n\n  sshNonQuery(stmts.join('; '));\n  console.log(`[seed] Seeded scan run 1 (${ordered.length} results, ${failCount} FAIL) and scan run 2 (${run2Checks.length} results, 0 FAIL).`);\n}"
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 496,
+              "end_line": 515,
+              "start_col": 16,
+              "end_col": 1,
+              "fragment": "['DELETE FROM azure_discovery_runs'];\n  for (const r of rows) {\n    const vals = cols.map(c => sqlValue(r[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_discovery_runs (${cols.join(', ')}) VALUES (${vals})`);\n  }\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored ${rows.length} discovery runs.`);\n}\n\nfunction seedCompletedDiscoveryRun() {\n  const now = new Date().toISOString();\n  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (-1, 'All', 'Completed', '${now}', '${now}', 1, 1, 1, 1, 0, NULL)`);\n  const rows = sshQuery(\"SELECT id FROM azure_discovery_runs WHERE psu_job_id = -1 AND status = 'Completed' ORDER BY id DESC LIMIT 1\");\n  if (rows.length !== 1) {\n    throw new Error('Seed verification failed: completed discovery run was not inserted');\n  }\n  const id = rows[0].id;\n  console.log(`[seed] Seeded completed discovery run id=${id}`);\n  return id;\n}"
+            }
+          ],
+          "token_count": 83,
+          "line_count": 44
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 250,
+              "end_line": 255,
+              "start_col": 168,
+              "end_col": 26,
+              "fragment": "'properties', 'collected_at', 'last_seen_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_arm_resources (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 256,
+              "end_line": 261,
+              "start_col": 61,
+              "end_col": 26,
+              "fragment": "'properties', 'collected_at', 'last_seen_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_entra_resources (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+            }
+          ],
+          "token_count": 61,
+          "line_count": 6
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 261,
+              "end_line": 267,
+              "start_col": 2,
+              "end_col": 26,
+              "fragment": "for (const row of state.graphNodes) {\n    const cols = ['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 446,
+              "end_line": 452,
+              "start_col": 2,
+              "end_col": 26,
+              "fragment": "for (const row of state.graphNodes) {\n    const cols = ['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+            }
+          ],
+          "token_count": 81,
+          "line_count": 7
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 262,
+              "end_line": 267,
+              "start_col": 111,
+              "end_col": 26,
+              "fragment": "'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 453,
+              "end_line": 458,
+              "start_col": 84,
+              "end_col": 26,
+              "fragment": "'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state."
+            }
+          ],
+          "token_count": 59,
+          "line_count": 6
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 268,
+              "end_line": 277,
+              "start_col": 17,
+              "end_col": 3,
+              "fragment": "['id', 'principal_id', 'principal_type', 'principal_display_name', 'original_principal_id', 'original_principal_type', 'role_definition_id', 'role_name', 'scope', 'permissions_json', 'computed_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO azure_effective_role_assignments (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state.graphEdges) {\n    const cols = ['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }"
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 447,
+              "end_line": 456,
+              "start_col": 17,
+              "end_col": 3,
+              "fragment": "['id', 'kind', 'display_name', 'provider', 'subscription_id', 'resource_group', 'properties', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_nodes (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  for (const row of state.graphEdges) {\n    const cols = ['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }"
+            }
+          ],
+          "token_count": 122,
+          "line_count": 10
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 274,
+              "end_line": 280,
+              "start_col": 17,
+              "end_col": 108,
+              "fragment": "['id', 'source_id', 'target_id', 'kind', 'properties', 'computed', 'collected_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO graph_edges (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored dashboard identity data (${state.graphNodes.length} graph nodes, ${state."
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/cleanup.js",
+              "start_line": 459,
+              "end_line": 465,
+              "start_col": 17,
+              "end_col": 89,
+              "fragment": "['id', 'rule_id', 'pattern_name', 'severity', 'category', 'remediation', 'psu_script_name', 'path_json', 'edges_json', 'path_chain', 'evaluated_at'];\n    const vals = cols.map(c => sqlValue(row[c])).join(', ');\n    stmts.push(`INSERT OR REPLACE INTO attack_paths (${cols.join(', ')}) VALUES (${vals})`);\n  }\n\n  sshNonQuery(stmts.join('; '));\n  console.log(`[teardown] Restored graph data (${state.graphNodes.length} nodes, ${state."
+            }
+          ],
+          "token_count": 74,
+          "line_count": 7
+        }
+      ],
+      "total_duplicated_lines": 80,
+      "total_duplicated_tokens": 480,
+      "suggestions": [
+        {
+          "kind": "ExtractModule",
+          "description": "Extract 6 shared clone groups (80 lines) from cleanup.js into psu-app/ui/e2e/_utils",
+          "estimated_savings": 80
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 6 duplicated code blocks (80 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract 6 shared clone groups (80 lines) from cleanup.js into psu-app/ui/e2e/_utils"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/_utils/psu-helpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/_utils/psu-helpers.js",
+              "start_line": 150,
+              "end_line": 164,
+              "start_col": 8,
+              "end_col": 3,
+              "fragment": "pipeline = await pipelineRes.json().catch(() => null);\n  let pipelineOutput = null;\n  if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {\n    pipelineOutput = JSON.parse(pipeline[0].jsonData);\n  }\n\n  return {\n    jobId,\n    status: PSU_STATUS_NAMES[job.status] || `Unknown(${job.status})`,\n    statusCode: job.status,\n    startTime: job.startTime,\n    endTime: job.endTime,\n    output,\n    pipelineOutput\n  }"
+            },
+            {
+              "file": "psu-app/ui/e2e/_utils/psu-helpers.js",
+              "start_line": 222,
+              "end_line": 236,
+              "start_col": 8,
+              "end_col": 3,
+              "fragment": "pipeline = curlJson([...headerArgs, `${baseUrl}/api/v1/job/${jobId}/pipelineOutput`], timeoutMs) || null;\n  let pipelineOutput = null;\n  if (pipeline && pipeline.length > 0 && pipeline[0].jsonData) {\n    pipelineOutput = JSON.parse(pipeline[0].jsonData);\n  }\n\n  return {\n    jobId,\n    status: PSU_STATUS_NAMES[job.status] || `Unknown(${job.status})`,\n    statusCode: job.status,\n    startTime: job.startTime,\n    endTime: job.endTime,\n    output,\n    pipelineOutput\n  }"
+            }
+          ],
+          "token_count": 73,
+          "line_count": 15
+        }
+      ],
+      "total_duplicated_lines": 15,
+      "total_duplicated_tokens": 73,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (15 lines) from psu-helpers.js, psu-helpers.js",
+          "estimated_savings": 15
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (15 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (15 lines) from psu-helpers.js, psu-helpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatterns.test.js",
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPaths.test.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatterns.test.js",
+              "start_line": 54,
+              "end_line": 60,
+              "start_col": 42,
+              "end_col": 9,
+              "fragment": ".getSeverityChipTexts();\n      const validLevels = ['critical', 'high', 'medium', 'low'];\n      const hasValidChip = chipTexts.some(t => validLevels.includes(t));\n      expect(hasValidChip).toBe(true);\n    });\n\n    test("
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPaths.test.js",
+              "start_line": 127,
+              "end_line": 133,
+              "start_col": 40,
+              "end_col": 9,
+              "fragment": ".getSeverityChipTexts();\n      const validLevels = ['critical', 'high', 'medium', 'low'];\n      const hasValidChip = chipTexts.some(t => validLevels.includes(t));\n      expect(hasValidChip).toBe(true);\n    });\n\n    test("
+            }
+          ],
+          "token_count": 56,
+          "line_count": 7
+        }
+      ],
+      "total_duplicated_lines": 7,
+      "total_duplicated_tokens": 56,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (7 lines) from AttackPathPatterns.test.js, AttackPaths.test.js",
+          "estimated_savings": 7
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (7 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (7 lines) from AttackPathPatterns.test.js, AttackPaths.test.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+              "start_line": 58,
+              "end_line": 68,
+              "start_col": 11,
+              "end_col": 16,
+              "fragment": "(await this.page.locator(this.selectors.dataGridRows).count()) > 0;\n  }\n\n  async getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 76,
+              "end_line": 86,
+              "start_col": 11,
+              "end_col": 16,
+              "fragment": "rowCount > 0;\n  }\n\n  async getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            }
+          ],
+          "token_count": 80,
+          "line_count": 11
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+              "start_line": 86,
+              "end_line": 90,
+              "start_col": 21,
+              "end_col": 24,
+              "fragment": "(patternName) {\n    await this.waitForElement(this.selectors.dataGrid);\n    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();\n    await row.waitFor({ state: 'visible' });\n    await row.getByRole("
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 109,
+              "end_line": 113,
+              "start_col": 23,
+              "end_col": 24,
+              "fragment": "(patternName) {\n    await this.waitForElement(this.selectors.dataGrid);\n    const row = this.page.locator(this.selectors.dataGridRows).filter({ hasText: patternName }).first();\n    await row.waitFor({ state: 'visible' });\n    await row.getByRole("
+            }
+          ],
+          "token_count": 67,
+          "line_count": 5
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+              "start_line": 89,
+              "end_line": 92,
+              "start_col": 42,
+              "end_col": 43,
+              "fragment": ");\n    await row.getByRole('button', { name: /^Expand$/i }).click();\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 113,
+              "end_line": 117,
+              "start_col": 65,
+              "end_col": 43,
+              "fragment": ");\n    await row.getByRole('button', { name: /^Expand$/i }).click();\n\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+            }
+          ],
+          "token_count": 55,
+          "line_count": 5
+        }
+      ],
+      "total_duplicated_lines": 21,
+      "total_duplicated_tokens": 202,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (11 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js",
+          "estimated_savings": 11
+        },
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (5 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js",
+          "estimated_savings": 5
+        },
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (5 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js",
+          "estimated_savings": 5
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 3 duplicated code blocks (21 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (11 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (5 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (5 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+        "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+        "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+              "start_line": 36,
+              "end_line": 47,
+              "start_col": 62,
+              "end_col": 16,
+              "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 53,
+              "end_line": 64,
+              "start_col": 62,
+              "end_col": 16,
+              "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+              "start_line": 94,
+              "end_line": 105,
+              "start_col": 70,
+              "end_col": 16,
+              "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 46,
+              "end_line": 57,
+              "start_col": 62,
+              "end_col": 16,
+              "fragment": ");\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            }
+          ],
+          "token_count": 92,
+          "line_count": 12
+        }
+      ],
+      "total_duplicated_lines": 12,
+      "total_duplicated_tokens": 92,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (12 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js, ScanPageHelpers.js, ScanHistoryPageHelpers.js",
+          "estimated_savings": 36
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (12 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (12 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js, ScanPageHelpers.js, ScanHistoryPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+        "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+              "start_line": 23,
+              "end_line": 52,
+              "start_col": 55,
+              "end_col": 71,
+              "fragment": ");\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle);\n  }\n\n  async isDataGridVisible() {\n    return await this.isElementVisible(this.selectors.dataGrid);\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts;\n  }\n\n  async getRowCount() {\n    await this.waitForElement(this.selectors.dataGrid);\n    return await this.page.locator(this.selectors.dataGridRows).count()"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 40,
+              "end_line": 69,
+              "start_col": 48,
+              "end_col": 71,
+              "fragment": ");\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle);\n  }\n\n  async isDataGridVisible() {\n    return await this.isElementVisible(this.selectors.dataGrid);\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts;\n  }\n\n  async getRowCount() {\n    await this.waitForElement(this.selectors.dataGrid);\n    return await this.page.locator(this.selectors.dataGridRows).count()"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 32,
+              "end_line": 62,
+              "start_col": 44,
+              "end_col": 71,
+              "fragment": ");\n    // Wait for dynamic content to load\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle);\n  }\n\n  async isDataGridVisible() {\n    return await this.isElementVisible(this.selectors.dataGrid);\n  }\n\n  async getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts;\n  }\n\n  async getRowCount() {\n    await this.waitForElement(this.selectors.dataGrid);\n    return await this.page.locator(this.selectors.dataGridRows).count()"
+            }
+          ],
+          "token_count": 196,
+          "line_count": 31
+        }
+      ],
+      "total_duplicated_lines": 31,
+      "total_duplicated_tokens": 196,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (31 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js, ScanHistoryPageHelpers.js",
+          "estimated_savings": 62
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (31 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (31 lines) from AttackPathPatternsPageHelpers.js, AttackPathsPageHelpers.js, ScanHistoryPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+        "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+              "start_line": 52,
+              "end_line": 58,
+              "start_col": 70,
+              "end_col": 77,
+              "fragment": ");\n  }\n\n  async hasData() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    return (await this.page.locator(this.selectors.dataGridRows).count()) > 0"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+              "start_line": 29,
+              "end_line": 35,
+              "start_col": 54,
+              "end_col": 77,
+              "fragment": ");\n  }\n\n  async hasData() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    return (await this.page.locator(this.selectors.dataGridRows).count()) > 0"
+            }
+          ],
+          "token_count": 50,
+          "line_count": 7
+        }
+      ],
+      "total_duplicated_lines": 7,
+      "total_duplicated_tokens": 50,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (7 lines) from AttackPathPatternsPageHelpers.js, IdentitiesPageHelpers.js",
+          "estimated_savings": 7
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (7 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (7 lines) from AttackPathPatternsPageHelpers.js, IdentitiesPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 100,
+              "end_line": 106,
+              "start_col": 4,
+              "end_col": 46,
+              "fragment": "await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });\n    await this.page.waitForFunction((selector) => {\n      const element = document.querySelector(selector);\n      return element && element.textContent.trim().length > 0;\n    }, this.selectors.remediationScriptBlock);"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 116,
+              "end_line": 122,
+              "start_col": 4,
+              "end_col": 46,
+              "fragment": "await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible' });\n    await this.page.waitForFunction((selector) => {\n      const element = document.querySelector(selector);\n      return element && element.textContent.trim().length > 0;\n    }, this.selectors.remediationScriptBlock);"
+            }
+          ],
+          "token_count": 119,
+          "line_count": 7
+        }
+      ],
+      "total_duplicated_lines": 7,
+      "total_duplicated_tokens": 119,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (7 lines) from AttackPathsPageHelpers.js, AttackPathsPageHelpers.js",
+          "estimated_savings": 7
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (7 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (7 lines) from AttackPathsPageHelpers.js, AttackPathsPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+        "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 91,
+              "end_line": 101,
+              "start_col": 69,
+              "end_col": 43,
+              "fragment": ");\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      await row.click();\n    }\n\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+              "start_line": 77,
+              "end_line": 86,
+              "start_col": 42,
+              "end_col": 43,
+              "fragment": ");\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      await row.click();\n    }\n    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });\n    await this.page.locator(this.selectors."
+            }
+          ],
+          "token_count": 87,
+          "line_count": 11
+        }
+      ],
+      "total_duplicated_lines": 11,
+      "total_duplicated_tokens": 87,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (11 lines) from AttackPathsPageHelpers.js, IdentitiesPageHelpers.js",
+          "estimated_savings": 11
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (11 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (11 lines) from AttackPathsPageHelpers.js, IdentitiesPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+        "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 79,
+              "end_line": 86,
+              "start_col": 8,
+              "end_col": 16,
+              "fragment": "getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+              "start_line": 119,
+              "end_line": 126,
+              "start_col": 8,
+              "end_col": 16,
+              "fragment": "getSeverityChipTexts() {\n    const chips = this.page.locator(this.selectors.severityChip);\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            }
+          ],
+          "token_count": 78,
+          "line_count": 8
+        }
+      ],
+      "total_duplicated_lines": 8,
+      "total_duplicated_tokens": 78,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (8 lines) from AttackPathsPageHelpers.js, ScanPageHelpers.js",
+          "estimated_savings": 8
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (8 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (8 lines) from AttackPathsPageHelpers.js, ScanPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+        "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+              "start_line": 72,
+              "end_line": 76,
+              "start_col": 25,
+              "end_col": 23,
+              "fragment": "() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    const rowCount = await this.page.locator(this.selectors.dataGridRows).count();\n    return rowCount > 0"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 152,
+              "end_line": 156,
+              "start_col": 19,
+              "end_col": 23,
+              "fragment": "() {\n    const gridVisible = await this.isElementVisible(this.selectors.dataGrid);\n    if (!gridVisible) return false;\n    const rowCount = await this.page.locator(this.selectors.dataGridRows).count();\n    return rowCount > 0"
+            }
+          ],
+          "token_count": 53,
+          "line_count": 5
+        }
+      ],
+      "total_duplicated_lines": 5,
+      "total_duplicated_tokens": 53,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (5 lines) from AttackPathsPageHelpers.js, ScanHistoryPageHelpers.js",
+          "estimated_savings": 5
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (5 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (5 lines) from AttackPathsPageHelpers.js, ScanHistoryPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/Configuration/Configuration.test.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Configuration/Configuration.test.js",
+              "start_line": 366,
+              "end_line": 371,
+              "start_col": 36,
+              "end_col": 7,
+              "fragment": "();\n      // Wait for either success or failure toast (test will fail without valid creds, but toast should appear)\n      const toast = configPage.page.locator('.iziToast');\n      await toast.first().waitFor({ state: 'visible', timeout: 30000 });\n      expect(await toast.first().isVisible()).toBe(true);\n    });"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Configuration/Configuration.test.js",
+              "start_line": 385,
+              "end_line": 390,
+              "start_col": 32,
+              "end_col": 7,
+              "fragment": "();\n      // Wait for a toast (success or error)\n      const toast = configPage.page.locator('.iziToast');\n      await toast.first().waitFor({ state: 'visible', timeout: 30000 });\n      expect(await toast.first().isVisible()).toBe(true);\n    });"
+            }
+          ],
+          "token_count": 58,
+          "line_count": 6
+        }
+      ],
+      "total_duplicated_lines": 6,
+      "total_duplicated_tokens": 58,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (6 lines) from Configuration.test.js, Configuration.test.js",
+          "estimated_savings": 6
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (6 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (6 lines) from Configuration.test.js, Configuration.test.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/Dashboard/DashboardPageHelpers.js",
+        "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Dashboard/DashboardPageHelpers.js",
+              "start_line": 50,
+              "end_line": 60,
+              "start_col": 46,
+              "end_col": 63,
+              "fragment": ");\n    // Wait for dynamic content to load\n    await this.page.waitForTimeout(3000);\n  }\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle)"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+              "start_line": 48,
+              "end_line": 60,
+              "start_col": 48,
+              "end_col": 63,
+              "fragment": ");\n    // Wait for PSU dynamic content to render\n    await this.page.waitForTimeout(3000);\n  }\n\n  // --- Page header ---\n\n  async getPageTitle() {\n    return await this.getText(this.selectors.pageTitle);\n  }\n\n  async isSubtitleVisible() {\n    return await this.isElementVisible(this.selectors.subtitle)"
+            }
+          ],
+          "token_count": 50,
+          "line_count": 13
+        }
+      ],
+      "total_duplicated_lines": 13,
+      "total_duplicated_tokens": 50,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (13 lines) from DashboardPageHelpers.js, EnvironmentPageHelpers.js",
+          "estimated_savings": 13
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (13 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (13 lines) from DashboardPageHelpers.js, EnvironmentPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+              "start_line": 202,
+              "end_line": 207,
+              "start_col": 4,
+              "end_col": 41,
+              "fragment": "await this.page.waitForFunction(() => {\n      const container = document.getElementById('ciemEnvTreeContainer');\n      return window.echarts && container && window.echarts.getInstanceByDom(container);\n    });\n\n    return await this.page.evaluate((name"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+              "start_line": 224,
+              "end_line": 229,
+              "start_col": 4,
+              "end_col": 43,
+              "fragment": "await this.page.waitForFunction(() => {\n      const container = document.getElementById('ciemEnvTreeContainer');\n      return window.echarts && container && window.echarts.getInstanceByDom(container);\n    });\n\n    return await this.page.evaluate(({ name"
+            }
+          ],
+          "token_count": 50,
+          "line_count": 6
+        }
+      ],
+      "total_duplicated_lines": 6,
+      "total_duplicated_tokens": 50,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (6 lines) from EnvironmentPageHelpers.js, EnvironmentPageHelpers.js",
+          "estimated_savings": 6
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (6 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (6 lines) from EnvironmentPageHelpers.js, EnvironmentPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+        "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+              "start_line": 38,
+              "end_line": 46,
+              "start_col": 8,
+              "end_col": 16,
+              "fragment": "getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+              "start_line": 97,
+              "end_line": 105,
+              "start_col": 8,
+              "end_col": 16,
+              "fragment": "getColumnHeaders() {\n    const headers = this.page.locator(this.selectors.dataGridColumnHeaders);\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            }
+          ],
+          "token_count": 91,
+          "line_count": 9
+        }
+      ],
+      "total_duplicated_lines": 9,
+      "total_duplicated_tokens": 91,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (9 lines) from IdentitiesPageHelpers.js, ScanPageHelpers.js",
+          "estimated_savings": 9
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (9 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (9 lines) from IdentitiesPageHelpers.js, ScanPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+        "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+              "start_line": 77,
+              "end_line": 85,
+              "start_col": 42,
+              "end_col": 20,
+              "fragment": ");\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      await row.click();\n    }\n    await this.page."
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 78,
+              "end_line": 89,
+              "start_col": 75,
+              "end_col": 20,
+              "fragment": ");\n    // Try the detail panel toggle button first\n    const toggle = row.locator('[aria-label=\"Expand\"], [aria-label=\"expand row\"]');\n    const toggleCount = await toggle.count();\n    if (toggleCount > 0) {\n      await toggle.first().click();\n    } else {\n      // Fallback: click the row itself\n      await row.click();\n    }\n    // Wait for detail panel to render (server-side content load)\n    await this.page."
+            }
+          ],
+          "token_count": 58,
+          "line_count": 12
+        }
+      ],
+      "total_duplicated_lines": 12,
+      "total_duplicated_tokens": 58,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (12 lines) from IdentitiesPageHelpers.js, ScanHistoryPageHelpers.js",
+          "estimated_savings": 12
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 1 duplicated code block (12 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (12 lines) from IdentitiesPageHelpers.js, ScanHistoryPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    },
+    {
+      "files": [
+        "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+        "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js"
+      ],
+      "groups": [
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+              "start_line": 98,
+              "end_line": 105,
+              "start_col": 74,
+              "end_col": 16,
+              "fragment": ");\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 111,
+              "end_line": 118,
+              "start_col": 74,
+              "end_col": 16,
+              "fragment": ");\n    const count = await headers.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      const text = (await headers.nth(i).textContent()).trim();\n      if (text.length > 0) texts.push(text);\n    }\n    return texts"
+            }
+          ],
+          "token_count": 72,
+          "line_count": 8
+        },
+        {
+          "instances": [
+            {
+              "file": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+              "start_line": 175,
+              "end_line": 181,
+              "start_col": 67,
+              "end_col": 16,
+              "fragment": ");\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 67,
+              "end_line": 73,
+              "start_col": 45,
+              "end_col": 16,
+              "fragment": ");\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            },
+            {
+              "file": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+              "start_line": 97,
+              "end_line": 103,
+              "start_col": 69,
+              "end_col": 16,
+              "fragment": ");\n    const count = await chips.count();\n    const texts = [];\n    for (let i = 0; i < count; i++) {\n      texts.push((await chips.nth(i).textContent()).trim());\n    }\n    return texts"
+            }
+          ],
+          "token_count": 59,
+          "line_count": 7
+        }
+      ],
+      "total_duplicated_lines": 15,
+      "total_duplicated_tokens": 131,
+      "suggestions": [
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (8 lines) from ScanPageHelpers.js, ScanHistoryPageHelpers.js",
+          "estimated_savings": 8
+        },
+        {
+          "kind": "ExtractFunction",
+          "description": "Extract shared function (7 lines) from ScanPageHelpers.js, ScanHistoryPageHelpers.js, ScanHistoryPageHelpers.js",
+          "estimated_savings": 14
+        }
+      ],
+      "actions": [
+        {
+          "type": "extract-shared",
+          "auto_fixable": false,
+          "description": "Extract 2 duplicated code blocks (15 lines) into a shared module",
+          "note": "These clone groups share the same files, indicating a structural relationship — refactor together"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (8 lines) from ScanPageHelpers.js, ScanHistoryPageHelpers.js"
+        },
+        {
+          "type": "apply-suggestion",
+          "auto_fixable": false,
+          "description": "Extract shared function (7 lines) from ScanPageHelpers.js, ScanHistoryPageHelpers.js, ScanHistoryPageHelpers.js"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the duplicated code",
+          "comment": "// fallow-ignore-next-line code-duplication"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "total_files": 32,
+    "files_with_clones": 12,
+    "total_lines": 5743,
+    "duplicated_lines": 458,
+    "total_tokens": 36237,
+    "duplicated_tokens": 2363,
+    "clone_groups": 25,
+    "clone_instances": 54,
+    "duplication_percentage": 7.974925996865749
+  }
+}

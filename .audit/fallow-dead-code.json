@@ -1,0 +1,1936 @@
+{
+  "schema_version": 3,
+  "version": "2.33.0",
+  "elapsed_ms": 9,
+  "total_issues": 93,
+  "entry_points": {
+    "total": 0,
+    "sources": {}
+  },
+  "summary": {
+    "total_issues": 93,
+    "unused_files": 31,
+    "unused_exports": 62,
+    "unused_types": 0,
+    "unused_dependencies": 0,
+    "unused_enum_members": 0,
+    "unused_class_members": 0,
+    "unresolved_imports": 0,
+    "unlisted_dependencies": 0,
+    "duplicate_exports": 0,
+    "type_only_dependencies": 0,
+    "test_only_dependencies": 0,
+    "circular_dependencies": 0,
+    "boundary_violations": 0,
+    "stale_suppressions": 0
+  },
+  "unused_files": [
+    {
+      "path": "psu-app/ui/e2e/_utils/BasePage.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/BaseTestSetup.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/database.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/global-setup.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/global-teardown.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/test-config.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/test-environment.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/About/About.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/About/AboutPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatterns.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/AttackPathPatterns/AttackPathPatternsPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/AttackPaths/AttackPaths.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/AttackPaths/AttackPathsPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Configuration/Configuration.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Configuration/ConfigurationPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Dashboard/Dashboard.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Dashboard/DashboardPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Environment/Environment.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Environment/EnvironmentPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Identities/Identities.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Identities/IdentitiesPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Navigation/Navigation.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Navigation/NavigationPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Reports/Reports.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Reports/ReportsPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Scan/Scan.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/Scan/ScanPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/ScanHistory/ScanHistory.test.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/pages/ScanHistory/ScanHistoryPageHelpers.js",
+      "actions": [
+        {
+          "type": "delete-file",
+          "auto_fixable": false,
+          "description": "Delete this file",
+          "note": "File deletion may remove runtime functionality not visible to static analysis"
+        },
+        {
+          "type": "suppress-file",
+          "auto_fixable": false,
+          "description": "Suppress with a file-level comment at the top of the file",
+          "comment": "// fallow-ignore-file unused-file"
+        }
+      ]
+    }
+  ],
+  "unused_exports": [
+    {
+      "path": "psu-app/ui/e2e/_utils/BaseTestSetup.js",
+      "export_name": "expect",
+      "is_type_only": false,
+      "line": 11,
+      "col": 25,
+      "span_start": 210,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/BaseTestSetup.js",
+      "export_name": "test",
+      "is_type_only": false,
+      "line": 11,
+      "col": 19,
+      "span_start": 204,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "backupAndClearAllChecks",
+      "is_type_only": false,
+      "line": 547,
+      "col": 31,
+      "span_start": 39413,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupTestData",
+      "is_type_only": false,
+      "line": 547,
+      "col": 2,
+      "span_start": 39384,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "restoreChecks",
+      "is_type_only": false,
+      "line": 547,
+      "col": 56,
+      "span_start": 39438,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedChecks",
+      "is_type_only": false,
+      "line": 547,
+      "col": 19,
+      "span_start": 39401,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedTestData",
+      "is_type_only": false,
+      "line": 547,
+      "col": 71,
+      "span_start": 39453,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "backupAndClearAllScanHistory",
+      "is_type_only": false,
+      "line": 548,
+      "col": 2,
+      "span_start": 39469,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getScanHistoryCounts",
+      "is_type_only": false,
+      "line": 548,
+      "col": 72,
+      "span_start": 39539,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getScanResultCount",
+      "is_type_only": false,
+      "line": 548,
+      "col": 52,
+      "span_start": 39519,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getTestCheckCounts",
+      "is_type_only": false,
+      "line": 548,
+      "col": 94,
+      "span_start": 39561,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "restoreScanHistory",
+      "is_type_only": false,
+      "line": 548,
+      "col": 32,
+      "span_start": 39499,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupEnvironmentData",
+      "is_type_only": false,
+      "line": 549,
+      "col": 23,
+      "span_start": 39604,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedEnvironmentData",
+      "is_type_only": false,
+      "line": 549,
+      "col": 2,
+      "span_start": 39583,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getArmResourceCount",
+      "is_type_only": false,
+      "line": 550,
+      "col": 2,
+      "span_start": 39630,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getTestArmResourceCount",
+      "is_type_only": false,
+      "line": 550,
+      "col": 23,
+      "span_start": 39651,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "backupAndClearAllArmResources",
+      "is_type_only": false,
+      "line": 551,
+      "col": 2,
+      "span_start": 39678,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "restoreArmResources",
+      "is_type_only": false,
+      "line": 551,
+      "col": 33,
+      "span_start": 39709,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "clearStaleDiscoveryRuns",
+      "is_type_only": false,
+      "line": 552,
+      "col": 2,
+      "span_start": 39732,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getCompletedDiscoveryRunCount",
+      "is_type_only": false,
+      "line": 552,
+      "col": 27,
+      "span_start": 39757,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "backupAndClearAllDiscoveryRuns",
+      "is_type_only": false,
+      "line": 553,
+      "col": 2,
+      "span_start": 39790,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "restoreDiscoveryRuns",
+      "is_type_only": false,
+      "line": 553,
+      "col": 34,
+      "span_start": 39822,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedCompletedDiscoveryRun",
+      "is_type_only": false,
+      "line": 553,
+      "col": 56,
+      "span_start": 39844,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedCompletedDiscoveryRunAt",
+      "is_type_only": false,
+      "line": 554,
+      "col": 2,
+      "span_start": 39873,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupDiscoveryRun",
+      "is_type_only": false,
+      "line": 555,
+      "col": 27,
+      "span_start": 39929,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getRunningDiscoveryRunCount",
+      "is_type_only": false,
+      "line": 555,
+      "col": 48,
+      "span_start": 39950,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedRunningDiscoveryRun",
+      "is_type_only": false,
+      "line": 555,
+      "col": 2,
+      "span_start": 39904,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupIdentityViewData",
+      "is_type_only": false,
+      "line": 556,
+      "col": 24,
+      "span_start": 40003,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getTestEffectiveRoleAssignmentCount",
+      "is_type_only": false,
+      "line": 556,
+      "col": 49,
+      "span_start": 40028,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedIdentityViewData",
+      "is_type_only": false,
+      "line": 556,
+      "col": 2,
+      "span_start": 39981,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "backupAndClearDashboardIdentityData",
+      "is_type_only": false,
+      "line": 557,
+      "col": 2,
+      "span_start": 40067,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getDashboardIdentityCounts",
+      "is_type_only": false,
+      "line": 557,
+      "col": 69,
+      "span_start": 40134,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "restoreDashboardIdentityData",
+      "is_type_only": false,
+      "line": 557,
+      "col": 39,
+      "span_start": 40104,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupIdentitiesPageData",
+      "is_type_only": false,
+      "line": 558,
+      "col": 26,
+      "span_start": 40188,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getTestIdentitiesGraphEdgeCount",
+      "is_type_only": false,
+      "line": 558,
+      "col": 53,
+      "span_start": 40215,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedIdentitiesPageData",
+      "is_type_only": false,
+      "line": 558,
+      "col": 2,
+      "span_start": 40164,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupIdentityAttackPathData",
+      "is_type_only": false,
+      "line": 559,
+      "col": 30,
+      "span_start": 40278,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedIdentityAttackPathData",
+      "is_type_only": false,
+      "line": 559,
+      "col": 2,
+      "span_start": 40250,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedAttackPathsPageData",
+      "is_type_only": false,
+      "line": 560,
+      "col": 2,
+      "span_start": 40311,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "seedAttackPathsRefreshGraphData",
+      "is_type_only": false,
+      "line": 560,
+      "col": 27,
+      "span_start": 40336,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "backupAndClearAttackPathGraphData",
+      "is_type_only": false,
+      "line": 561,
+      "col": 2,
+      "span_start": 40371,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "restoreAttackPathGraphData",
+      "is_type_only": false,
+      "line": 561,
+      "col": 37,
+      "span_start": 40406,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "cleanupAttackPathsPageData",
+      "is_type_only": false,
+      "line": 562,
+      "col": 2,
+      "span_start": 40436,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getTestAttackPathCount",
+      "is_type_only": false,
+      "line": 563,
+      "col": 30,
+      "span_start": 40494,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "getTestAttackPathNodeCount",
+      "is_type_only": false,
+      "line": 563,
+      "col": 2,
+      "span_start": 40466,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/cleanup.js",
+      "export_name": "TEST_PREFIX",
+      "is_type_only": false,
+      "line": 564,
+      "col": 2,
+      "span_start": 40520,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "isPSUReady",
+      "is_type_only": false,
+      "line": 405,
+      "col": 2,
+      "span_start": 14621,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "startPSU",
+      "is_type_only": false,
+      "line": 405,
+      "col": 14,
+      "span_start": 14633,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "waitForPSU",
+      "is_type_only": false,
+      "line": 405,
+      "col": 24,
+      "span_start": 14643,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "runPSUCommand",
+      "is_type_only": false,
+      "line": 406,
+      "col": 2,
+      "span_start": 14657,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "runPSUNonQuery",
+      "is_type_only": false,
+      "line": 406,
+      "col": 30,
+      "span_start": 14685,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "runPSUQuery",
+      "is_type_only": false,
+      "line": 406,
+      "col": 17,
+      "span_start": 14672,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "sshNonQuery",
+      "is_type_only": false,
+      "line": 407,
+      "col": 12,
+      "span_start": 14713,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "sshQuery",
+      "is_type_only": false,
+      "line": 407,
+      "col": 2,
+      "span_start": 14703,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "PSU_STATUS",
+      "is_type_only": false,
+      "line": 408,
+      "col": 24,
+      "span_start": 14750,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "PSU_STATUS_NAMES",
+      "is_type_only": false,
+      "line": 408,
+      "col": 36,
+      "span_start": 14762,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "cancelRunningPSUJobs",
+      "is_type_only": false,
+      "line": 408,
+      "col": 2,
+      "span_start": 14728,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "activateAzureAuthProfile",
+      "is_type_only": false,
+      "line": 409,
+      "col": 30,
+      "span_start": 14810,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "deactivateAzureAuthProfile",
+      "is_type_only": false,
+      "line": 409,
+      "col": 2,
+      "span_start": 14782,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/psu-helpers.js",
+      "export_name": "getActiveAzureAuthProfileCount",
+      "is_type_only": false,
+      "line": 410,
+      "col": 2,
+      "span_start": 14838,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/test-config.js",
+      "export_name": "testConfig",
+      "is_type_only": false,
+      "line": 35,
+      "col": 19,
+      "span_start": 851,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    },
+    {
+      "path": "psu-app/ui/e2e/_utils/test-environment.js",
+      "export_name": "resolveTestEnvironment",
+      "is_type_only": false,
+      "line": 56,
+      "col": 2,
+      "span_start": 1533,
+      "is_re_export": false,
+      "actions": [
+        {
+          "type": "remove-export",
+          "auto_fixable": true,
+          "description": "Remove the `export` keyword from the declaration"
+        },
+        {
+          "type": "suppress-line",
+          "auto_fixable": false,
+          "description": "Suppress with an inline comment above the line",
+          "comment": "// fallow-ignore-next-line unused-export"
+        }
+      ]
+    }
+  ],
+  "unused_types": [],
+  "unused_dependencies": [],
+  "unused_dev_dependencies": [],
+  "unused_optional_dependencies": [],
+  "unused_enum_members": [],
+  "unused_class_members": [],
+  "unresolved_imports": [],
+  "unlisted_dependencies": [],
+  "duplicate_exports": [],
+  "type_only_dependencies": [],
+  "test_only_dependencies": [],
+  "circular_dependencies": [],
+  "boundary_violations": [],
+  "stale_suppressions": []
+}
