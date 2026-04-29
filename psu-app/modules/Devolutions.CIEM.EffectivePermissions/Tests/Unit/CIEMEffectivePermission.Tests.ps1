@@ -204,6 +204,62 @@ Describe 'Get-CIEMEffectivePermission' {
                     Should -Be 'Can modify Azure role assignments in this Azure subscription'
             }
         }
+
+        It 'Describes provider-wide Azure authorization actions in plain language' {
+            InModuleScope Devolutions.CIEM {
+                ResolveCIEMEffectivePermissionActionDescription `
+                    -Provider Azure `
+                    -NativeAction 'Microsoft.Authorization/*' `
+                    -TargetType 'AzureSubscription' |
+                    Should -Be 'Can manage Azure authorization resources in this Azure subscription'
+            }
+        }
+
+        It 'Describes provider-wide Azure network actions in plain language' {
+            InModuleScope Devolutions.CIEM {
+                ResolveCIEMEffectivePermissionActionDescription `
+                    -Provider Azure `
+                    -NativeAction 'Microsoft.Network/*' `
+                    -TargetType 'AzureSubscription' |
+                    Should -Be 'Can manage Azure networking resources in this Azure subscription'
+            }
+        }
+
+        It 'Describes Azure Resource Health availability status read actions in plain language' {
+            InModuleScope Devolutions.CIEM {
+                ResolveCIEMEffectivePermissionActionDescription `
+                    -Provider Azure `
+                    -NativeAction 'Microsoft.ResourceHealth/availabilityStatuses/read' `
+                    -TargetType 'AzureSubscription' |
+                    Should -Be 'Can read Azure resource health availability statuses in this Azure subscription'
+            }
+        }
+
+        It 'Describes common Azure role actions discovered from identity projections' {
+            InModuleScope Devolutions.CIEM {
+                $actions = @(
+                    'Microsoft.Authorization/locks/read',
+                    'Microsoft.CognitiveServices/accounts/listkeys/action',
+                    'Microsoft.Compute/disks/read',
+                    'Microsoft.ManagedIdentity/userAssignedIdentities/*/assign/action',
+                    'Microsoft.Network/networkInterfaces/join/action',
+                    'Microsoft.OperationalInsights/workspaces/search/action',
+                    'Microsoft.RecoveryServices/Vaults/backupPolicies/write',
+                    'Microsoft.Resources/subscriptions/operationresults/read',
+                    'Microsoft.Sql/servers/firewallRules/write',
+                    'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'
+                )
+
+                foreach ($action in $actions) {
+                    {
+                        ResolveCIEMEffectivePermissionActionDescription `
+                            -Provider Azure `
+                            -NativeAction $action `
+                            -TargetType 'AzureSubscription'
+                    } | Should -Not -Throw
+                }
+            }
+        }
     }
 
     Context 'when directory role and app consent graph edges exist' {
