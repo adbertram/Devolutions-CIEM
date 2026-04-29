@@ -96,35 +96,60 @@ function New-CIEMScanPage {
                     Sync-UDElement -Id 'selectionSummary'
                 } -Columns @(
                     New-UDDataGridColumn -Field 'info' -HeaderName 'Info' -Width 60 -Render {
+                        $checkTitle = [string]$EventData.title
+                        $checkSeverity = [string]$EventData.severity
+                        $checkProvider = [string]$EventData.provider
+                        $checkService = [string]$EventData.service
+                        $checkDescription = [string]$EventData.description
+                        $checkRisk = [string]$EventData.risk
+                        $checkId = [string]$EventData.checkId
+                        $checkRelatedUrl = [string]$EventData.relatedUrl
+                        $checkRemediationText = [string]$EventData.remediationText
+                        $checkRemediationUrl = [string]$EventData.remediationUrl
+
+                        foreach ($requiredInfoField in @(
+                            @{ Name = 'title'; Value = $checkTitle },
+                            @{ Name = 'severity'; Value = $checkSeverity },
+                            @{ Name = 'provider'; Value = $checkProvider },
+                            @{ Name = 'service'; Value = $checkService },
+                            @{ Name = 'description'; Value = $checkDescription },
+                            @{ Name = 'risk'; Value = $checkRisk },
+                            @{ Name = 'checkId'; Value = $checkId }
+                        )) {
+                            if ([string]::IsNullOrWhiteSpace($requiredInfoField.Value)) {
+                                throw "Cannot render Scan check info button because row field '$($requiredInfoField.Name)' is empty."
+                            }
+                        }
+
                         New-UDIconButton -Icon (New-UDIcon -Icon 'InfoCircle') -Size 'small' -OnClick {
                             Show-UDModal -Header {
-                                New-UDTypography -Text $EventData.title -Variant 'h6'
+                                New-UDTypography -Text $checkTitle -Variant 'h6'
                             } -Content {
-                                $sev = $EventData.severity.ToUpper()
+                                $sev = $checkSeverity.ToUpper()
                                 $sevColor = Devolutions.CIEM\Get-SeverityColor -Severity $sev
                                 New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
                                     New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                                         New-UDChip -Label $sev -Style @{ backgroundColor = $sevColor; color = 'white' }
-                                        New-UDChip -Label $EventData.provider -Variant 'outlined'
-                                        New-UDChip -Label $EventData.service -Variant 'outlined'
+                                        New-UDChip -Label $checkProvider -Variant 'outlined'
+                                        New-UDChip -Label $checkService -Variant 'outlined'
                                     }
                                 }
                                 New-UDTypography -Text 'Description' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                New-UDTypography -Text $EventData.description -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                New-UDTypography -Text $checkDescription -Variant 'body2' -Style @{ marginBottom = '16px' }
                                 New-UDTypography -Text 'Risk' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                New-UDTypography -Text $EventData.risk -Variant 'body2' -Style @{ marginBottom = '16px' }
-                                if ($EventData.remediationText) {
+                                New-UDTypography -Text $checkRisk -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                if ($checkRemediationText) {
                                     New-UDTypography -Text 'Remediation' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                    New-UDTypography -Text $EventData.remediationText -Variant 'body2' -Style @{ marginBottom = '16px' }
+                                    New-UDTypography -Text $checkRemediationText -Variant 'body2' -Style @{ marginBottom = '16px' }
                                 }
                                 New-UDTypography -Text 'Check ID' -Variant 'subtitle2' -Style @{ fontWeight = 'bold'; marginBottom = '4px' }
-                                New-UDTypography -Text $EventData.checkId -Variant 'body2' -Style @{ marginBottom = '16px'; fontFamily = 'monospace' }
+                                New-UDTypography -Text $checkId -Variant 'body2' -Style @{ marginBottom = '16px'; fontFamily = 'monospace' }
                             } -Footer {
                                 New-UDStack -Direction 'row' -Spacing 2 -Content {
-                                    if ($EventData.relatedUrl) {
-                                        New-UDButton -Text 'Documentation' -Variant 'outlined' -OnClick { Invoke-UDRedirect -Url $EventData.relatedUrl -OpenInNewWindow }
+                                    if ($checkRelatedUrl) {
+                                        New-UDButton -Text 'Documentation' -Variant 'outlined' -OnClick { Invoke-UDRedirect -Url $checkRelatedUrl -OpenInNewWindow }
                                     }
-                                    if ($EventData.remediationUrl) {
+                                    if ($checkRemediationUrl) {
                                         New-UDButton -Text 'Remediation' -Variant 'outlined' -OnClick { Show-UDToast -Message 'This is where we could link to Devolutions PAM articles on how PAM remediates this.' -Duration 5000 }
                                     }
                                     New-UDButton -Text 'Close' -OnClick { Hide-UDModal }
@@ -218,7 +243,7 @@ function New-CIEMScanPage {
                             CheckId       = $selectedCheckIds
                             IncludePassed = $true
                         }
-                        Set-PSUCache -Key $script:ScanConfigCacheKey -Value $scanConfig -Integrated
+                        Set-PSUCache -Key 'CIEM:ScanConfig' -Value $scanConfig -Integrated
 
                         Devolutions.CIEM\Write-CIEMLog -Message "Launching CIEM Scan job for providers: $($selectedProviders -join ', ')..." -Severity INFO -Component 'PSU-ScanPage'
 

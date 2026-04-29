@@ -146,8 +146,8 @@ function New-CIEMEnvironmentPage {
                             }
                             New-UDButton -Id 'cancelDiscoveryBtn' -Text 'Cancel' -Variant 'outlined' -Color 'error' -Size 'small' -OnClick {
                                 Devolutions.CIEM\Stop-CIEMAzureDiscovery
-                                # Also cancel PSU jobs running discovery
-                                $discoveryJobs = @(Get-PSUJob -Status 'Running' -Integrated | Where-Object { $_.Script -and $_.Script.Name -like '*Discovery*' })
+                                # Also cancel the CIEM discovery PSU script job.
+                                $discoveryJobs = @(Get-PSUJob -Status 'Running' -Integrated | Where-Object { $_.Script -and $_.Script.Name -eq 'Checks/Start-CIEMAzureDiscovery' })
                                 foreach ($job in $discoveryJobs) {
                                     Stop-PSUJob -Job $job -Integrated
                                 }
