@@ -31,49 +31,52 @@ function Save-CIEMGraphEdge {
 
     process {
         $ErrorActionPreference = 'Stop'
-        $sql = @"
-INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at)
-VALUES (@source_id, @target_id, @kind, @properties, @computed, @collected_at)
-"@
 
+        $items = [System.Collections.Generic.List[object]]::new()
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
-                $collectedAt = if ($obj.CollectedAt) { $obj.CollectedAt } else { (Get-Date).ToString('o') }
-                $computedVal = if ($null -ne $obj.Computed) { $obj.Computed } else { 0 }
-                $queryParams = @{
-                    Query      = $sql
-                    Parameters = @{
-                        source_id    = $obj.SourceId
-                        target_id    = $obj.TargetId
-                        kind         = $obj.Kind
-                        properties   = $obj.Properties
-                        computed     = $computedVal
-                        collected_at = $collectedAt
-                    }
-                    AsNonQuery = $true
+                $effectiveCollectedAt = if ([string]::IsNullOrWhiteSpace([string]$obj.CollectedAt)) {
+                    (Get-Date).ToString('o')
                 }
-                if ($Connection) { $queryParams.Connection = $Connection }
-                Invoke-CIEMQuery @queryParams | Out-Null
+                else {
+                    [string]$obj.CollectedAt
+                }
+
+                $effectiveComputed = if ($null -ne $obj.Computed) {
+                    [int]$obj.Computed
+                }
+                else {
+                    0
+                }
+
+                $items.Add(@{
+                    SourceId    = $obj.SourceId
+                    TargetId    = $obj.TargetId
+                    Kind        = $obj.Kind
+                    Properties  = $obj.Properties
+                    Computed    = $effectiveComputed
+                    CollectedAt = $effectiveCollectedAt
+                })
             }
-        } else {
-            if (-not $CollectedAt) {
-                $CollectedAt = (Get-Date).ToString('o')
+        }
+        else {
+            $effectiveCollectedAt = if ([string]::IsNullOrWhiteSpace($CollectedAt)) {
+                (Get-Date).ToString('o')
+            }
+            else {
+                $CollectedAt
             }
 
-            $queryParams = @{
-                Query      = $sql
-                Parameters = @{
-                    source_id    = $SourceId
-                    target_id    = $TargetId
-                    kind         = $Kind
-                    properties   = $Properties
-                    computed     = $Computed
-                    collected_at = $CollectedAt
-                }
-                AsNonQuery = $true
-            }
-            if ($Connection) { $queryParams.Connection = $Connection }
-            Invoke-CIEMQuery @queryParams | Out-Null
+            $items.Add(@{
+                SourceId    = $SourceId
+                TargetId    = $TargetId
+                Kind        = $Kind
+                Properties  = $Properties
+                Computed    = $Computed
+                CollectedAt = $effectiveCollectedAt
+            })
         }
+
+        SaveCIEMGraphEntity -Entity Edge -Items $items.ToArray() -Connection $Connection
     }
 }

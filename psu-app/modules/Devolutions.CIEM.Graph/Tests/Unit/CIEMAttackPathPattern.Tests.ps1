@@ -252,6 +252,7 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
 
         It 'every remediation script template has no unknown replacement token format' {
             $scriptRoot = InModuleScope Devolutions.CIEM { $script:ModuleRoot }
+            $knownTokens = InModuleScope Devolutions.CIEM { @((GetCIEMAttackPathRemediationTokenConfig).Keys) }
             foreach ($file in $script:PatternFiles) {
                 $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
                 $scriptPath = Join-Path $scriptRoot $raw.remediation_script
@@ -259,21 +260,7 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
                 $content = Get-Content $scriptPath -Raw
                 $tokens = @([regex]::Matches($content, '{{([A-Z0-9_]+)}}') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
                 foreach ($token in $tokens) {
-                    $token | Should -BeIn @(
-                        'PATTERN_NAME',
-                        'PATH_CHAIN',
-                        'ROLE_ASSIGNMENT_DELETE_COMMANDS',
-                        'NSG_RULE_DELETE_COMMANDS',
-                        'GROUP_MEMBER_REMOVE_COMMANDS',
-                        'AUTH_PROFILE_ID',
-                        'AUTH_PROFILE_NAME',
-                        'AUTH_PROFILE_METHOD',
-                        'TENANT_ID',
-                        'CLIENT_ID',
-                        'MANAGED_IDENTITY_CLIENT_ID',
-                        'PSU_ENVIRONMENT',
-                        'PSU_WEBSITE_NAME'
-                    ) -Because "pattern '$($raw.id)' template uses unknown token '$token'"
+                    $token | Should -BeIn $knownTokens -Because "pattern '$($raw.id)' template uses unknown token '$token'"
                 }
             }
         }

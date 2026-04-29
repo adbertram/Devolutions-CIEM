@@ -1,3 +1,19 @@
+BeforeDiscovery {
+    $script:AttackPathFilterDiscoveryCases = @(
+        Get-Content -Path (Join-Path $PSScriptRoot '..' 'Fixtures' 'attack_path_filter_cases.json') -Raw |
+            ConvertFrom-Json -Depth 20 |
+            ForEach-Object {
+                @{
+                    name           = [string]$_.name
+                    propertiesJson = [string]$_.propertiesJson
+                    filter         = $_.filter
+                    expected       = $_.expected
+                    throwsLike     = $_.throwsLike
+                }
+            }
+    )
+}
+
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
@@ -20,6 +36,7 @@ BeforeAll {
     }
 
     Sync-CIEMAttackPathRuleCatalog | Out-Null
+    $script:AttackPathFilterCases = @(Get-Content -Path (Join-Path $PSScriptRoot '..' 'Fixtures' 'attack_path_filter_cases.json') -Raw | ConvertFrom-Json -Depth 20)
 }
 
 Describe 'Attack Path Engine' {
@@ -33,209 +50,41 @@ Describe 'Attack Path Engine' {
     # =========================================================================
     Context 'ResolveCIEMAttackPathFilter' {
 
-        It 'Handles eq operator returning true when property matches' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"accountEnabled":false}'
-                $filter = [PSCustomObject]@{ property = 'accountEnabled'; op = 'eq'; value = $false }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
+        It 'Defines strict fixture-backed filter cases' {
+            $script:AttackPathFilterCases | Should -HaveCount 23
+            foreach ($case in $script:AttackPathFilterCases) {
+                [string]$case.name | Should -Not -BeNullOrEmpty
+                [string]$case.propertiesJson | Should -Not -BeNullOrEmpty
+                $case.filter.PSObject.Properties.Name | Sort-Object | Should -Be @('op', 'property', 'value')
+                [string]$case.filter.property | Should -Not -BeNullOrEmpty
+                [string]$case.filter.op | Should -Not -BeNullOrEmpty
+
+                $hasExpected = $case.PSObject.Properties.Name -contains 'expected'
+                $hasThrowsLike = $case.PSObject.Properties.Name -contains 'throwsLike'
+                ($hasExpected -xor $hasThrowsLike) | Should -BeTrue
             }
         }
 
-        It 'Handles eq operator returning false when property does not match' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"accountEnabled":true}'
-                $filter = [PSCustomObject]@{ property = 'accountEnabled'; op = 'eq'; value = $false }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
+        It '<name>' -ForEach $script:AttackPathFilterDiscoveryCases {
+            InModuleScope Devolutions.CIEM -Parameters @{
+                PropertiesJson = $propertiesJson
+                Filter         = $filter
+                Expected       = $expected
+                ThrowsLike     = $throwsLike
+            } {
+                $filterObject = [PSCustomObject]@{
+                    property = [string]$Filter.property
+                    op       = [string]$Filter.op
+                    value    = $Filter.value
+                }
 
-        It 'Handles neq operator' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"status":"active"}'
-                $filter = [PSCustomObject]@{ property = 'status'; op = 'neq'; value = 'inactive' }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles gt operator for numeric comparison' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"daysSinceSignIn":120}'
-                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt'; value = 90 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles gt operator returning false when value is less' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"daysSinceSignIn":30}'
-                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt'; value = 90 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Handles lt operator for numeric comparison' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"riskScore":3}'
-                $filter = [PSCustomObject]@{ property = 'riskScore'; op = 'lt'; value = 5 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles in operator when property value is in array' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"roleName":"Owner"}'
-                $filter = [PSCustomObject]@{ property = 'roleName'; op = 'in'; value = @('Owner', 'Contributor') }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles in operator returning false when not in array' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"roleName":"Reader"}'
-                $filter = [PSCustomObject]@{ property = 'roleName'; op = 'in'; value = @('Owner', 'Contributor') }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Handles contains_port operator when management port is present' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":3389,"protocol":"TCP","rule_name":"AllowRDP"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389, 5985, 5986) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles contains_port with string port numbers in JSON' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"22","protocol":"TCP","rule_name":"AllowSSH"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles contains_port returning false when no matching port' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":443,"protocol":"TCP","rule_name":"AllowHTTPS"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389, 5985, 5986) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Returns false for contains_port when open_ports is null' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"other":"value"}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Handles contains_port with wildcard port "*" matching any target port' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"*","protocol":"*","rule_name":"AllowAll"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles contains_port with port range containing a target port' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"1-65535","protocol":"TCP","rule_name":"AllowAllTCP"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389, 5985, 5986) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles contains_port with port range not containing target ports' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"100-200","protocol":"TCP","rule_name":"AllowRange"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389, 5985, 5986) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Handles contains_port with mixed single ports and ranges' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"443","protocol":"TCP","rule_name":"HTTPS"},{"port":"3380-3400","protocol":"TCP","rule_name":"RDPRange"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles contains_port with inverted port range (high-low) by normalizing' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"5000-3000","protocol":"TCP","rule_name":"InvertedRange"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(3389) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles contains_port with non-numeric port string (e.g. "Any") without crashing' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"open_ports":[{"port":"Any","protocol":"*","rule_name":"AllowAll"}]}'
-                $filter = [PSCustomObject]@{ property = 'open_ports'; op = 'contains_port'; value = @(22, 3389) }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Throws on unknown filter operator' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"x":1}'
-                $filter = [PSCustomObject]@{ property = 'x'; op = 'bogus'; value = 1 }
-                { ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter } | Should -Throw '*Unknown filter operator*'
-            }
-        }
-
-        It 'Handles gt_or_null returning true when property exceeds threshold' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"daysSinceSignIn":120}'
-                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles gt_or_null returning false when property is below threshold' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"daysSinceSignIn":30}'
-                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeFalse
-            }
-        }
-
-        It 'Handles gt_or_null returning true when property is missing (never-signed-in identity)' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"accountEnabled":true}'
-                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
-            }
-        }
-
-        It 'Handles gt_or_null returning true when property is explicitly null' {
-            InModuleScope Devolutions.CIEM {
-                $json = '{"daysSinceSignIn":null}'
-                $filter = [PSCustomObject]@{ property = 'daysSinceSignIn'; op = 'gt_or_null'; value = 90 }
-                $result = ResolveCIEMAttackPathFilter -PropertiesJson $json -Filter $filter
-                $result | Should -BeTrue
+                if (-not [string]::IsNullOrEmpty([string]$ThrowsLike)) {
+                    { ResolveCIEMAttackPathFilter -PropertiesJson ([string]$PropertiesJson) -Filter $filterObject } | Should -Throw ([string]$ThrowsLike)
+                }
+                else {
+                    $result = ResolveCIEMAttackPathFilter -PropertiesJson ([string]$PropertiesJson) -Filter $filterObject
+                    $result | Should -Be ([bool]$Expected)
+                }
             }
         }
     }

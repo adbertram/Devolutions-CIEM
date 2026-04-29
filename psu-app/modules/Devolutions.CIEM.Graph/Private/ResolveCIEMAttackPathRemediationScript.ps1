@@ -423,6 +423,463 @@ function GetCIEMRequiredTokenObjectValue {
     $value
 }
 
+function TestCIEMAttackPathRemediationTokenRegistry {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [hashtable]$Registry = $script:CIEMAttackPathRemediationTokensConfig
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if ($null -eq $Registry -or $Registry.Count -eq 0) {
+        throw 'Attack path remediation token registry is empty.'
+    }
+
+    $allowedFields = @(
+        'Name',
+        'Resolver',
+        'RequiredNodeKinds',
+        'RequiredEdgeKinds',
+        'RequiredEdgeKindMode',
+        'OutputType',
+        'Description'
+    )
+
+    foreach ($token in @($Registry.Keys | Sort-Object)) {
+        if ([string]::IsNullOrWhiteSpace([string]$token)) {
+            throw 'Attack path remediation token registry contains an empty token name.'
+        }
+
+        if ($token -cnotmatch '^[A-Z0-9_]+$') {
+            throw "Attack path remediation token '$token' must be uppercase letters, numbers, and underscores."
+        }
+
+        $entry = $Registry[$token]
+        if ($null -eq $entry) {
+            throw "Attack path remediation token '$token' has no registry entry."
+        }
+
+        $fields = @($entry.Keys | Sort-Object)
+        $expectedFields = @($allowedFields | Sort-Object)
+        $unexpectedFields = @($fields | Where-Object { $_ -notin $expectedFields })
+        if ($unexpectedFields.Count -gt 0) {
+            throw "Attack path remediation token '$token' has unknown field(s): $($unexpectedFields -join ', ')."
+        }
+
+        $missingFields = @($expectedFields | Where-Object { $_ -notin $fields })
+        if ($missingFields.Count -gt 0) {
+            throw "Attack path remediation token '$token' is missing required field(s): $($missingFields -join ', ')."
+        }
+
+        if ([string]$entry.Name -cne [string]$token) {
+            throw "Attack path remediation token key '$token' must match entry Name '$($entry.Name)'."
+        }
+
+        if ([string]::IsNullOrWhiteSpace([string]$entry.Resolver)) {
+            throw "Attack path remediation token '$token' has an empty Resolver."
+        }
+
+        Get-Command -Name ([string]$entry.Resolver) -CommandType Function -ErrorAction Stop | Out-Null
+
+        if ($null -eq $entry.RequiredNodeKinds) {
+            throw "Attack path remediation token '$token' is missing RequiredNodeKinds."
+        }
+
+        if ($null -eq $entry.RequiredEdgeKinds) {
+            throw "Attack path remediation token '$token' is missing RequiredEdgeKinds."
+        }
+
+        if ([string]$entry.RequiredEdgeKindMode -notin @('All', 'Any')) {
+            throw "Attack path remediation token '$token' has unsupported RequiredEdgeKindMode '$($entry.RequiredEdgeKindMode)'."
+        }
+
+        if ([string]$entry.OutputType -notin @('Text', 'PowerShell')) {
+            throw "Attack path remediation token '$token' has unsupported OutputType '$($entry.OutputType)'."
+        }
+
+        if ([string]::IsNullOrWhiteSpace([string]$entry.Description)) {
+            throw "Attack path remediation token '$token' has an empty Description."
+        }
+    }
+
+    $true
+}
+
+function GetCIEMAttackPathRemediationTokenConfig {
+    [CmdletBinding()]
+    param()
+
+    $ErrorActionPreference = 'Stop'
+
+    TestCIEMAttackPathRemediationTokenRegistry | Out-Null
+    $script:CIEMAttackPathRemediationTokensConfig
+}
+
+function AssertCIEMAttackPathRemediationTokenContext {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Token,
+
+        [Parameter(Mandatory)]
+        [hashtable]$TokenConfig,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $patternId = [string]$AttackPath.PatternId
+    if ([string]::IsNullOrWhiteSpace($patternId)) {
+        throw "Cannot render remediation script token '$Token' because attack path PatternId is empty."
+    }
+
+    $requiredNodeKinds = @($TokenConfig.RequiredNodeKinds)
+    foreach ($kind in $requiredNodeKinds) {
+        if ($kind -eq '*') {
+            if (@($AttackPath.Path).Count -eq 0) {
+                throw "Attack path remediation token '$Token' requires at least one path node in attack path '$patternId'."
+            }
+        }
+        elseif (-not @($AttackPath.Path | Where-Object { $_.kind -eq $kind })) {
+            throw "Attack path remediation token '$Token' requires node kind '$kind' in attack path '$patternId'."
+        }
+    }
+
+    $requiredEdgeKinds = @($TokenConfig.RequiredEdgeKinds)
+    if ($requiredEdgeKinds.Count -eq 0) {
+        return
+    }
+
+    $edgeKinds = @($AttackPath.Edges | ForEach-Object { [string]$_.kind } | Sort-Object -Unique)
+    if ([string]$TokenConfig.RequiredEdgeKindMode -eq 'All') {
+        foreach ($kind in $requiredEdgeKinds) {
+            if ($kind -notin $edgeKinds) {
+                throw "Attack path remediation token '$Token' requires edge kind '$kind' in attack path '$patternId'."
+            }
+        }
+    }
+    elseif (-not @($requiredEdgeKinds | Where-Object { $_ -in $edgeKinds })) {
+        throw "Attack path remediation token '$Token' requires one of edge kinds '$($requiredEdgeKinds -join ', ')' in attack path '$patternId'."
+    }
+}
+
+function ResolveCIEMAttackPathPatternNameToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    GetCIEMRequiredTokenObjectValue -Object $Pattern -PropertyName 'Name' -Context 'attack path pattern'
+}
+
+function ResolveCIEMAttackPathChainToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    GetCIEMAttackPathChainText -AttackPath $AttackPath
+}
+
+function ResolveCIEMAttackPathRoleAssignmentDeleteCommandsToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    NewCIEMRoleAssignmentDeleteCommandBlock -AttackPath $AttackPath
+}
+
+function ResolveCIEMAttackPathNsgRuleDeleteCommandsToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    NewCIEMNsgRuleDeleteCommandBlock -AttackPath $AttackPath
+}
+
+function ResolveCIEMAttackPathGroupMemberRemoveCommandsToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    NewCIEMGroupMemberRemoveCommandBlock -AttackPath $AttackPath
+}
+
+function GetCIEMAttackPathTokenAuthProfile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if (-not $Context.ContainsKey('AuthProfile') -or $null -eq $Context['AuthProfile']) {
+        $Context['AuthProfile'] = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript
+    }
+
+    $Context['AuthProfile']
+}
+
+function ResolveCIEMAttackPathAuthProfileIdToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Id' -Context 'active Azure authentication profile'
+}
+
+function ResolveCIEMAttackPathAuthProfileNameToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Name' -Context 'active Azure authentication profile'
+}
+
+function ResolveCIEMAttackPathAuthProfileMethodToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Method' -Context 'active Azure authentication profile'
+}
+
+function ResolveCIEMAttackPathTenantIdToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'TenantId' -Context 'active Azure authentication profile'
+}
+
+function ResolveCIEMAttackPathClientIdToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'ClientId' -Context 'active Azure authentication profile'
+}
+
+function ResolveCIEMAttackPathManagedIdentityClientIdToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'ManagedIdentityClientId' -Context 'active Azure authentication profile'
+}
+
+function GetCIEMAttackPathTokenPsuEnvironment {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if (-not $Context.ContainsKey('PsuEnvironment') -or $null -eq $Context['PsuEnvironment']) {
+        $Context['PsuEnvironment'] = Get-PSUInstalledEnvironment
+    }
+
+    $Context['PsuEnvironment']
+}
+
+function ResolveCIEMAttackPathPsuEnvironmentToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $psuEnvironment = GetCIEMAttackPathTokenPsuEnvironment -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $psuEnvironment -PropertyName 'Environment' -Context 'PSU environment'
+}
+
+function ResolveCIEMAttackPathPsuWebsiteNameToken {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $psuEnvironment = GetCIEMAttackPathTokenPsuEnvironment -Context $Context
+    GetCIEMRequiredTokenObjectValue -Object $psuEnvironment -PropertyName 'WebsiteName' -Context 'PSU environment'
+}
+
+function ResolveCIEMAttackPathTokenValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Token,
+
+        [Parameter(Mandatory)]
+        [object]$Pattern,
+
+        [Parameter(Mandatory)]
+        [object]$AttackPath,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Context
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $registry = GetCIEMAttackPathRemediationTokenConfig
+    if (-not $registry.ContainsKey($Token)) {
+        throw "Attack path remediation script '$($AttackPath.PsuScriptName)' contains unknown token '$Token'."
+    }
+
+    $tokenConfig = $registry[$Token]
+    AssertCIEMAttackPathRemediationTokenContext -Token $Token -TokenConfig $tokenConfig -AttackPath $AttackPath
+
+    $resolver = Get-Command -Name ([string]$tokenConfig.Resolver) -CommandType Function -ErrorAction Stop
+    $value = & $resolver -Pattern $Pattern -AttackPath $AttackPath -Context $Context
+    if ($null -eq $value) {
+        throw "Attack path remediation token '$Token' resolved to null."
+    }
+
+    $stringValue = [string]$value
+    if ([string]::IsNullOrWhiteSpace($stringValue)) {
+        throw "Attack path remediation token '$Token' resolved to an empty value."
+    }
+
+    $stringValue
+}
+
 function ResolveCIEMAttackPathScriptContent {
     [CmdletBinding()]
     param(
@@ -444,58 +901,10 @@ function ResolveCIEMAttackPathScriptContent {
 
     $content = $ScriptContent
     $tokens = @([regex]::Matches($content, '{{([A-Z0-9_]+)}}') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-    $authProfile = $null
-    $psuEnvironment = $null
+    $context = @{}
 
     foreach ($token in $tokens) {
-        $value = switch ($token) {
-            'PATTERN_NAME' { [string]$Pattern.Name; break }
-            'PATH_CHAIN' { GetCIEMAttackPathChainText -AttackPath $AttackPath; break }
-            'ROLE_ASSIGNMENT_DELETE_COMMANDS' { NewCIEMRoleAssignmentDeleteCommandBlock -AttackPath $AttackPath; break }
-            'NSG_RULE_DELETE_COMMANDS' { NewCIEMNsgRuleDeleteCommandBlock -AttackPath $AttackPath; break }
-            'GROUP_MEMBER_REMOVE_COMMANDS' { NewCIEMGroupMemberRemoveCommandBlock -AttackPath $AttackPath; break }
-            'AUTH_PROFILE_ID' {
-                if ($null -eq $authProfile) { $authProfile = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript }
-                GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Id' -Context 'active Azure authentication profile'
-                break
-            }
-            'AUTH_PROFILE_NAME' {
-                if ($null -eq $authProfile) { $authProfile = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript }
-                GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Name' -Context 'active Azure authentication profile'
-                break
-            }
-            'AUTH_PROFILE_METHOD' {
-                if ($null -eq $authProfile) { $authProfile = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript }
-                GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Method' -Context 'active Azure authentication profile'
-                break
-            }
-            'TENANT_ID' {
-                if ($null -eq $authProfile) { $authProfile = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript }
-                GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'TenantId' -Context 'active Azure authentication profile'
-                break
-            }
-            'CLIENT_ID' {
-                if ($null -eq $authProfile) { $authProfile = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript }
-                GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'ClientId' -Context 'active Azure authentication profile'
-                break
-            }
-            'MANAGED_IDENTITY_CLIENT_ID' {
-                if ($null -eq $authProfile) { $authProfile = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript }
-                GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'ManagedIdentityClientId' -Context 'active Azure authentication profile'
-                break
-            }
-            'PSU_ENVIRONMENT' {
-                if ($null -eq $psuEnvironment) { $psuEnvironment = Get-PSUInstalledEnvironment }
-                GetCIEMRequiredTokenObjectValue -Object $psuEnvironment -PropertyName 'Environment' -Context 'PSU environment'
-                break
-            }
-            'PSU_WEBSITE_NAME' {
-                if ($null -eq $psuEnvironment) { $psuEnvironment = Get-PSUInstalledEnvironment }
-                GetCIEMRequiredTokenObjectValue -Object $psuEnvironment -PropertyName 'WebsiteName' -Context 'PSU environment'
-                break
-            }
-            default { throw "Attack path remediation script '$($AttackPath.PsuScriptName)' contains unknown token '$token'." }
-        }
+        $value = ResolveCIEMAttackPathTokenValue -Token $token -Pattern $Pattern -AttackPath $AttackPath -Context $context
         $content = $content.Replace("{{$token}}", [string]$value)
     }
 

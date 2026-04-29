@@ -38,63 +38,62 @@ function Save-CIEMGraphNode {
     process {
         $ErrorActionPreference = 'Stop'
 
+        $items = [System.Collections.Generic.List[object]]::new()
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
-                $collectedAt = if ($obj.CollectedAt) { $obj.CollectedAt } else { (Get-Date).ToString('o') }
-                $provider = if ($obj.Provider) { $obj.Provider } else { 'azure' }
-                $parameters = @{
-                    id              = $obj.Id
-                    kind            = $obj.Kind
-                    display_name    = $obj.DisplayName
-                    provider        = $provider
-                    subscription_id = $obj.SubscriptionId
-                    resource_group  = $obj.ResourceGroup
-                    properties      = $obj.Properties
-                    collected_at    = $collectedAt
+                $effectiveCollectedAt = if ([string]::IsNullOrWhiteSpace([string]$obj.CollectedAt)) {
+                    (Get-Date).ToString('o')
+                }
+                else {
+                    [string]$obj.CollectedAt
                 }
 
-                $sql = @"
-INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at)
-VALUES (@id, @kind, @display_name, @provider, @subscription_id, @resource_group, @properties, @collected_at)
-"@
-
-                if ($Connection) {
-                    Invoke-PSUSQLiteQuery -Connection $Connection -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-                } else {
-                    Invoke-CIEMQuery -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
+                $effectiveProvider = if ([string]::IsNullOrWhiteSpace([string]$obj.Provider)) {
+                    'azure'
                 }
+                else {
+                    [string]$obj.Provider
+                }
+
+                $items.Add(@{
+                    Id             = $obj.Id
+                    Kind           = $obj.Kind
+                    DisplayName    = $obj.DisplayName
+                    Provider       = $effectiveProvider
+                    SubscriptionId = $obj.SubscriptionId
+                    ResourceGroup  = $obj.ResourceGroup
+                    Properties     = $obj.Properties
+                    CollectedAt    = $effectiveCollectedAt
+                })
             }
-            return
+        }
+        else {
+            $effectiveCollectedAt = if ([string]::IsNullOrWhiteSpace($CollectedAt)) {
+                (Get-Date).ToString('o')
+            }
+            else {
+                $CollectedAt
+            }
+
+            $effectiveProvider = if ([string]::IsNullOrWhiteSpace($Provider)) {
+                'azure'
+            }
+            else {
+                $Provider
+            }
+
+            $items.Add(@{
+                Id             = $Id
+                Kind           = $Kind
+                DisplayName    = $DisplayName
+                Provider       = $effectiveProvider
+                SubscriptionId = $SubscriptionId
+                ResourceGroup  = $ResourceGroup
+                Properties     = $Properties
+                CollectedAt    = $effectiveCollectedAt
+            })
         }
 
-        if (-not $CollectedAt) {
-            $CollectedAt = (Get-Date).ToString('o')
-        }
-
-        if (-not $Provider) {
-            $Provider = 'azure'
-        }
-
-        $parameters = @{
-            id              = $Id
-            kind            = $Kind
-            display_name    = $DisplayName
-            provider        = $Provider
-            subscription_id = $SubscriptionId
-            resource_group  = $ResourceGroup
-            properties      = $Properties
-            collected_at    = $CollectedAt
-        }
-
-        $sql = @"
-INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at)
-VALUES (@id, @kind, @display_name, @provider, @subscription_id, @resource_group, @properties, @collected_at)
-"@
-
-        if ($Connection) {
-            Invoke-PSUSQLiteQuery -Connection $Connection -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-        } else {
-            Invoke-CIEMQuery -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
-        }
+        SaveCIEMGraphEntity -Entity Node -Items $items.ToArray() -Connection $Connection
     }
 }

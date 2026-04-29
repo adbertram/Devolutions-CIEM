@@ -1,0 +1,232 @@
+[
+  {
+    "name": "Handles eq operator returning true when property matches",
+    "propertiesJson": "{\"accountEnabled\":false}",
+    "filter": {
+      "property": "accountEnabled",
+      "op": "eq",
+      "value": false
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles eq operator returning false when property does not match",
+    "propertiesJson": "{\"accountEnabled\":true}",
+    "filter": {
+      "property": "accountEnabled",
+      "op": "eq",
+      "value": false
+    },
+    "expected": false
+  },
+  {
+    "name": "Handles neq operator",
+    "propertiesJson": "{\"status\":\"active\"}",
+    "filter": {
+      "property": "status",
+      "op": "neq",
+      "value": "inactive"
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles gt operator for numeric comparison",
+    "propertiesJson": "{\"daysSinceSignIn\":120}",
+    "filter": {
+      "property": "daysSinceSignIn",
+      "op": "gt",
+      "value": 90
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles gt operator returning false when value is less",
+    "propertiesJson": "{\"daysSinceSignIn\":30}",
+    "filter": {
+      "property": "daysSinceSignIn",
+      "op": "gt",
+      "value": 90
+    },
+    "expected": false
+  },
+  {
+    "name": "Handles lt operator for numeric comparison",
+    "propertiesJson": "{\"riskScore\":3}",
+    "filter": {
+      "property": "riskScore",
+      "op": "lt",
+      "value": 5
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles in operator when property value is in array",
+    "propertiesJson": "{\"roleName\":\"Owner\"}",
+    "filter": {
+      "property": "roleName",
+      "op": "in",
+      "value": ["Owner", "Contributor"]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles in operator returning false when not in array",
+    "propertiesJson": "{\"roleName\":\"Reader\"}",
+    "filter": {
+      "property": "roleName",
+      "op": "in",
+      "value": ["Owner", "Contributor"]
+    },
+    "expected": false
+  },
+  {
+    "name": "Handles contains_port operator when management port is present",
+    "propertiesJson": "{\"open_ports\":[{\"port\":3389,\"protocol\":\"TCP\",\"rule_name\":\"AllowRDP\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389, 5985, 5986]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles contains_port with string port numbers in JSON",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"22\",\"protocol\":\"TCP\",\"rule_name\":\"AllowSSH\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles contains_port returning false when no matching port",
+    "propertiesJson": "{\"open_ports\":[{\"port\":443,\"protocol\":\"TCP\",\"rule_name\":\"AllowHTTPS\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389, 5985, 5986]
+    },
+    "expected": false
+  },
+  {
+    "name": "Returns false for contains_port when open_ports is null",
+    "propertiesJson": "{\"other\":\"value\"}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389]
+    },
+    "expected": false
+  },
+  {
+    "name": "Handles contains_port with wildcard port matching any target port",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"*\",\"protocol\":\"*\",\"rule_name\":\"AllowAll\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles contains_port with port range containing a target port",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"1-65535\",\"protocol\":\"TCP\",\"rule_name\":\"AllowAllTCP\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389, 5985, 5986]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles contains_port with port range not containing target ports",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"100-200\",\"protocol\":\"TCP\",\"rule_name\":\"AllowRange\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389, 5985, 5986]
+    },
+    "expected": false
+  },
+  {
+    "name": "Handles contains_port with mixed single ports and ranges",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"443\",\"protocol\":\"TCP\",\"rule_name\":\"HTTPS\"},{\"port\":\"3380-3400\",\"protocol\":\"TCP\",\"rule_name\":\"RDPRange\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles contains_port with inverted port range by normalizing",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"5000-3000\",\"protocol\":\"TCP\",\"rule_name\":\"InvertedRange\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [3389]
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles contains_port with non-numeric port string without crashing",
+    "propertiesJson": "{\"open_ports\":[{\"port\":\"Any\",\"protocol\":\"*\",\"rule_name\":\"AllowAll\"}]}",
+    "filter": {
+      "property": "open_ports",
+      "op": "contains_port",
+      "value": [22, 3389]
+    },
+    "expected": false
+  },
+  {
+    "name": "Throws on unknown filter operator",
+    "propertiesJson": "{\"x\":1}",
+    "filter": {
+      "property": "x",
+      "op": "bogus",
+      "value": 1
+    },
+    "throwsLike": "*Unknown filter operator*"
+  },
+  {
+    "name": "Handles gt_or_null returning true when property exceeds threshold",
+    "propertiesJson": "{\"daysSinceSignIn\":120}",
+    "filter": {
+      "property": "daysSinceSignIn",
+      "op": "gt_or_null",
+      "value": 90
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles gt_or_null returning false when property is below threshold",
+    "propertiesJson": "{\"daysSinceSignIn\":30}",
+    "filter": {
+      "property": "daysSinceSignIn",
+      "op": "gt_or_null",
+      "value": 90
+    },
+    "expected": false
+  },
+  {
+    "name": "Handles gt_or_null returning true when property is missing",
+    "propertiesJson": "{\"accountEnabled\":true}",
+    "filter": {
+      "property": "daysSinceSignIn",
+      "op": "gt_or_null",
+      "value": 90
+    },
+    "expected": true
+  },
+  {
+    "name": "Handles gt_or_null returning true when property is explicitly null",
+    "propertiesJson": "{\"daysSinceSignIn\":null}",
+    "filter": {
+      "property": "daysSinceSignIn",
+      "op": "gt_or_null",
+      "value": 90
+    },
+    "expected": true
+  }
+]
