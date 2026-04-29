@@ -29,7 +29,7 @@ function Get-PSUApp {
 
     $ErrorActionPreference = 'Stop'
 
-    Assert-PSUConnection
+    AssertPSUConnection
 
     $headers = @{
         'Authorization'              = "Bearer $($script:PSUConnection.Token)"

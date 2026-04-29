@@ -1,4 +1,4 @@
-function Invoke-CIEME2ECommand {
+function InvokeCIEME2ECommand {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]

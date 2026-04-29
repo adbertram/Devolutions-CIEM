@@ -1,4 +1,4 @@
-function Invoke-CIEMPesterSuite {
+function InvokeCIEMPesterSuite {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -32,7 +32,7 @@ function Invoke-CIEMPesterSuite {
         throw 'Invoke-Pester is required to run CIEM Pester suites.'
     }
 
-    $resolvedPaths = @(Get-CIEMTestPath -Suite $Suite -Path $Path)
+    $resolvedPaths = @(GetCIEMTestPath -Suite $Suite -Path $Path)
     $summaryPath = Join-Path ([System.IO.Path]::GetTempPath()) "ciem-pester-$([guid]::NewGuid()).json"
 
     $pathsJson = ConvertTo-Json -InputObject @($resolvedPaths) -Compress

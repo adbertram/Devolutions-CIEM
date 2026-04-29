@@ -1,4 +1,4 @@
-function Get-CIEMTestPath {
+function GetCIEMTestPath {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]

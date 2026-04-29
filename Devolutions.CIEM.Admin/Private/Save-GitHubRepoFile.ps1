@@ -1,4 +1,4 @@
-function Save-GitHubRepoFile {
+function SaveGitHubRepoFile {
     <#
     .SYNOPSIS
         Downloads a single file from a public GitHub repository to disk.
@@ -32,15 +32,15 @@ function Save-GitHubRepoFile {
         Returns nothing on error (unless -ErrorAction Stop is specified).
 
     .EXAMPLE
-        Save-GitHubRepoFile -Owner prowler-cloud -Repo prowler -Path 'README.md' -Destination '/tmp/readme.md'
+        SaveGitHubRepoFile -Owner prowler-cloud -Repo prowler -Path 'README.md' -Destination '/tmp/readme.md'
         # Downloads the README from master and saves to /tmp/readme.md.
 
     .EXAMPLE
-        Save-GitHubRepoFile -Owner prowler-cloud -Repo prowler -Ref 'v4.0.0' -Path 'setup.py' -Destination './setup.py' -Verbose
+        SaveGitHubRepoFile -Owner prowler-cloud -Repo prowler -Ref 'v4.0.0' -Path 'setup.py' -Destination './setup.py' -Verbose
         # Downloads setup.py from the v4.0.0 tag.
 
     .EXAMPLE
-        $file = Save-GitHubRepoFile -Owner prowler-cloud -Repo prowler -Path 'config.yaml' -Destination '/tmp/config.yaml'
+        $file = SaveGitHubRepoFile -Owner prowler-cloud -Repo prowler -Path 'config.yaml' -Destination '/tmp/config.yaml'
         Get-Content $file
         # Downloads and then reads the file via pipeline chaining.
     #>

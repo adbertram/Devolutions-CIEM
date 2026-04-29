@@ -62,6 +62,8 @@ function Invoke-DiagnosticStep {
         [string]$FailurePlane = 'Unknown'
     )
 
+    $ErrorActionPreference = 'Stop'
+
     try {
         [pscustomobject]@{
             Name         = $Name
@@ -89,6 +91,8 @@ function Get-FailureClassification {
         [string]$FailurePlane
     )
 
+    $ErrorActionPreference = 'Stop'
+
     switch ($FailurePlane) {
         'AzureControlPlane' { 'AzureControlPlaneUnavailable' }
         'KuduControlPlane' { 'AzureControlPlaneUnavailable' }
@@ -102,6 +106,8 @@ function Get-HttpFailureDetail {
         [Parameter(Mandatory)]
         [System.Management.Automation.ErrorRecord]$ErrorRecord
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $response = $null
     if ($ErrorRecord.Exception.PSObject.Properties.Name -contains 'Response') {
@@ -157,6 +163,8 @@ function Invoke-AzJson {
         [string[]]$Arguments
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $timeoutExe = Get-Command timeout -ErrorAction Stop
     $output = & $timeoutExe.Source $AzureCliTimeoutSeconds az @Arguments 2>&1
     if ($LASTEXITCODE -eq 124) {
@@ -175,6 +183,8 @@ function Invoke-AzJson {
 }
 
 function Get-AzAccessToken {
+    $ErrorActionPreference = 'Stop'
+
     $tokenResponse = Invoke-AzJson -Arguments @(
         'account', 'get-access-token',
         '--resource', 'https://management.azure.com/',
@@ -185,6 +195,8 @@ function Get-AzAccessToken {
 }
 
 function Get-AzSubscriptionId {
+    $ErrorActionPreference = 'Stop'
+
     $account = Invoke-AzJson -Arguments @(
         'account', 'show',
         '-o', 'json'
@@ -210,6 +222,8 @@ function Invoke-AzArmJson {
         [Parameter()]
         [object]$Body
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $baseUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Web/sites/$WebAppName"
     if ($Path.StartsWith('?')) {
@@ -246,6 +260,8 @@ function Get-KuduCredential {
         [string]$AccessToken
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $creds = Invoke-AzArmJson -SubscriptionId $SubscriptionId -AccessToken $AccessToken -Path 'config/publishingcredentials/list?api-version=2023-12-01' -Method Post -Body @{}
 
     [pscustomobject]@{
@@ -262,6 +278,8 @@ function Invoke-KuduCommand {
         [Parameter(Mandatory)]
         [string]$Command
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $uri = "https://${WebAppName}.scm.azurewebsites.net/api/command"
     $pair = '{0}:{1}' -f $Credential.UserName, $Credential.Password
@@ -288,6 +306,8 @@ function Invoke-KuduGet {
         [string]$Uri
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $pair = '{0}:{1}' -f $Credential.UserName, $Credential.Password
     $authBytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
     $authValue = [Convert]::ToBase64String($authBytes)
@@ -302,6 +322,8 @@ function Convert-AliveResult {
         [Parameter(Mandatory)]
         [string]$Url
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $response = Invoke-WebRequest -Uri "$Url/api/v1/alive" -Method Get
@@ -327,6 +349,8 @@ function Select-RecentLogLines {
         [int]$LineCount
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $command = @"
 find /home/LogFiles -type f 2>/dev/null | sort | tail -n 3 | while read -r file; do
   echo "--- ${file} ---"
@@ -344,6 +368,8 @@ function Get-SectionValue {
         [Parameter(Mandatory)]
         [pscustomobject]$Section
     )
+
+    $ErrorActionPreference = 'Stop'
 
     if ($Section.Ok) {
         return $Section.Data

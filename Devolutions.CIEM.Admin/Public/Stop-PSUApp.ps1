@@ -29,7 +29,7 @@ function Stop-PSUApp {
 
     $ErrorActionPreference = 'Stop'
 
-    Assert-PSUConnection
+    AssertPSUConnection
 
     if ($PSCmdlet.ParameterSetName -eq 'ByName') {
         $app = Get-PSUApp -Name $Name | Where-Object { $_.name -eq $Name }

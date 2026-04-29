@@ -1,4 +1,4 @@
-function Save-GitHubRepoSparseCheckout {
+function SaveGitHubRepoSparseCheckout {
     <#
     .SYNOPSIS
         Clones a GitHub repo using sparse checkout to download only specified paths.
@@ -32,11 +32,11 @@ function Save-GitHubRepoSparseCheckout {
         [string] The clone directory path.
 
     .EXAMPLE
-        Save-GitHubRepoSparseCheckout -Owner prowler-cloud -Repo prowler -Paths 'prowler/providers/aws'
+        SaveGitHubRepoSparseCheckout -Owner prowler-cloud -Repo prowler -Paths 'prowler/providers/aws'
         # Clones only the AWS provider directory (~7MB, ~2s)
 
     .EXAMPLE
-        Save-GitHubRepoSparseCheckout -Owner prowler-cloud -Repo prowler -Paths @('prowler/providers/aws/services/iam', 'prowler/providers/aws/services/s3') -Destination /tmp/prowler-sparse
+        SaveGitHubRepoSparseCheckout -Owner prowler-cloud -Repo prowler -Paths @('prowler/providers/aws/services/iam', 'prowler/providers/aws/services/s3') -Destination /tmp/prowler-sparse
         # Clones only IAM and S3 service directories
     #>
     [CmdletBinding()]

@@ -1,4 +1,4 @@
-function Compare-ProwlerCheck {
+function CompareProwlerCheck {
     <#
     .SYNOPSIS
         Compares upstream Prowler checks against locally registered CIEM checks.
@@ -26,10 +26,10 @@ function Compare-ProwlerCheck {
         PSCustomObject with InputObject (check ID) and SideIndicator, matching Compare-Object output.
 
     .EXAMPLE
-        Compare-ProwlerCheck -Provider azure
+        CompareProwlerCheck -Provider azure
 
     .EXAMPLE
-        Compare-ProwlerCheck -Provider aws -IncludeEqual
+        CompareProwlerCheck -Provider aws -IncludeEqual
     #>
     [CmdletBinding()]
     param(

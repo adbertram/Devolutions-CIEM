@@ -1,4 +1,4 @@
-function Get-GitHubRepoTree {
+function GetGitHubRepoTree {
     <#
     .SYNOPSIS
         Lists files in a public GitHub repository using the Trees API.
@@ -30,15 +30,15 @@ function Get-GitHubRepoTree {
         Returns nothing on error (unless -ErrorAction Stop is specified).
 
     .EXAMPLE
-        Get-GitHubRepoTree -Owner prowler-cloud -Repo prowler
+        GetGitHubRepoTree -Owner prowler-cloud -Repo prowler
         # Lists all files and directories in the prowler repo at the master branch.
 
     .EXAMPLE
-        Get-GitHubRepoTree -Owner prowler-cloud -Repo prowler -Path 'prowler/providers/azure/services/entra' -Verbose
+        GetGitHubRepoTree -Owner prowler-cloud -Repo prowler -Path 'prowler/providers/azure/services/entra' -Verbose
         # Lists only entries under the entra services directory.
 
     .EXAMPLE
-        Get-GitHubRepoTree -Owner prowler-cloud -Repo prowler -Ref 'v4.0.0' -ErrorAction Stop
+        GetGitHubRepoTree -Owner prowler-cloud -Repo prowler -Ref 'v4.0.0' -ErrorAction Stop
         # Lists files at tag v4.0.0, throwing on any error.
     #>
     [CmdletBinding()]

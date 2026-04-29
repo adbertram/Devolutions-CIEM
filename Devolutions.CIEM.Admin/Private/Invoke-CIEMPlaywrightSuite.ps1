@@ -1,4 +1,4 @@
-function Invoke-CIEMPlaywrightSuite {
+function InvokeCIEMPlaywrightSuite {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]

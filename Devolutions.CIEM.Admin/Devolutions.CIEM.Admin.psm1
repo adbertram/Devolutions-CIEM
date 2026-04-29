@@ -5,7 +5,7 @@ $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $script:PsuAppRoot  = Join-Path $PSScriptRoot '../psu-app'
 $script:ChecksRoot  = Join-Path $script:PsuAppRoot 'modules/Devolutions.CIEM.Checks'
 
-# GitHub API cache (shared across Get-GitHubRepoTree calls within a session)
+# GitHub API cache (shared across GetGitHubRepoTree calls within a session)
 $script:GitHubTreeCache = @{}
 
 # PSU connection state

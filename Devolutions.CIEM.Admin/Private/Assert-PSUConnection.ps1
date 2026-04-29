@@ -1,4 +1,4 @@
-function Assert-PSUConnection {
+function AssertPSUConnection {
     <#
     .SYNOPSIS
         Validates that a PSU connection exists.

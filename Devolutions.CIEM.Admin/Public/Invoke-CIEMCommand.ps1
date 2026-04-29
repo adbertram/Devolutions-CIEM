@@ -45,7 +45,7 @@ function Invoke-CIEMCommand {
 
     $ErrorActionPreference = 'Stop'
 
-    Assert-PSUConnection
+    AssertPSUConnection
 
     if ($PSCmdlet.ParameterSetName -eq 'ScriptBlock') {
         $Command = $ScriptBlock.ToString()
@@ -65,7 +65,7 @@ function Invoke-CIEMCommand {
 
     $baseUrl = $script:PSUConnection.Url
 
-    function InvokePSURestRequest {
+    $invokePSURestRequest = {
         param(
             [Parameter(Mandatory)]
             [string]$Uri,
@@ -89,38 +89,7 @@ function Invoke-CIEMCommand {
             $restParams.Body = $Body
         }
 
-        for ($attempt = 1; $attempt -le 2; $attempt++) {
-            try {
-                return Invoke-RestMethod @restParams
-            }
-            catch {
-                $statusCode = $null
-                if ($_.Exception.Message -match '401 \(Unauthorized\)') {
-                    $statusCode = 401
-                }
-                elseif ($_.Exception.Response -and $null -ne $_.Exception.Response.StatusCode) {
-                    try {
-                        $statusCode = [int]$_.Exception.Response.StatusCode.value__
-                    }
-                    catch {
-                        try {
-                            $statusCode = [int]$_.Exception.Response.StatusCode
-                        }
-                        catch {
-                            $statusCode = $null
-                        }
-                    }
-                }
-
-                if ($statusCode -eq 401 -and $attempt -eq 1) {
-                    Write-Verbose "Received transient 401 from PSU API. Retrying the same request once."
-                    Start-Sleep -Milliseconds 500
-                    continue
-                }
-
-                throw
-            }
-        }
+        Invoke-RestMethod @restParams
     }
 
     # --- Ensure persistent executor script exists ---
@@ -131,7 +100,7 @@ param([string]$ScriptContent)
 '@
 
     # Check if executor already exists
-    $scripts = InvokePSURestRequest -Uri "$baseUrl/api/v1/script" -Method Get
+    $scripts = & $invokePSURestRequest -Uri "$baseUrl/api/v1/script" -Method Get
     $executor = $scripts | Where-Object { $_.name -eq $executorName }
 
     if (-not $executor) {
@@ -144,7 +113,7 @@ param([string]$ScriptContent)
             maxHistory  = 100
         } | ConvertTo-Json -Depth 10
 
-        $executor = InvokePSURestRequest -Uri "$baseUrl/api/v1/script" -Method Post -Body $scriptBody
+        $executor = & $invokePSURestRequest -Uri "$baseUrl/api/v1/script" -Method Post -Body $scriptBody
         Write-Verbose "Created executor script with ID: $($executor.id)"
     }
 
@@ -159,7 +128,7 @@ param([string]$ScriptContent)
         $invokeUri += "&Environment=$([System.Uri]::EscapeDataString($Environment))"
     }
 
-    $jobResponse = InvokePSURestRequest -Uri $invokeUri -Method Post -Body '{}'
+    $jobResponse = & $invokePSURestRequest -Uri $invokeUri -Method Post -Body '{}'
 
     $jobId = if ($jobResponse -is [int] -or $jobResponse -is [long]) {
         $jobResponse
@@ -196,7 +165,7 @@ param([string]$ScriptContent)
         Start-Sleep -Milliseconds 500
 
         $jobUri = "$baseUrl/api/v1/job/$jobId"
-        $jobDetails = InvokePSURestRequest -Uri $jobUri -Method Get
+        $jobDetails = & $invokePSURestRequest -Uri $jobUri -Method Get
         $jobStatus = [int]$jobDetails.status
         $statusName = $statusNames[$jobStatus]
 
@@ -214,12 +183,12 @@ param([string]$ScriptContent)
 
     # --- Get job output ---
     $outputUri = "$baseUrl/api/v1/job/$jobId/output"
-    $output = InvokePSURestRequest -Uri $outputUri -Method Get
+    $output = & $invokePSURestRequest -Uri $outputUri -Method Get
 
     $pipelineUri = "$baseUrl/api/v1/job/$jobId/pipelineOutput"
     $pipelineOutput = $null
     try {
-        $pipelineOutput = InvokePSURestRequest -Uri $pipelineUri -Method Get
+        $pipelineOutput = & $invokePSURestRequest -Uri $pipelineUri -Method Get
     }
     catch {
         Write-Verbose "No pipeline output available or error retrieving it."

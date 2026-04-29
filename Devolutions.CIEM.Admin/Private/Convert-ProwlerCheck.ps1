@@ -1,4 +1,4 @@
-function Convert-ProwlerCheck {
+function ConvertProwlerCheck {
     <#
     .SYNOPSIS
         Converts Prowler Python checks to PowerShell format for the Devolutions.CIEM module.
@@ -24,7 +24,7 @@ function Convert-ProwlerCheck {
         Hashtable of permissions to override inferred permissions.
 
     .EXAMPLE
-        Convert-ProwlerCheck -CheckPath '/tmp/prowler/providers/azure/services/entra/entra_security_defaults_enabled'
+        ConvertProwlerCheck -CheckPath '/tmp/prowler/providers/azure/services/entra/entra_security_defaults_enabled'
     #>
     [CmdletBinding()]
     param(
@@ -50,7 +50,7 @@ function Convert-ProwlerCheck {
     #region Helper Functions
 
     # Maps Prowler service names to display-friendly names used in the module
-    function Get-ServiceDisplayName {
+    function GetServiceDisplayName {
         param([string]$ServiceName)
 
         $ErrorActionPreference = 'Stop'
@@ -79,7 +79,7 @@ function Convert-ProwlerCheck {
     }
 
     # Analyzes Prowler Python code to infer required Azure/Graph permissions
-    function Get-InferredPermission {
+    function GetInferredPermission {
         param(
             [string]$PythonCode,
             [string]$ServiceName,
@@ -165,7 +165,7 @@ function Convert-ProwlerCheck {
     }
 
     # Generates a PowerShell check function scaffold from Prowler metadata
-    function ConvertTo-PowerShellCheck {
+    function ConvertToPowerShellCheck {
         param(
             [hashtable]$Metadata,
             [string]$FunctionName
@@ -203,7 +203,7 @@ function $FunctionName {
     }
 
     # Converts Prowler metadata to CIEM-compatible JSON metadata format
-    function ConvertTo-CheckMetadataJson {
+    function ConvertToCheckMetadataJson {
         param(
             [hashtable]$Metadata,
             [string]$FunctionName,
@@ -259,11 +259,11 @@ function $FunctionName {
     }
 
     $serviceName = $metadata.ServiceName
-    $serviceDisplayName = Get-ServiceDisplayName -ServiceName $serviceName
-    $functionName = Get-CheckFunctionName -CheckId $CheckId
+    $serviceDisplayName = GetServiceDisplayName -ServiceName $serviceName
+    $functionName = GetCheckFunctionName -CheckId $CheckId
 
     if (-not $Permissions) {
-        $Permissions = Get-InferredPermission -PythonCode $pythonCode -ServiceName $serviceName -ProviderName $Provider
+        $Permissions = GetInferredPermission -PythonCode $pythonCode -ServiceName $serviceName -ProviderName $Provider
     }
 
     if (-not $OutputDirectory) {
@@ -279,7 +279,7 @@ function $FunctionName {
     }
 
     if (-not $MetadataOnly) {
-        $scriptContent = ConvertTo-PowerShellCheck -Metadata $metadata -FunctionName $functionName
+        $scriptContent = ConvertToPowerShellCheck -Metadata $metadata -FunctionName $functionName
         $scriptPath = Join-Path $OutputDirectory "$functionName.ps1"
 
         if (-not (Test-Path $OutputDirectory)) {
@@ -292,7 +292,7 @@ function $FunctionName {
     }
 
     if (-not $ScriptOnly) {
-        $checkMetadata = ConvertTo-CheckMetadataJson -Metadata $metadata -FunctionName $functionName -ServiceDisplayName $serviceDisplayName -Perms $Permissions
+        $checkMetadata = ConvertToCheckMetadataJson -Metadata $metadata -FunctionName $functionName -ServiceDisplayName $serviceDisplayName -Perms $Permissions
         $results.Metadata = $checkMetadata
 
         $jsonOutput = $checkMetadata | ConvertTo-Json -Depth 10

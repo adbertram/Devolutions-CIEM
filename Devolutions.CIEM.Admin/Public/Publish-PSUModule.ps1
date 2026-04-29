@@ -158,7 +158,7 @@ function Publish-PSUModule {
             Write-Host "  Gallery version:   $galleryVersion" -ForegroundColor Cyan
         }
 
-        $newVersion = Get-BumpedVersion -Base $baseVersion -Component $BumpVersion
+        $newVersion = GetBumpedVersion -Base $baseVersion -Component $BumpVersion
 
         Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
 

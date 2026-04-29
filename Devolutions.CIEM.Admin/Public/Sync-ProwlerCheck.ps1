@@ -68,7 +68,7 @@ function Sync-ProwlerCheck {
 
     # 1. Get the full repo tree (single API call, cached)
     Write-Verbose "Fetching repository tree..."
-    $tree = Get-GitHubRepoTree -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path 'prowler/providers' -ErrorAction Stop
+    $tree = GetGitHubRepoTree -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path 'prowler/providers' -ErrorAction Stop
 
     # 2. Find check directories via regex on tree paths
     #    Pattern: prowler/providers/{provider}/services/{service}/{checkName}/{checkName}.metadata.json
@@ -108,7 +108,7 @@ function Sync-ProwlerCheck {
         $null = $entry.Path -match '^prowler/providers/([^/]+)/services/[^/]+/([^/]+)/'
         $prov = (Get-Culture).TextInfo.ToTitleCase($Matches[1])
         $cn = $Matches[2]
-        $funcName = Get-CheckFunctionName -CheckId $cn
+        $funcName = GetCheckFunctionName -CheckId $cn
         $checksDir = Join-Path $script:PsuAppRoot 'modules' $prov 'Checks'
         $hasScript = Test-Path (Join-Path $checksDir "$funcName.ps1")
         $hasDb = $existingMetadata.ContainsKey($cn)
@@ -153,7 +153,7 @@ function Sync-ProwlerCheck {
     $needsScriptSet = [System.Collections.Generic.HashSet[string]]::new([string[]]$needsScript)
     $cloneDir = $null
     try {
-        $cloneDir = Save-GitHubRepoSparseCheckout -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
+        $cloneDir = SaveGitHubRepoSparseCheckout -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref `
             -Paths $sparsePaths -ErrorAction Stop
 
         Write-Verbose "Sparse checkout complete. Processing $($entriesToProcess.Count) checks..."
@@ -182,13 +182,13 @@ function Sync-ProwlerCheck {
 
                 # Create metadata if missing
                 if ($wantMeta) {
-                    Convert-ProwlerCheck -CheckPath $checkDir -MetadataOnly | Out-Null
+                    ConvertProwlerCheck -CheckPath $checkDir -MetadataOnly | Out-Null
                     $createdMetadata.Add($checkName)
                 }
 
                 # Create script if missing
                 if ($wantScript) {
-                    Convert-ProwlerCheck -CheckPath $checkDir -ScriptOnly | Out-Null
+                    ConvertProwlerCheck -CheckPath $checkDir -ScriptOnly | Out-Null
                     $createdScripts.Add($checkName)
                 }
             }

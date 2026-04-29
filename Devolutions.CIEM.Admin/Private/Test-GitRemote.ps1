@@ -1,4 +1,4 @@
-function Test-GitRemote {
+function TestGitRemote {
     <#
     .SYNOPSIS
         Verifies the upstream git remote is configured for Prowler.
@@ -11,7 +11,7 @@ function Test-GitRemote {
         [void] - Throws on failure, returns nothing on success.
 
     .EXAMPLE
-        Test-GitRemote
+        TestGitRemote
         # Verifies upstream remote is configured
     #>
     [CmdletBinding()]

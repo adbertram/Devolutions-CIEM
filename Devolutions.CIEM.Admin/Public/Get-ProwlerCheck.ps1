@@ -60,7 +60,7 @@ function Get-ProwlerCheck {
         }
 
         try {
-            $tree = Get-GitHubRepoTree -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path $path -ErrorAction Stop
+            $tree = GetGitHubRepoTree -Owner 'prowler-cloud' -Repo 'prowler' -Ref $Ref -Path $path -ErrorAction Stop
         }
         catch {
             $msg = "Failed to fetch check tree for provider '$prov': $_"

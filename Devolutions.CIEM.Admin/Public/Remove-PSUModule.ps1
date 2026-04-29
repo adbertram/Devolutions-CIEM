@@ -39,7 +39,7 @@ function Remove-PSUModule {
 
     $ErrorActionPreference = 'Stop'
 
-    Assert-PSUConnection
+    AssertPSUConnection
 
     $modules = Get-PSUModule -Name $Name | Where-Object { $_.name -eq $Name }
 

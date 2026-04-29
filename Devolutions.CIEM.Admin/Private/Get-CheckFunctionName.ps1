@@ -1,4 +1,4 @@
-function Get-CheckFunctionName {
+function GetCheckFunctionName {
     <#
     .SYNOPSIS
         Converts a Prowler check ID (snake_case) to a PowerShell function name (Test-PascalCase).

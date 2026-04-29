@@ -82,7 +82,7 @@ function Invoke-CIEMTest {
             if ($ScriptBlock -or $Command) {
                 throw 'Unit suite does not support -ScriptBlock or -Command.'
             }
-            Invoke-CIEMPesterSuite -Suite Unit -Environment $Environment -Path $Path -Name $Name -Tag $Tag -Output $Output
+            InvokeCIEMPesterSuite -Suite Unit -Environment $Environment -Path $Path -Name $Name -Tag $Tag -Output $Output
         }
         'E2E' {
             if ($ScriptBlock -and $Command) {
@@ -98,17 +98,17 @@ function Invoke-CIEMTest {
                 if ($Path -or $Name -or $Tag) {
                     throw 'E2E command validation does not support -Path, -Name, or -Tag.'
                 }
-                Invoke-CIEME2ECommand -Environment $Environment -ScriptBlock $e2eScriptBlock -TimeoutSeconds $TimeoutSeconds
+                InvokeCIEME2ECommand -Environment $Environment -ScriptBlock $e2eScriptBlock -TimeoutSeconds $TimeoutSeconds
             }
             else {
-                Invoke-CIEMPesterSuite -Suite E2E -Environment $Environment -Path $Path -Name $Name -Tag $Tag -Output $Output
+                InvokeCIEMPesterSuite -Suite E2E -Environment $Environment -Path $Path -Name $Name -Tag $Tag -Output $Output
             }
         }
         'Playwright' {
             if ($ScriptBlock -or $Command) {
                 throw 'Playwright suite does not support -ScriptBlock or -Command.'
             }
-            Invoke-CIEMPlaywrightSuite -Environment $Environment -Path $Path -Name $Name -Tag $Tag
+            InvokeCIEMPlaywrightSuite -Environment $Environment -Path $Path -Name $Name -Tag $Tag
         }
     }
 }

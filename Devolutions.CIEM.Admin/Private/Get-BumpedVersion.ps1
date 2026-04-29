@@ -1,4 +1,4 @@
-function Get-BumpedVersion {
+function GetBumpedVersion {
     param([version]$Base, [string]$Component)
 
     $ErrorActionPreference = 'Stop'
