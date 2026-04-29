@@ -3,7 +3,6 @@ const DashboardPageHelpers = require('./DashboardPageHelpers');
 const {
   backupAndClearAllScanHistory,
   restoreScanHistory,
-  seedTestData,
   getScanResultCount,
   getScanHistoryCounts,
   seedIdentityViewData,
@@ -12,6 +11,7 @@ const {
   getDashboardIdentityCounts,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
+const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
 
 test.describe('Dashboard Page', () => {
   let dashPage;
@@ -38,9 +38,8 @@ test.describe('Dashboard Page', () => {
     let identityBackup = null;
 
     test.beforeAll(() => {
-      backup = backupAndClearAllScanHistory();
+      backup = backupAndApplyFixture('scan-history-summary');
       identityBackup = backupAndClearDashboardIdentityData();
-      seedTestData();
       seedIdentityViewData();
       const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
       const run2Count = getScanResultCount(`${TEST_PREFIX}scan_run_2`);
@@ -55,7 +54,7 @@ test.describe('Dashboard Page', () => {
     });
 
     test.afterAll(() => {
-      restoreScanHistory(backup);
+      restoreFixtureBackup(backup);
       restoreDashboardIdentityData(identityBackup);
     });
 

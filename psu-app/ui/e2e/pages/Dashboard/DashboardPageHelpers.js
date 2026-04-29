@@ -1,5 +1,5 @@
 const BasePage = require('../../_utils/BasePage');
-const { testConfig } = require('../../_utils/test-config');
+const { navigateToRegisteredPage } = require('../../_utils/page-contract');
 
 class DashboardPageHelpers extends BasePage {
   constructor(page) {
@@ -47,9 +47,16 @@ class DashboardPageHelpers extends BasePage {
   }
 
   async navigateToDashboard() {
-    await this.goto(testConfig.pages.dashboard);
-    // Wait for dynamic content to load
-    await this.page.waitForTimeout(3000);
+    await navigateToRegisteredPage(this, 'Dashboard');
+    await this.waitForDashboardState();
+  }
+
+  async waitForDashboardState() {
+    await this.page.locator(this.selectors.sectionPanelGroup).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page
+      .locator(`${this.selectors.totalResultsCard}, ${this.selectors.emptyStateCard}`)
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
   }
 
   async getPageTitle() {
@@ -85,13 +92,17 @@ class DashboardPageHelpers extends BasePage {
   }
 
   async clickScanPanelHeader() {
+    const section = this.page.locator(this.selectors.scanSection);
+    const visibleBeforeClick = await section.isVisible();
     await this.page.locator(this.selectors.scanPanel).getByText('Prowler Checks & Scans').first().click();
-    await this.page.waitForTimeout(1000);
+    await section.waitFor({ state: visibleBeforeClick ? 'hidden' : 'visible', timeout: 15000 });
   }
 
   async clickIdentityPanelHeader() {
+    const section = this.page.locator(this.selectors.identitySection);
+    const visibleBeforeClick = await section.isVisible();
     await this.page.locator(this.selectors.identityPanel).getByText('Identity Stats').first().click();
-    await this.page.waitForTimeout(1000);
+    await section.waitFor({ state: visibleBeforeClick ? 'hidden' : 'visible', timeout: 15000 });
   }
 
   async isScanRunSelectorInsideScanSection() {
@@ -152,16 +163,20 @@ class DashboardPageHelpers extends BasePage {
   }
 
   async changeScanRunSelector() {
-    // Click the combobox to open
+    const previousValue = await this.page.locator(this.selectors.scanRunSelector).inputValue();
     const combobox = this.page.locator(this.selectors.scanRunSelectorCombobox);
     await combobox.click();
-    // Select the second option (older scan run)
+
     const options = this.page.locator('[role="option"]');
     const count = await options.count();
     if (count > 1) {
       await options.nth(1).click();
-      // Wait for Sync-UDElement refresh
-      await this.page.waitForTimeout(3000);
+      await this.page.waitForFunction(
+        ({ selector, previous }) => document.querySelector(selector).value !== previous,
+        { selector: this.selectors.scanRunSelector, previous: previousValue },
+        { timeout: 15000 }
+      );
+      await this.page.locator(this.selectors.totalResultsCard).waitFor({ state: 'visible', timeout: 15000 });
       return true;
     }
     return false;

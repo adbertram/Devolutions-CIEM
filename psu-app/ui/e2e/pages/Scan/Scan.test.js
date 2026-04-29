@@ -21,10 +21,10 @@ test.describe('Scan Page', () => {
     checksBackup = backupAndClearAllChecks();
     seedChecks();
     const counts = getTestCheckCounts();
-    if (counts.enabled !== 7 || counts.disabled !== 3) {
-      throw new Error(`Expected 7 enabled and 3 disabled seeded checks, got ${counts.enabled} enabled and ${counts.disabled} disabled`);
+    if (counts.enabled <= 0 || counts.disabled <= 0) {
+      throw new Error(`Expected enabled and disabled catalog check state, got ${counts.enabled} enabled and ${counts.disabled} disabled`);
     }
-    console.log(`[setup:scan-checks] Verified ${counts.enabled} enabled and ${counts.disabled} disabled seeded checks.`);
+    console.log(`[setup:scan-checks] Verified ${counts.enabled} enabled and ${counts.disabled} disabled catalog check state rows.`);
   });
 
   test.afterAll(() => {

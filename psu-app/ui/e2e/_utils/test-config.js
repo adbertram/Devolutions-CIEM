@@ -1,4 +1,5 @@
 const { resolveTestEnvironment } = require('./test-environment');
+const { getPagePathByName } = require('./page-registry');
 
 const testEnvironment = resolveTestEnvironment();
 
@@ -8,16 +9,16 @@ const testConfig = {
     psu: testEnvironment.psuUrl
   },
   pages: {
-    dashboard: '/ciem/ciem/',
-    scan: '/ciem/ciem/scan',
-    history: '/ciem/ciem/history',
-
-    environment: '/ciem/ciem/environment',
-    config: '/ciem/ciem/config',
-    about: '/ciem/ciem/about',
-    identities: '/ciem/ciem/identities',
-    attackPaths: '/ciem/ciem/attack-paths',
-    attackPathPatterns: '/ciem/ciem/attack-path-patterns'
+    dashboard: getPagePathByName('Dashboard'),
+    scan: getPagePathByName('Scan'),
+    history: getPagePathByName('Scan History'),
+    reports: getPagePathByName('Reports'),
+    environment: getPagePathByName('Environment'),
+    config: getPagePathByName('Configuration'),
+    about: getPagePathByName('About'),
+    identities: getPagePathByName('Identities'),
+    attackPaths: getPagePathByName('Attack Paths'),
+    attackPathPatterns: getPagePathByName('Attack Path Patterns')
   },
   psu: {
     healthEndpoint: testEnvironment.healthEndpoint,

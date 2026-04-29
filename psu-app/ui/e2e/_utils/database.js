@@ -51,12 +51,7 @@ function getTestScanRuns() {
 }
 
 function getTestScanResults(scanRunId) {
-  return query(`
-    SELECT sr.*, c.severity, c.service, c.title as check_title
-    FROM scan_results sr
-    JOIN checks c ON sr.check_id = c.id
-    WHERE sr.scan_run_id = ?
-  `, [scanRunId]);
+  return query('SELECT * FROM scan_results WHERE scan_run_id = ?', [scanRunId]);
 }
 
 module.exports = {

@@ -1,7 +1,9 @@
-const { sshQuery, sshNonQuery } = require('./psu-helpers');
+const { sshQuery, sshNonQuery, LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME } = require('./psu-helpers');
+const { insertFixtureRows, loadFixture } = require('./fixtures');
 
 const TEST_PREFIX = '_E2E_TEST_';
 const P = TEST_PREFIX; // shorthand for SQL literals
+const SCAN_HISTORY_FIXTURE = 'scan-history-summary';
 
 function sqlValue(value) {
   return value == null ? 'NULL' : `'${String(value).replace(/'/g, "''")}'`;
@@ -28,24 +30,13 @@ function cleanupTestData() {
 }
 
 function seedChecks() {
-  const checks = [
-    [P+'check_security_defaults',    'Azure','Entra',   'Ensure Security Defaults is enabled','Security defaults provide secure default settings for MFA and blocking legacy authentication.','Without security defaults, users may not be required to use MFA, leaving accounts vulnerable.','CRITICAL','Enable Security Defaults in Azure AD Properties.','azure_entra_security_defaults.ps1',0],
-    [P+'check_mfa_enforcement',      'Azure','Entra',   'Ensure Multifactor Authentication is enforced for all users','Multi-factor authentication adds a second layer of identity verification.','Accounts without MFA are significantly more susceptible to compromise.','CRITICAL','Enable MFA for all users via Conditional Access policies.','azure_entra_mfa_enforcement.ps1',0],
-    [P+'check_keyvault_access',      'Azure','KeyVault','Ensure Key Vault access is properly configured','Key Vault should use RBAC or access policies to control access.','Misconfigured Key Vault access may expose secrets and certificates.','HIGH','Configure RBAC-based access for Key Vault.','azure_keyvault_access.ps1',0],
-    [P+'check_storage_encryption',   'Azure','Storage', 'Ensure storage account encryption is enabled','Azure Storage encrypts data at rest by default.','Unencrypted storage accounts expose data to unauthorized access.','MEDIUM','Enable encryption on all storage accounts.','azure_storage_encryption.ps1',0],
-    [P+'check_nsg_rules',            'Azure','Network', 'Ensure NSG rules are properly configured','Network Security Groups control inbound and outbound traffic.','Overly permissive NSG rules may allow unauthorized network access.','MEDIUM','Review and tighten NSG rules.','azure_network_nsg_rules.ps1',0],
-    [P+'check_resource_locks',       'Azure','ARM',     'Ensure resource locks are applied to critical resources','Resource locks prevent accidental deletion or modification.','Critical resources without locks may be accidentally deleted.','LOW','Apply CanNotDelete locks to production resources.','azure_arm_resource_locks.ps1',0],
-    [P+'check_tags_compliance',      'Azure','ARM',     'Ensure resources have required tags','Tags help organize and manage Azure resources.','Missing tags make cost allocation and resource management difficult.','INFO','Apply organization-standard tags to all resources.','azure_arm_tags_compliance.ps1',0],
-    [P+'check_disabled_legacy_auth', 'Azure','Entra',   'Ensure legacy authentication is disabled','Legacy authentication protocols do not support MFA.','Legacy auth bypass allows attackers to skip MFA requirements.','HIGH','Block legacy authentication via Conditional Access.','azure_entra_legacy_auth.ps1',1],
-    [P+'check_disabled_guest_access','Azure','Entra',   'Ensure guest user access is restricted','Guest users should have limited access to directory resources.','Unrestricted guest access may expose sensitive directory information.','MEDIUM','Restrict guest user permissions in External Collaboration settings.','azure_entra_guest_access.ps1',1],
-    [P+'check_disabled_public_access','Azure','Storage','Ensure public blob access is disabled','Public access to blob containers should be disabled.','Public blob access may expose sensitive data to the internet.','HIGH','Disable public access on all storage accounts.','azure_storage_public_access.ps1',1],
-  ];
+  const checks = loadFixture(SCAN_HISTORY_FIXTURE).tables.checks;
   const stmts = checks.map(c => {
-    const vals = c.map(v => typeof v === 'number' ? v : `'${String(v).replace(/'/g, "''")}'`).join(', ');
-    return `INSERT OR REPLACE INTO checks (id, provider, service, title, description, risk, severity, remediation_text, check_script, disabled) VALUES (${vals})`;
+    const vals = [c.id, c.disabled].map(v => typeof v === 'number' ? v : `'${String(v).replace(/'/g, "''")}'`).join(', ');
+    return `INSERT OR REPLACE INTO checks (id, disabled) VALUES (${vals})`;
   });
   sshNonQuery(stmts.join('; '));
-  console.log(`[seed] Seeded ${checks.length} test checks.`);
+  console.log(`[seed] Seeded mutable state for ${checks.length} catalog checks.`);
 }
 
 function backupAndClearAllChecks() {
@@ -58,7 +49,7 @@ function backupAndClearAllChecks() {
 function restoreChecks(rows) {
   if (!rows) return;
 
-  const cols = ['id', 'provider', 'service', 'title', 'description', 'risk', 'severity', 'remediation_text', 'remediation_url', 'related_url', 'check_script', 'disabled', 'permissions', 'depends_on', 'data_needs'];
+  const cols = ['id', 'disabled'];
   const stmts = ['DELETE FROM checks'];
   for (const r of rows) {
     const vals = cols.map(c => sqlValue(r[c])).join(', ');
@@ -69,39 +60,10 @@ function restoreChecks(rows) {
 }
 
 function seedTestData() {
-  seedChecks();
-
-  const provider = sshQuery("SELECT id FROM providers WHERE name = 'Azure' COLLATE NOCASE LIMIT 1")[0];
-  if (!provider) { console.log('[seed] No providers -- skipping.'); return; }
-  const checks = sshQuery(`SELECT id, severity FROM checks WHERE id LIKE '${P}check_%' ORDER BY CASE UPPER(severity) WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, id`);
-  if (checks.length === 0) { console.log('[seed] No checks -- skipping.'); return; }
-
-  const now = new Date().toISOString();
-  const critHigh = checks.filter(c => ['CRITICAL','HIGH'].includes((c.severity||'').toUpperCase()));
-  const other = checks.filter(c => !['CRITICAL','HIGH'].includes((c.severity||'').toUpperCase()));
-  const ordered = [...critHigh, ...other].slice(0, 5);
-  const failCount = Math.min(2, ordered.length);
-  const passCount = ordered.length - failCount;
-
-  const stmts = [];
-  // Scan Run 1 (most recent): 5 results, includes CRITICAL/HIGH failures
-  stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES ('${P}scan_run_1', '${provider.id}', 'Completed', '${now}', '${now}', 42.5, ${ordered.length}, ${failCount}, ${passCount})`);
-  const statuses = ['FAIL','FAIL','PASS','PASS','PASS'];
-  const descs = ['Security defaults are not enabled','MFA is not enforced','Key vault access is properly configured','Storage encryption is enabled','NSGs are configured correctly'];
-  for (let i = 0; i < ordered.length; i++) {
-    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES ('${P}scan_run_1', '${ordered[i].id}', '${statuses[i]}', '${descs[i]}', '${P}resource_${i}', 'Test Resource ${i}')`);
-  }
-
-  // Scan Run 2 (older): 3 results, all passed
-  const olderDate = new Date(Date.now() - 86400000).toISOString();
-  const run2Checks = checks.slice(0, 3);
-  stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES ('${P}scan_run_2', '${provider.id}', 'Completed', '${olderDate}', '${olderDate}', 18.2, ${run2Checks.length}, 0, ${run2Checks.length})`);
-  for (let i = 0; i < run2Checks.length; i++) {
-    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES ('${P}scan_run_2', '${run2Checks[i].id}', 'PASS', 'Check passed successfully', '${P}resource_old_${i}', 'Old Test Resource ${i}')`);
-  }
-
-  sshNonQuery(stmts.join('; '));
-  console.log(`[seed] Seeded scan run 1 (${ordered.length} results, ${failCount} FAIL) and scan run 2 (${run2Checks.length} results, 0 FAIL).`);
+  insertFixtureRows(SCAN_HISTORY_FIXTURE);
+  const run1Count = getScanResultCount(`${P}scan_run_1`);
+  const run2Count = getScanResultCount(`${P}scan_run_2`);
+  console.log(`[seed] Seeded scan-history fixture (${run1Count} + ${run2Count} results).`);
 }
 
 function backupAndClearAllScanHistory() {
@@ -140,7 +102,7 @@ function getScanHistoryCounts() {
 }
 
 function getTestCheckCounts() {
-  return sshQuery(`SELECT SUM(CASE WHEN disabled = 0 THEN 1 ELSE 0 END) as enabled, SUM(CASE WHEN disabled = 1 THEN 1 ELSE 0 END) as disabled FROM checks WHERE id LIKE '${P}check_%'`)[0];
+  return sshQuery('SELECT SUM(CASE WHEN disabled = 0 THEN 1 ELSE 0 END) as enabled, SUM(CASE WHEN disabled = 1 THEN 1 ELSE 0 END) as disabled FROM checks')[0];
 }
 
 function seedEnvironmentData() {
@@ -396,6 +358,20 @@ function seedAttackPathsPageData() {
       _type: 'edge'
     }
   ]);
+  const longRunningPathJson = JSON.stringify([
+    { id: `${P}ap-long-running-user`, kind: 'EntraUser', display_name: 'E2E Long Running User', properties: '{"accountEnabled":false}', _type: 'node' },
+    { id: `/subscriptions/${P}ap-long-running-sub`, kind: 'AzureSubscription', display_name: 'E2E Long Running Subscription', properties: null, _type: 'node' }
+  ]);
+  const longRunningEdgesJson = JSON.stringify([
+    {
+      id: `${P}ap-edge-long-running-role`,
+      source_id: `${P}ap-long-running-user`,
+      target_id: `/subscriptions/${P}ap-long-running-sub`,
+      kind: 'HasRole',
+      properties: `{"role_name":"Reader","role_definition_id":"/subscriptions/${P}ap-long-running-sub/providers/Microsoft.Authorization/roleDefinitions/reader-role","role_assignment_id":"/subscriptions/${P}ap-long-running-sub/providers/Microsoft.Authorization/roleAssignments/e2e-long-running-role","privileged":false}`,
+      _type: 'edge'
+    }
+  ]);
   sshNonQuery([
     `DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'`,
     // Pattern 1: open-management-port
@@ -406,10 +382,15 @@ function seedAttackPathsPageData() {
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-disabled-user','EntraUser','E2E Disabled User','azure','{"accountEnabled":false}','${now}')`,
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}ap-sub-1','AzureSubscription','E2E Subscription','azure',null,'${now}')`,
     `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ap-disabled-user','/subscriptions/${P}ap-sub-1','HasRole','{"role_name":"Contributor","role_definition_id":"/subscriptions/${P}ap-sub-1/providers/Microsoft.Authorization/roleDefinitions/contributor-role","role_assignment_id":"/subscriptions/${P}ap-sub-1/providers/Microsoft.Authorization/roleAssignments/e2e-disabled-role","privileged":false}',0,'${now}')`,
+    // Pattern 3: long-running remediation fixture
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-long-running-user','EntraUser','E2E Long Running User','azure','{"accountEnabled":false}','${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}ap-long-running-sub','AzureSubscription','E2E Long Running Subscription','azure',null,'${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ap-long-running-user','/subscriptions/${P}ap-long-running-sub','HasRole','{"role_name":"Reader","role_definition_id":"/subscriptions/${P}ap-long-running-sub/providers/Microsoft.Authorization/roleDefinitions/reader-role","role_assignment_id":"/subscriptions/${P}ap-long-running-sub/providers/Microsoft.Authorization/roleAssignments/e2e-long-running-role","privileged":false}',0,'${now}')`,
     `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-open-management-port','open-management-port','Management port open to the internet','high','network-exposure','1. Restrict or remove the inbound management rule that allows internet access to SSH, RDP, or WinRM.\n2. Replace public management access with Azure Bastion, VPN, private endpoint access, or Just-in-Time VM access.\n3. If a management rule must remain, limit the source to approved administrative IP ranges and document the exception owner.\n4. Confirm attached resources no longer have public management exposure.\n5. rerun Azure discovery and confirm this attack path no longer appears.','management-port-open-to-the-internet',${sqlValue(openManagementPathJson)},${sqlValue(openManagementEdgesJson)},'Internet (Internet) -> E2E Attack Path NSG (AzureNSG)','${now}')`,
     `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-disabled-account','disabled-account-with-roles','Disabled account still holding active role assignments','high','identity-hygiene','1. Open the disabled identity in Microsoft Entra ID and confirm it should remain disabled.\n2. In Azure RBAC, find every active role assignment for this identity at the listed scope.\n3. Remove active role assignments from the disabled identity.\n4. If access is still required, assign it to an active owner-approved identity instead of re-enabling the disabled account.\n5. rerun Azure discovery and confirm this attack path no longer appears.','disabled-account-still-holding-active-role-assignments',${sqlValue(disabledAccountPathJson)},${sqlValue(disabledAccountEdgesJson)},'E2E Disabled User (EntraUser) -> E2E Subscription (AzureSubscription)','${now}')`,
+    `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-long-running-remediation','disabled-account-with-roles','ZZZ Long running remediation fixture','low','identity-hygiene','1. Keep the test remediation running long enough to exercise the close-warning branch.\n2. Terminate the PSU job from the warning dialog.','${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}',${sqlValue(longRunningPathJson)},${sqlValue(longRunningEdgesJson)},'E2E Long Running User (EntraUser) -> E2E Long Running Subscription (AzureSubscription)','${now}')`,
   ].join('; '));
-  console.log('[seed] Seeded graph and materialized attack path data for Attack Paths page tests (2 patterns).');
+  console.log('[seed] Seeded graph and materialized attack path data for Attack Paths page tests (3 patterns).');
 }
 
 function seedAttackPathsRefreshGraphData() {

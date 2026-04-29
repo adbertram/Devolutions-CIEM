@@ -3,11 +3,10 @@ const ScanHistoryPageHelpers = require('./ScanHistoryPageHelpers');
 const {
   backupAndClearAllScanHistory,
   restoreScanHistory,
-  seedTestData,
-  cleanupTestData,
   getScanResultCount,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
+const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
 
 test.describe('Scan History Page', () => {
   let historyPage;
@@ -23,8 +22,7 @@ test.describe('Scan History Page', () => {
     let backup = null;
 
     test.beforeAll(() => {
-      backup = backupAndClearAllScanHistory();
-      seedTestData();
+      backup = backupAndApplyFixture('scan-history-summary');
       const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
       const run2Count = getScanResultCount(`${TEST_PREFIX}scan_run_2`);
       if (run1Count !== 5 || run2Count !== 3) {
@@ -34,8 +32,7 @@ test.describe('Scan History Page', () => {
     });
 
     test.afterAll(() => {
-      cleanupTestData();
-      restoreScanHistory(backup);
+      restoreFixtureBackup(backup);
     });
 
     test('should display page title', async () => {
@@ -127,7 +124,6 @@ test.describe('Scan History Page', () => {
       const completedIdx = await historyPage.findCompletedRowIndex();
       expect(completedIdx).toBeGreaterThanOrEqual(0);
       await historyPage.expandRow(completedIdx);
-      await historyPage.page.waitForTimeout(2000);
       const headers = await historyPage.getDetailColumnHeaders();
       expect(headers).toContain('Check ID');
       expect(headers).toContain('Finding');
@@ -139,7 +135,6 @@ test.describe('Scan History Page', () => {
       const completedIdx = await historyPage.findCompletedRowIndex();
       expect(completedIdx).toBeGreaterThanOrEqual(0);
       await historyPage.expandRow(completedIdx);
-      await historyPage.page.waitForTimeout(2000);
       const detailRowCount = await historyPage.getDetailRowCount();
       expect(detailRowCount).toBeGreaterThan(0);
     });

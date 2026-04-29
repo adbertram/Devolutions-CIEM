@@ -4,6 +4,7 @@ const { testConfig } = require('./test-config');
 const PSU_STATUS = { Queued: 0, Running: 1, Completed: 2, Failed: 3, Canceled: 5, TimedOut: 9, Warning: 10, WarningOutput: 11 };
 const PSU_STATUS_NAMES = Object.fromEntries(Object.entries(PSU_STATUS).map(([k, v]) => [v, k]));
 const PSU_TERMINAL_STATUSES = [PSU_STATUS.Completed, PSU_STATUS.Failed, PSU_STATUS.Canceled, PSU_STATUS.TimedOut, PSU_STATUS.Warning, PSU_STATUS.WarningOutput];
+const LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME = 'E2EAttackPathLongRunningRemediation';
 
 async function isPSUReady() {
   try {
@@ -236,6 +237,62 @@ function runPSUCommandSync(command, timeoutMs = 30000) {
   };
 }
 
+function registerLongRunningAttackPathRemediationScript() {
+  const command = `
+    $scriptName = '${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}'
+    $scriptPath = 'Identities/AttackPaths/${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}.ps1'
+    $content = @'
+$ErrorActionPreference = 'Stop'
+Write-Information 'E2E long-running attack path remediation started.' -InformationAction Continue
+Start-Sleep -Seconds 60
+Write-Information 'E2E long-running attack path remediation completed.' -InformationAction Continue
+'@
+    $matches = @(Get-PSUScript -Integrated | Where-Object {
+      [string]$_.Name -eq $scriptName -or [string]$_.FullPath -eq $scriptPath -or [string]$_.Path -eq $scriptPath
+    })
+    if ($matches.Count -gt 1) {
+      throw "Expected one PSU script named '$scriptName', found $($matches.Count)."
+    }
+
+    if ($matches.Count -eq 1) {
+      Set-PSUScript -Script $matches[0] -Content $content -Description 'Long-running E2E attack path remediation script' -Status 'Published' -TimeOut 90 -DisableManualInvocation:$true -Notes 'ManagedBy=Devolutions.CIEM.E2E' -Integrated | Out-Null
+    } else {
+      New-PSUScript -Name $scriptName -Path $scriptPath -ScriptBlock ([scriptblock]::Create($content)) -Description 'Long-running E2E attack path remediation script' -Status 'Published' -TimeOut 90 -DisableManualInvocation:$true -Notes 'ManagedBy=Devolutions.CIEM.E2E' -Integrated | Out-Null
+    }
+
+    [pscustomobject]@{ Status = 'Registered'; Name = $scriptName }
+  `;
+  const result = runPSUCommandSync(command, 30000);
+  if (result.status !== 'Completed') {
+    throw new Error(`Failed to register long-running attack path remediation script: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+function removeLongRunningAttackPathRemediationScript() {
+  const command = `
+    $scriptName = '${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}'
+    $scriptPath = 'Identities/AttackPaths/${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}.ps1'
+    $matches = @(Get-PSUScript -Integrated | Where-Object {
+      [string]$_.Name -eq $scriptName -or [string]$_.FullPath -eq $scriptPath -or [string]$_.Path -eq $scriptPath
+    })
+    if ($matches.Count -gt 1) {
+      throw "Expected one PSU script named '$scriptName', found $($matches.Count)."
+    }
+
+    if ($matches.Count -eq 1) {
+      Remove-PSUScript -Script $matches[0] -Integrated | Out-Null
+    }
+
+    [pscustomobject]@{ Status = 'Removed'; Name = $scriptName; Removed = $matches.Count }
+  `;
+  const result = runPSUCommandSync(command, 30000);
+  if (result.status !== 'Completed') {
+    throw new Error(`Failed to remove long-running attack path remediation script: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 /**
  * Deactivate any active Azure auth profile. Returns the previously active profile ID (or null).
  * Caller should assert the result in the test.
@@ -402,9 +459,12 @@ function sshNonQuery(sql) {
 }
 
 module.exports = {
+  LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME,
   isPSUReady, startPSU, waitForPSU,
   runPSUCommand, runPSUQuery, runPSUNonQuery,
   sshQuery, sshNonQuery,
+  registerLongRunningAttackPathRemediationScript,
+  removeLongRunningAttackPathRemediationScript,
   cancelRunningPSUJobs, PSU_STATUS, PSU_STATUS_NAMES,
   deactivateAzureAuthProfile, activateAzureAuthProfile,
   getActiveAzureAuthProfileCount

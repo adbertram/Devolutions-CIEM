@@ -1,5 +1,6 @@
 const BasePage = require('../../_utils/BasePage');
 const { testConfig } = require('../../_utils/test-config');
+const { getExpectedNavItems } = require('../../_utils/page-registry');
 
 class NavigationPageHelpers extends BasePage {
   constructor(page) {
@@ -12,17 +13,7 @@ class NavigationPageHelpers extends BasePage {
       navItemByLabel: (label) => `.MuiDrawer-anchorLeft .MuiListItem-root:has-text("${label}")`,
       lastDiscoveryHeader: '#ciemLastDiscoveryHeader'
     };
-    this.expectedNavItems = [
-      { label: 'Dashboard', href: '/ciem' },
-      { label: 'Scan', href: '/ciem/scan' },
-      { label: 'Scan History', href: '/ciem/history' },
-      { label: 'Identities', href: '/ciem/identities' },
-      { label: 'Attack Paths', href: '/ciem/attack-paths' },
-      { label: 'Attack Path Patterns', href: '/ciem/attack-path-patterns' },
-      { label: 'Environment', href: '/ciem/environment' },
-      { label: 'Configuration', href: '/ciem/config' },
-      { label: 'About', href: '/ciem/about' }
-    ];
+    this.expectedNavItems = getExpectedNavItems();
   }
 
   async navigateToDashboard() {

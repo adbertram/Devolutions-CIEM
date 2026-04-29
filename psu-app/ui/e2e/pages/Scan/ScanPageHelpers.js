@@ -42,7 +42,7 @@ class ScanPageHelpers extends BasePage {
       infoModal: '[role="dialog"]',
       infoModalTitle: '[role="dialog"] h6',
       infoModalCloseBtn: "[role='dialog'] button:has-text('Close')",
-      infoButton: '.MuiDataGrid-row button',
+      infoButton: '.MuiDataGrid-row [data-field="info"] button',
 
       // Error state
       scanErrorCard: "#scanProgressArea .MuiCard-root:has-text('Scan Failed')"
@@ -55,6 +55,7 @@ class ScanPageHelpers extends BasePage {
     await this.waitForElement(this.selectors.dataGrid);
     // Give PSU time to load data into the grid
     await this.page.waitForTimeout(2000);
+    await this.clearSelectedChecks();
   }
 
   // --- Selection Summary ---
@@ -144,6 +145,29 @@ class ScanPageHelpers extends BasePage {
     return await checkbox.isChecked();
   }
 
+  async clearSelectedChecks() {
+    const counts = await this.getSelectionCounts();
+    if (!counts || counts.selected === 0) {
+      return;
+    }
+
+    const header = this.page.locator(this.selectors.headerCheckbox);
+    await header.waitFor({ state: 'visible', timeout: 15000 });
+    await header.click();
+    await this.page.waitForTimeout(500);
+
+    const afterFirstClick = await this.getSelectionCounts();
+    if (afterFirstClick && afterFirstClick.selected > 0) {
+      await header.click();
+      await this.page.waitForTimeout(500);
+    }
+
+    const finalCounts = await this.getSelectionCounts();
+    if (!finalCounts || finalCounts.selected !== 0) {
+      throw new Error(`Expected Scan page selection to be cleared, got ${finalCounts ? finalCounts.selected : 'unknown'} selected checks`);
+    }
+  }
+
   // --- Quick Filter ---
 
   async searchChecks(text) {
@@ -160,8 +184,9 @@ class ScanPageHelpers extends BasePage {
 
   async clickInfoButton(rowIndex) {
     const row = this.page.locator(this.selectors.dataGridRows).nth(rowIndex);
-    const infoButton = row.locator('button').first();
+    const infoButton = row.locator('[data-field="info"] button').first();
     await infoButton.waitFor({ state: 'visible', timeout: 15000 });
+    await infoButton.scrollIntoViewIfNeeded();
     await infoButton.click();
     await this.waitForElement('[role="dialog"]');
   }

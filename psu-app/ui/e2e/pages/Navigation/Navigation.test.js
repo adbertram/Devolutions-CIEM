@@ -1,6 +1,6 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const NavigationPageHelpers = require('./NavigationPageHelpers');
-const { testConfig } = require('../../_utils/test-config');
+const { getExpectedNavItems } = require('../../_utils/page-registry');
 const {
   backupAndClearAllDiscoveryRuns,
   restoreDiscoveryRuns,
@@ -21,72 +21,40 @@ test.describe('Navigation', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display all 9 navigation items', async () => {
+    test('should display all 10 navigation items', async () => {
       const labels = await navPage.getNavItemLabels();
-      expect(labels).toHaveLength(9);
-      expect(labels).toContain('Dashboard');
-      expect(labels).toContain('Scan');
-      expect(labels).toContain('Scan History');
-      expect(labels).toContain('Identities');
+      const expectedLabels = navPage.expectedNavItems.map((item) => item.label);
+
+      expect(labels).toHaveLength(expectedLabels.length);
+      for (const label of expectedLabels) {
+        expect(labels).toContain(label);
+      }
       expect(labels).not.toContain('Effective Permissions');
-      expect(labels).toContain('Attack Paths');
-      expect(labels).toContain('Attack Path Patterns');
-      expect(labels).toContain('Environment');
-      expect(labels).toContain('Configuration');
-      expect(labels).toContain('About');
     });
 
-    test('should have correct href for Attack Path Patterns link', async () => {
-      const href = await navPage.getNavItemHref('Attack Path Patterns');
-      expect(href).toContain('/ciem/attack-path-patterns');
-    });
-
-    test('should have correct href for Dashboard link', async () => {
-      const href = await navPage.getNavItemHref('Dashboard');
-      expect(href).toContain('/ciem');
-    });
-
-    test('should have correct href for Scan link', async () => {
-      const href = await navPage.getNavItemHref('Scan');
-      expect(href).toContain('/ciem/scan');
-    });
-
-    test('should have correct href for Scan History link', async () => {
-      const href = await navPage.getNavItemHref('Scan History');
-      expect(href).toContain('/ciem/history');
-    });
-
-    test('should have correct href for Identities link', async () => {
-      const href = await navPage.getNavItemHref('Identities');
-      expect(href).toContain('/ciem/identities');
-    });
-
-    test('should have correct href for Configuration link', async () => {
-      const href = await navPage.getNavItemHref('Configuration');
-      expect(href).toContain('/ciem/config');
-    });
-
-    test('should have correct href for About link', async () => {
-      const href = await navPage.getNavItemHref('About');
-      expect(href).toContain('/ciem/about');
-    });
+    for (const expectedItem of [
+      'Attack Path Patterns',
+      'Dashboard',
+      'Scan',
+      'Scan History',
+      'Identities',
+      'Reports',
+      'Configuration',
+      'About'
+    ]) {
+      test(`should have registry-backed href for ${expectedItem} link`, async () => {
+        const expected = navPage.expectedNavItems.find((item) => item.label === expectedItem);
+        const href = await navPage.getNavItemHref(expectedItem);
+        expect(href).toContain(expected.href);
+      });
+    }
   });
 
   test.describe('when a completed discovery run exists', () => {
     let backup = null;
     const completedAt = '2026-03-14T09:15:30Z';
     const expectedTimestamp = '2026-03-14 09:15 UTC';
-    const pages = [
-      { name: 'Dashboard', path: testConfig.pages.dashboard },
-      { name: 'Scan', path: testConfig.pages.scan },
-      { name: 'Scan History', path: testConfig.pages.history },
-      { name: 'Identities', path: testConfig.pages.identities },
-      { name: 'Attack Paths', path: testConfig.pages.attackPaths },
-      { name: 'Attack Path Patterns', path: testConfig.pages.attackPathPatterns },
-      { name: 'Environment', path: testConfig.pages.environment },
-      { name: 'Configuration', path: testConfig.pages.config },
-      { name: 'About', path: testConfig.pages.about }
-    ];
+    const pages = getExpectedNavItems().map((item) => ({ name: item.label, path: item.path }));
 
     test.beforeAll(() => {
       backup = backupAndClearAllDiscoveryRuns();
@@ -132,6 +100,14 @@ test.describe('Navigation', () => {
       await navPage.page.waitForTimeout(2000);
       const pageText = await navPage.page.textContent('body');
       expect(pageText).toContain('About Devolutions CIEM');
+    });
+
+    test('should navigate to the Reports page when Reports nav item is clicked', async () => {
+      await navPage.clickNavItem('Reports');
+      await navPage.page.waitForTimeout(2000);
+      const pageText = await navPage.page.textContent('body');
+      expect(pageText).toContain('Reports');
+      expect(pageText).toContain('Azure Discovery Coverage');
     });
   });
 });

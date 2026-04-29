@@ -134,6 +134,7 @@ class ConfigurationPageHelpers extends BasePage {
 
   async clickReset() {
     await this.click(this.selectors.resetConfigBtn);
+    await this.waitForAuthFieldState('Azure', 'ServicePrincipalSecret');
   }
 
   async clickGetPermissions() {
@@ -165,9 +166,56 @@ class ConfigurationPageHelpers extends BasePage {
   }
 
   async waitForDynamicFieldsLoad() {
-    // Wait for auth method combobox to be visible after dynamic re-render
     await this.waitForElement(this.selectors.authMethodCombobox);
-    await this.page.waitForTimeout(1000);
+  }
+
+  getExpectedAuthFieldSelector(provider, method) {
+    const selectors = {
+      Azure: {
+        ServicePrincipalSecret: this.selectors.azTenantId,
+        ServicePrincipalCertificate: this.selectors.azTenantId,
+        ManagedIdentity: this.selectors.managedIdentityWarning
+      },
+      AWS: {
+        CurrentProfile: this.selectors.awsProfile,
+        AccessKey: this.selectors.awsAccessKeyId
+      }
+    };
+
+    if (!Object.prototype.hasOwnProperty.call(selectors, provider)) {
+      throw new Error(`Unsupported provider '${provider}'`);
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(selectors[provider], method)) {
+      throw new Error(`Unsupported authentication method '${method}' for provider '${provider}'`);
+    }
+
+    return selectors[provider][method];
+  }
+
+  async waitForAuthFieldState(provider, method) {
+    const expectedSelector = this.getExpectedAuthFieldSelector(provider, method);
+
+    await this.page.waitForFunction(
+      ({ provider, method, expectedSelector }) => {
+        const providerElement = document.querySelector('#cloudProvider');
+        const methodElement = document.querySelector('#authMethod');
+        const expectedElement = document.querySelector(expectedSelector);
+
+        if (providerElement === null || methodElement === null || expectedElement === null) {
+          return false;
+        }
+
+        if (providerElement.value !== provider || methodElement.value !== method) {
+          return false;
+        }
+
+        const style = window.getComputedStyle(expectedElement);
+        return style.visibility !== 'hidden' && style.display !== 'none' && expectedElement.getClientRects().length > 0;
+      },
+      { provider, method, expectedSelector },
+      { timeout: 15000 }
+    );
   }
 
   async getEnvironmentChipText() {

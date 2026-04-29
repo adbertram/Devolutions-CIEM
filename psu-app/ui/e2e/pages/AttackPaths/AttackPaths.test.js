@@ -9,6 +9,10 @@ const {
   getTestAttackPathNodeCount,
   getTestAttackPathCount
 } = require('../../_utils/cleanup');
+const {
+  registerLongRunningAttackPathRemediationScript,
+  removeLongRunningAttackPathRemediationScript
+} = require('../../_utils/psu-helpers');
 
 test.describe('Attack Paths Page', () => {
   let attackPage;
@@ -88,6 +92,7 @@ test.describe('Attack Paths Page', () => {
     let graphBackup;
 
     test.beforeAll(() => {
+      registerLongRunningAttackPathRemediationScript();
       graphBackup = backupAndClearAttackPathGraphData();
       seedAttackPathsPageData();
       const count = getTestAttackPathNodeCount();
@@ -99,7 +104,10 @@ test.describe('Attack Paths Page', () => {
 
     test.afterAll(() => {
       cleanupAttackPathsPageData();
-      restoreAttackPathGraphData(graphBackup);
+      if (graphBackup) {
+        restoreAttackPathGraphData(graphBackup);
+      }
+      removeLongRunningAttackPathRemediationScript();
       console.log('[teardown:attack-paths-page] Cleaned up graph data');
     });
 
@@ -249,7 +257,7 @@ test.describe('Attack Paths Page', () => {
 
     test('should warn before closing while the remediation script is still running', async () => {
       await expect.poll(async () => await attackPage.hasAttackPathData()).toBe(true);
-      await attackPage.expandFirstRow();
+      await attackPage.clickAttackPath('ZZZ Long running remediation fixture');
       await attackPage.executeRemediationScript();
       await expect.poll(async () => await attackPage.isExecutionDialogVisible()).toBe(true);
       await attackPage.closeExecutionDialog();

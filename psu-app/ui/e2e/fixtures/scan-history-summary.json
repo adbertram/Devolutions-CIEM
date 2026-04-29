@@ -1,0 +1,172 @@
+{
+  "name": "scan-history-summary",
+  "description": "Two completed scan runs with deterministic results for Dashboard and Scan History tests.",
+  "touchedTables": [
+    "scan_results",
+    "scan_runs",
+    "checks"
+  ],
+  "tables": {
+    "checks": [
+      {
+        "id": "entra_conditional_access_policy_require_mfa_for_management_api",
+        "disabled": 0
+      },
+      {
+        "id": "entra_non_privileged_user_has_mfa",
+        "disabled": 0
+      },
+      {
+        "id": "entra_policy_default_user_cannot_create_security_group",
+        "disabled": 0
+      },
+      {
+        "id": "entra_policy_guest_user_access_restriction",
+        "disabled": 0
+      },
+      {
+        "id": "entra_privileged_user_has_mfa",
+        "disabled": 0
+      },
+      {
+        "id": "entra_security_defaults_enabled",
+        "disabled": 0
+      },
+      {
+        "id": "entra_trusted_named_location_exist",
+        "disabled": 0
+      },
+      {
+        "id": "aisearch_service_not_publicly_accessible",
+        "disabled": 1
+      },
+      {
+        "id": "aks_cluster_rbac_enabled",
+        "disabled": 1
+      },
+      {
+        "id": "aks_clusters_created_with_private_nodes",
+        "disabled": 1
+      }
+    ],
+    "scan_runs": [
+      {
+        "id": "_E2E_TEST_scan_run_1",
+        "provider_id": "azure",
+        "scan_type": "checks",
+        "status": "Completed",
+        "resource_filter": null,
+        "resource_providers": null,
+        "include_passed": 1,
+        "started_at": "2026-01-15T12:00:00.000Z",
+        "completed_at": "2026-01-15T12:00:42.500Z",
+        "duration_seconds": 42.5,
+        "total_results": 5,
+        "failed_results": 2,
+        "passed_results": 3,
+        "skipped_results": 0,
+        "manual_results": 0,
+        "error_message": null
+      },
+      {
+        "id": "_E2E_TEST_scan_run_2",
+        "provider_id": "azure",
+        "scan_type": "checks",
+        "status": "Completed",
+        "resource_filter": null,
+        "resource_providers": null,
+        "include_passed": 1,
+        "started_at": "2026-01-14T12:00:00.000Z",
+        "completed_at": "2026-01-14T12:00:18.200Z",
+        "duration_seconds": 18.2,
+        "total_results": 3,
+        "failed_results": 0,
+        "passed_results": 3,
+        "skipped_results": 0,
+        "manual_results": 0,
+        "error_message": null
+      }
+    ],
+    "scan_results": [
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_security_defaults_enabled",
+        "status": "FAIL",
+        "status_extended": "Security defaults are not enabled",
+        "resource_id": "_E2E_TEST_resource_0",
+        "resource_name": "Test Resource 0",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_conditional_access_policy_require_mfa_for_management_api",
+        "status": "FAIL",
+        "status_extended": "MFA is not enforced",
+        "resource_id": "_E2E_TEST_resource_1",
+        "resource_name": "Test Resource 1",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_non_privileged_user_has_mfa",
+        "status": "PASS",
+        "status_extended": "Key vault access is properly configured",
+        "resource_id": "_E2E_TEST_resource_2",
+        "resource_name": "Test Resource 2",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_policy_guest_user_access_restriction",
+        "status": "PASS",
+        "status_extended": "Storage encryption is enabled",
+        "resource_id": "_E2E_TEST_resource_3",
+        "resource_name": "Test Resource 3",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_trusted_named_location_exist",
+        "status": "PASS",
+        "status_extended": "NSGs are configured correctly",
+        "resource_id": "_E2E_TEST_resource_4",
+        "resource_name": "Test Resource 4",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "check_id": "entra_security_defaults_enabled",
+        "status": "PASS",
+        "status_extended": "Check passed successfully",
+        "resource_id": "_E2E_TEST_resource_old_0",
+        "resource_name": "Old Test Resource 0",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "check_id": "entra_conditional_access_policy_require_mfa_for_management_api",
+        "status": "PASS",
+        "status_extended": "Check passed successfully",
+        "resource_id": "_E2E_TEST_resource_old_1",
+        "resource_name": "Old Test Resource 1",
+        "location": null
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "check_id": "entra_non_privileged_user_has_mfa",
+        "status": "PASS",
+        "status_extended": "Check passed successfully",
+        "resource_id": "_E2E_TEST_resource_old_2",
+        "resource_name": "Old Test Resource 2",
+        "location": null
+      }
+    ]
+  },
+  "preconditions": [],
+  "expectedCounts": {
+    "scan_results": 8,
+    "scan_runs": 2,
+    "checks": 10
+  },
+  "cleanup": "restoreTouchedTables"
+}
