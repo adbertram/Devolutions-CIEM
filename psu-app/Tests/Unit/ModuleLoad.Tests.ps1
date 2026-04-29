@@ -113,6 +113,16 @@ Describe 'Module Load — Post-Discovery-Schema' {
         }
     }
 
+    Context 'Report functions are exported' {
+        It 'Get-CIEMReport is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMReport -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Invoke-CIEMReport is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Invoke-CIEMReport -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+    }
+
     Context 'Check functions are exported' {
         It 'Get-CIEMCheck is available as a public command' {
             Get-Command -Module Devolutions.CIEM -Name Get-CIEMCheck -ErrorAction Stop | Should -Not -BeNullOrEmpty
@@ -182,6 +192,10 @@ Describe 'Module Load — Post-Discovery-Schema' {
 
         It 'Module does not expose Get-CIEMAzureResourceTypeEntity' {
             Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceTypeEntity -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+        }
+
+        It 'Module does not expose Get-CIEMAzureDiscoveryCoverageReport' {
+            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureDiscoveryCoverageReport -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
     }
 

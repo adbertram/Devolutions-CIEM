@@ -24,8 +24,7 @@
       "path": "Checks/Invoke-CIEMAttackPathRemediation.ps1",
       "description": "Execute the resolved remediation script for a CIEM attack path",
       "status": "Published",
-      "timeout": 600,
-      "disableManualInvocation": true
+      "timeout": 600
     }
   ],
   "remediationTemplates": {

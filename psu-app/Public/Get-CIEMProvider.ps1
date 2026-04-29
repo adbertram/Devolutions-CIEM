@@ -57,10 +57,9 @@ function Get-CIEMProvider {
         $provider
     })
 
-    # Add computed CheckCount to each provider
+    # Add computed CheckCount from provider catalogs.
     foreach ($p in $providers) {
-        $checksDir = Join-Path $script:ModuleRoot "modules/$($p.Name)/Checks"
-        $checkCount = if (Test-Path $checksDir) { @(Get-ChildItem -Path "$checksDir/*.ps1" -ErrorAction SilentlyContinue).Count } else { 0 }
+        $checkCount = @(Get-CIEMCheck -Provider $p.Name).Count
         $p | Add-Member -NotePropertyName 'CheckCount' -NotePropertyValue $checkCount -Force
     }
 

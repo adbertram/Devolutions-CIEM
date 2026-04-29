@@ -32,19 +32,6 @@ function Import-CIEMScript {
     if ($Integrated) {
         $psuConnectionParameters.Integrated = $true
     }
-    $legacyScriptExactNames = @(
-        'Devolutions.CIEM'
-        'Devolutions.CIEM/New-CIEMScanRun'
-        'Devolutions.CIEM/Start-CIEMAzureDiscovery'
-        'Devolutions.CIEM/Invoke-CIEMIdentityGraphBuild'
-        'Devolutions.CIEM/Invoke-CIEMAttackPathRefresh'
-    )
-    $legacyPathPatterns = @(
-        '.*/Devolutions-CIEM/psu-app/Checks/New-CIEMScanRun\.ps1$'
-        '.*/Devolutions-CIEM/psu-app/Checks/Start-CIEMAzureDiscovery\.ps1$'
-        '.*/Devolutions-CIEM/psu-app/modules/Devolutions\.CIEM\.Graph/Data/attack_path_remediation_scripts/[^/]+\.ps1$'
-    )
-
     $normalizeScriptName = {
         param(
             [Parameter(Mandatory)]
@@ -52,20 +39,6 @@ function Import-CIEMScript {
             [string]$Name
         )
         $Name.Replace('\', '/').TrimStart('/')
-    }
-
-    $getPsuRepositoryPath = {
-        param(
-            [Parameter(Mandatory)]
-            [string]$Name
-        )
-
-        $normalizedName = & $normalizeScriptName -Name $Name
-        if ($normalizedName -match '\.ps1$') {
-            $normalizedName
-        } else {
-            "$normalizedName.ps1"
-        }
     }
 
     $getExistingScriptPath = {
@@ -85,27 +58,8 @@ function Import-CIEMScript {
         ''
     }
 
-    $getExistingScriptNotes = {
-        param(
-            [Parameter(Mandatory)]
-            [object]$Script
-        )
-
-        foreach ($propertyName in @('Notes', 'CommitNotes')) {
-            $property = $Script.PSObject.Properties[$propertyName]
-            if ($property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
-                [string]$property.Value
-                return
-            }
-        }
-
-        ''
-    }
-
     $scriptDefinitions = [System.Collections.Generic.List[object]]::new()
     $expectedScriptNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    $expectedScriptPaths = @{}
-    $folderPaths = [System.Collections.Generic.List[string]]::new()
     $expectedFolderPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
     foreach ($folder in @($manifest.folders)) {
@@ -127,7 +81,6 @@ function Import-CIEMScript {
             throw "CIEM script manifest contains a duplicate folder path: $normalizedFolderPath"
         }
 
-        $folderPaths.Add($normalizedFolderPath)
     }
 
     foreach ($scriptDef in @($manifest.scripts)) {
@@ -144,7 +97,6 @@ function Import-CIEMScript {
         if (-not $expectedScriptNames.Add($normalizedScriptName)) {
             throw "CIEM script manifest contains a duplicate script name: $normalizedScriptName"
         }
-        $expectedScriptPaths[$normalizedScriptName] = & $getPsuRepositoryPath -Name $normalizedScriptName
 
         $path = [string]$scriptDef.path
         if ([string]::IsNullOrWhiteSpace($path)) {
@@ -170,7 +122,7 @@ function Import-CIEMScript {
                 Description             = [string]$scriptDef.description
                 Status                  = [string]$scriptDef.status
                 Timeout                 = [double]$scriptDef.timeout
-                DisableManualInvocation = $false
+                DisableManualInvocation = [bool]$scriptDef.disableManualInvocation
                 RepositoryPath          = $null
                 Type                    = 'Core'
             })
@@ -244,7 +196,6 @@ function Import-CIEMScript {
             throw "CIEM script manifest contains a duplicate script name: $normalizedScriptName"
         }
         $repositoryPath = "Identities/AttackPaths/$normalizedScriptName.ps1"
-        $expectedScriptPaths[$normalizedScriptName] = $repositoryPath
 
         $scriptDefinitions.Add([pscustomobject]@{
                 Name                    = $normalizedScriptName
@@ -259,110 +210,9 @@ function Import-CIEMScript {
     }
 
     $syncedFolders = 0
-    if ($folderPaths.Count -gt 0) {
-        $getFolderCommand = Get-Command -Name 'Get-PSUFolder' -ErrorAction SilentlyContinue
-        $newFolderCommand = Get-Command -Name 'New-PSUFolder' -ErrorAction SilentlyContinue
-        if (-not $getFolderCommand) {
-            throw 'Import-CIEMScript requires Get-PSUFolder to sync PSU script folders.'
-        }
-        if (-not $newFolderCommand) {
-            throw 'Import-CIEMScript requires New-PSUFolder to sync PSU script folders.'
-        }
-
-        foreach ($folderPath in $folderPaths) {
-            $folderName = @($folderPath -split '/')[-1]
-            $matchingFolders = @(Get-PSUFolder -Name $folderName @psuConnectionParameters | Where-Object {
-                    $pathProperty = $_.PSObject.Properties['Path']
-                    $nameProperty = $_.PSObject.Properties['Name']
-                    $existingFolderPath = if ($pathProperty -and -not [string]::IsNullOrWhiteSpace([string]$pathProperty.Value)) {
-                        [string]$pathProperty.Value
-                    } elseif ($nameProperty -and -not [string]::IsNullOrWhiteSpace([string]$nameProperty.Value)) {
-                        [string]$nameProperty.Value
-                    } else {
-                        ''
-                    }
-
-                    -not [string]::IsNullOrWhiteSpace($existingFolderPath) -and
-                    (& $normalizeScriptName -Name $existingFolderPath) -eq $folderPath
-                })
-
-            if ($matchingFolders.Count -gt 1) {
-                throw "Multiple PSU script folders found for CIEM folder path '$folderPath'."
-            }
-
-            if ($matchingFolders.Count -eq 1) {
-                continue
-            }
-
-            if ($PSCmdlet.ShouldProcess($folderPath, 'Create PSU script folder')) {
-                New-PSUFolder -Path $folderPath -Type Script @psuConnectionParameters | Out-Null
-            }
-            $syncedFolders++
-        }
-    }
 
     $prunedScripts = 0
     $getScriptCommand = Get-Command -Name 'Get-PSUScript' -ErrorAction SilentlyContinue
-    $removeScriptCommand = Get-Command -Name 'Remove-PSUScript' -ErrorAction SilentlyContinue
-    if ($getScriptCommand -and $removeScriptCommand) {
-        foreach ($existingScript in @(Get-PSUScript @psuConnectionParameters)) {
-            $existingName = [string]$existingScript.Name
-            if ([string]::IsNullOrWhiteSpace($existingName)) {
-                continue
-            }
-
-            $normalizedExistingName = & $normalizeScriptName -Name $existingName
-            $isStaleScript = $false
-            if ($expectedScriptPaths.ContainsKey($normalizedExistingName)) {
-                $expectedRepositoryPath = [string]$expectedScriptPaths[$normalizedExistingName]
-                $existingRepositoryPath = & $getExistingScriptPath -Script $existingScript
-                if ([string]::IsNullOrWhiteSpace($existingRepositoryPath) -or $existingRepositoryPath -eq $expectedRepositoryPath) {
-                    continue
-                }
-
-                if ((& $getExistingScriptNotes -Script $existingScript) -eq $managedScriptNotes) {
-                    $isStaleScript = $true
-                } else {
-                    throw "Existing PSU script '$normalizedExistingName' is stored at '$existingRepositoryPath' but CIEM expects '$expectedRepositoryPath'."
-                }
-            }
-
-            if (-not $isStaleScript) {
-                $isStaleScript = $legacyScriptExactNames -contains $normalizedExistingName
-            }
-            if (-not $isStaleScript -and $normalizedExistingName -match '^Checks/AttackPathRemediation-') {
-                $isStaleScript = $true
-            }
-            if (-not $isStaleScript -and $normalizedExistingName -match '^Identities/AttackPaths/AttackPathRemediation-') {
-                $isStaleScript = $true
-            }
-
-            if (-not $isStaleScript) {
-                foreach ($pathPattern in $legacyPathPatterns) {
-                    if ($normalizedExistingName -match $pathPattern) {
-                        $isStaleScript = $true
-                        break
-                    }
-                }
-            }
-
-            if (-not $isStaleScript) {
-                if ((& $getExistingScriptNotes -Script $existingScript) -eq $managedScriptNotes) {
-                    $isStaleScript = $true
-                }
-            }
-
-            if (-not $isStaleScript) {
-                continue
-            }
-
-            if ($PSCmdlet.ShouldProcess($normalizedExistingName, 'Remove stale CIEM PSU script')) {
-                Remove-PSUScript -Script $existingScript @psuConnectionParameters | Out-Null
-            }
-
-            $prunedScripts++
-        }
-    }
 
     $coreScripts = 0
     $attackPathScripts = 0

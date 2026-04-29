@@ -20,24 +20,40 @@ function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
 _BootLog "Module loading from: $PSScriptRoot"
 
 # --- Sub-module directory roots (for runtime file discovery) ---
-$script:GraphRoot           = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Graph'
-$script:AzureRoot           = Join-Path $PSScriptRoot 'modules/Azure/Infrastructure'
-$script:AzureDiscoveryRoot  = Join-Path $PSScriptRoot 'modules/Azure/Discovery'
-$script:AWSRoot             = Join-Path $PSScriptRoot 'modules/AWS/Infrastructure'
-$script:ChecksRoot          = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.Checks'
-$script:EffectivePermissionsRoot = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.EffectivePermissions'
-$script:PSURoot             = Join-Path $PSScriptRoot 'modules/Devolutions.CIEM.PSU'
+$script:CIEMModuleRootsConfig = Import-PowerShellDataFile -Path (Join-Path $script:ModuleRoot 'Data/module_roots.psd1')
+$script:CIEMModuleRoots = @($script:CIEMModuleRootsConfig.Modules | Sort-Object LoadOrder)
+if ($script:CIEMModuleRoots.Count -eq 0) {
+    throw "CIEM module root registry contains no modules."
+}
 
-# All sub-module roots in load order
-$subModuleRoots = @(
-    $script:GraphRoot
-    $script:AzureRoot
-    $script:AzureDiscoveryRoot
-    $script:AWSRoot
-    $script:ChecksRoot
-    $script:EffectivePermissionsRoot
-    $script:PSURoot
-)
+foreach ($rootEntry in $script:CIEMModuleRoots) {
+    foreach ($requiredField in @('Name', 'Variable', 'Path', 'LoadOrder', 'LoadClasses')) {
+        if (-not $rootEntry.ContainsKey($requiredField)) {
+            throw "CIEM module root registry entry is missing required field '$requiredField'."
+        }
+    }
+
+    foreach ($stringField in @('Name', 'Variable', 'Path')) {
+        if ([string]::IsNullOrWhiteSpace([string]$rootEntry.$stringField)) {
+            throw "CIEM module root registry entry has an empty '$stringField' field."
+        }
+    }
+
+    if ([int]$rootEntry.LoadOrder -le 0) {
+        throw "CIEM module root registry load order must be positive for '$($rootEntry.Name)'."
+    }
+
+    $resolvedRoot = Join-Path $PSScriptRoot ([string]$rootEntry.Path)
+    if (-not (Test-Path -Path $resolvedRoot -PathType Container)) {
+        throw "CIEM module root '$($rootEntry.Name)' was not found: $resolvedRoot"
+    }
+
+    Set-Variable -Name ([string]$rootEntry.Variable) -Scope Script -Value $resolvedRoot
+}
+
+$subModuleRoots = @($script:CIEMModuleRoots | ForEach-Object {
+    Get-Variable -Name ([string]$_.Variable) -Scope Script -ValueOnly
+})
 
 # --- Severity catalog (single source of truth for name/rank/color/label) ---
 $script:SeverityByName = @{}
@@ -81,9 +97,11 @@ foreach ($className in @('CIEMServiceCache', 'CIEMProviderService', 'CIEMCheck',
     try { . $classFile } catch { _BootLog "FAILED to load class $className : $_" 'ERROR'; throw }
 }
 
-# Unordered classes (Graph, Azure, Azure Discovery, AWS - no interdependencies)
+# Unordered classes (provider modules with no interdependencies)
 _BootLog "Loading provider classes..."
-foreach ($root in @($script:GraphRoot, $script:AzureRoot, $script:AzureDiscoveryRoot, $script:AWSRoot, $script:EffectivePermissionsRoot)) {
+foreach ($root in @($script:CIEMModuleRoots | Where-Object { [bool]$_.LoadClasses } | ForEach-Object {
+    Get-Variable -Name ([string]$_.Variable) -Scope Script -ValueOnly
+})) {
     foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction SilentlyContinue)) {
         try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR'; throw }
     }
@@ -137,7 +155,10 @@ $script:RelationshipColors = @{}
 $script:DormantPermissionThresholdDays = 90
 $script:MediumEntitlementThreshold = 5
 $script:PrivilegedRoleNames = @((Get-Content (Join-Path $script:AzureDiscoveryRoot 'Data/privileged_roles.json') -Raw | ConvertFrom-Json).name)
-$script:CIEMSaveTablesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/save-tables.psd1')
+$script:CIEMGraphEntitiesConfig = Import-PowerShellDataFile -Path (Join-Path $script:GraphRoot 'Data/entities.psd1')
+$script:CIEMAttackPathRemediationTokensConfig = Import-PowerShellDataFile -Path (Join-Path $script:GraphRoot 'Data/remediation_tokens.psd1')
+$script:CIEMAzureEntitiesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/entities.psd1')
+$script:CIEMAzureDiscoveryPhasesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/discovery_phases.psd1')
 # Tunables (script-scope, all defined in one place for discoverability)
 # CIEMParallelThrottleLimit*: ForEach-Object -Parallel throttle for discovery vs scan workloads.
 # CIEMSqlBatchSize: cap on rows per multi-row INSERT before InvokeCIEMBatchInsert further sub-divides
@@ -166,15 +187,8 @@ foreach ($dir in $exportDirs) {
     if ($files) { $exportFunctions += $files.BaseName }
 }
 
-# Page files may define multiple functions per file — extract all function names
-# (required because [scriptblock]::Create() in PSU tab/onClick only sees exported functions)
-foreach ($pageFile in (Get-ChildItem "$script:PSURoot/Pages/*.ps1" -ErrorAction SilentlyContinue)) {
-    $content = Get-Content $pageFile.FullName -Raw
-    $fnMatches = [regex]::Matches($content, '(?m)^function\s+([\w-]+)')
-    foreach ($m in $fnMatches) {
-        $exportFunctions += $m.Groups[1].Value
-    }
-}
+$exportFunctions += @(GetCIEMPSUPageRegistry | ForEach-Object { [string]$_.factory })
+$exportFunctions = @($exportFunctions | Sort-Object -Unique)
 
 Write-CIEMLog -Message "Exporting $($exportFunctions.Count) functions" -Component 'ModuleInit'
 Export-ModuleMember -Function $exportFunctions

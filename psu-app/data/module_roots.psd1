@@ -1,0 +1,60 @@
+@{
+    Modules = @(
+        @{
+            Name        = 'Graph'
+            Variable    = 'GraphRoot'
+            Path        = 'modules/Devolutions.CIEM.Graph'
+            LoadOrder   = 10
+            LoadClasses = $true
+        }
+        @{
+            Name        = 'AzureInfrastructure'
+            Variable    = 'AzureRoot'
+            Path        = 'modules/Azure/Infrastructure'
+            LoadOrder   = 20
+            LoadClasses = $true
+        }
+        @{
+            Name        = 'AzureDiscovery'
+            Variable    = 'AzureDiscoveryRoot'
+            Path        = 'modules/Azure/Discovery'
+            LoadOrder   = 30
+            LoadClasses = $true
+        }
+        @{
+            Name        = 'AWSInfrastructure'
+            Variable    = 'AWSRoot'
+            Path        = 'modules/AWS/Infrastructure'
+            LoadOrder   = 40
+            LoadClasses = $true
+        }
+        @{
+            Name        = 'Checks'
+            Variable    = 'ChecksRoot'
+            Path        = 'modules/Devolutions.CIEM.Checks'
+            LoadOrder   = 50
+            LoadClasses = $false
+        }
+        @{
+            Name        = 'EffectivePermissions'
+            Variable    = 'EffectivePermissionsRoot'
+            Path        = 'modules/Devolutions.CIEM.EffectivePermissions'
+            LoadOrder   = 60
+            LoadClasses = $true
+        }
+        @{
+            Name        = 'Reports'
+            Variable    = 'ReportsRoot'
+            Path        = 'modules/Devolutions.CIEM.Reports'
+            LoadOrder   = 70
+            LoadClasses = $true
+        }
+        @{
+            Name        = 'PSU'
+            Variable    = 'PSURoot'
+            Path        = 'modules/Devolutions.CIEM.PSU'
+            LoadOrder   = 80
+            LoadClasses = $false
+        }
+    )
+}

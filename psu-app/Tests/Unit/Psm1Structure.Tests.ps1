@@ -6,13 +6,14 @@ BeforeAll {
     $script:GetDatabasePathContent = Get-Content (Join-Path $repoRoot 'Public' 'Get-CIEMDatabasePath.ps1') -Raw
     $script:InvokeQueryContent = Get-Content (Join-Path $repoRoot 'Public' 'Invoke-CIEMQuery.ps1') -Raw
     $script:ConfigPageContent = Get-Content (Join-Path $repoRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
+    $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psd1'
 }
 
 Describe 'Devolutions.CIEM.psm1 Structure' {
 
     Context 'Sub-module root variables' {
-        It 'Contains $script:AzureDiscoveryRoot assignment' {
-            $script:Psm1Content | Should -Match '\$script:AzureDiscoveryRoot\s*='
+        It 'Preserves $script:AzureDiscoveryRoot for runtime consumers' {
+            $script:Psm1Content | Should -Match '\$script:AzureDiscoveryRoot'
         }
 
         It 'Does NOT contain $script:AzurePermissionsRoot' {
@@ -79,6 +80,7 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
     Context 'App registration references' {
         BeforeAll {
             $script:AppContent = Get-Content (Join-Path $PSScriptRoot '..' '..' 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1') -Raw
+            $script:PageRegistryContent = Get-Content (Join-Path $PSScriptRoot '..' '..' 'modules' 'Devolutions.CIEM.PSU' 'Data' 'pages.json') -Raw
         }
 
         It 'Does NOT reference New-CIEMGraphPage (dead function)' {
@@ -89,12 +91,14 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:AppContent | Should -Not -Match 'New-CIEMIdentityRiskPage'
         }
 
-        It 'References New-CIEMIdentitiesPage' {
-            $script:AppContent | Should -Match 'New-CIEMIdentitiesPage'
+        It 'References New-CIEMIdentitiesPage through the page registry' {
+            $script:AppContent | Should -Match 'GetCIEMPSUPageRegistry'
+            $script:PageRegistryContent | Should -Match '"factory"\s*:\s*"New-CIEMIdentitiesPage"'
         }
 
-        It 'References New-CIEMAttackPathsPage' {
-            $script:AppContent | Should -Match 'New-CIEMAttackPathsPage'
+        It 'References New-CIEMAttackPathsPage through the page registry' {
+            $script:AppContent | Should -Match 'GetCIEMPSUPageRegistry'
+            $script:PageRegistryContent | Should -Match '"factory"\s*:\s*"New-CIEMAttackPathsPage"'
         }
     }
 
@@ -144,18 +148,50 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
         }
     }
 
-    Context 'Sub-module roots array' {
-        It '$subModuleRoots contains $script:AzureDiscoveryRoot' {
-            $script:Psm1Content | Should -Match '\$subModuleRoots\s*=\s*@\([^)]*\$script:AzureDiscoveryRoot'
+    Context 'Sub-module root registry' {
+        It 'Defines sub-module roots in a data manifest' {
+            $script:ModuleRootsPath | Should -Exist
+            $registry = Import-PowerShellDataFile -Path $script:ModuleRootsPath
+
+            @($registry.Modules.Variable) | Should -Be @(
+                'GraphRoot'
+                'AzureRoot'
+                'AzureDiscoveryRoot'
+                'AWSRoot'
+                'ChecksRoot'
+                'EffectivePermissionsRoot'
+                'ReportsRoot'
+                'PSURoot'
+            )
         }
 
-        It '$subModuleRoots does NOT contain $script:AzurePermissionsRoot' {
-            # Extract the $subModuleRoots block and check it doesn't reference the old roots
-            $script:Psm1Content | Should -Not -Match '\$subModuleRoots\s*=\s*@\([^)]*AzurePermissionsRoot'
+        It 'Loads sub-module roots from the data manifest' {
+            $script:Psm1Content | Should -Match 'Data/module_roots\.psd1'
+            $script:Psm1Content | Should -Match 'Import-PowerShellDataFile'
+            $script:Psm1Content | Should -Match 'Set-Variable\s+-Name\s+\(\[string\]\$rootEntry\.Variable\)\s+-Scope\s+Script'
+            $script:Psm1Content | Should -Match '\$subModuleRoots\s*=\s*@\(\$script:CIEMModuleRoots'
         }
 
-        It '$subModuleRoots does NOT contain $script:IdentitiesRoot' {
-            $script:Psm1Content | Should -Not -Match '\$subModuleRoots\s*=\s*@\([^)]*IdentitiesRoot'
+        It 'Does NOT contain removed sub-module roots' {
+            $script:Psm1Content | Should -Not -Match 'AzurePermissionsRoot'
+            $script:Psm1Content | Should -Not -Match 'IdentitiesRoot'
+            $script:ModuleRootsPath | Should -Exist
+            $registry = Import-PowerShellDataFile -Path $script:ModuleRootsPath
+            @($registry.Modules.Variable) | Should -Not -Contain 'AzurePermissionsRoot'
+            @($registry.Modules.Variable) | Should -Not -Contain 'IdentitiesRoot'
+        }
+    }
+
+    Context 'Export registry' {
+        It 'Does not parse PSU page files with regex to build module exports' {
+            $script:Psm1Content | Should -Not -Match '\[regex\]::Matches'
+            $script:Psm1Content | Should -Not -Match 'Get-Content\s+\$pageFile\.FullName\s+-Raw'
+        }
+
+        It 'Exports PSU page factories from the page registry' {
+            $script:Psm1Content | Should -Match 'GetCIEMPSUPageRegistry'
+            $script:Psm1Content | Should -Match '\$_\.factory'
+            $script:Psm1Content | Should -Match 'Export-ModuleMember\s+-Function\s+\$exportFunctions'
         }
     }
 }

@@ -7,6 +7,8 @@ BeforeAll {
     $script:UniversalScriptsContent = if ($script:UniversalScriptsExists) { Get-Content -Path $script:UniversalScriptsPath -Raw } else { '' }
     $script:ImportScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Import-CIEMScript.ps1'
     $script:ImportScriptContent = Get-Content -Path $script:ImportScriptPath -Raw
+    $script:RepairScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Repair-CIEMLegacyScriptRegistration.ps1'
+    $script:RepairScriptContent = if (Test-Path -Path $script:RepairScriptPath -PathType Leaf) { Get-Content -Path $script:RepairScriptPath -Raw } else { '' }
     $script:AppScriptPath = Join-Path $PSScriptRoot '..' '..' 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1'
     $script:AppScriptContent = Get-Content -Path $script:AppScriptPath -Raw
     $script:ManifestPath = Join-Path $PSScriptRoot '..' '..' 'data' 'psu-scripts.json'
@@ -20,6 +22,10 @@ Describe 'Import-CIEMScript registration model' {
     Context 'Command exposure' {
         It 'Exposes Import-CIEMScript as a public module command' {
             Get-Command Import-CIEMScript -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Exposes Repair-CIEMLegacyScriptRegistration as a public module command' {
+            Get-Command Repair-CIEMLegacyScriptRegistration -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
     }
 
@@ -85,16 +91,17 @@ Describe 'Import-CIEMScript registration model' {
             $script:ImportScriptContent | Should -Not -Match '(?m)^\s*-Path \$path\s*$'
         }
 
-        It 'Prunes stale CIEM scripts before registering core scripts' {
+        It 'Keeps legacy repair out of the current registration path' {
             $script:ImportScriptContent | Should -Match 'Get-PSUScript'
-            $script:ImportScriptContent | Should -Match 'Remove-PSUScript'
+            $script:ImportScriptContent | Should -Not -Match 'Remove-PSUScript'
+            $script:ImportScriptContent | Should -Not -Match 'legacyScriptExactNames'
+            $script:ImportScriptContent | Should -Not -Match 'legacyPathPatterns'
         }
 
-        It 'Syncs manifest script folders without creating a legacy Devolutions.CIEM folder' {
-            $script:ImportScriptContent | Should -Match 'Get-PSUFolder'
-            $script:ImportScriptContent | Should -Match 'New-PSUFolder'
+        It 'Validates manifest script folders without using PSU folder APIs' {
+            $script:ImportScriptContent | Should -Not -Match 'Get-PSUFolder'
+            $script:ImportScriptContent | Should -Not -Match 'New-PSUFolder'
             $script:ImportScriptContent | Should -Match 'manifest\.folders'
-            $script:ImportScriptContent | Should -Not -Match 'New-PSUFolder[^\r\n]*Devolutions\.CIEM'
         }
 
         It 'Uses managed notes and upsert behavior for CIEM-owned scripts' {
@@ -114,8 +121,17 @@ Describe 'Import-CIEMScript registration model' {
         }
     }
 
+    Context 'Repair-CIEMLegacyScriptRegistration implementation' {
+        It 'Owns stale CIEM script removal instead of Import-CIEMScript' {
+            $script:RepairScriptContent | Should -Match 'Get-PSUScript'
+            $script:RepairScriptContent | Should -Match 'Remove-PSUScript'
+            $script:RepairScriptContent | Should -Match 'legacyScriptExactNames'
+            $script:RepairScriptContent | Should -Match 'legacyPathPatterns'
+        }
+    }
+
     Context 'Import-CIEMScript behavior' {
-        It 'Prunes stale CIEM scripts and keeps unrelated scripts intact' {
+        It 'Registers current scripts without pruning legacy scripts' {
             Mock -ModuleName Devolutions.CIEM Get-Command {
                 [pscustomobject]@{
                     Name = $Name
@@ -154,19 +170,12 @@ Describe 'Import-CIEMScript registration model' {
             $result.Status | Should -Be 'Registered'
             $result.CoreScripts | Should -Be @($script:Manifest.scripts).Count
             $result.AttackPathScripts | Should -Be @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count
-            $result.PrunedScripts | Should -Be 5
-            $result.SyncedFolders | Should -Be 2
+            $result.PrunedScripts | Should -Be 0
+            $result.SyncedFolders | Should -Be 0
 
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Devolutions.CIEM/Start-CIEMAzureDiscovery' }
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Checks/AttackPathRemediation-guest-user-holding-a-privileged-role' }
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/Checks/New-CIEMScanRun.ps1' }
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Identities/AttackPaths/AttackPathRemediation-disabled-account-still-holding-active-role-assignments' }
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'management-port-open-to-the-internet' }
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $Script.Name -eq 'Infra/RotateCertificates' }
-            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $Path -eq 'Checks' }
-            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Path -eq 'Identities' -and [string]$Type -eq 'Script' }
-            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Path -eq 'Identities/AttackPaths' -and [string]$Type -eq 'Script' }
-            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $Path -eq 'Devolutions.CIEM' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 0
+            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 0
+            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 0
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times (@($script:Manifest.scripts).Count + @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count - 1)
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count -ParameterFilter {
                 $Name -notmatch '/' -and $Path -match '^Identities/AttackPaths/[^/]+\.ps1$'
@@ -179,10 +188,7 @@ Describe 'Import-CIEMScript registration model' {
                 $Script.Name -eq 'Checks/New-CIEMScanRun'
             }
             Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $PSBoundParameters.ContainsKey('Name') }
-            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 3 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
-            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
-            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Name') -and -not $PSBoundParameters.ContainsKey('Integrated') }
-            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 5 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
+            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Name') -and -not $PSBoundParameters.ContainsKey('Integrated') }
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times ($result.TotalScripts - 1) -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
         }
 
@@ -209,9 +215,9 @@ Describe 'Import-CIEMScript registration model' {
 
             $result = Import-CIEMScript -Integrated
 
-            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 3 -ParameterFilter { $Integrated.IsPresent }
-            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 3 -ParameterFilter { $Integrated.IsPresent }
-            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { $Integrated.IsPresent -and -not $PSBoundParameters.ContainsKey('Name') }
+            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 0
+            Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 0
+            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Integrated.IsPresent -and -not $PSBoundParameters.ContainsKey('Name') }
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times $result.TotalScripts -ParameterFilter { $Integrated.IsPresent }
         }
 
@@ -276,7 +282,7 @@ Describe 'Import-CIEMScript registration model' {
             }
         }
 
-        It 'Queries folders by leaf name to avoid recursive folder enumeration' {
+        It 'Does not call PSU folder APIs during current script registration' {
             Mock -ModuleName Devolutions.CIEM Get-Command {
                 [pscustomobject]@{
                     Name = $Name
@@ -288,17 +294,7 @@ Describe 'Import-CIEMScript registration model' {
             Mock -ModuleName Devolutions.CIEM Set-PSUScript {}
             Mock -ModuleName Devolutions.CIEM New-PSUFolder {}
             Mock -ModuleName Devolutions.CIEM Get-PSUFolder {
-                param($Name)
-                if (-not $PSBoundParameters.ContainsKey('Name')) {
-                    throw 'Recursive folder enumeration is not supported.'
-                }
-
-                switch ($Name) {
-                    'Checks' { return [pscustomobject]@{ Name = 'Checks'; Path = 'Checks'; Type = 'Script' } }
-                    'Identities' { return [pscustomobject]@{ Name = 'Identities'; Path = 'Identities'; Type = 'Script' } }
-                    'AttackPaths' { return [pscustomobject]@{ Name = 'AttackPaths'; Path = 'Identities/AttackPaths'; Type = 'Script' } }
-                    default { return @() }
-                }
+                throw 'PSU folder API is not part of current script registration.'
             }
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 param($Name)
@@ -313,11 +309,53 @@ Describe 'Import-CIEMScript registration model' {
 
             $result.Status | Should -Be 'Registered'
             $result.SyncedFolders | Should -Be 0
-            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 3
-            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { [string]::IsNullOrEmpty($Name) }
+            Should -Invoke -CommandName Get-PSUFolder -ModuleName Devolutions.CIEM -Times 0
             Should -Invoke -CommandName New-PSUFolder -ModuleName Devolutions.CIEM -Times 0
         }
 
+    }
+
+    Context 'Repair-CIEMLegacyScriptRegistration behavior' {
+        It 'Prunes stale CIEM scripts and keeps unrelated scripts intact' {
+            Mock -ModuleName Devolutions.CIEM Get-Command {
+                [pscustomobject]@{
+                    Name = $Name
+                }
+            } -ParameterFilter { $Name -in @('Get-PSUScript', 'Remove-PSUScript') }
+
+            Mock -ModuleName Devolutions.CIEM Remove-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                param($Name)
+                if ($PSBoundParameters.ContainsKey('Name')) {
+                    return @()
+                }
+
+                return @(
+                    [pscustomobject]@{ Name = 'Checks/New-CIEMScanRun' }
+                    [pscustomobject]@{ Name = 'Devolutions.CIEM/Start-CIEMAzureDiscovery' }
+                    [pscustomobject]@{ Name = 'Checks/AttackPathRemediation-guest-user-holding-a-privileged-role' }
+                    [pscustomobject]@{ Name = 'Identities/AttackPaths/AttackPathRemediation-disabled-account-still-holding-active-role-assignments' }
+                    [pscustomobject]@{ Name = 'management-port-open-to-the-internet'; FullPath = 'management-port-open-to-the-internet.ps1'; CommitNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json' }
+                    [pscustomobject]@{ Name = 'Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/Checks/New-CIEMScanRun.ps1' }
+                    [pscustomobject]@{ Name = 'Infra/RotateCertificates' }
+                )
+            }
+
+            $result = Repair-CIEMLegacyScriptRegistration
+
+            $result.Status | Should -Be 'Repaired'
+            $result.ScannedScripts | Should -Be 7
+            $result.PrunedScripts | Should -Be 5
+
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Devolutions.CIEM/Start-CIEMAzureDiscovery' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Checks/AttackPathRemediation-guest-user-holding-a-privileged-role' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Users/adam/Dropbox/GitRepos/Devolutions-CIEM/psu-app/Checks/New-CIEMScanRun.ps1' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'Identities/AttackPaths/AttackPathRemediation-disabled-account-still-holding-active-role-assignments' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Script.Name -eq 'management-port-open-to-the-internet' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $Script.Name -eq 'Checks/New-CIEMScanRun' }
+            Should -Invoke -CommandName Remove-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $Script.Name -eq 'Infra/RotateCertificates' }
+            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $PSBoundParameters.ContainsKey('Name') }
+        }
     }
 
     Context 'Remediation template behavior' {

@@ -26,25 +26,8 @@ CREATE TABLE IF NOT EXISTS providers (
 
 CREATE TABLE IF NOT EXISTS checks (
     id TEXT PRIMARY KEY,
-    provider TEXT NOT NULL,
-    service TEXT NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT,
-    risk TEXT,
-    severity TEXT NOT NULL,
-    remediation_text TEXT,
-    remediation_url TEXT,
-    related_url TEXT,
-    check_script TEXT NOT NULL,
-    disabled INTEGER NOT NULL DEFAULT 0,
-    permissions TEXT,
-    depends_on TEXT,
-    data_needs TEXT
+    disabled INTEGER NOT NULL DEFAULT 0
 );
-
-CREATE INDEX IF NOT EXISTS idx_checks_provider ON checks(provider);
-CREATE INDEX IF NOT EXISTS idx_checks_service ON checks(service);
-CREATE INDEX IF NOT EXISTS idx_checks_severity ON checks(severity);
 
 CREATE TABLE IF NOT EXISTS scan_runs (
     id TEXT PRIMARY KEY,
