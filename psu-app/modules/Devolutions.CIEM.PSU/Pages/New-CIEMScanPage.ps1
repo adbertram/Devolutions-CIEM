@@ -17,6 +17,8 @@ function New-CIEMScanPage {
         New-UDTypography -Text 'Run CIEM Scan' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
+        $Session:SelectedCheckIds = @()
+
         # Check Selection Card
         New-UDCard -Title 'Check Selection' -Content {
             # Check selection data grid with checkboxes

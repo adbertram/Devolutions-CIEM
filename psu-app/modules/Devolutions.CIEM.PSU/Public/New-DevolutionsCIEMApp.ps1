@@ -20,19 +20,11 @@ function New-DevolutionsCIEMApp {
         $ErrorActionPreference = 'Stop'
 
         $Navigation = New-CIEMNavigation
+        $Pages = foreach ($page in GetCIEMPSUPageRegistry) {
+            & ([string]$page.factory) -Navigation $Navigation
+        }
 
-        New-UDApp -Title 'Devolutions CIEM' -Pages @(
-            New-CIEMDashboardPage -Navigation $Navigation
-            New-CIEMScanPage -Navigation $Navigation
-            New-CIEMScanHistoryPage -Navigation $Navigation
-            New-CIEMIdentitiesPage -Navigation $Navigation
-            New-CIEMAttackPathsPage -Navigation $Navigation
-            New-CIEMAttackPathPatternsPage -Navigation $Navigation
-
-            New-CIEMEnvironmentPage -Navigation $Navigation
-            New-CIEMConfigPage -Navigation $Navigation
-            New-CIEMAboutPage -Navigation $Navigation
-        ) -DefaultTheme 'Light' -HeaderContent {
+        New-UDApp -Title 'Devolutions CIEM' -Pages @($Pages) -DefaultTheme 'Light' -HeaderContent {
             New-UDDynamic -Id 'ciemLastDiscoveryHeaderRegion' -Content {
                 Devolutions.CIEM\New-CIEMLastDiscoveryHeader
             } -AutoRefresh -AutoRefreshInterval 60

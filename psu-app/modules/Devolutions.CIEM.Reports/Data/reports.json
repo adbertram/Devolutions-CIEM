@@ -1,0 +1,45 @@
+[
+  {
+    "id": "azure.discovery.coverage",
+    "provider": "Azure",
+    "category": "Discovery",
+    "title": "Azure Discovery Coverage",
+    "description": "Shows which Azure discovery areas were collected, skipped, partial, or missing for a discovery run.",
+    "executorName": "GetCIEMAzureDiscoveryCoverageReportData",
+    "columns": [
+      "Area",
+      "SourceApi",
+      "Status",
+      "TypeCount",
+      "RowCount",
+      "MissingReason",
+      "Evidence"
+    ],
+    "visuals": [
+      "coverage-status-summary",
+      "coverage-row-table"
+    ],
+    "parameters": [
+      "RunId"
+    ],
+    "statusSummary": [
+      {
+        "status": "Collected",
+        "color": "#2e7d32"
+      },
+      {
+        "status": "Partial",
+        "color": "#ed6c02"
+      },
+      {
+        "status": "Missing",
+        "color": "#d32f2f"
+      },
+      {
+        "status": "Skipped",
+        "color": "#616161"
+      }
+    ],
+    "emptyState": "No Azure discovery coverage rows are available."
+  }
+]

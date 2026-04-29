@@ -57,6 +57,13 @@ Describe 'Attack Paths page remediation execution action' {
         $script:ScriptManifestContent | Should -Match '"path"\s*:\s*"Checks/Invoke-CIEMAttackPathRemediation.ps1"'
     }
 
+    It 'Keeps the page-invoked remediation PSU script manually invokable' {
+        $manifest = $script:ScriptManifestContent | ConvertFrom-Json -Depth 10
+        $scripts = @($manifest.scripts | Where-Object { $_.name -eq 'Checks/Invoke-CIEMAttackPathRemediation' })
+        $scripts | Should -HaveCount 1
+        [bool]$scripts[0].disableManualInvocation | Should -BeFalse
+    }
+
     It 'Warns before closing a running remediation and can terminate the PSU job' {
         $script:PageContent | Should -Match "Stop-PSUJob[\s\S]*-Integrated"
         $script:PageContent | Should -Match "'data-ciem-attack-path-execution-close-warning'\s*=\s*'true'"

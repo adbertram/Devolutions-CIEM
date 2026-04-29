@@ -1,0 +1,132 @@
+[
+  {
+    "name": "Dashboard",
+    "route": "/",
+    "title": "Dashboard",
+    "subtitle": "Current CIEM scan and identity posture",
+    "icon": "Home",
+    "factory": "New-CIEMDashboardPage",
+    "order": 10,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Devolutions CIEM Dashboard')"
+    }
+  },
+  {
+    "name": "Scan",
+    "route": "/scan",
+    "title": "Scan",
+    "subtitle": "Run provider checks against collected CIEM data",
+    "icon": "Play",
+    "factory": "New-CIEMScanPage",
+    "order": 20,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Run CIEM Scan')"
+    }
+  },
+  {
+    "name": "Scan History",
+    "route": "/history",
+    "title": "Scan History",
+    "subtitle": "Review previous scan runs and findings",
+    "icon": "ClockRotateLeft",
+    "factory": "New-CIEMScanHistoryPage",
+    "order": 30,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Scan History')"
+    }
+  },
+  {
+    "name": "Identities",
+    "route": "/identities",
+    "title": "Identities",
+    "subtitle": "Identity risk and entitlement summaries",
+    "icon": "UserShield",
+    "factory": "New-CIEMIdentitiesPage",
+    "order": 40,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Identities')"
+    }
+  },
+  {
+    "name": "Attack Paths",
+    "route": "/attack-paths",
+    "title": "Attack Paths",
+    "subtitle": "Materialized identity and resource attack paths",
+    "icon": "Route",
+    "factory": "New-CIEMAttackPathsPage",
+    "order": 50,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Attack Paths')"
+    }
+  },
+  {
+    "name": "Attack Path Patterns",
+    "route": "/attack-path-patterns",
+    "title": "Attack Path Patterns",
+    "subtitle": "Registered attack path detection rules",
+    "icon": "InfoCircle",
+    "factory": "New-CIEMAttackPathPatternsPage",
+    "order": 60,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Attack Path Patterns')"
+    }
+  },
+  {
+    "name": "Reports",
+    "route": "/reports",
+    "title": "Reports",
+    "subtitle": "Registry-backed CIEM reports",
+    "icon": "InfoCircle",
+    "factory": "New-CIEMReportsPage",
+    "order": 70,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Reports')"
+    }
+  },
+  {
+    "name": "Environment",
+    "route": "/environment",
+    "title": "Environment",
+    "subtitle": "Cloud inventory and discovery status",
+    "icon": "SiteMap",
+    "factory": "New-CIEMEnvironmentPage",
+    "order": 80,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Environment')"
+    }
+  },
+  {
+    "name": "Configuration",
+    "route": "/config",
+    "title": "Configuration",
+    "subtitle": "Provider authentication and CIEM settings",
+    "icon": "Cog",
+    "factory": "New-CIEMConfigPage",
+    "order": 90,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Configuration')"
+    }
+  },
+  {
+    "name": "About",
+    "route": "/about",
+    "title": "About",
+    "subtitle": "CIEM module and runtime information",
+    "icon": "InfoCircle",
+    "factory": "New-CIEMAboutPage",
+    "order": 100,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('About Devolutions CIEM')"
+    }
+  }
+]
