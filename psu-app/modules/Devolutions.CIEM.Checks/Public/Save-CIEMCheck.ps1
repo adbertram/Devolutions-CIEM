@@ -15,7 +15,7 @@ function Save-CIEMCheck {
     begin {
         $ErrorActionPreference = 'Stop'
 
-        function SaveCIEMCheckStateObject {
+        $saveCIEMCheckStateObject = {
             param(
                 [Parameter(Mandatory)]
                 [object]$Item
@@ -68,11 +68,11 @@ function Save-CIEMCheck {
     process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
-                SaveCIEMCheckStateObject -Item $item
+                & $saveCIEMCheckStateObject -Item $item
             }
         }
         else {
-            SaveCIEMCheckStateObject -Item ([PSCustomObject]@{
+            & $saveCIEMCheckStateObject -Item ([PSCustomObject]@{
                 Id       = $Id
                 Disabled = $Disabled
             })

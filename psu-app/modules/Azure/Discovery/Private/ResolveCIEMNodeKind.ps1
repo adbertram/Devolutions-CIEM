@@ -48,12 +48,10 @@ function ResolveCIEMNodeKind {
     # Entra source
     # Special case: detect managed identity
     if ($Type -eq 'servicePrincipal' -and $PropertiesJson) {
-        try {
-            $props = $PropertiesJson | ConvertFrom-Json -ErrorAction Stop
-            if ($props.servicePrincipalType -eq 'ManagedIdentity') {
-                return $script:GraphKindMap.managed_identity_kind
-            }
-        } catch { }
+        $props = $PropertiesJson | ConvertFrom-Json -ErrorAction Stop
+        if ($props.servicePrincipalType -eq 'ManagedIdentity') {
+            return $script:GraphKindMap.managed_identity_kind
+        }
     }
 
     $kind = $script:GraphKindMap.entra_type_to_kind.$Type

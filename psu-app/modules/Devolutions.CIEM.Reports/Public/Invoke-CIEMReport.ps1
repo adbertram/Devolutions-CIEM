@@ -6,7 +6,7 @@ function Invoke-CIEMReport {
         [string]$Id,
 
         [Parameter(Mandatory, ValueFromPipeline, ParameterSetName = 'ByInputObject')]
-        [CIEMReport]$InputObject,
+        [object]$InputObject,
 
         [Parameter()]
         [hashtable]$Parameter = @{}
@@ -20,6 +20,12 @@ function Invoke-CIEMReport {
         }
         else {
             $report = $InputObject
+        }
+
+        foreach ($requiredReportProperty in @('Id', 'Title', 'ExecutorName', 'Columns', 'Visuals')) {
+            if (-not $report.PSObject.Properties[$requiredReportProperty]) {
+                throw "InputObject is missing required CIEM report property '$requiredReportProperty'."
+            }
         }
 
         Get-Command -Name $report.ExecutorName -CommandType Function -ErrorAction Stop | Out-Null

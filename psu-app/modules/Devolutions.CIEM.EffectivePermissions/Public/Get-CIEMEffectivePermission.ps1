@@ -1,15 +1,17 @@
 function Get-CIEMEffectivePermission {
     [CmdletBinding()]
-    [OutputType([CIEMEffectivePermission[]])]
+    [OutputType('CIEMEffectivePermission[]')]
     param(
         [Parameter()]
-        [CIEMEffectivePermissionProvider[]]$Provider,
+        [ValidateSet('Azure', 'AWS')]
+        [string[]]$Provider,
 
         [Parameter()]
         [string]$PrincipalId,
 
         [Parameter()]
-        [CIEMPrincipalType[]]$PrincipalType,
+        [ValidateSet('User', 'Group', 'ServicePrincipal', 'ManagedIdentity', 'Role', 'ServiceAccount', 'Application', 'WorkloadIdentity', 'Unknown')]
+        [string[]]$PrincipalType,
 
         [Parameter()]
         [string]$ResourceId,
@@ -18,10 +20,12 @@ function Get-CIEMEffectivePermission {
         [string]$ResourceType,
 
         [Parameter()]
-        [CIEMAccessLevel[]]$AccessLevel,
+        [ValidateSet('Read', 'Write', 'Manage', 'PermissionAdmin', 'DataAccess', 'SecretAccess', 'AssumeRole', 'Impersonate', 'Execute', 'Unclassified')]
+        [string[]]$AccessLevel,
 
         [Parameter()]
-        [CIEMEntitlementType[]]$EntitlementType,
+        [ValidateSet('RoleAssignment', 'GroupMembership', 'DirectoryRole', 'AppRoleAssignment', 'OAuthGrant', 'ManagedPolicy', 'InlinePolicy', 'ResourcePolicy', 'TrustPolicy', 'ServiceControlPolicy', 'PermissionBoundary', 'IAMBinding', 'DenyPolicy', 'RoleBinding', 'ClusterRoleBinding')]
+        [string[]]$EntitlementType,
 
         [Parameter()]
         [switch]$PrivilegedOnly,
@@ -41,17 +45,17 @@ function Get-CIEMEffectivePermission {
     $selectedProviders = if ($Provider) {
         @($Provider)
     } else {
-        @([CIEMEffectivePermissionProvider]::Azure)
+        @('Azure')
     }
 
     $results = [System.Collections.Generic.List[object]]::new()
 
     foreach ($providerName in $selectedProviders) {
         switch ($providerName) {
-            ([CIEMEffectivePermissionProvider]::Azure) {
+            'Azure' {
                 $results.AddRange(@(ResolveCIEMAzureEffectivePermission -IncludeInherited:$IncludeInherited))
             }
-            ([CIEMEffectivePermissionProvider]::AWS) {
+            'AWS' {
                 $results.AddRange(@(ResolveCIEMAwsEffectivePermission))
             }
             default {
@@ -66,7 +70,7 @@ function Get-CIEMEffectivePermission {
         $filtered = @($filtered | Where-Object { $_.Principal.Id -eq $PrincipalId })
     }
     if ($PrincipalType) {
-        $filtered = @($filtered | Where-Object { $_.Principal.Type -in $PrincipalType })
+        $filtered = @($filtered | Where-Object { [string]$_.Principal.Type -in $PrincipalType })
     }
     if ($ResourceId) {
         $filtered = @($filtered | Where-Object { $_.Target.Id -eq $ResourceId })
@@ -76,11 +80,11 @@ function Get-CIEMEffectivePermission {
     }
     if ($AccessLevel) {
         $filtered = @($filtered | Where-Object {
-            @($_.Actions | Where-Object { $_.AccessLevel -in $AccessLevel }).Count -gt 0
+            @($_.Actions | Where-Object { [string]$_.AccessLevel -in $AccessLevel }).Count -gt 0
         })
     }
     if ($EntitlementType) {
-        $filtered = @($filtered | Where-Object { $_.Entitlement.Type -in $EntitlementType })
+        $filtered = @($filtered | Where-Object { [string]$_.Entitlement.Type -in $EntitlementType })
     }
     if ($PrivilegedOnly) {
         $filtered = @($filtered | Where-Object { $_.Privileged })

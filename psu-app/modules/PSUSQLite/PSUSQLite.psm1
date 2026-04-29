@@ -4,7 +4,7 @@ foreach ($file in (Get-ChildItem "$PSScriptRoot/Private/*.ps1" -ErrorAction Sile
 }
 
 # Load Microsoft.Data.Sqlite assembly BEFORE loading public functions (they reference the types)
-Resolve-PSUSQLiteAssembly
+ResolvePSUSQLiteAssembly
 
 # Load public functions
 foreach ($file in (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue)) {

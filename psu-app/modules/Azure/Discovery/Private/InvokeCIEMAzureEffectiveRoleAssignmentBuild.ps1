@@ -21,12 +21,27 @@ function InvokeCIEMAzureEffectiveRoleAssignmentBuild {
 
     $ErrorActionPreference = 'Stop'
 
+    function ConvertRoleAssignmentJson([string]$Json, [string]$Context) {
+        $ErrorActionPreference = 'Stop'
+        try {
+            $value = $Json | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            throw "$Context contains invalid JSON: $($_.Exception.Message)"
+        }
+
+        if ($null -eq $value) {
+            throw "$Context contains empty JSON."
+        }
+
+        $value
+    }
+
     # 1. Build role definition lookup: roleDefId -> { RoleName, PermissionsJson }
     $roleDefLookup = @{}
     foreach ($r in $ArmResources) {
         if ($r.Type -eq 'microsoft.authorization/roledefinitions' -and $r.Properties) {
-            try { $props = $r.Properties | ConvertFrom-Json -ErrorAction Stop }
-            catch { $props = $null }
+            $props = ConvertRoleAssignmentJson -Json $r.Properties -Context "Role definition '$($r.Id)' properties"
             if ($props) {
                 $roleDefLookup[$r.Id] = @{
                     RoleName        = $props.roleName
@@ -71,9 +86,7 @@ function InvokeCIEMAzureEffectiveRoleAssignmentBuild {
     $rows = [System.Collections.Generic.List[object]]::new()
 
     foreach ($ra in $roleAssignments) {
-        try { $props = $ra.Properties | ConvertFrom-Json -ErrorAction Stop }
-        catch { continue }
-        if (-not $props) { continue }
+        $props = ConvertRoleAssignmentJson -Json $ra.Properties -Context "Role assignment '$($ra.Id)' properties"
 
         $principalId      = $props.principalId
         $principalType    = $props.principalType

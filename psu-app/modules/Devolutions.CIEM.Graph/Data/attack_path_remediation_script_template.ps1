@@ -9,6 +9,8 @@ function Assert-CIEMAttackPathRemediationScriptResolved {
         [scriptblock]$ScriptBlock
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $scriptContent = $ScriptBlock.ToString()
     $tokenPattern = ([regex]::Escape((([char]123).ToString() + [char]123)) + '[A-Z0-9_]+' + [regex]::Escape((([char]125).ToString() + [char]125)))
     $unresolvedTokens = @([regex]::Matches($scriptContent, $tokenPattern) | ForEach-Object { $_.Value } | Sort-Object -Unique)

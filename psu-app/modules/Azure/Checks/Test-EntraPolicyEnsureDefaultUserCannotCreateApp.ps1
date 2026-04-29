@@ -24,6 +24,8 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateApp {
         [CIEMServiceCache[]]$ServiceCache
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $params = @{
         Check = $Check
         PropertyName  = 'allowedToCreateApps'

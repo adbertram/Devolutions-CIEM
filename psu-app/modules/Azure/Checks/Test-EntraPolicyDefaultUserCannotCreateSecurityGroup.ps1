@@ -24,6 +24,8 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
         [CIEMServiceCache[]]$ServiceCache
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $params = @{
         Check = $Check
         PropertyName  = 'allowedToCreateSecurityGroups'

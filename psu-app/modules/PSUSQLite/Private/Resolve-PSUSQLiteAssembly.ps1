@@ -1,4 +1,4 @@
-function Resolve-PSUSQLiteAssembly {
+function ResolvePSUSQLiteAssembly {
     <#
     .SYNOPSIS
         Loads the Microsoft.Data.Sqlite assembly from PSU's installation directory.

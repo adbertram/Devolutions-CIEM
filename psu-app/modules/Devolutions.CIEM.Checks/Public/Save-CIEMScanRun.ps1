@@ -33,8 +33,7 @@ function Save-CIEMScanRun {
         # Ensure the provider exists in the DB (it should, but be safe)
         $providerExists = Invoke-CIEMQuery -Query "SELECT id FROM providers WHERE id = @id" -Parameters @{ id = $providerId }
         if (-not $providerExists) {
-            Write-Verbose "Save-CIEMScanRun: Provider '$providerId' not in database — skipping persistence."
-            return
+            throw "Save-CIEMScanRun cannot persist scan run '$($ScanRun.Id)' because provider '$providerId' does not exist."
         }
 
         $conn = Open-PSUSQLiteConnection -Database (Get-CIEMDatabasePath)
@@ -81,7 +80,9 @@ VALUES (@id, @provider_id, @scan_type, @status, @resource_filter, @resource_prov
 
                 foreach ($result in $ScanRun.ScanResults) {
                     $checkId = if ($result.Check.Id) { $result.Check.Id } else { $result.Check.id }
-                    if (-not $checkId) { continue }
+                    if (-not $checkId) {
+                        throw "Save-CIEMScanRun cannot persist scan result for run '$($ScanRun.Id)' because the check id is empty."
+                    }
 
                     Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query @"
 INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
@@ -103,7 +104,7 @@ VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resou
         }
         catch {
             if ($tx) { $tx.Rollback() }
-            Write-Warning "Save-CIEMScanRun: Failed to persist scan run $($ScanRun.Id): $($_.Exception.Message)"
+            throw "Save-CIEMScanRun failed to persist scan run '$($ScanRun.Id)': $($_.Exception.Message)"
         }
         finally {
             $conn.Dispose()

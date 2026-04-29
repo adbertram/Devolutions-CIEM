@@ -13,8 +13,9 @@ if (-not (Test-Path $script:DataRoot)) {
 # --- Bootstrap logger (used before Write-CIEMLog is dot-sourced) ---
 $script:_BootLogPath = Join-Path $script:DataRoot 'ciem.log'
 function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
+    $ErrorActionPreference = 'Stop'
     $entry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')] [$Sev] [ModuleInit] $Msg"
-    try { Add-Content -Path $script:_BootLogPath -Value $entry -Encoding UTF8 -ErrorAction SilentlyContinue } catch { Write-Verbose "Boot log write failed: $_" }
+    Add-Content -Path $script:_BootLogPath -Value $entry -Encoding UTF8 -ErrorAction Stop
 }
 
 _BootLog "Module loading from: $PSScriptRoot"

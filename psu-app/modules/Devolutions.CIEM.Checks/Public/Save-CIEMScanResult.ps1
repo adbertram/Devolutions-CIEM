@@ -10,7 +10,7 @@ function Save-CIEMScanResult {
         [Parameter(ParameterSetName = 'ByProperties')][string]$ResourceName,
         [Parameter(ParameterSetName = 'ByProperties')][string]$Location,
         [Parameter(Mandatory, ParameterSetName = 'InputObject', ValueFromPipeline)]
-        [CIEMScanResult[]]$InputObject,
+        [object[]]$InputObject,
         [Parameter(ParameterSetName = 'InputObject')][string]$ForScanRunId
     )
     process {
@@ -19,6 +19,9 @@ function Save-CIEMScanResult {
             foreach ($item in $InputObject) {
                 $cScanRunId = if ($ForScanRunId) { $ForScanRunId } else { throw "ForScanRunId is required with InputObject" }
                 $cCheckId = if ($item.Check.Id) { $item.Check.Id } else { $item.Check.id }
+                if (-not $cCheckId) {
+                    throw "InputObject scan result is missing Check.Id."
+                }
                 Invoke-CIEMQuery -Query @"
 INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
 VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resource_name, @location)

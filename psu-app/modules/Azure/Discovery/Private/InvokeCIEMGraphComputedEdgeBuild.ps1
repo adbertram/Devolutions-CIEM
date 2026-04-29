@@ -76,22 +76,26 @@ function InvokeCIEMGraphComputedEdgeBuild {
         $exists
     }
 
-    # ===== Helper: save edge with FK-safe error handling =====
-    # Role assignment scopes may reference resources with case mismatches vs graph_nodes IDs.
-    # Log and skip FK failures rather than crashing the entire discovery run.
-    function SaveEdgeSafe([hashtable]$splat) {
+    function ConvertFromJsonStrict([string]$Json, [string]$Context) {
         $ErrorActionPreference = 'Stop'
         try {
-            Save-CIEMGraphEdge @splat
-            return $true
+            $value = $Json | ConvertFrom-Json -ErrorAction Stop
         }
         catch {
-            if ($_.Exception.Message -match 'FOREIGN KEY' -or ($_.Exception.InnerException -and $_.Exception.InnerException.Message -match 'FOREIGN KEY')) {
-                Write-CIEMLog "FK constraint: skipping edge $($splat.Kind) $($splat.SourceId) -> $($splat.TargetId)" -Severity WARNING -Component 'GraphBuilder'
-                return $false
-            }
-            throw
+            throw "$Context contains invalid JSON: $($_.Exception.Message)"
         }
+
+        if ($null -eq $value) {
+            throw "$Context contains empty JSON."
+        }
+
+        $value
+    }
+
+    function SaveEdgeStrict([hashtable]$splat) {
+        $ErrorActionPreference = 'Stop'
+        Save-CIEMGraphEdge @splat
+        $true
     }
 
     # ===== 1. Build lookups from ARM resources =====
@@ -100,7 +104,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
     $roleDefLookup = @{}
     foreach ($r in $ArmResources) {
         if ($r.Type -eq 'microsoft.authorization/roledefinitions' -and $r.Properties) {
-            try { $props = $r.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+            $props = ConvertFromJsonStrict -Json $r.Properties -Context "Role definition '$($r.Id)' properties"
             if ($props) {
                 $roleDefLookup[$r.Id] = @{
                     RoleName       = $props.roleName
@@ -134,8 +138,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
     })
 
     foreach ($ra in $roleAssignments) {
-        try { $raProps = $ra.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
-        if (-not $raProps) { continue }
+        $raProps = ConvertFromJsonStrict -Json $ra.Properties -Context "Role assignment '$($ra.Id)' properties"
 
         $principalId      = $raProps.principalId
         $principalType    = $raProps.principalType
@@ -167,7 +170,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
             $splat.TargetId   = $scope
             $splat.Kind       = 'HasRole'
             $splat.Properties = $edgePropsJson
-            if (SaveEdgeSafe $splat) { $edgeCount++ }
+            if (SaveEdgeStrict $splat) { $edgeCount++ }
         }
 
         # InheritedRole: expand group memberships
@@ -193,7 +196,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $splat.TargetId   = $scope
                         $splat.Kind       = 'InheritedRole'
                         $splat.Properties = $inheritedPropsJson
-                        if (SaveEdgeSafe $splat) { $edgeCount++ }
+                        if (SaveEdgeStrict $splat) { $edgeCount++ }
                     }
                 }
             }
@@ -206,7 +209,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
         if (-not $e.Properties) { continue }
 
         if ($e.Type -eq 'appRoleAssignment') {
-            try { $assignmentProps = $e.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+            $assignmentProps = ConvertFromJsonStrict -Json $e.Properties -Context "App role assignment '$($e.Id)' properties"
 
             $sourceId = $assignmentProps.principalId
             if (-not $sourceId) { $sourceId = $e.ParentId }
@@ -226,12 +229,12 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.TargetId = $targetId
                 $splat.Kind = 'HasAppRoleAssignment'
                 $splat.Properties = $edgePropsJson
-                if (SaveEdgeSafe $splat) { $edgeCount++ }
+                if (SaveEdgeStrict $splat) { $edgeCount++ }
             }
         }
 
         if ($e.Type -eq 'oauth2PermissionGrant') {
-            try { $grantProps = $e.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+            $grantProps = ConvertFromJsonStrict -Json $e.Properties -Context "OAuth grant '$($e.Id)' properties"
 
             $sourceId = $grantProps.clientId
             if (-not $sourceId) { $sourceId = $e.ParentId }
@@ -251,7 +254,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.TargetId = $targetId
                 $splat.Kind = 'HasOAuthGrant'
                 $splat.Properties = $edgePropsJson
-                if (SaveEdgeSafe $splat) { $edgeCount++ }
+                if (SaveEdgeStrict $splat) { $edgeCount++ }
             }
         }
     }
@@ -259,23 +262,21 @@ function InvokeCIEMGraphComputedEdgeBuild {
     # ===== 4. HasManagedIdentity edges =====
     foreach ($r in $ArmResources) {
         if (-not $r.Identity) { continue }
-        try {
-            $identityJson = $r.Identity | ConvertFrom-Json -ErrorAction Stop
-            $principalId = $identityJson.principalId
-            if ($principalId -and (NodeExists $r.Id) -and (NodeExists $principalId)) {
-                $splat = $baseSplat.Clone()
-                $splat.SourceId = $r.Id
-                $splat.TargetId = $principalId
-                $splat.Kind     = 'HasManagedIdentity'
-                if (SaveEdgeSafe $splat) { $edgeCount++ }
-            }
-        } catch { Write-CIEMLog -Message "HasManagedIdentity edge build failed for resource $($r.Id): $_" -Severity WARNING -Component 'GraphBuilder' }
+        $identityJson = ConvertFromJsonStrict -Json $r.Identity -Context "Managed identity '$($r.Id)' identity"
+        $principalId = $identityJson.principalId
+        if ($principalId -and (NodeExists $r.Id) -and (NodeExists $principalId)) {
+            $splat = $baseSplat.Clone()
+            $splat.SourceId = $r.Id
+            $splat.TargetId = $principalId
+            $splat.Kind     = 'HasManagedIdentity'
+            if (SaveEdgeStrict $splat) { $edgeCount++ }
+        }
     }
 
     # ===== 5. Network topology edges (NIC -> VM, NIC -> PIP, NIC -> Subnet) =====
     $nics = @($ArmResources | Where-Object { $_.Type -eq 'microsoft.network/networkinterfaces' -and $_.Properties })
     foreach ($nic in $nics) {
-        try { $nicProps = $nic.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+        $nicProps = ConvertFromJsonStrict -Json $nic.Properties -Context "Network interface '$($nic.Id)' properties"
 
         # AttachedTo: NIC -> VM
         $vmId = $null
@@ -286,7 +287,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.SourceId = $nic.Id
                 $splat.TargetId = $vmId
                 $splat.Kind     = 'AttachedTo'
-                if (SaveEdgeSafe $splat) { $edgeCount++ }
+                if (SaveEdgeStrict $splat) { $edgeCount++ }
             }
         }
 
@@ -298,7 +299,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                 $splat.SourceId = $nsgId
                 $splat.TargetId = $vmId
                 $splat.Kind     = 'AttachedTo'
-                if (SaveEdgeSafe $splat) { $edgeCount++ }
+                if (SaveEdgeStrict $splat) { $edgeCount++ }
             }
         }
 
@@ -315,7 +316,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $splat.SourceId = $nic.Id
                         $splat.TargetId = $pipId
                         $splat.Kind     = 'HasPublicIP'
-                        if (SaveEdgeSafe $splat) { $edgeCount++ }
+                        if (SaveEdgeStrict $splat) { $edgeCount++ }
                     }
                 }
 
@@ -330,7 +331,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
                         $splat.TargetId   = $vnetId
                         $splat.Kind       = 'InSubnet'
                         $splat.Properties = @{ subnet_id = $subnetId } | ConvertTo-Json -Compress
-                        if (SaveEdgeSafe $splat) { $edgeCount++ }
+                        if (SaveEdgeStrict $splat) { $edgeCount++ }
                     }
                 }
             }
@@ -340,7 +341,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
     # ===== 6. AllowsInbound edges: Internet -> NSG (aggregated per NSG) =====
     $nsgs = @($ArmResources | Where-Object { $_.Type -eq 'microsoft.network/networksecuritygroups' -and $_.Properties })
     foreach ($nsg in $nsgs) {
-        try { $nsgProps = $nsg.Properties | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+        $nsgProps = ConvertFromJsonStrict -Json $nsg.Properties -Context "Network security group '$($nsg.Id)' properties"
 
         $allRules = @()
         if ($nsgProps.securityRules) { $allRules += $nsgProps.securityRules }
@@ -376,7 +377,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
             $splat.TargetId   = $nsg.Id
             $splat.Kind       = 'AllowsInbound'
             $splat.Properties = $edgePropsJson
-            if (SaveEdgeSafe $splat) { $edgeCount++ }
+            if (SaveEdgeStrict $splat) { $edgeCount++ }
         }
     }
 
@@ -402,7 +403,7 @@ function InvokeCIEMGraphComputedEdgeBuild {
             $splat.SourceId = $r.Id
             $splat.TargetId = $subNodeId
             $splat.Kind     = 'ContainedIn'
-            if (SaveEdgeSafe $splat) { $edgeCount++ }
+            if (SaveEdgeStrict $splat) { $edgeCount++ }
         }
     }
 

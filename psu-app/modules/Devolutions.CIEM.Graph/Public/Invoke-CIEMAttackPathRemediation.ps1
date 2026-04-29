@@ -3,7 +3,7 @@ function Invoke-CIEMAttackPathRemediation {
     [OutputType([pscustomobject])]
     param(
         [Parameter(Mandatory, ValueFromPipeline)]
-        [CIEMAttackPath[]]$AttackPath
+        [object[]]$AttackPath
     )
 
     process {

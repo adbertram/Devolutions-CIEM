@@ -24,6 +24,8 @@ function Test-EntraPolicyEnsureDefaultUserCannotCreateTenant {
         [CIEMServiceCache[]]$ServiceCache
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $params = @{
         Check = $Check
         PropertyName  = 'allowedToCreateTenants'

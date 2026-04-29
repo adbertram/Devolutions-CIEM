@@ -432,6 +432,7 @@ function InvokeCIEMScan {
             }
             [pscustomobject]@{
                 Check = $check
+                ScriptPath = $scriptPath
                 FunctionName = $functionName
                 ProviderName = $providerName
                 ServiceCache = @($neededServices | ForEach-Object {
@@ -444,6 +445,14 @@ function InvokeCIEMScan {
 
         $parallelResults = @(InvokeCIEMParallelForEach -InputObject $workItems -ThrottleLimit $script:CIEMParallelThrottleLimitScan -ScriptBlock {
             param($workItem)
+
+            if ([string]::IsNullOrWhiteSpace([string]$workItem.ScriptPath)) {
+                throw "Check '$($workItem.Check.Id)' is missing a script path."
+            }
+            if (-not (Test-Path -LiteralPath $workItem.ScriptPath -PathType Leaf)) {
+                throw "Check '$($workItem.Check.Id)' script path does not exist: $($workItem.ScriptPath)"
+            }
+            . $workItem.ScriptPath
 
             $check = [CIEMCheck]::new()
             foreach ($property in 'Id', 'Provider', 'Service', 'Title', 'Description', 'Risk', 'RelatedUrl', 'CheckScript', 'ExecutionMode', 'ManualReason', 'Evaluator', 'EvaluatorConfig', 'DependsOn', 'DataNeeds', 'Disabled') {

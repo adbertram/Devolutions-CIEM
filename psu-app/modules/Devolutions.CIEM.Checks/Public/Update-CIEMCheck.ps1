@@ -50,7 +50,7 @@ function Update-CIEMCheck {
             'DataNeeds'
         )
 
-        function UpdateCIEMCheckStateObject {
+        $updateCIEMCheckStateObject = {
             param(
                 [Parameter(Mandatory)]
                 [object]$Item,
@@ -84,7 +84,7 @@ function Update-CIEMCheck {
     process {
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
-                UpdateCIEMCheckStateObject -Item $item -HasDisabled ($item.PSObject.Properties.Name -contains 'Disabled')
+                & $updateCIEMCheckStateObject -Item $item -HasDisabled ($item.PSObject.Properties.Name -contains 'Disabled')
             }
         }
         else {
@@ -98,7 +98,7 @@ function Update-CIEMCheck {
                 }
             }
 
-            UpdateCIEMCheckStateObject -Item $item -HasDisabled ($PSBoundParameters.ContainsKey('Disabled'))
+            & $updateCIEMCheckStateObject -Item $item -HasDisabled ($PSBoundParameters.ContainsKey('Disabled'))
         }
     }
 }

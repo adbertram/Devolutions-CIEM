@@ -22,7 +22,7 @@ function Start-CIEMAzureDiscovery {
 
     $ErrorActionPreference = 'Stop'
 
-    function SaveResourceTypesFromList {
+    $saveResourceTypesFromList = {
         param(
             [Parameter(Mandatory)]
             [AllowEmptyCollection()]
@@ -158,7 +158,7 @@ function Start-CIEMAzureDiscovery {
                                 $resource.LastSeenAt = $runStart
                             }
                             Save-CIEMAzureArmResource -InputObject $armResources -Connection $conn
-                            SaveResourceTypesFromList -Resources $armResources -Connection $conn -DiscoveredAt (Get-Date).ToString('o')
+                            & $saveResourceTypesFromList -Resources $armResources -Connection $conn -DiscoveredAt (Get-Date).ToString('o')
                         }
 
                         if ($armDiscoverySucceeded) {
@@ -253,7 +253,7 @@ function Start-CIEMAzureDiscovery {
                             Save-CIEMAzureEntraResource -InputObject $entraPermissions -Connection $conn
                         }
 
-                        SaveResourceTypesFromList -Resources (@($entraResources) + @($entraPermissions)) -Connection $conn -DiscoveredAt (Get-Date).ToString('o')
+                        & $saveResourceTypesFromList -Resources (@($entraResources) + @($entraPermissions)) -Connection $conn -DiscoveredAt (Get-Date).ToString('o')
 
                         if ($entraDiscoverySucceeded) {
                             Invoke-PSUSQLiteQuery -Connection $conn -Query 'DELETE FROM azure_entra_resources WHERE last_seen_at < @last_seen_at' -Parameters @{ last_seen_at = $runStart } -AsNonQuery | Out-Null

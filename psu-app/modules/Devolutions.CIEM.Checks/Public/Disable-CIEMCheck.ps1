@@ -37,8 +37,7 @@ function Disable-CIEMCheck {
         foreach ($id in $CheckId) {
             $existing = @(Get-CIEMCheck -CheckId $id)
             if ($existing.Count -eq 0) {
-                Write-Error "Check '$id' not found."
-                continue
+                throw "Check '$id' not found."
             }
             if ($existing[0].Disabled) {
                 Write-Verbose "Check '$id' is already disabled"

@@ -23,12 +23,23 @@ function Get-CIEMAttackPathRemediationScript {
         throw "Cannot render attack path remediation script because rule '$($attackPath.PatternId)' was not found."
     }
 
-    $scripts = @(Get-PSUScript -Name $attackPath.PsuScriptName -Integrated | Where-Object { $null -ne $_ })
-    if ($scripts.Count -ne 1) {
+    $scripts = @(Get-PSUScript -Integrated | Where-Object { $null -ne $_ })
+    $matchingScripts = @($scripts | Where-Object {
+        $names = @(
+            [string]$_.Name
+            [string]$_.FullPath
+            [string]$_.Path
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+        $names | Where-Object {
+            ($_ -replace '\.ps1$', '') -eq $attackPath.PsuScriptName
+        }
+    })
+    if ($matchingScripts.Count -ne 1) {
         throw "Cannot render attack path remediation script because PSU script '$($attackPath.PsuScriptName)' was not found."
     }
 
-    $content = [string]$scripts[0].Content
+    $content = [string]$matchingScripts[0].Content
     if ([string]::IsNullOrWhiteSpace($content)) {
         throw "Cannot render attack path remediation script because PSU script '$($attackPath.PsuScriptName)' has empty content."
     }
