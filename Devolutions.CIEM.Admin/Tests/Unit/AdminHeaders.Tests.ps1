@@ -130,7 +130,7 @@ Describe 'PSU admin REST cmdlets send the ngrok-skip-browser-warning header' {
 
     Context 'Remove-PSUModule' {
         It 'sends ngrok-skip-browser-warning on every request' {
-            Remove-PSUModule -Name 'Devolutions.CIEM' -Force | Out-Null
+            Remove-PSUModule -Name 'Devolutions.CIEM' -Force -WarningAction SilentlyContinue | Out-Null
             $script:capturedCalls.Count | Should -BeGreaterThan 0
             foreach ($call in $script:capturedCalls) {
                 $call.Headers['ngrok-skip-browser-warning'] |

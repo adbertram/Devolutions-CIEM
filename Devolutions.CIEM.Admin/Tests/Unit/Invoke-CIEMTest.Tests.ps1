@@ -95,6 +95,8 @@ Describe 'Nested failure test' {
     Context 'Playwright suite targeting' {
         BeforeAll {
             $script:playwrightSource = Get-Content (Join-Path $moduleRoot 'Private/Invoke-CIEMPlaywrightSuite.ps1') -Raw
+            $script:playwrightPackage = Get-Content (Join-Path $moduleRoot '../psu-app/ui/e2e/package.json') -Raw |
+                ConvertFrom-Json
         }
 
         It 'allows Playwright to target the selected environment' {
@@ -103,6 +105,24 @@ Describe 'Nested failure test' {
 
         It 'does not reject Azure Playwright runs at the runner layer' {
             $script:playwrightSource | Should -Not -Match "\$Environment -eq 'azure'"
+        }
+
+        It 'runs the locally installed Playwright CLI through node instead of npx' {
+            $script:playwrightSource | Should -Match 'node_modules/@playwright/test/cli\.js'
+            $script:playwrightSource | Should -Match '& node @playwrightArgs'
+            $script:playwrightSource | Should -Not -Match '& npx'
+        }
+
+        It 'removes NO_COLOR before invoking Playwright and restores it afterward' {
+            $script:playwrightSource | Should -Match 'Remove-Item Env:NO_COLOR'
+            $script:playwrightSource | Should -Match '\$env:NO_COLOR = \$previousNoColor'
+        }
+
+        It 'keeps Playwright package scripts on the local CLI path' {
+            $scriptValues = $script:playwrightPackage.scripts.PSObject.Properties.Value -join "`n"
+
+            $scriptValues | Should -Match 'node ./node_modules/@playwright/test/cli\.js'
+            $scriptValues | Should -Not -Match '\bnpx\b'
         }
     }
 }

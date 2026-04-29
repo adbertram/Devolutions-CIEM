@@ -26,14 +26,25 @@ function Invoke-CIEMPlaywrightSuite {
         throw "Playwright E2E root not found: $e2eRoot"
     }
 
+    $playwrightCli = Join-Path $e2eRoot 'node_modules/@playwright/test/cli.js'
+    if (-not (Test-Path $playwrightCli)) {
+        throw "Playwright CLI not found: $playwrightCli. Run npm install from $e2eRoot."
+    }
+
     $previousEnvironment = $env:CIEM_TEST_ENVIRONMENT
     $hadPreviousEnvironment = Test-Path Env:CIEM_TEST_ENVIRONMENT
+    $previousNoColor = $env:NO_COLOR
+    $hadPreviousNoColor = Test-Path Env:NO_COLOR
 
     try {
         $env:CIEM_TEST_ENVIRONMENT = $Environment
+        if (Test-Path Env:NO_COLOR) {
+            Remove-Item Env:NO_COLOR
+        }
+
         Push-Location $e2eRoot
 
-        $playwrightArgs = @('playwright', 'test')
+        $playwrightArgs = @($playwrightCli, 'test')
         if ($Path) {
             $playwrightArgs += $Path
         }
@@ -41,7 +52,7 @@ function Invoke-CIEMPlaywrightSuite {
             $playwrightArgs += @('-g', $Name)
         }
 
-        & npx @playwrightArgs
+        & node @playwrightArgs
         $exitCode = $global:LASTEXITCODE
     }
     finally {
@@ -51,6 +62,10 @@ function Invoke-CIEMPlaywrightSuite {
         }
         else {
             Remove-Item Env:CIEM_TEST_ENVIRONMENT
+        }
+
+        if ($hadPreviousNoColor) {
+            $env:NO_COLOR = $previousNoColor
         }
     }
 

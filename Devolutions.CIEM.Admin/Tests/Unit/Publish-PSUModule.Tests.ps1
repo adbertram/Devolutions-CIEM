@@ -44,7 +44,10 @@ LOCAL_PSU_TOKEN=fake-token
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
             Mock -ModuleName Devolutions.CIEM.Admin ssh { '' } -ParameterFilter { $args -match 'ls' }
             Mock -ModuleName Devolutions.CIEM.Admin ssh {} -ParameterFilter { $args -match 'rm -rf' }
-            Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
+            Mock -ModuleName Devolutions.CIEM.Admin rsync {
+                $script:rsyncArgs = @($args)
+                $global:LASTEXITCODE = 0
+            }
             Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp { throw 'Mocked restart failure: PSU connection stale' }
         }
 
@@ -56,6 +59,18 @@ LOCAL_PSU_TOKEN=fake-token
         It 'invokes Restart-PSUApp with the CIEM app name' {
             try { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } catch {}
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Restart-PSUApp -Times 1 -ParameterFilter { $Name -eq 'Devolutions CIEM' }
+        }
+
+        It 'excludes local test dependencies and Playwright artifacts from rsync' {
+            try { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } catch {}
+
+            $script:rsyncArgs | Should -Contain '--exclude=node_modules/'
+            $script:rsyncArgs | Should -Contain '--exclude=playwright-report/'
+            $script:rsyncArgs | Should -Contain '--exclude=test-results/'
+            $script:rsyncArgs | Should -Contain '--exclude=*.log'
+            $script:rsyncArgs | Should -Contain '--exclude=modules/Devolutions.CIEM.PSU/Data/icons/source-packs/'
+            $script:rsyncArgs | Should -Contain '--exclude=Tests/'
+            $script:rsyncArgs | Should -Contain '--exclude=ui/e2e/'
         }
     }
 

@@ -185,6 +185,13 @@ function Publish-PSUModule {
                 $rsyncArgs += '--exclude=*.db-shm'
                 $rsyncArgs += '--exclude=*.db-wal'
             }
+            $rsyncArgs += '--exclude=*.log'
+            $rsyncArgs += '--exclude=modules/Devolutions.CIEM.PSU/Data/icons/source-packs/'
+            $rsyncArgs += '--exclude=Tests/'
+            $rsyncArgs += '--exclude=node_modules/'
+            $rsyncArgs += '--exclude=playwright-report/'
+            $rsyncArgs += '--exclude=test-results/'
+            $rsyncArgs += '--exclude=ui/e2e/'
             $rsyncArgs += "$ModulePath/"
             $rsyncArgs += "${sshAlias}:${remoteModulesDir}/${moduleName}/${moduleVersion}/"
 
@@ -416,7 +423,14 @@ NuGet API key required. Options:
         $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) "PSUPublish_$moduleName"
         if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
         Copy-Item -Path $ModulePath -Destination $stagingDir -Recurse -Force
-        Get-ChildItem -Path $stagingDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal' -File | Remove-Item -Force
+        Get-ChildItem -Path $stagingDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal', '*.log' -File | Remove-Item -Force
+        $stagingExcludeDirectories = @(
+            Get-ChildItem -Path $stagingDir -Recurse -Directory -Force |
+                Where-Object { $_.Name -in @('Tests', 'node_modules', 'playwright-report', 'test-results', 'source-packs') -or $_.FullName -like '*/ui/e2e' }
+        )
+        foreach ($directory in $stagingExcludeDirectories) {
+            Remove-Item -Path $directory.FullName -Recurse -Force
+        }
         Write-Host "  [OK] Staged clean copy (excluded *.db files)" -ForegroundColor Green
 
         $publishParams = @{

@@ -61,71 +61,19 @@ function Connect-PSU {
 
     $ErrorActionPreference = 'Stop'
 
-    # Find .env file if not specified
-    if (-not $EnvFilePath) {
-        $searchPaths = @(
-            (Join-Path $PWD '.env'),
-            (Join-Path $script:RepoRoot '.env'),
-            (Join-Path $script:AdminRoot '.env')
-        )
+    $targetName = if ($Local) { 'local' } else { 'azure' }
+    $runtimeTarget = GetCIEMRuntimeTarget `
+        -Name $targetName `
+        -EnvFilePath $EnvFilePath `
+        -Url $Url `
+        -Token $Token `
+        -ResourceGroup $ResourceGroup `
+        -WebAppName $WebAppName
 
-        foreach ($path in $searchPaths) {
-            if (Test-Path $path) {
-                $EnvFilePath = $path
-                break
-            }
-        }
-    }
-
-    # Read from .env file if we have one and parameters weren't provided
-    $envVars = @{}
-    if ($EnvFilePath -and (Test-Path $EnvFilePath)) {
-        Write-Verbose "Reading configuration from: $EnvFilePath"
-        $envContent = Get-Content $EnvFilePath -ErrorAction Stop
-
-        foreach ($line in $envContent) {
-            if ($line -match '^\s*#' -or $line -match '^\s*$') {
-                continue
-            }
-
-            if ($line -match '^([^=]+)=(.*)$') {
-                $key = $matches[1].Trim()
-                $value = $matches[2].Trim()
-                $envVars[$key] = $value
-
-                switch ($key) {
-                    'AZURE_PSU_URL' {
-                        if (-not $Url -and -not $Local) { $Url = $value }
-                    }
-                    'AZURE_PSU_TOKEN' {
-                        if (-not $Token -and -not $Local) { $Token = $value }
-                    }
-                    'LOCAL_PSU_URL' {
-                        if (-not $Url -and $Local) { $Url = $value }
-                    }
-                    'LOCAL_PSU_TOKEN' {
-                        if (-not $Token -and $Local) { $Token = $value }
-                    }
-                }
-            }
-        }
-    }
-
-    if ($Local -and -not $Url) {
-        throw "LOCAL_PSU_URL is required in .env for -Local connections. Set it to the PSU publish point URL (e.g., http://192.168.86.30:5001)."
-    }
-
-    # Validate required parameters
-    $target = if ($Local) { 'LOCAL' } else { 'AZURE' }
-    if (-not $Url) {
-        throw "PSU URL is required. Provide -Url parameter or set ${target}_PSU_URL in .env file."
-    }
-    if (-not $Token) {
-        throw "PSU Token is required. Provide -Token parameter or set ${target}_PSU_TOKEN in .env file."
-    }
-
-    # Normalize URL (remove trailing slash)
-    $Url = $Url.TrimEnd('/')
+    $Url = $runtimeTarget.Url
+    $Token = $runtimeTarget.Token
+    $ResourceGroup = $runtimeTarget.ResourceGroup
+    $WebAppName = $runtimeTarget.WebAppName
 
     # Test connection by calling the module endpoint
     Write-Verbose "Testing connection to $Url"
@@ -152,27 +100,10 @@ function Connect-PSU {
         throw "Failed to connect to PSU at $Url. Error: $_"
     }
 
-    # Detect Azure hosting from URL pattern
-    $isAzure = $Url -match '\.azurewebsites\.net'
-
-    # Auto-detect webapp name from URL if not provided
-    if ($isAzure -and -not $WebAppName) {
-        if ($Url -match 'https://([^.]+)\.azurewebsites\.net') {
-            $WebAppName = $matches[1]
-            Write-Verbose "Auto-detected Azure webapp name: $WebAppName"
-        }
-    }
-
-    # Default resource group for this project
-    if ($isAzure -and -not $ResourceGroup) {
-        $ResourceGroup = 'devolutions-ciem-rg'
-        Write-Verbose "Using default resource group: $ResourceGroup"
-    }
-
     # Store connection info for Invoke-CIEMCommand (our REST-based command executor)
     $script:PSUConnection.Url = $Url
     $script:PSUConnection.Token = $Token
-    $script:PSUConnection.IsAzure = $isAzure
+    $script:PSUConnection.IsAzure = $runtimeTarget.IsAzure
     $script:PSUConnection.ResourceGroup = $ResourceGroup
     $script:PSUConnection.WebAppName = $WebAppName
 
@@ -196,7 +127,7 @@ function Connect-PSU {
     [PSCustomObject]@{
         Url           = $Url
         Status        = 'Connected'
-        IsAzure       = $isAzure
+        IsAzure       = $runtimeTarget.IsAzure
         ResourceGroup = $ResourceGroup
         WebAppName    = $WebAppName
     }
