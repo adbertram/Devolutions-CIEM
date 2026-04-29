@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     # Read source for structural assertions
     $script:ConnectSource = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Public' 'Connect-CIEMAzure.ps1') -Raw
@@ -51,13 +52,12 @@ Describe 'Connect-CIEMAzure' {
             # Extract the switch block content (between 'switch ($profile.Method)' and the closing shared loop)
             # Scope URLs should only appear in the $tokenScopes data array, not in the switch body
             $switchMatch = [regex]::Match($script:ConnectSource, 'switch \(\$profile\.Method\) \{(.+?)\n    \}', [System.Text.RegularExpressions.RegexOptions]::Singleline)
-            if ($switchMatch.Success) {
-                $switchBody = $switchMatch.Groups[1].Value
-                # No hardcoded .default scope URLs inside the switch block
-                $switchBody | Should -Not -Match 'management\.azure\.com/\.default'
-                $switchBody | Should -Not -Match 'graph\.microsoft\.com/\.default'
-                $switchBody | Should -Not -Match 'vault\.azure\.net/\.default'
-            }
+            $switchMatch.Success | Should -BeTrue
+            $switchBody = $switchMatch.Groups[1].Value
+            # No hardcoded .default scope URLs inside the switch block
+            $switchBody | Should -Not -Match 'management\.azure\.com/\.default'
+            $switchBody | Should -Not -Match 'graph\.microsoft\.com/\.default'
+            $switchBody | Should -Not -Match 'vault\.azure\.net/\.default'
         }
 
         It 'Uses shared token acquisition loop' {

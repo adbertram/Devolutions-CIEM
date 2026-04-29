@@ -1,5 +1,9 @@
 function Initialize-DiscoveryTestDatabase {
-    Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+    $ErrorActionPreference = 'Stop'
+
+    if (Get-Module Devolutions.CIEM) {
+        Remove-Module Devolutions.CIEM -Force
+    }
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 

@@ -170,7 +170,7 @@ Describe 'Invoke-CIEMCommand' {
         }
     }
 
-    Context 'when the PSU job endpoint returns a transient 401' {
+    Context 'when the PSU job endpoint returns 401' {
         BeforeAll {
             InModuleScope Devolutions.CIEM.Admin {
                 $script:PSUConnection.Url = 'https://fake.ngrok-free.app'
@@ -211,11 +211,11 @@ Describe 'Invoke-CIEMCommand' {
             }
         }
 
-        It 'retries the job poll once without reconnecting to PSU' {
-            $result = Invoke-CIEMCommand -Command 'Get-Date' -TimeoutSeconds 5
+        It 'throws immediately without retrying the same request' {
+            { Invoke-CIEMCommand -Command 'Get-Date' -TimeoutSeconds 5 } |
+                Should -Throw -ExpectedMessage '*401*'
 
-            $result.Status | Should -Be 'Completed'
-            $script:jobPollCount | Should -Be 2
+            $script:jobPollCount | Should -Be 1
         }
     }
 

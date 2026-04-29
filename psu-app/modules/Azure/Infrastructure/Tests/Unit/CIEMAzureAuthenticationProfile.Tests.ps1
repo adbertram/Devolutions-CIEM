@@ -85,6 +85,22 @@ Describe 'CIEM Azure authentication profile cache operations' {
         }
     }
 
+    Context 'when PSU cache has no Azure auth profile key yet' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM {
+                Mock Get-Command { [PSCustomObject]@{ Name = 'Get-PSUCache' } } -ParameterFilter { $Name -eq 'Get-PSUCache' }
+                Mock ReadPSUCache { $null } -ParameterFilter { $Key -eq $script:AzureAuthProfilesCacheKey }
+            }
+        }
+
+        It 'returns an empty profile list' {
+            InModuleScope Devolutions.CIEM {
+                $profiles = GetCIEMAzureAuthProfileCache
+                $profiles.Count | Should -Be 0
+            }
+        }
+    }
+
     Context 'when resolving a certificate profile without a password secret' {
         BeforeAll {
             InModuleScope Devolutions.CIEM -Parameters @{ PasswordlessPfxBase64 = $script:PasswordlessPfxBase64 } {

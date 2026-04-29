@@ -106,6 +106,16 @@ VALUES ('entra_security_defaults_enabled', 'Azure', 'Entra', 'stale title', 'cri
         (Get-CIEMCheck -CheckId 'entra_security_defaults_enabled').Disabled | Should -BeTrue
     }
 
+    It 'Throws when disabling an unknown check id' {
+        { Disable-CIEMCheck -CheckId 'missing_check_id' } |
+            Should -Throw -ExpectedMessage "*Check 'missing_check_id' not found*"
+    }
+
+    It 'Throws when enabling an unknown check id' {
+        { Enable-CIEMCheck -CheckId 'missing_check_id' } |
+            Should -Throw -ExpectedMessage "*Check 'missing_check_id' not found*"
+    }
+
     It 'Rejects static metadata updates because catalog rows are authoritative' {
         {
             Update-CIEMCheck -Id 'entra_security_defaults_enabled' -Title 'Changed title'

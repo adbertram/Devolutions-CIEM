@@ -121,18 +121,17 @@ Describe 'Issue 1: DormantPermissionThresholdDays null guard' {
 # Issue 2: Empty catch {} in HasManagedIdentity section
 # =============================================================================
 
-Describe 'Issue 2: HasManagedIdentity edge build logs errors instead of swallowing' {
+Describe 'Issue 2: Computed edge build fails fast on malformed graph data' {
 
     Context 'When Identity JSON parse fails for a resource' {
 
-        It 'Calls Write-CIEMLog with a warning when HasManagedIdentity edge build fails' {
+        It 'does not skip JSON parse or foreign-key failures' {
             InModuleScope Devolutions.CIEM {
-                # We need to test that the catch block logs a warning instead of silently swallowing
-                # Read the source file and check it does NOT have an empty catch
                 $sourceFile = Join-Path $PSScriptRoot '..' '..' 'modules' 'Azure' 'Discovery' 'Private' 'InvokeCIEMGraphComputedEdgeBuild.ps1'
                 $content = Get-Content $sourceFile -Raw
-                # The source should NOT have a bare 'catch { }' or 'catch {}' (empty catch block)
                 $content | Should -Not -Match 'catch\s*\{\s*\}'
+                $content | Should -Not -Match 'catch\s*\{\s*continue\s*\}'
+                $content | Should -Not -Match 'FK constraint: skipping edge'
             }
         }
     }

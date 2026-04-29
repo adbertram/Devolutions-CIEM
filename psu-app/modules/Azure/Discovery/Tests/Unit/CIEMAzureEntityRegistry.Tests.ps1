@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'entities.psd1'
     $script:DiscoverySchemaPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'

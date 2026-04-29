@@ -3,6 +3,7 @@ BeforeAll {
     $moduleManifest = Join-Path $repoRoot 'Devolutions.CIEM.psd1'
     Remove-Module Devolutions.CIEM -ErrorAction SilentlyContinue
     Import-Module $moduleManifest
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     $script:RegistryPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'pages.json'
     $script:RegistryPages = @(Get-Content -Path $script:RegistryPath -Raw | ConvertFrom-Json -Depth 10)

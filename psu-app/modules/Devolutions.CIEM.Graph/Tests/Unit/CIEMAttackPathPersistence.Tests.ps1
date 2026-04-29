@@ -170,9 +170,15 @@ INSERT INTO attack_paths (
 
         It 'reads the PSU script by rule reference and replaces attack path, auth profile, and PSU environment placeholders' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-                [pscustomobject]@{
-                    Name    = $Name
-                    Content = @'
+                @(
+                    [pscustomobject]@{
+                        Name    = 'unrelated-script'
+                        Content = 'Write-Output "unused"'
+                    }
+                    [pscustomobject]@{
+                        Name     = 'management-port-open-to-the-internet'
+                        FullPath = 'Remediation/management-port-open-to-the-internet.ps1'
+                        Content  = @'
 # {{PATTERN_NAME}}
 # {{PATH_CHAIN}}
 # {{AUTH_PROFILE_ID}}
@@ -185,7 +191,8 @@ INSERT INTO attack_paths (
 # {{PSU_WEBSITE_NAME}}
 {{NSG_RULE_DELETE_COMMANDS}}
 '@
-                }
+                    }
+                )
             }
             Mock -ModuleName Devolutions.CIEM Get-CIEMAzureAuthenticationProfile {
                 [pscustomobject]@{
@@ -225,14 +232,14 @@ INSERT INTO attack_paths (
             $scriptText | Should -Not -Match '\baz\b'
             $scriptText | Should -Not -Match '{{'
             Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
-                $Name -eq 'management-port-open-to-the-internet' -and $Integrated
+                -not $Name -and $Integrated
             }
         }
 
         It 'preserves leading template comment help when rendering attack path placeholders' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 [pscustomobject]@{
-                    Name    = $Name
+                    Name    = 'management-port-open-to-the-internet'
                     Content = @'
 <#
 .SYNOPSIS
@@ -303,7 +310,9 @@ It runs Azure REST API commands with the selected CIEM authentication profile co
                 $attackPathLike = New-CIEMAttackPathClone -Source $script:StoredAttackPath
             }
             finally {
-                Remove-Module $cloneModule -Force -ErrorAction SilentlyContinue
+                if (Get-Module $cloneModule.Name) {
+                    Remove-Module $cloneModule -Force
+                }
             }
 
             $pattern = [pscustomobject]@{

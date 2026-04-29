@@ -179,42 +179,56 @@ Describe 'Get-CIEMAttackPathPattern — catalog projection' {
         }
 
         It 'every step with a kind uses a known node kind' {
+            $unknownKinds = [System.Collections.Generic.List[string]]::new()
             foreach ($file in $script:PatternFiles) {
                 $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
                 foreach ($step in $raw.steps) {
                     if ($step.kind) {
                         $kinds = @($step.kind)
                         foreach ($k in $kinds) {
-                            $k | Should -BeIn $script:ValidNodeKinds -Because "pattern '$($raw.id)' in $($file.Name) uses unknown kind '$k'"
+                            if ($k -notin $script:ValidNodeKinds) {
+                                $unknownKinds.Add("pattern '$($raw.id)' in $($file.Name) uses unknown kind '$k'")
+                            }
                         }
                     }
                 }
             }
+            $unknownKinds.Count | Should -Be 0
         }
 
         It 'every step with an edge uses a known edge kind' {
+            $unknownEdges = [System.Collections.Generic.List[string]]::new()
             foreach ($file in $script:PatternFiles) {
                 $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
                 foreach ($step in $raw.steps) {
                     if ($step.edge) {
-                        $step.edge | Should -BeIn $script:ValidEdgeKinds -Because "pattern '$($raw.id)' in $($file.Name) uses unknown edge '$($step.edge)'"
+                        if ($step.edge -notin $script:ValidEdgeKinds) {
+                            $unknownEdges.Add("pattern '$($raw.id)' in $($file.Name) uses unknown edge '$($step.edge)'")
+                        }
                     }
                 }
             }
+            $unknownEdges.Count | Should -Be 0
         }
 
         It 'every filter op is a known operator' {
+            $unknownOps = [System.Collections.Generic.List[string]]::new()
             foreach ($file in $script:PatternFiles) {
                 $raw = Get-Content $file.FullName -Raw | ConvertFrom-Json
                 foreach ($step in $raw.steps) {
                     if ($step.node_filter) {
-                        $step.node_filter.op | Should -BeIn $script:ValidFilterOps -Because "pattern '$($raw.id)' node_filter op '$($step.node_filter.op)' is unknown"
+                        if ($step.node_filter.op -notin $script:ValidFilterOps) {
+                            $unknownOps.Add("pattern '$($raw.id)' node_filter op '$($step.node_filter.op)' is unknown")
+                        }
                     }
                     if ($step.filter) {
-                        $step.filter.op | Should -BeIn $script:ValidFilterOps -Because "pattern '$($raw.id)' edge filter op '$($step.filter.op)' is unknown"
+                        if ($step.filter.op -notin $script:ValidFilterOps) {
+                            $unknownOps.Add("pattern '$($raw.id)' edge filter op '$($step.filter.op)' is unknown")
+                        }
                     }
                 }
             }
+            $unknownOps.Count | Should -Be 0
         }
 
         It 'every pattern has required top-level fields' {

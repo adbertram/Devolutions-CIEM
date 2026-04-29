@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"

@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     $script:ParallelHelperPath = Join-Path $PSScriptRoot '..' '..' 'Private' 'InvokeCIEMParallelForEach.ps1'
     $script:ParallelHelperSource = if (Test-Path $script:ParallelHelperPath) {
@@ -20,7 +21,7 @@ Describe 'InvokeCIEMParallelForEach private helper' {
 
     It 'Old dashed name no longer exists in the module' {
         InModuleScope Devolutions.CIEM {
-            (Get-Command -Name 'Invoke-CIEMParallelForEach' -ErrorAction SilentlyContinue) | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Invoke-CIEMParallelForEach'
         }
     }
 

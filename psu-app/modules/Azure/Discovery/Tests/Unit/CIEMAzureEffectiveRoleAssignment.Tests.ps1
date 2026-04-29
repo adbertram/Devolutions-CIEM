@@ -737,15 +737,16 @@ Describe 'Effective Role Assignment CRUD' {
             }
         }
 
-        It 'Skips role assignments with invalid Properties JSON' {
+        It 'Throws when role assignments contain invalid Properties JSON' {
             InModuleScope Devolutions.CIEM {
                 $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
                 try {
                     $armResources = @(
                         [PSCustomObject]@{ Id = 'ra-bad'; Type = 'microsoft.authorization/roleassignments'; Properties = 'not-valid-json{{{' }
                     )
-                    $result = InvokeCIEMAzureEffectiveRoleAssignmentBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $conn -ComputedAt '2026-01-01T00:00:00Z'
-                    $result | Should -Be 0
+                    {
+                        InvokeCIEMAzureEffectiveRoleAssignmentBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $conn -ComputedAt '2026-01-01T00:00:00Z'
+                    } | Should -Throw -ExpectedMessage "*Role assignment 'ra-bad' properties contains invalid JSON*"
                 } finally { $conn.Dispose() }
             }
         }

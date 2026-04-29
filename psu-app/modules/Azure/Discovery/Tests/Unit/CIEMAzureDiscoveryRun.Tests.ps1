@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
@@ -79,7 +80,9 @@ Describe 'Discovery Run CRUD' {
             }
 
             $result.Id | Should -BeGreaterThan 0
-            Remove-Item Env:\CIEM_TEST_DISCOVERY_DATA_ROOT -ErrorAction SilentlyContinue
+            if (Test-Path Env:\CIEM_TEST_DISCOVERY_DATA_ROOT) {
+                Remove-Item Env:\CIEM_TEST_DISCOVERY_DATA_ROOT -ErrorAction Stop
+            }
         }
 
         It 'Mandatory params: -Scope, -Status, -StartedAt' {

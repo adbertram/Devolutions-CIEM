@@ -2,37 +2,19 @@ BeforeDiscovery {
     $psuAppRoot = Join-Path $PSScriptRoot '..' '..'
     $repoRoot = Resolve-Path (Join-Path $psuAppRoot '..')
 
-    # Directories to scan for function files
-    $searchPaths = @(
-        (Join-Path $psuAppRoot 'Public')
-        (Join-Path $psuAppRoot 'Private')
-        (Join-Path $repoRoot 'Devolutions.CIEM.Admin' 'Public')
-        (Join-Path $repoRoot 'Devolutions.CIEM.Admin' 'Private')
-    )
-
-    # Add all modules/**/Public and modules/**/Private directories.
-    $modulesRoot = Join-Path $psuAppRoot 'modules'
-    if (Test-Path $modulesRoot) {
-        Get-ChildItem -Path $modulesRoot -Directory -Recurse |
-            Where-Object {
-                $_.Name -eq 'Public' -or $_.Name -eq 'Private'
-            } |
-            ForEach-Object { $searchPaths += $_.FullName }
-    }
-
     # Exempt files
     $exemptFileNames = @(
         'RegisterCIEMArgumentCompleters.ps1'
     )
 
-    # Collect all .ps1 files from the search paths
-    $ps1Files = foreach ($dir in $searchPaths) {
-        if (Test-Path $dir) {
-            Get-ChildItem -Path $dir -Filter '*.ps1' -File
-        }
-    }
-
     $resolvedRoot = $repoRoot.Path
+
+    $trackedPowerShellFiles = & git -C $resolvedRoot ls-files '*.ps1' '*.psm1'
+    $ps1Files = foreach ($relativePath in $trackedPowerShellFiles) {
+        if ($relativePath -match '\.Tests\.ps1$') { continue }
+        if ($relativePath -match '(^|/)Classes/') { continue }
+        Get-Item (Join-Path $resolvedRoot $relativePath)
+    }
 
     function Get-FirstFunctionStatement {
         param(
@@ -88,35 +70,13 @@ BeforeDiscovery {
     # Store counts as discovery-time data for -ForEach on the Describe block
     $fileCount = ($ps1Files | Measure-Object).Count
     $violationCount = $violations.Count
+    $scanSummary = @(@{ FileCount = $fileCount })
 }
 
 Describe 'ErrorActionPreference Enforcement' {
 
-    It "Scanned function files from Public/ and Private/ directories" {
-        # Re-derive file count at runtime to validate discovery worked
-        $psuAppRoot = Join-Path $PSScriptRoot '..' '..'
-        $repoRoot = Resolve-Path (Join-Path $psuAppRoot '..')
-        $searchPaths = @(
-            (Join-Path $psuAppRoot 'Public')
-            (Join-Path $psuAppRoot 'Private')
-            (Join-Path $repoRoot 'Devolutions.CIEM.Admin' 'Public')
-            (Join-Path $repoRoot 'Devolutions.CIEM.Admin' 'Private')
-        )
-        $modulesRoot = Join-Path $psuAppRoot 'modules'
-        if (Test-Path $modulesRoot) {
-            Get-ChildItem -Path $modulesRoot -Directory -Recurse |
-                Where-Object {
-                    $_.Name -eq 'Public' -or $_.Name -eq 'Private'
-                } |
-                ForEach-Object { $searchPaths += $_.FullName }
-        }
-        $count = 0
-        foreach ($dir in $searchPaths) {
-            if (Test-Path $dir) {
-                $count += (Get-ChildItem -Path $dir -Filter '*.ps1' -File | Measure-Object).Count
-            }
-        }
-        $count | Should -BeGreaterThan 0
+    It "Scanned tracked PowerShell source files" -ForEach $scanSummary {
+        $FileCount | Should -BeGreaterThan 0
     }
 
     Context 'Every function must set $ErrorActionPreference = ''Stop'' first' {

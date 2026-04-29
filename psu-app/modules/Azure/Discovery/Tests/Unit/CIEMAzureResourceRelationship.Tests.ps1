@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     # Create isolated test DB with base + azure + discovery schemas
     New-CIEMDatabase -Path "$TestDrive/ciem.db"
@@ -59,10 +60,16 @@ Describe 'Resource Relationship CRUD' {
             $result.SourceId | Should -Be 'sp-1'
         }
 
-        It 'Mandatory: SourceId, SourceType, TargetId, TargetType, Relationship, CollectedAt' {
+        It 'Marks SourceId, SourceType, TargetId, TargetType, Relationship, and CollectedAt mandatory' {
             { New-CIEMAzureResourceRelationship -SourceId 'x' -SourceType 'User' -TargetId 'y' -TargetType 'Group' -Relationship 'MemberOf' -CollectedAt (Get-Date).ToString('o') } | Should -Not -Throw
-            # Missing mandatory should throw
-            { New-CIEMAzureResourceRelationship -SourceId 'x' } | Should -Throw
+
+            $metadata = Get-Command New-CIEMAzureResourceRelationship
+            foreach ($parameterName in @('SourceId', 'SourceType', 'TargetId', 'TargetType', 'Relationship', 'CollectedAt')) {
+                $parameter = $metadata.Parameters[$parameterName]
+                $parameter | Should -Not -BeNullOrEmpty
+                $parameterAttribute = @($parameter.Attributes | Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] })[0]
+                $parameterAttribute.Mandatory | Should -BeTrue
+            }
         }
 
         It 'Throws on duplicate (source_id, target_id, relationship) UNIQUE violation' {

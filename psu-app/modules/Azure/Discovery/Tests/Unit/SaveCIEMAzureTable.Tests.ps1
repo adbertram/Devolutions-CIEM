@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
     $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' '..' 'Discovery' 'Data' 'entities.psd1'
     $script:DiscoverySchemaPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
@@ -112,7 +113,7 @@ Describe 'entities.psd1 + Save-CIEMAzureTable generic core' {
             InModuleScope Devolutions.CIEM {
                 Get-Command -Name 'SaveCIEMAzureTable' -ErrorAction Stop | Should -Not -BeNullOrEmpty
             }
-            (Get-Command -Module Devolutions.CIEM -Name 'SaveCIEMAzureTable' -ErrorAction SilentlyContinue) | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'SaveCIEMAzureTable'
         }
 
         It 'Delegates through InvokeCIEMBatchInsert to the correct table' {

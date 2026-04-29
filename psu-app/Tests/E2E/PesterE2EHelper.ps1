@@ -13,7 +13,11 @@ function script:Initialize-PesterE2E {
         [int]$TimeoutSeconds = 120
     )
 
-    Remove-Module Devolutions.CIEM.Admin -Force -ErrorAction SilentlyContinue
+    $ErrorActionPreference = 'Stop'
+
+    if (Get-Module Devolutions.CIEM.Admin) {
+        Remove-Module Devolutions.CIEM.Admin -Force -ErrorAction Stop
+    }
     Import-Module (Join-Path $ProjectRoot 'Devolutions.CIEM.Admin' 'Devolutions.CIEM.Admin.psd1')
 
     $script:PesterE2EEnvironment = $Environment
@@ -100,6 +104,8 @@ function script:Run-OnPSU {
         [int]$TimeoutSeconds = 60
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $wrappedCommand = @"
 `$ErrorActionPreference = 'Stop'
 `$__result = & { $Command }
@@ -138,6 +144,8 @@ function script:Run-OnPSU-LongRunning {
         [Parameter(Mandatory)][string]$Command,
         [int]$TimeoutSeconds = 600
     )
+
+    $ErrorActionPreference = 'Stop'
 
     Run-OnPSU -Command $Command -TimeoutSeconds $TimeoutSeconds
 }

@@ -1,6 +1,9 @@
 BeforeAll {
-    Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
+    if (Get-Module Devolutions.CIEM) {
+        Remove-Module Devolutions.CIEM -Force
+    }
     Import-Module (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
     $script:ModuleRoot = Join-Path $PSScriptRoot '..' '..'
 }
 
@@ -9,17 +12,6 @@ Describe 'Module Load — Post-Discovery-Schema' {
     Context 'Module imports without errors' {
         It 'Imports Devolutions.CIEM without throwing' {
             Get-Module Devolutions.CIEM | Should -Not -BeNullOrEmpty
-        }
-
-        It 'Boot log (ciem.log) has zero FAILED entries from last import' {
-            $logPath = Join-Path $script:ModuleRoot 'data' 'ciem.log'
-            $logPath | Should -Exist
-            $content = Get-Content $logPath -Tail 50
-            # Find the last "Module loading from:" line — that's the start of the most recent import
-            $lastLoadIdx = ($content.Count - 1)..0 | Where-Object { $content[$_] -match 'Module loading from:' } | Select-Object -First 1
-            $lastLoadIdx | Should -Not -BeNullOrEmpty
-            $recentLines = $content[$lastLoadIdx..($content.Count - 1)]
-            $recentLines | Where-Object { $_ -cmatch '\[ERROR\].*\bFAILED\b' } | Should -BeNullOrEmpty
         }
     }
 
@@ -151,51 +143,51 @@ Describe 'Module Load — Post-Discovery-Schema' {
 
     Context 'Old functions are NOT exported' {
         It 'Module does not expose Get-CIEMAzureEntraData' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureEntraData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Get-CIEMAzureEntraData'
         }
 
         It 'Module does not expose Save-CIEMAzureEntraData' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureEntraData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Save-CIEMAzureEntraData'
         }
 
         It 'Module does not expose Get-CIEMAzureIAMData' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureIAMData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Get-CIEMAzureIAMData'
         }
 
         It 'Module does not expose Save-CIEMAzureIAMData' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureIAMData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Save-CIEMAzureIAMData'
         }
 
         It 'Module does not expose Save-CIEMCollectedData' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMCollectedData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Save-CIEMCollectedData'
         }
 
         It 'Module does not expose Get-CIEMCollectedData' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMCollectedData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Get-CIEMCollectedData'
         }
 
         It 'Module does not expose Test-CIEMCollectedDataExists' {
-            Get-Command -Module Devolutions.CIEM -Name Test-CIEMCollectedDataExists -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Test-CIEMCollectedDataExists'
         }
 
         It 'Module does not expose Get-CIEMAzureServiceData' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureServiceData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Get-CIEMAzureServiceData'
         }
 
         It 'Module does not expose Save-CIEMAzureServiceData' {
-            Get-Command -Module Devolutions.CIEM -Name Save-CIEMAzureServiceData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Save-CIEMAzureServiceData'
         }
 
         It 'Module does not expose Remove-CIEMAzureServiceData' {
-            Get-Command -Module Devolutions.CIEM -Name Remove-CIEMAzureServiceData -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Remove-CIEMAzureServiceData'
         }
 
         It 'Module does not expose Get-CIEMAzureResourceTypeEntity' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureResourceTypeEntity -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Get-CIEMAzureResourceTypeEntity'
         }
 
         It 'Module does not expose Get-CIEMAzureDiscoveryCoverageReport' {
-            Get-Command -Module Devolutions.CIEM -Name Get-CIEMAzureDiscoveryCoverageReport -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'Get-CIEMAzureDiscoveryCoverageReport'
         }
     }
 

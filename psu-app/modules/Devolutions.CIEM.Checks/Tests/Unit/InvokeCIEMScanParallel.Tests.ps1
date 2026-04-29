@@ -35,6 +35,7 @@ Describe 'InvokeCIEMScan parallel execution' {
             $script:ParallelInvocation = [pscustomobject]@{
                 Count = @($InputObject).Count
                 ThrottleLimit = $ThrottleLimit
+                ScriptPaths = @($InputObject | ForEach-Object { $_.ScriptPath })
             }
 
             @()
@@ -55,6 +56,10 @@ Describe 'InvokeCIEMScan parallel execution' {
         $script:ParallelInvocation | Should -Not -BeNullOrEmpty
         $script:ParallelInvocation.Count | Should -Be 2
         $script:ParallelInvocation.ThrottleLimit | Should -Be $expectedThrottleLimit
+        $script:ParallelInvocation.ScriptPaths | Should -HaveCount 2
+        foreach ($scriptPath in $script:ParallelInvocation.ScriptPaths) {
+            Test-Path -LiteralPath $scriptPath -PathType Leaf | Should -BeTrue
+        }
     }
 
     It 'Surfaces a child failure with the failing check id' {
@@ -175,6 +180,13 @@ Describe 'InvokeCIEMScan parallel execution' {
         # InvokeCIEMParallelForEach call), not only inside the parallel script block.
         $beforeParallel = $script:ScanSource -split 'InvokeCIEMParallelForEach', 2
         $beforeParallel[0] | Should -Match '\[CIEMCheckSeverity\]'
+    }
+
+    It 'Dot-sources the selected check script inside the parallel runspace before invocation' {
+        $script:ScanSource | Should -Match 'ScriptPath\s*=\s*\$scriptPath'
+        $parallelBlock = $script:ScanSource.Substring($script:ScanSource.IndexOf('InvokeCIEMParallelForEach'))
+        $parallelBlock | Should -Match '\.\s+\$workItem\.ScriptPath'
+        $parallelBlock.IndexOf('. $workItem.ScriptPath') | Should -BeLessThan $parallelBlock.IndexOf('InvokeCIEMCheck')
     }
 
     It 'No dashed private helper names remain anywhere in the scan source (VerbNoun rule)' {

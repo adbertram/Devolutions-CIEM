@@ -1,5 +1,5 @@
 BeforeDiscovery {
-    $script:AttackPathFilterDiscoveryCases = @(
+    $rawAttackPathFilterDiscoveryCases = @(
         Get-Content -Path (Join-Path $PSScriptRoot '..' 'Fixtures' 'attack_path_filter_cases.json') -Raw |
             ConvertFrom-Json -Depth 20 |
             ForEach-Object {
@@ -12,6 +12,8 @@ BeforeDiscovery {
                 }
             }
     )
+    $script:AttackPathFilterExpectedCases = @($rawAttackPathFilterDiscoveryCases | Where-Object { $null -ne $_.expected })
+    $script:AttackPathFilterThrowCases = @($rawAttackPathFilterDiscoveryCases | Where-Object { -not [string]::IsNullOrEmpty([string]$_.throwsLike) })
 }
 
 BeforeAll {
@@ -65,11 +67,27 @@ Describe 'Attack Path Engine' {
             }
         }
 
-        It '<name>' -ForEach $script:AttackPathFilterDiscoveryCases {
+        It '<name>' -ForEach $script:AttackPathFilterExpectedCases {
             InModuleScope Devolutions.CIEM -Parameters @{
                 PropertiesJson = $propertiesJson
                 Filter         = $filter
                 Expected       = $expected
+            } {
+                $filterObject = [PSCustomObject]@{
+                    property = [string]$Filter.property
+                    op       = [string]$Filter.op
+                    value    = $Filter.value
+                }
+
+                $result = ResolveCIEMAttackPathFilter -PropertiesJson ([string]$PropertiesJson) -Filter $filterObject
+                $result | Should -Be ([bool]$Expected)
+            }
+        }
+
+        It '<name>' -ForEach $script:AttackPathFilterThrowCases {
+            InModuleScope Devolutions.CIEM -Parameters @{
+                PropertiesJson = $propertiesJson
+                Filter         = $filter
                 ThrowsLike     = $throwsLike
             } {
                 $filterObject = [PSCustomObject]@{
@@ -78,13 +96,8 @@ Describe 'Attack Path Engine' {
                     value    = $Filter.value
                 }
 
-                if (-not [string]::IsNullOrEmpty([string]$ThrowsLike)) {
-                    { ResolveCIEMAttackPathFilter -PropertiesJson ([string]$PropertiesJson) -Filter $filterObject } | Should -Throw ([string]$ThrowsLike)
-                }
-                else {
-                    $result = ResolveCIEMAttackPathFilter -PropertiesJson ([string]$PropertiesJson) -Filter $filterObject
-                    $result | Should -Be ([bool]$Expected)
-                }
+                { ResolveCIEMAttackPathFilter -PropertiesJson ([string]$PropertiesJson) -Filter $filterObject } |
+                    Should -Throw ([string]$ThrowsLike)
             }
         }
     }
@@ -695,7 +708,7 @@ Describe 'Attack Path Engine' {
         It 'renders a direct Azure RBAC role assignment REST delete command from the finding path' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 [pscustomobject]@{
-                    Name    = $Name
+                    Name    = 'disabled-account-still-holding-active-role-assignments'
                     Content = '{{ROLE_ASSIGNMENT_DELETE_COMMANDS}}'
                 }
             }
@@ -721,7 +734,7 @@ Describe 'Attack Path Engine' {
         It 'renders a group membership REST delete command from the finding path' {
             Mock -ModuleName Devolutions.CIEM Get-PSUScript {
                 [pscustomobject]@{
-                    Name    = $Name
+                    Name    = 'guest-user-is-a-member-of-a-group-that-holds-a-privileged-role'
                     Content = '{{GROUP_MEMBER_REMOVE_COMMANDS}}'
                 }
             }

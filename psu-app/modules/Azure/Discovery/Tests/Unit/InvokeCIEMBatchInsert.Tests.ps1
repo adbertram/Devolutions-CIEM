@@ -1,6 +1,7 @@
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
+    Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 }
 
 Describe 'InvokeCIEMBatchInsert shared helper' {
@@ -14,7 +15,7 @@ Describe 'InvokeCIEMBatchInsert shared helper' {
         InModuleScope Devolutions.CIEM {
             Get-Command -Name InvokeCIEMBatchInsert -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
-        (Get-Command -Module Devolutions.CIEM -Name InvokeCIEMBatchInsert -ErrorAction SilentlyContinue) | Should -BeNullOrEmpty
+        (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'InvokeCIEMBatchInsert'
     }
 
     It 'Computes chunk size from column count to stay under 999 SQLite parameter cap' {

@@ -1,7 +1,4 @@
 BeforeAll {
-    Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
-    Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
-
     # Read the InvokeCIEMScan source and its private helpers for structural assertions.
     # Entra/ARM resource dispatch lives in GetCIEMEntraNeeds/GetCIEMIAMNeeds after the refactor.
     $checksPrivate = Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.Checks' 'Private'
