@@ -1,0 +1,51 @@
+[
+  {
+    "area": "ARM resources",
+    "sourceApi": "Azure Resource Graph",
+    "runScopes": ["All", "ARM"],
+    "runTypeCountColumn": "arm_type_count",
+    "runRowCountColumn": "arm_row_count",
+    "resourceTypeApiSource": "ARM",
+    "errorPrefixes": [
+      "ResourceGraph/Resources failed:",
+      "ResourceGraph/ResourceContainers failed:",
+      "ResourceGraph/AuthorizationResources failed:",
+      "BuiltInRoleDefinitions failed:",
+      "ARM persistence failed:"
+    ]
+  },
+  {
+    "area": "Entra resources",
+    "sourceApi": "Microsoft Graph",
+    "runScopes": ["All", "Entra"],
+    "runTypeCountColumn": "entra_type_count",
+    "runRowCountColumn": "entra_row_count",
+    "resourceTypeApiSource": "Graph",
+    "errorPrefixes": [
+      "Entra entity collection failed:",
+      "Entra permission collection failed:",
+      "Entra persistence failed:"
+    ]
+  },
+  {
+    "area": "Entra relationships",
+    "sourceApi": "Microsoft Graph",
+    "runScopes": ["All", "Entra"],
+    "countTable": "azure_resource_relationships",
+    "evidenceLabel": "azure_resource_relationships",
+    "errorPrefixes": [
+      "Entra relationship collection failed:",
+      "Relationship persistence failed:"
+    ]
+  },
+  {
+    "area": "Effective role assignments",
+    "sourceApi": "Local CIEM computation",
+    "runScopes": ["All", "ARM", "Entra"],
+    "countTable": "azure_effective_role_assignments",
+    "evidenceLabel": "azure_effective_role_assignments",
+    "errorPrefixes": [
+      "ERA build failed:"
+    ]
+  }
+]

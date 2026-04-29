@@ -84,8 +84,20 @@ Describe 'Discovery Run CRUD' {
 
         It 'Mandatory params: -Scope, -Status, -StartedAt' {
             { New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Running' -StartedAt (Get-Date).ToString('o') } | Should -Not -Throw
-            # Missing mandatory should throw (ParameterBindingException)
-            { New-CIEMAzureDiscoveryRun -Scope 'All' } | Should -Throw
+
+            $parameterSet = Get-Command New-CIEMAzureDiscoveryRun |
+                Select-Object -ExpandProperty ParameterSets |
+                Where-Object { $_.Name -eq 'ByProperties' }
+
+            $mandatoryParameters = @(
+                $parameterSet.Parameters |
+                    Where-Object { $_.IsMandatory } |
+                    Select-Object -ExpandProperty Name
+            )
+
+            $mandatoryParameters | Should -Contain 'Scope'
+            $mandatoryParameters | Should -Contain 'Status'
+            $mandatoryParameters | Should -Contain 'StartedAt'
         }
     }
 

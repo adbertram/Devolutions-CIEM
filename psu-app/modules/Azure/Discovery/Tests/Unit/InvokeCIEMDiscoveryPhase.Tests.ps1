@@ -48,6 +48,15 @@ Describe 'InvokeCIEMDiscoveryPhase' {
                     ForEach-Object { $_.Mandatory | Should -BeTrue }
             }
         }
+
+        It 'Has mandatory FailureMode parameter' {
+            InModuleScope Devolutions.CIEM {
+                $cmd = Get-Command InvokeCIEMDiscoveryPhase
+                $cmd.Parameters['FailureMode'].Attributes |
+                    Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] } |
+                    ForEach-Object { $_.Mandatory | Should -BeTrue }
+            }
+        }
     }
 
     Context 'Accepts empty ErrorMessages list' {
@@ -58,6 +67,7 @@ Describe 'InvokeCIEMDiscoveryPhase' {
 
                 $result = InvokeCIEMDiscoveryPhase `
                     -Name 'TestPhase' `
+                    -FailureMode 'FailRun' `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
                     -Action { 'hello' }
@@ -76,6 +86,7 @@ Describe 'InvokeCIEMDiscoveryPhase' {
 
                 $script:testResult = InvokeCIEMDiscoveryPhase `
                     -Name 'SuccessPhase' `
+                    -FailureMode 'FailRun' `
                     -ErrorMessages $script:testErrors `
                     -WarningCounter $script:testWarnings `
                     -Action { 42 }
@@ -121,8 +132,10 @@ Describe 'InvokeCIEMDiscoveryPhase' {
 
                 $script:failResult = InvokeCIEMDiscoveryPhase `
                     -Name 'FailPhase' `
+                    -FailureMode 'RecordUnsupported' `
                     -ErrorMessages $script:failErrors `
                     -WarningCounter $script:failWarnings `
+                    -WarningAction SilentlyContinue `
                     -Action { throw 'Something went wrong' }
             }
         }
@@ -162,6 +175,7 @@ Describe 'InvokeCIEMDiscoveryPhase' {
 
                 $result = InvokeCIEMDiscoveryPhase `
                     -Name 'DetailPhase' `
+                    -FailureMode 'FailRun' `
                     -ErrorMessages $errors `
                     -WarningCounter $warnings `
                     -DetailBuilder { param($r) "got $r items" } `

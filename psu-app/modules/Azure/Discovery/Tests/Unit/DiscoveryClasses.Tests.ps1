@@ -83,6 +83,23 @@ Describe 'Discovery Classes' {
         }
     }
 
+    Context 'CIEMAzureDiscoveryCoverageReport class' {
+        It 'CIEMAzureDiscoveryCoverageReport stores and retrieves coverage evidence fields' {
+            $obj = InModuleScope Devolutions.CIEM { [CIEMAzureDiscoveryCoverageReport]::new() }
+            $props = $obj.PSObject.Properties.Name
+            $props | Should -Contain 'Provider'
+            $props | Should -Contain 'RunId'
+            $props | Should -Contain 'Scope'
+            $props | Should -Contain 'Area'
+            $props | Should -Contain 'SourceApi'
+            $props | Should -Contain 'Status'
+            $props | Should -Contain 'TypeCount'
+            $props | Should -Contain 'RowCount'
+            $props | Should -Contain 'MissingReason'
+            $props | Should -Contain 'Evidence'
+        }
+    }
+
     Context 'CIEMAzureResourceRelationship class' {
         It 'CIEMAzureResourceRelationship stores and retrieves all relationship columns (Id, SourceId, SourceType, TargetId, TargetType, Relationship, CollectedAt)' {
             $obj = InModuleScope Devolutions.CIEM { [CIEMAzureResourceRelationship]::new() }

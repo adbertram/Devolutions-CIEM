@@ -23,37 +23,26 @@ function Remove-CIEMAzureArmResource {
             'ById' {
                 if ($PSCmdlet.ShouldProcess($Id, 'Remove ARM resource')) {
                     Write-CIEMLog -Message "DELETE azure_arm_resources WHERE id='$Id' (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ArmResource'
-                    $q = "DELETE FROM azure_arm_resources WHERE id = @id"
-                    $p = @{ id = $Id }
-                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
-                    else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                    RemoveCIEMAzureEntity -Entity 'ArmResource' -Filters @{ Id = $Id } -Connection $Connection
                 }
             }
             'ByType' {
                 if ($PSCmdlet.ShouldProcess("Type=$Type", 'Remove ARM resources')) {
                     Write-CIEMLog -Message "DELETE azure_arm_resources WHERE type='$Type' (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ArmResource'
-                    $q = "DELETE FROM azure_arm_resources WHERE type = @type"
-                    $p = @{ type = $Type }
-                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
-                    else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                    RemoveCIEMAzureEntity -Entity 'ArmResource' -Filters @{ Type = $Type } -Connection $Connection
                 }
             }
             'All' {
                 if ($PSCmdlet.ShouldProcess('all records', 'Remove ARM resources')) {
                     Write-CIEMLog -Message "DELETE azure_arm_resources ALL ROWS (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ArmResource'
-                    $q = "DELETE FROM azure_arm_resources"
-                    if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -AsNonQuery | Out-Null }
-                    else { Invoke-CIEMQuery -Query $q -AsNonQuery | Out-Null }
+                    RemoveCIEMAzureEntity -Entity 'ArmResource' -All -Connection $Connection
                 }
             }
             'InputObject' {
                 foreach ($obj in $InputObject) {
                     if ($PSCmdlet.ShouldProcess($obj.Id, 'Remove ARM resource')) {
                         Write-CIEMLog -Message "DELETE azure_arm_resources WHERE id='$($obj.Id)' (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ArmResource'
-                        $q = "DELETE FROM azure_arm_resources WHERE id = @id"
-                        $p = @{ id = $obj.Id }
-                        if ($Connection) { Invoke-PSUSQLiteQuery -Connection $Connection -Query $q -Parameters $p -AsNonQuery | Out-Null }
-                        else { Invoke-CIEMQuery -Query $q -Parameters $p -AsNonQuery | Out-Null }
+                        RemoveCIEMAzureEntity -Entity 'ArmResource' -Filters @{ Id = $obj.Id } -Connection $Connection
                     }
                 }
             }

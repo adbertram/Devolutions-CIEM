@@ -230,16 +230,21 @@ Describe 'Invoke-AzureApi retry handling' {
         Assert-MockCalled InvokeCIEMAzureSleep -ModuleName Devolutions.CIEM -Times 5 -Exactly
     }
 
-    It 'Source file uses the renamed nested helper InvokeSafeRestMethod (no dash)' {
+    It 'Source file uses private transport helpers instead of nested helper definitions' {
         $sourcePath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Invoke-AzureApi.ps1'
+        $transportPath = Join-Path $PSScriptRoot '..' '..' 'Private' 'InvokeAzureApiTransport.ps1'
         $source = Get-Content -Path $sourcePath -Raw
-        $source | Should -Match '\bfunction\s+InvokeSafeRestMethod\b'
-        $source | Should -Match '\bfunction\s+GetRetryDelaySeconds\b'
-        $source | Should -Match '\bfunction\s+InvokeAzureRequestWithRetry\b'
-        $source | Should -Match '\bfunction\s+ConvertToHeaderMap\b'
-        $source | Should -Match '\bfunction\s+GetHeaderValue\b'
-        $source | Should -Match '\bfunction\s+GetParsedErrorMessage\b'
-        $source | Should -Match '\bfunction\s+InvokeAzureBatchRequests\b'
+        $transport = Get-Content -Path $transportPath -Raw
+        $source | Should -Not -Match '\bfunction\s+InvokeSafeRestMethod\b'
+        $source | Should -Not -Match '\bfunction\s+GetRetryDelaySeconds\b'
+        $source | Should -Not -Match '\bfunction\s+InvokeAzureRequestWithRetry\b'
+        $transport | Should -Match '\bfunction\s+InvokeSafeRestMethod\b'
+        $transport | Should -Match '\bfunction\s+GetRetryDelaySeconds\b'
+        $transport | Should -Match '\bfunction\s+InvokeAzureRequestWithRetry\b'
+        $transport | Should -Match '\bfunction\s+ConvertToHeaderMap\b'
+        $transport | Should -Match '\bfunction\s+GetHeaderValue\b'
+        $transport | Should -Match '\bfunction\s+GetParsedErrorMessage\b'
+        $transport | Should -Match '\bfunction\s+InvokeAzureBatchRequests\b'
         $source | Should -Not -Match '\bfunction\s+Parse-ResponseContent\b'
         $source | Should -Not -Match '\bfunction\s+Invoke-SafeRestMethod\b'
     }
@@ -269,8 +274,8 @@ Describe 'Invoke-AzureApi retry handling' {
     }
 
     It 'Source file extracts the $skipToken body mutation into a named helper' {
-        $sourcePath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Invoke-AzureApi.ps1'
-        $source = Get-Content -Path $sourcePath -Raw
+        $transportPath = Join-Path $PSScriptRoot '..' '..' 'Private' 'InvokeAzureApiTransport.ps1'
+        $source = Get-Content -Path $transportPath -Raw
         # The extracted helper should be a no-dash VerbNoun nested function.
         $source | Should -Match '\bfunction\s+ConvertToSkipTokenBody\b'
     }

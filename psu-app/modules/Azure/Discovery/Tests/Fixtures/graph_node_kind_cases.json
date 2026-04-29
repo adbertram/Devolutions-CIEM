@@ -1,0 +1,76 @@
+[
+  {
+    "name": "Maps known ARM type microsoft.compute/virtualmachines to AzureVM",
+    "type": "microsoft.compute/virtualmachines",
+    "source": "ARM",
+    "expected": "AzureVM"
+  },
+  {
+    "name": "Maps known ARM type microsoft.network/networksecuritygroups to AzureNSG",
+    "type": "microsoft.network/networksecuritygroups",
+    "source": "ARM",
+    "expected": "AzureNSG"
+  },
+  {
+    "name": "Maps known ARM type microsoft.authorization/roleassignments to AzureRoleAssignment",
+    "type": "microsoft.authorization/roleassignments",
+    "source": "ARM",
+    "expected": "AzureRoleAssignment"
+  },
+  {
+    "name": "Maps known ARM type microsoft.resources/subscriptions to AzureSubscription",
+    "type": "microsoft.resources/subscriptions",
+    "source": "ARM",
+    "expected": "AzureSubscription"
+  },
+  {
+    "name": "Maps unknown ARM type to AzureResource",
+    "type": "microsoft.custom/something",
+    "source": "ARM",
+    "expected": "AzureResource"
+  },
+  {
+    "name": "Maps Entra user type to EntraUser",
+    "type": "user",
+    "source": "Entra",
+    "expected": "EntraUser"
+  },
+  {
+    "name": "Maps Entra servicePrincipal to EntraServicePrincipal",
+    "type": "servicePrincipal",
+    "source": "Entra",
+    "expected": "EntraServicePrincipal"
+  },
+  {
+    "name": "Maps Entra servicePrincipal with ManagedIdentity type to EntraManagedIdentity",
+    "type": "servicePrincipal",
+    "source": "Entra",
+    "propertiesJson": "{\"servicePrincipalType\":\"ManagedIdentity\"}",
+    "expected": "EntraManagedIdentity"
+  },
+  {
+    "name": "Maps Entra servicePrincipal without ManagedIdentity type to EntraServicePrincipal",
+    "type": "servicePrincipal",
+    "source": "Entra",
+    "propertiesJson": "{\"servicePrincipalType\":\"Application\"}",
+    "expected": "EntraServicePrincipal"
+  },
+  {
+    "name": "Maps Entra group to EntraGroup",
+    "type": "group",
+    "source": "Entra",
+    "expected": "EntraGroup"
+  },
+  {
+    "name": "Maps Entra directoryRole to EntraDirectoryRole",
+    "type": "directoryRole",
+    "source": "Entra",
+    "expected": "EntraDirectoryRole"
+  },
+  {
+    "name": "Returns unknown Entra type as-is",
+    "type": "unknownEntraType",
+    "source": "Entra",
+    "expected": "unknownEntraType"
+  }
+]

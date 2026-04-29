@@ -8,7 +8,7 @@ function InvokeCIEMDiscoveryPhase {
         Every collection/persistence step of discovery follows the same shape:
         start a stopwatch, run an action, log elapsed time, and route any
         exceptions into a shared error accumulator so the run can complete as
-        Partial instead of exploding on the first failure.
+        Partial only when the phase declares a non-fatal failure mode.
 
         This helper centralizes that shell so individual phase Actions contain
         only the domain logic.
@@ -30,6 +30,10 @@ function InvokeCIEMDiscoveryPhase {
 
     .PARAMETER WarningCounter
         Ref to an integer counter. Failed phases increment it.
+
+    .PARAMETER FailureMode
+        FailRun throws after recording the phase failure. RecordUnsupported records
+        the failure and returns a failed phase result.
 
     .PARAMETER OnSuccess
         Optional scriptblock invoked after a successful Action with the
@@ -56,6 +60,10 @@ function InvokeCIEMDiscoveryPhase {
         [Parameter(Mandatory)]
         [ref]$WarningCounter,
 
+        [Parameter(Mandatory)]
+        [ValidateSet('FailRun', 'RecordUnsupported')]
+        [string]$FailureMode,
+
         [Parameter()]
         [scriptblock]$OnSuccess,
 
@@ -68,6 +76,7 @@ function InvokeCIEMDiscoveryPhase {
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     $result = $null
     $succeeded = $true
+    $phaseException = $null
 
     try {
         $result = & $Action
@@ -78,6 +87,7 @@ function InvokeCIEMDiscoveryPhase {
         $failMessage = "${Name} failed: $($_.Exception.Message)"
         $ErrorMessages.Add($failMessage)
         Write-Warning $failMessage
+        $phaseException = [System.InvalidOperationException]::new($failMessage, $_.Exception)
     }
 
     $stopwatch.Stop()
@@ -99,6 +109,9 @@ function InvokeCIEMDiscoveryPhase {
     }
     else {
         Write-CIEMLog -Message "Phase ${Name} failed after ${elapsed}s" -Severity WARNING -Component 'Discovery'
+        if ($FailureMode -eq 'FailRun') {
+            throw $phaseException
+        }
     }
 
     [pscustomobject]@{

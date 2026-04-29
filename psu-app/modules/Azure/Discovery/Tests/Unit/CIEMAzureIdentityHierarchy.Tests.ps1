@@ -279,7 +279,7 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
                 -SubscriptionId 'sub1' -TenantId 'tenant1'
 
             # Seed role definition for role name resolution
-            $roleDefProps = @{ roleName = 'Contributor'; permissions = @(@{ actions = @('*') }) } | ConvertTo-Json -Compress
+            $roleDefProps = @{ roleName = 'Contributor'; permissions = @(@{ actions = @('*') }) } | ConvertTo-Json -Depth 5 -Compress
             Save-CIEMAzureArmResource -Id '/providers/Microsoft.Authorization/roleDefinitions/roledef-contrib' `
                 -Type 'microsoft.authorization/roledefinitions' -Name 'Contributor' `
                 -TenantId 'tenant1' -Properties $roleDefProps
@@ -294,7 +294,7 @@ Describe 'Get-CIEMAzureIdentityHierarchy' {
                 principalType     = 'ServicePrincipal'
                 roleDefinitionId  = '/providers/Microsoft.Authorization/roleDefinitions/roledef-contrib'
                 scope             = '/subscriptions/sub1/resourceGroups/rg-deploy'
-            } | ConvertTo-Json -Compress
+            } | ConvertTo-Json -Depth 5 -Compress
             Save-CIEMAzureArmResource -Id '/subscriptions/sub1/providers/Microsoft.Authorization/roleAssignments/ra-1' `
                 -Type 'microsoft.authorization/roleassignments' -Name 'ra-1' `
                 -SubscriptionId 'sub1' -TenantId 'tenant1' -Properties $raProps

@@ -79,6 +79,11 @@ function Start-CIEMAzureDiscovery {
     $entraTypeCount = 0
     $relationshipCount = 0
     $warningCounter = [ref]$warningCount
+    $discoveryPhaseConfig = @(GetCIEMAzureDiscoveryPhaseConfig -Scope $Scope)
+    $phaseById = @{}
+    foreach ($phase in $discoveryPhaseConfig) {
+        $phaseById[$phase.Id] = $phase
+    }
 
     try {
         # =================================================================
@@ -94,9 +99,11 @@ function Start-CIEMAzureDiscovery {
             Write-Progress -Activity 'Azure Discovery' -Status 'Collecting ARM resources' -PercentComplete 10
 
             # Resource Graph tables — one phase per table so each failure is isolated.
-            foreach ($table in @('Resources', 'ResourceContainers', 'AuthorizationResources')) {
+            foreach ($phase in @($discoveryPhaseConfig | Where-Object { $_.Executor -eq 'InvokeCIEMResourceGraphQuery' })) {
+                $table = $phase.Query
                 $phaseOutcome = InvokeCIEMDiscoveryPhase `
-                    -Name "ResourceGraph/$table" `
+                    -Name $phase.Name `
+                    -FailureMode $phase.FailureMode `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
                     -Action {
@@ -112,8 +119,13 @@ function Start-CIEMAzureDiscovery {
                 }
             }
 
+            $builtInPhaseConfig = $phaseById['BuiltInRoleDefinitions']
+            if (-not $builtInPhaseConfig) {
+                throw 'Start-CIEMAzureDiscovery: BuiltInRoleDefinitions phase is not registered.'
+            }
             $builtInPhase = InvokeCIEMDiscoveryPhase `
-                -Name 'BuiltInRoleDefinitions' `
+                -Name $builtInPhaseConfig.Name `
+                -FailureMode $builtInPhaseConfig.FailureMode `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
                 -Action {
@@ -133,6 +145,7 @@ function Start-CIEMAzureDiscovery {
 
             $null = InvokeCIEMDiscoveryPhase `
                 -Name 'ARM persistence' `
+                -FailureMode 'FailRun' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
                 -DetailBuilder { param($r) "$armRowCount rows" } `
@@ -166,8 +179,13 @@ function Start-CIEMAzureDiscovery {
             $entraDiscoverySucceeded = $true
 
             Write-Progress -Activity 'Azure Discovery' -Status 'Collecting Entra entities' -PercentComplete 55
+            $entityPhaseConfig = $phaseById['EntraEntityCollection']
+            if (-not $entityPhaseConfig) {
+                throw 'Start-CIEMAzureDiscovery: EntraEntityCollection phase is not registered.'
+            }
             $entityPhase = InvokeCIEMDiscoveryPhase `
-                -Name 'Entra entity collection' `
+                -Name $entityPhaseConfig.Name `
+                -FailureMode $entityPhaseConfig.FailureMode `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
                 -DetailBuilder { param($r) "$(@($r).Count) rows" } `
@@ -185,8 +203,13 @@ function Start-CIEMAzureDiscovery {
 
             $collectedServicePrincipals = @($entraResources | Where-Object { $_.Type -eq 'servicePrincipal' })
             if ($collectedServicePrincipals.Count -gt 0) {
+                $permissionPhaseConfig = $phaseById['EntraPermissionCollection']
+                if (-not $permissionPhaseConfig) {
+                    throw 'Start-CIEMAzureDiscovery: EntraPermissionCollection phase is not registered.'
+                }
                 $permissionPhase = InvokeCIEMDiscoveryPhase `
-                    -Name 'Entra permission collection' `
+                    -Name $permissionPhaseConfig.Name `
+                    -FailureMode $permissionPhaseConfig.FailureMode `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
                     -DetailBuilder { param($r) "$(@($r).Count) rows" } `
@@ -208,6 +231,7 @@ function Start-CIEMAzureDiscovery {
 
             $null = InvokeCIEMDiscoveryPhase `
                 -Name 'Entra persistence' `
+                -FailureMode 'FailRun' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
                 -DetailBuilder { param($r) "$entraRowCount rows" } `
@@ -242,8 +266,13 @@ function Start-CIEMAzureDiscovery {
             $collectedUsers = @($entraResources | Where-Object { $_.Type -eq 'user' })
 
             if ($collectedGroups.Count -gt 0 -or $collectedRoles.Count -gt 0 -or $collectedUsers.Count -gt 0) {
+                $relationshipPhaseConfig = $phaseById['EntraRelationshipCollection']
+                if (-not $relationshipPhaseConfig) {
+                    throw 'Start-CIEMAzureDiscovery: EntraRelationshipCollection phase is not registered.'
+                }
                 $relationshipPhase = InvokeCIEMDiscoveryPhase `
-                    -Name 'Entra relationship collection' `
+                    -Name $relationshipPhaseConfig.Name `
+                    -FailureMode $relationshipPhaseConfig.FailureMode `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
                     -DetailBuilder { param($r) "$(@($r).Count) rows" } `
@@ -268,6 +297,7 @@ function Start-CIEMAzureDiscovery {
         if ($relationshipsSucceeded -and $relationships.Count -gt 0) {
             $null = InvokeCIEMDiscoveryPhase `
                 -Name 'Relationship persistence' `
+                -FailureMode 'FailRun' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
                 -DetailBuilder { param($r) "$relationshipCount rows" } `
@@ -290,6 +320,7 @@ function Start-CIEMAzureDiscovery {
 
         $null = InvokeCIEMDiscoveryPhase `
             -Name 'Build data load' `
+            -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
             -DetailBuilder { param($r) "$($r.ArmCount) ARM, $($r.EntraCount) Entra, $($r.RelCount) relationships" } `
@@ -312,6 +343,7 @@ function Start-CIEMAzureDiscovery {
 
         $null = InvokeCIEMDiscoveryPhase `
             -Name 'ERA build' `
+            -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
             -Action {
@@ -325,6 +357,7 @@ function Start-CIEMAzureDiscovery {
 
         $null = InvokeCIEMDiscoveryPhase `
             -Name 'Graph build' `
+            -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
             -Action {
@@ -347,6 +380,7 @@ function Start-CIEMAzureDiscovery {
 
         $null = InvokeCIEMDiscoveryPhase `
             -Name 'Attack path materialization' `
+            -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
             -Action {

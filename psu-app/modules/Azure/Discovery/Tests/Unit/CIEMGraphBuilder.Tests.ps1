@@ -1,3 +1,19 @@
+BeforeDiscovery {
+    $script:GraphNodeKindDiscoveryCases = @(
+        Get-Content -Path (Join-Path $PSScriptRoot '..' 'Fixtures' 'graph_node_kind_cases.json') -Raw |
+            ConvertFrom-Json -Depth 10 |
+            ForEach-Object {
+                @{
+                    name           = [string]$_.name
+                    type           = [string]$_.type
+                    source         = [string]$_.source
+                    propertiesJson = $_.propertiesJson
+                    expected       = [string]$_.expected
+                }
+            }
+    )
+}
+
 BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
@@ -19,6 +35,8 @@ BeforeAll {
             Invoke-CIEMQuery -Query $statement.Trim() -AsNonQuery | Out-Null
         }
     }
+
+    $script:GraphNodeKindCases = @(Get-Content -Path (Join-Path $PSScriptRoot '..' 'Fixtures' 'graph_node_kind_cases.json') -Raw | ConvertFrom-Json -Depth 10)
 }
 
 Describe 'Graph Builder Functions' {
@@ -35,89 +53,38 @@ Describe 'Graph Builder Functions' {
             }
         }
 
-        It 'Maps known ARM type microsoft.compute/virtualmachines to AzureVM' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'microsoft.compute/virtualmachines' -Source 'ARM'
-                $result | Should -Be 'AzureVM'
+        It 'Defines strict fixture-backed node kind cases' {
+            $script:GraphNodeKindCases | Should -HaveCount 12
+            foreach ($case in $script:GraphNodeKindCases) {
+                $allowedFields = @('expected', 'name', 'propertiesJson', 'source', 'type')
+                foreach ($field in $case.PSObject.Properties.Name) {
+                    $allowedFields | Should -Contain $field
+                }
+                [string]$case.name | Should -Not -BeNullOrEmpty
+                [string]$case.type | Should -Not -BeNullOrEmpty
+                [string]$case.source | Should -Not -BeNullOrEmpty
+                [string]$case.expected | Should -Not -BeNullOrEmpty
             }
         }
 
-        It 'Maps known ARM type microsoft.network/networksecuritygroups to AzureNSG' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'microsoft.network/networksecuritygroups' -Source 'ARM'
-                $result | Should -Be 'AzureNSG'
-            }
-        }
+        It '<name>' -ForEach $script:GraphNodeKindDiscoveryCases {
+            InModuleScope Devolutions.CIEM -Parameters @{
+                Type           = $type
+                Source         = $source
+                PropertiesJson = $propertiesJson
+                Expected       = $expected
+            } {
+                $parameters = @{
+                    Type   = [string]$Type
+                    Source = [string]$Source
+                }
 
-        It 'Maps known ARM type microsoft.authorization/roleassignments to AzureRoleAssignment' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'microsoft.authorization/roleassignments' -Source 'ARM'
-                $result | Should -Be 'AzureRoleAssignment'
-            }
-        }
+                if (-not [string]::IsNullOrEmpty([string]$PropertiesJson)) {
+                    $parameters.PropertiesJson = [string]$PropertiesJson
+                }
 
-        It 'Maps known ARM type microsoft.resources/subscriptions to AzureSubscription' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'microsoft.resources/subscriptions' -Source 'ARM'
-                $result | Should -Be 'AzureSubscription'
-            }
-        }
-
-        It 'Maps unknown ARM type to AzureResource' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'microsoft.custom/something' -Source 'ARM'
-                $result | Should -Be 'AzureResource'
-            }
-        }
-
-        It 'Maps Entra user type to EntraUser' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'user' -Source 'Entra'
-                $result | Should -Be 'EntraUser'
-            }
-        }
-
-        It 'Maps Entra servicePrincipal to EntraServicePrincipal' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'servicePrincipal' -Source 'Entra'
-                $result | Should -Be 'EntraServicePrincipal'
-            }
-        }
-
-        It 'Maps Entra servicePrincipal with ManagedIdentity type to EntraManagedIdentity' {
-            InModuleScope Devolutions.CIEM {
-                $propsJson = '{"servicePrincipalType":"ManagedIdentity"}'
-                $result = ResolveCIEMNodeKind -Type 'servicePrincipal' -Source 'Entra' -PropertiesJson $propsJson
-                $result | Should -Be 'EntraManagedIdentity'
-            }
-        }
-
-        It 'Maps Entra servicePrincipal without ManagedIdentity type to EntraServicePrincipal' {
-            InModuleScope Devolutions.CIEM {
-                $propsJson = '{"servicePrincipalType":"Application"}'
-                $result = ResolveCIEMNodeKind -Type 'servicePrincipal' -Source 'Entra' -PropertiesJson $propsJson
-                $result | Should -Be 'EntraServicePrincipal'
-            }
-        }
-
-        It 'Maps Entra group to EntraGroup' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'group' -Source 'Entra'
-                $result | Should -Be 'EntraGroup'
-            }
-        }
-
-        It 'Maps Entra directoryRole to EntraDirectoryRole' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'directoryRole' -Source 'Entra'
-                $result | Should -Be 'EntraDirectoryRole'
-            }
-        }
-
-        It 'Returns unknown Entra type as-is (no default mapping)' {
-            InModuleScope Devolutions.CIEM {
-                $result = ResolveCIEMNodeKind -Type 'unknownEntraType' -Source 'Entra'
-                $result | Should -Be 'unknownEntraType'
+                $result = ResolveCIEMNodeKind @parameters
+                $result | Should -Be ([string]$Expected)
             }
         }
     }

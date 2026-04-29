@@ -4,13 +4,13 @@ function SaveCIEMAzureTable {
         Generic INSERT OR REPLACE core for every Save-CIEMAzure* shim.
 
     .DESCRIPTION
-        Reads table + column configuration from $script:CIEMSaveTablesConfig (loaded
-        from Discovery/Data/save-tables.psd1 at module init) and delegates to
+        Reads table + insert-column configuration from the Azure discovery entity
+        registry loaded from Discovery/Data/entities.psd1 and delegates to
         InvokeCIEMBatchInsert. Each Save-CIEMAzure* public shim calls this with the
         matching -Entity key so there's a single code path for batch inserts.
 
     .PARAMETER Entity
-        Logical entity name matching a top-level key in save-tables.psd1
+        Logical entity name matching a top-level key in entities.psd1
         (e.g., 'ArmResource', 'EntraResource', 'ResourceRelationship',
         'EffectiveRoleAssignment').
 
@@ -37,15 +37,6 @@ function SaveCIEMAzureTable {
 
     $ErrorActionPreference = 'Stop'
 
-    if (-not $script:CIEMSaveTablesConfig) {
-        throw 'SaveCIEMAzureTable: $script:CIEMSaveTablesConfig is not loaded. Module init failed.'
-    }
-
-    if (-not $script:CIEMSaveTablesConfig.ContainsKey($Entity)) {
-        $known = ($script:CIEMSaveTablesConfig.Keys | Sort-Object) -join ', '
-        throw "SaveCIEMAzureTable: unknown entity '$Entity'. Known entities: $known"
-    }
-
-    $entityConfig = $script:CIEMSaveTablesConfig[$Entity]
-    InvokeCIEMBatchInsert -Table $entityConfig.Table -Columns $entityConfig.Columns -Items $Items -Connection $Connection
+    $entityConfig = GetCIEMAzureEntityConfig -Entity $Entity
+    InvokeCIEMBatchInsert -Table $entityConfig.Table -Columns $entityConfig.InsertColumns -Items $Items -Connection $Connection
 }

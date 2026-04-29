@@ -61,72 +61,44 @@ function Update-CIEMAzureArmResource {
         $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($obj in $InputObject) {
-                $parameters = @{
-                    id              = $obj.Id
-                    type            = $obj.Type
-                    name            = $obj.Name
-                    location        = $obj.Location
-                    resource_group  = $obj.ResourceGroup
-                    subscription_id = $obj.SubscriptionId
-                    tenant_id       = $obj.TenantId
-                    kind            = $obj.Kind
-                    sku             = $obj.Sku
-                    identity        = $obj.Identity
-                    managed_by      = $obj.ManagedBy
-                    plan            = $obj.Plan
-                    zones           = $obj.Zones
-                    tags            = $obj.Tags
-                    properties      = $obj.Properties
-                    collected_at    = $obj.CollectedAt
+                UpdateCIEMAzureEntity -Entity 'ArmResource' -Filters @{ Id = $obj.Id } -Values @{
+                    Type = $obj.Type
+                    Name = $obj.Name
+                    Location = $obj.Location
+                    ResourceGroup = $obj.ResourceGroup
+                    SubscriptionId = $obj.SubscriptionId
+                    TenantId = $obj.TenantId
+                    Kind = $obj.Kind
+                    Sku = $obj.Sku
+                    Identity = $obj.Identity
+                    ManagedBy = $obj.ManagedBy
+                    Plan = $obj.Plan
+                    Zones = $obj.Zones
+                    Tags = $obj.Tags
+                    Properties = $obj.Properties
+                    CollectedAt = $obj.CollectedAt
+                    LastSeenAt = $obj.LastSeenAt
                 }
-
-                Invoke-CIEMQuery -Query @"
-UPDATE azure_arm_resources
-SET type = @type, name = @name, location = @location, resource_group = @resource_group,
-    subscription_id = @subscription_id, tenant_id = @tenant_id, kind = @kind, sku = @sku,
-    identity = @identity, managed_by = @managed_by, plan = @plan, zones = @zones,
-    tags = @tags, properties = @properties, collected_at = @collected_at
-WHERE id = @id
-"@ -Parameters $parameters -AsNonQuery | Out-Null
             }
             return
         }
 
-        $columnMap = @{
-            Type           = 'type'
-            Name           = 'name'
-            Location       = 'location'
-            ResourceGroup  = 'resource_group'
-            SubscriptionId = 'subscription_id'
-            TenantId       = 'tenant_id'
-            Kind           = 'kind'
-            Sku            = 'sku'
-            Identity       = 'identity'
-            ManagedBy      = 'managed_by'
-            Plan           = 'plan'
-            Zones          = 'zones'
-            Tags           = 'tags'
-            Properties     = 'properties'
-            CollectedAt    = 'collected_at'
-        }
-
-        $setClauses = @()
-        $parameters = @{ id = $Id }
-
-        foreach ($paramName in $columnMap.Keys) {
+        $values = @{}
+        foreach ($paramName in @(
+            'Type', 'Name', 'Location', 'ResourceGroup', 'SubscriptionId',
+            'TenantId', 'Kind', 'Sku', 'Identity', 'ManagedBy', 'Plan',
+            'Zones', 'Tags', 'Properties', 'CollectedAt'
+        )) {
             if ($PSBoundParameters.ContainsKey($paramName)) {
-                $col = $columnMap[$paramName]
-                $setClauses += "$col = @$col"
-                $parameters[$col] = $PSBoundParameters[$paramName]
+                $values[$paramName] = $PSBoundParameters[$paramName]
             }
         }
 
-        if ($setClauses.Count -eq 0) {
+        if ($values.Count -eq 0) {
             return
         }
 
-        $sql = "UPDATE azure_arm_resources SET " + ($setClauses -join ', ') + " WHERE id = @id"
-        Invoke-CIEMQuery -Query $sql -Parameters $parameters -AsNonQuery | Out-Null
+        UpdateCIEMAzureEntity -Entity 'ArmResource' -Filters @{ Id = $Id } -Values $values
 
         if ($PassThru) {
             Get-CIEMAzureArmResource -Id $Id

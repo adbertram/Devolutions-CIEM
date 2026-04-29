@@ -2,7 +2,7 @@ BeforeAll {
     Remove-Module Devolutions.CIEM -Force -ErrorAction SilentlyContinue
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
 
-    $script:SaveTablesConfigPath = Join-Path $PSScriptRoot '..' '..' '..' 'Discovery' 'Data' 'save-tables.psd1'
+    $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' '..' 'Discovery' 'Data' 'entities.psd1'
     $script:DiscoverySchemaPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
 
     function Get-SchemaColumns {
@@ -44,13 +44,13 @@ BeforeAll {
     }
 }
 
-Describe 'save-tables.psd1 + Save-CIEMAzureTable generic core' {
-    It 'save-tables.psd1 config file exists' {
-        Test-Path $script:SaveTablesConfigPath | Should -BeTrue
+Describe 'entities.psd1 + Save-CIEMAzureTable generic core' {
+    It 'entities.psd1 config file exists' {
+        $script:EntityConfigPath | Should -Exist
     }
 
-    It 'save-tables.psd1 is a valid PowerShell data file with entries for all four tables' {
-        $config = Import-PowerShellDataFile -Path $script:SaveTablesConfigPath
+    It 'entities.psd1 is a valid PowerShell data file with entries for all four tables' {
+        $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
 
         $config.Keys | Should -Contain 'ArmResource'
         $config.Keys | Should -Contain 'EntraResource'
@@ -59,19 +59,19 @@ Describe 'save-tables.psd1 + Save-CIEMAzureTable generic core' {
     }
 
     It 'Each config entry declares Table and Columns' {
-        $config = Import-PowerShellDataFile -Path $script:SaveTablesConfigPath
+        $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
         foreach ($entityName in 'ArmResource', 'EntraResource', 'ResourceRelationship', 'EffectiveRoleAssignment') {
             $entry = $config[$entityName]
             $entry.Keys | Should -Contain 'Table'
-            $entry.Keys | Should -Contain 'Columns'
-            $entry.Columns.Count | Should -BeGreaterThan 0
+            $entry.Keys | Should -Contain 'InsertColumns'
+            $entry.InsertColumns.Count | Should -BeGreaterThan 0
         }
     }
 
     Context 'Schema drift detection' {
         It 'ArmResource columns match discovery_schema.sql azure_arm_resources' {
-            $config = Import-PowerShellDataFile -Path $script:SaveTablesConfigPath
-            $configColumns = @($config.ArmResource.Columns)
+            $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
+            $configColumns = @($config.ArmResource.InsertColumns)
             $schemaColumns = Get-SchemaColumns -SchemaPath $script:DiscoverySchemaPath -TableName 'azure_arm_resources'
             $missing = @($schemaColumns | Where-Object { $_ -notin $configColumns })
             $extra = @($configColumns | Where-Object { $_ -notin $schemaColumns })
@@ -79,8 +79,8 @@ Describe 'save-tables.psd1 + Save-CIEMAzureTable generic core' {
         }
 
         It 'EntraResource columns match discovery_schema.sql azure_entra_resources' {
-            $config = Import-PowerShellDataFile -Path $script:SaveTablesConfigPath
-            $configColumns = @($config.EntraResource.Columns)
+            $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
+            $configColumns = @($config.EntraResource.InsertColumns)
             $schemaColumns = Get-SchemaColumns -SchemaPath $script:DiscoverySchemaPath -TableName 'azure_entra_resources'
             $missing = @($schemaColumns | Where-Object { $_ -notin $configColumns })
             $extra = @($configColumns | Where-Object { $_ -notin $schemaColumns })
@@ -88,8 +88,8 @@ Describe 'save-tables.psd1 + Save-CIEMAzureTable generic core' {
         }
 
         It 'ResourceRelationship columns match discovery_schema.sql azure_resource_relationships (excluding autoincrement id)' {
-            $config = Import-PowerShellDataFile -Path $script:SaveTablesConfigPath
-            $configColumns = @($config.ResourceRelationship.Columns)
+            $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
+            $configColumns = @($config.ResourceRelationship.InsertColumns)
             # The schema has an AUTOINCREMENT id column that must NOT appear in the PSD1 (inserts don't specify it)
             $schemaColumns = Get-SchemaColumns -SchemaPath $script:DiscoverySchemaPath -TableName 'azure_resource_relationships' | Where-Object { $_ -ne 'id' }
             $missing = @($schemaColumns | Where-Object { $_ -notin $configColumns })
@@ -98,8 +98,8 @@ Describe 'save-tables.psd1 + Save-CIEMAzureTable generic core' {
         }
 
         It 'EffectiveRoleAssignment columns match discovery_schema.sql azure_effective_role_assignments (excluding autoincrement id)' {
-            $config = Import-PowerShellDataFile -Path $script:SaveTablesConfigPath
-            $configColumns = @($config.EffectiveRoleAssignment.Columns)
+            $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
+            $configColumns = @($config.EffectiveRoleAssignment.InsertColumns)
             $schemaColumns = Get-SchemaColumns -SchemaPath $script:DiscoverySchemaPath -TableName 'azure_effective_role_assignments' | Where-Object { $_ -ne 'id' }
             $missing = @($schemaColumns | Where-Object { $_ -notin $configColumns })
             $extra = @($configColumns | Where-Object { $_ -notin $schemaColumns })

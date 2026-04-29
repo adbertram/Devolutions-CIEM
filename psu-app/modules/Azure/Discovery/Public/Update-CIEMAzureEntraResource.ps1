@@ -24,42 +24,30 @@ function Update-CIEMAzureEntraResource {
         $ErrorActionPreference = 'Stop'
         if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
             foreach ($item in $InputObject) {
-                $parameters = @{
-                    id           = $item.Id
-                    type         = $item.Type
-                    display_name = $item.DisplayName
-                    parent_id    = $item.ParentId
-                    properties   = $item.Properties
-                    collected_at = $item.CollectedAt
+                UpdateCIEMAzureEntity -Entity 'EntraResource' -Filters @{ Id = $item.Id } -Values @{
+                    Type = $item.Type
+                    DisplayName = $item.DisplayName
+                    ParentId = $item.ParentId
+                    Properties = $item.Properties
+                    CollectedAt = $item.CollectedAt
+                    LastSeenAt = $item.LastSeenAt
                 }
-                Invoke-CIEMQuery -Query "UPDATE azure_entra_resources SET type = @type, display_name = @display_name, parent_id = @parent_id, properties = @properties, collected_at = @collected_at WHERE id = @id" -Parameters $parameters -AsNonQuery | Out-Null
                 if ($PassThru) { Get-CIEMAzureEntraResource -Id $item.Id }
             }
         } else {
-            $setClauses = @()
-            $parameters = @{ id = $Id }
-            $columnMap = @{
-                Type        = 'type'
-                DisplayName = 'display_name'
-                ParentId    = 'parent_id'
-                Properties  = 'properties'
-                CollectedAt = 'collected_at'
-            }
-
-            foreach ($paramName in $columnMap.Keys) {
+            $values = @{}
+            foreach ($paramName in @('Type', 'DisplayName', 'ParentId', 'Properties', 'CollectedAt')) {
                 if ($PSBoundParameters.ContainsKey($paramName)) {
-                    $col = $columnMap[$paramName]
-                    $setClauses += "$col = @$col"
-                    $parameters[$col] = $PSBoundParameters[$paramName]
+                    $values[$paramName] = $PSBoundParameters[$paramName]
                 }
             }
 
-            if ($setClauses.Count -eq 0) {
+            if ($values.Count -eq 0) {
                 if ($PassThru) { Get-CIEMAzureEntraResource -Id $Id }
                 return
             }
 
-            Invoke-CIEMQuery -Query "UPDATE azure_entra_resources SET $($setClauses -join ', ') WHERE id = @id" -Parameters $parameters -AsNonQuery | Out-Null
+            UpdateCIEMAzureEntity -Entity 'EntraResource' -Filters @{ Id = $Id } -Values $values
             if ($PassThru) { Get-CIEMAzureEntraResource -Id $Id }
         }
     }
