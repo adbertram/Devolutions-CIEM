@@ -23,8 +23,8 @@ function New-CIEMIdentitiesPage {
                     New-UDSelect -Id 'identitiesProviderSelect' -Label 'Provider' -Option {
                         New-UDSelectOption -Name 'Azure' -Value 'Azure'
                         New-UDSelectOption -Name 'AWS' -Value 'AWS'
-                    } -DefaultValue $(if ($Session:IdentitiesProvider) { $Session:IdentitiesProvider } else { 'Azure' }) -OnChange {
-                        $Session:IdentitiesProvider = $EventData
+                    } -DefaultValue $(if ($Page:IdentitiesProvider) { $Page:IdentitiesProvider } else { 'Azure' }) -OnChange {
+                        $Page:IdentitiesProvider = $EventData
                         Sync-UDElement -Id 'identitiesGrid'
                     }
                 }
@@ -40,8 +40,8 @@ function New-CIEMIdentitiesPage {
                         New-UDSelectOption -Name 'Secret Access' -Value 'SecretAccess'
                         New-UDSelectOption -Name 'Assume Role' -Value 'AssumeRole'
                         New-UDSelectOption -Name 'Unclassified' -Value 'Unclassified'
-                    } -DefaultValue $(if ($Session:IdentitiesAccessLevel) { $Session:IdentitiesAccessLevel } else { 'All' }) -OnChange {
-                        $Session:IdentitiesAccessLevel = $EventData
+                    } -DefaultValue $(if ($Page:IdentitiesAccessLevel) { $Page:IdentitiesAccessLevel } else { 'All' }) -OnChange {
+                        $Page:IdentitiesAccessLevel = $EventData
                         Sync-UDElement -Id 'identitiesGrid'
                     }
                 }
@@ -50,8 +50,8 @@ function New-CIEMIdentitiesPage {
                     New-UDSelect -Id 'identitiesPrivilegedSelect' -Label 'Privilege' -Option {
                         New-UDSelectOption -Name 'All' -Value 'All'
                         New-UDSelectOption -Name 'Privileged Only' -Value 'Privileged'
-                    } -DefaultValue $(if ($Session:IdentitiesPrivilege) { $Session:IdentitiesPrivilege } else { 'All' }) -OnChange {
-                        $Session:IdentitiesPrivilege = $EventData
+                    } -DefaultValue $(if ($Page:IdentitiesPrivilege) { $Page:IdentitiesPrivilege } else { 'All' }) -OnChange {
+                        $Page:IdentitiesPrivilege = $EventData
                         Sync-UDElement -Id 'identitiesGrid'
                     }
                 }
@@ -60,9 +60,9 @@ function New-CIEMIdentitiesPage {
 
         New-UDDynamic -Id 'identitiesGrid' -Content {
             try {
-                $provider = if ($Session:IdentitiesProvider) { $Session:IdentitiesProvider } else { 'Azure' }
-                $accessLevel = if ($Session:IdentitiesAccessLevel) { $Session:IdentitiesAccessLevel } else { 'All' }
-                $privilege = if ($Session:IdentitiesPrivilege) { $Session:IdentitiesPrivilege } else { 'All' }
+                $provider = if ($Page:IdentitiesProvider) { $Page:IdentitiesProvider } else { 'Azure' }
+                $accessLevel = if ($Page:IdentitiesAccessLevel) { $Page:IdentitiesAccessLevel } else { 'All' }
+                $privilege = if ($Page:IdentitiesPrivilege) { $Page:IdentitiesPrivilege } else { 'All' }
 
                 $splat = @{ Provider = $provider; IncludeRaw = $true }
                 if ($accessLevel -ne 'All') { $splat.AccessLevel = $accessLevel }

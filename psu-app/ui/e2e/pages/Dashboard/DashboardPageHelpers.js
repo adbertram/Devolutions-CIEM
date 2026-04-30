@@ -176,6 +176,9 @@ class DashboardPageHelpers extends BasePage {
         { selector: this.selectors.scanRunSelector, previous: previousValue },
         { timeout: 15000 }
       );
+      await this.page
+        .locator(`${this.selectors.scanSection} [role="progressbar"]`)
+        .waitFor({ state: 'hidden', timeout: 15000 });
       await this.page.locator(this.selectors.totalResultsCard).waitFor({ state: 'visible', timeout: 15000 });
       return true;
     }

@@ -164,7 +164,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                             } -Content {
                                                 New-UDButton -Text 'Execute' -Variant 'outlined' -Color 'secondary' -Size 'small' -Icon (New-UDIcon -Icon 'Play' -Size 'sm') -Style $scriptActionButtonStyle -OnClick {
                                                 $job = Invoke-PSUScript -Name 'Checks/Invoke-CIEMAttackPathRemediation' -Integrated -Parameters @{ AttackPathId = $attackPathId }
-                                                $Session:CIEMAttackPathExecution = @{
+                                                $Page:CIEMAttackPathExecution = @{
                                                     JobId        = [int64]$job.Id
                                                     Script       = $remediationScript
                                                     Status       = [string]$job.Status
@@ -197,11 +197,11 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                                 overflow = 'auto'
                                                             }
                                                         } -Content {
-                                                            $Session:CIEMAttackPathExecution['Script']
+                                                            $Page:CIEMAttackPathExecution['Script']
                                                         }
                                                         New-UDTypography -Text 'Streams' -Variant 'subtitle2' -Style @{ fontWeight = '600' }
                                                         New-UDDynamic -Id $executionStreamsId -AutoRefresh -AutoRefreshInterval 1 -Content {
-                                                            $executionState = $Session:CIEMAttackPathExecution
+                                                            $executionState = $Page:CIEMAttackPathExecution
                                                             if ($null -eq $executionState) {
                                                                 throw 'Cannot render attack path remediation execution because execution state is missing.'
                                                             }
@@ -224,7 +224,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                             $executionState['Status'] = [string]$job.Status
                                                             $executionState['IsRunning'] = $isRunning
                                                             $executionState['Streams'] = $streamText
-                                                            $Session:CIEMAttackPathExecution = $executionState
+                                                            $Page:CIEMAttackPathExecution = $executionState
 
                                                             New-UDElement -Tag 'div' -Attributes @{
                                                                 'data-ciem-attack-path-execution-streams' = 'true'
@@ -233,7 +233,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                             }
                                                         }
                                                         New-UDDynamic -Id $executionWarningId -Content {
-                                                            $executionState = $Session:CIEMAttackPathExecution
+                                                            $executionState = $Page:CIEMAttackPathExecution
                                                             if ($null -eq $executionState) {
                                                                 throw 'Cannot render attack path remediation close warning because execution state is missing.'
                                                             }
@@ -250,7 +250,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                                             'data-ciem-attack-path-execution-warning-terminate' = 'true'
                                                                         } -Content {
                                                                             New-UDButton -Text 'Terminate' -Variant 'contained' -Color 'error' -OnClick {
-                                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                                $executionState = $Page:CIEMAttackPathExecution
                                                                                 if ($null -eq $executionState) {
                                                                                     throw 'Cannot terminate attack path remediation because execution state is missing.'
                                                                                 }
@@ -267,13 +267,13 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                                             'data-ciem-attack-path-execution-leave-running' = 'true'
                                                                         } -Content {
                                                                             New-UDButton -Text 'Leave Running' -Variant 'outlined' -Color 'secondary' -OnClick {
-                                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                                $executionState = $Page:CIEMAttackPathExecution
                                                                                 if ($null -eq $executionState) {
                                                                                     throw 'Cannot leave attack path remediation running because execution state is missing.'
                                                                                 }
 
                                                                                 $executionState['CloseWarning'] = $false
-                                                                                $Session:CIEMAttackPathExecution = $executionState
+                                                                                $Page:CIEMAttackPathExecution = $executionState
                                                                                 Hide-UDModal
                                                                             }
                                                                         }
@@ -290,7 +290,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                             'data-ciem-attack-path-execution-terminate' = 'true'
                                                         } -Content {
                                                             New-UDButton -Text 'Terminate' -Variant 'outlined' -Color 'error' -OnClick {
-                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                $executionState = $Page:CIEMAttackPathExecution
                                                                 if ($null -eq $executionState) {
                                                                     throw 'Cannot terminate attack path remediation because execution state is missing.'
                                                                 }
@@ -307,7 +307,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                             'data-ciem-attack-path-execution-close' = 'true'
                                                         } -Content {
                                                             New-UDButton -Text 'Close' -Variant 'contained' -Color 'primary' -OnClick {
-                                                                $executionState = $Session:CIEMAttackPathExecution
+                                                                $executionState = $Page:CIEMAttackPathExecution
                                                                 if ($null -eq $executionState) {
                                                                     throw 'Cannot close attack path remediation execution because execution state is missing.'
                                                                 }
@@ -320,7 +320,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
 
                                                                 if ($isRunning) {
                                                                     $executionState['CloseWarning'] = $true
-                                                                    $Session:CIEMAttackPathExecution = $executionState
+                                                                    $Page:CIEMAttackPathExecution = $executionState
                                                                     Sync-UDElement -Id $executionWarningId
                                                                 }
                                                                 else {

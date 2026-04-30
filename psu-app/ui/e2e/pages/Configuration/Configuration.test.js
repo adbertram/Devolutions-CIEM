@@ -122,8 +122,7 @@ test.describe('Configuration Page', () => {
       });
 
       test('should display Upload Certificate button', async () => {
-        const visible = await configPage.isElementVisible(configPage.selectors.uploadCertButton);
-        expect(visible).toBe(true);
+        await configPage.waitForElement(configPage.selectors.uploadCertButton);
       });
 
       test('should display Certificate Password field', async () => {
@@ -142,6 +141,11 @@ test.describe('Configuration Page', () => {
         // Should mention either uploading a PFX file or that a certificate is stored
         const mentionsCert = guidanceText.includes('PFX') || guidanceText.includes('certificate') || guidanceText.includes('Certificate');
         expect(mentionsCert).toBe(true);
+      });
+
+      test('should upload a PFX file and display the selected filename', async () => {
+        await configPage.uploadCertificateFixture();
+        await expect(configPage.page.locator('text=test-certificate.pfx')).toBeVisible();
       });
     });
 
@@ -374,7 +378,7 @@ test.describe('Configuration Page', () => {
   test.describe('when the user clicks Save Configuration with empty required fields', () => {
     test('should show loading state on Save button during processing', async () => {
       await configPage.clickSave();
-      const saveBtn = configPage.page.locator('#saveConfigBtn');
+      const saveBtn = configPage.page.locator(configPage.selectors.saveConfigBtn);
       await expect(saveBtn).toBeVisible();
     });
 
@@ -396,6 +400,17 @@ test.describe('Configuration Page', () => {
       await configPage.fill('#azSpClientId', 'e2e-test-client-id');
       await configPage.clickSave();
       // Wait for success toast
+      const toast = await configPage.waitForToastMessage('Configuration saved successfully');
+      expect(toast).toBeTruthy();
+    });
+
+    test('should display success toast when saving valid Azure SP Certificate configuration with an uploaded PFX', async () => {
+      await configPage.selectAuthMethod('ServicePrincipalCertificate');
+      await configPage.fillTenantId('e2e-test-tenant-id');
+      await configPage.fill('#azCertClientId', 'e2e-test-client-id');
+      await configPage.uploadCertificateFixture();
+      await configPage.clickSave();
+
       const toast = await configPage.waitForToastMessage('Configuration saved successfully');
       expect(toast).toBeTruthy();
     });

@@ -351,6 +351,11 @@ test.describe('Environment Page', () => {
       expect(treeVisible).toBe(true);
     });
 
+    test('should render the tree without loading ECharts from a CDN script tag', async () => {
+      await envPage.isTreeContainerVisible();
+      await expect(envPage.page.locator('script[src*="echarts"]')).toHaveCount(0);
+    });
+
     test('should use resource icon image symbols in the tree visualization', async () => {
       const keyVaultNode = await envPage.getTreeNodeByName('e2e-kv-1');
       expect(keyVaultNode).not.toBeNull();

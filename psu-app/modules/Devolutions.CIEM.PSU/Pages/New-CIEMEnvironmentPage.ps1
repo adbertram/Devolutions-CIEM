@@ -22,12 +22,6 @@ function New-CIEMEnvironmentPage {
 
         Devolutions.CIEM\Write-CIEMLog -Message "Environment page Content block executing" -Severity INFO -Component 'PSU-EnvironmentPage'
 
-        # Load ECharts community library from CDN
-        New-UDHelmet -Tag 'script' -Attributes @{
-            src  = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js'
-            type = 'text/javascript'
-        }
-
         New-UDTypography -Text 'Environment Explorer' -Variant 'h4' -Style @{ marginBottom = '10px'; marginTop = '10px' }
         New-UDTypography -Text 'Explore your cloud infrastructure hierarchy - expand and collapse nodes to navigate resources' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
@@ -38,7 +32,7 @@ function New-CIEMEnvironmentPage {
                     New-UDSelect -Id 'envProviderSelect' -Label 'Provider' -Option {
                         New-UDSelectOption -Name 'Azure' -Value 'Azure'
                     } -DefaultValue 'Azure' -OnChange {
-                        $Session:SelectedEnvProvider = $EventData
+                        $Page:SelectedEnvProvider = $EventData
                     }
                 }
                 New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '180px' } } -Content {
@@ -46,7 +40,7 @@ function New-CIEMEnvironmentPage {
                         New-UDSelectOption -Name 'Infrastructure' -Value 'Infrastructure'
                         New-UDSelectOption -Name 'Identities' -Value 'Identities'
                     } -DefaultValue 'Infrastructure' -OnChange {
-                        $Session:SelectedEnvView = $EventData
+                        $Page:SelectedEnvView = $EventData
                         Sync-UDElement -Id 'envChartDynamic'
                     }
                 }
@@ -55,13 +49,13 @@ function New-CIEMEnvironmentPage {
                         New-UDSelectOption -Name 'Left to Right' -Value 'LR'
                         New-UDSelectOption -Name 'Top to Bottom' -Value 'TB'
                     } -DefaultValue 'LR' -OnChange {
-                        $Session:SelectedEnvOrient = $EventData
+                        $Page:SelectedEnvOrient = $EventData
                         Sync-UDElement -Id 'envChartDynamic'
                     }
                 }
                 New-UDButton -Id 'startDiscoveryBtn' -Text 'Start Discovery' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
                     try {
-                        $provider = $Session:SelectedEnvProvider
+                        $provider = $Page:SelectedEnvProvider
                         if (-not $provider) { $provider = 'Azure' }
 
                         Devolutions.CIEM\Write-CIEMLog -Message "DISCOVERY ONCLICK: entered handler, provider=$provider" -Severity INFO -Component 'PSU-EnvironmentPage'
@@ -174,16 +168,16 @@ function New-CIEMEnvironmentPage {
                 Devolutions.CIEM\Write-CIEMLog -Message "ENV PAGE: DatabasePath=$script:DatabasePath" -Severity INFO -Component 'PSU-EnvironmentPage'
                 Devolutions.CIEM\Write-CIEMLog -Message "ENV PAGE: ModuleRoot=$script:ModuleRoot" -Severity INFO -Component 'PSU-EnvironmentPage'
                 try {
-                    $orient = $Session:SelectedEnvOrient
+                    $orient = $Page:SelectedEnvOrient
                     if (-not $orient) { $orient = 'LR' }
-                    $viewMode = $Session:SelectedEnvView
+                    $viewMode = $Page:SelectedEnvView
                     if (-not $viewMode) { $viewMode = 'Infrastructure' }
 
                     Devolutions.CIEM\Write-CIEMLog -Message "DYNAMIC CONTENT: view=$viewMode, orient=$orient" -Severity INFO -Component 'PSU-EnvironmentPage'
 
                     if ($viewMode -eq 'Identities') {
                         # --- Identity View ---
-                        $assignmentMode = $Session:SelectedEnvAssignmentMode
+                        $assignmentMode = $Page:SelectedEnvAssignmentMode
                         if (-not $assignmentMode) { $assignmentMode = 'Effective' }
 
                         # Assignment mode sub-toggle
@@ -193,7 +187,7 @@ function New-CIEMEnvironmentPage {
                                     New-UDSelectOption -Name 'Effective (Group Expanded)' -Value 'Effective'
                                     New-UDSelectOption -Name 'Direct Only' -Value 'Direct'
                                 } -DefaultValue $assignmentMode -OnChange {
-                                    $Session:SelectedEnvAssignmentMode = $EventData
+                                    $Page:SelectedEnvAssignmentMode = $EventData
                                     Sync-UDElement -Id 'envChartDynamic'
                                 }
                             }
@@ -356,119 +350,12 @@ function New-CIEMEnvironmentPage {
                         }
                     }
 
-                    $treeJson = $treeRoot | ConvertTo-Json -Depth 20 -Compress
-
-                    # Render the chart container
+                    # Render the chart through the CIEM PSU custom component.
                     New-UDCard -Content {
-                        New-UDHtml -Markup '<div id="ciemEnvTreeContainer" style="width:100%;height:700px;"></div>'
+                        New-CIEMEnvironmentTree -Id 'ciemEnvTreeContainer' -Data $treeRoot -Orientation $orient -Height 700
                     }
 
-                    # Render the ECharts tree via browser JavaScript
-                    # NOTE: @"..."@ here-string interpolates $treeJson and $orient from PowerShell;
-                    #       the JS code itself contains no $ variables so no false interpolation.
-                    $js = @"
-(function() {
-    var attempts = 0;
-    function tryRender() {
-        if (typeof echarts === 'undefined') {
-            attempts++;
-            if (attempts < 30) { setTimeout(tryRender, 200); return; }
-            console.error('CIEM: ECharts library failed to load from CDN');
-            return;
-        }
-        var container = document.getElementById('ciemEnvTreeContainer');
-        if (!container) {
-            attempts++;
-            if (attempts < 30) { setTimeout(tryRender, 200); return; }
-            console.error('CIEM: Tree container element not found');
-            return;
-        }
-        var existing = echarts.getInstanceByDom(container);
-        if (existing) existing.dispose();
-        var bgColor = window.getComputedStyle(document.body).backgroundColor;
-        var isDark = false;
-        if (bgColor) {
-            var match = bgColor.match(/\d+/g);
-            if (match) {
-                var r = parseInt(match[0]), g = parseInt(match[1]), b = parseInt(match[2]);
-                isDark = (r * 0.299 + g * 0.587 + b * 0.114) < 128;
-            }
-        }
-        var chart = echarts.init(container, isDark ? 'dark' : null);
-        var data = ${treeJson};
-        var isLR = '$orient' === 'LR';
-        chart.setOption({
-            backgroundColor: 'transparent',
-            tooltip: {
-                trigger: 'item',
-                triggerOn: 'mousemove',
-                confine: true,
-                formatter: function(params) {
-                    var d = params.data.value || {};
-                    var lines = ['<b>' + params.name + '</b>'];
-                    var parts = (d.tooltip || '').split('|');
-                    for (var i = 0; i < parts.length; i++) {
-                        if (parts[i]) lines.push(parts[i]);
-                    }
-                    return lines.join('<br/>');
-                }
-            },
-            series: [{
-                type: 'tree',
-                data: [data],
-                top: isLR ? '2%' : '8%',
-                left: isLR ? '18%' : '2%',
-                bottom: isLR ? '2%' : '20%',
-                right: isLR ? '20%' : '2%',
-                symbolSize: function(value, params) {
-                    return params.data.symbolSize || 10;
-                },
-                orient: '$orient',
-                label: {
-                    show: true,
-                    position: isLR ? 'left' : 'top',
-                    verticalAlign: 'middle',
-                    align: isLR ? 'right' : 'center',
-                    fontSize: 16,
-                    fontFamily: '"Roboto","Helvetica","Arial",sans-serif',
-                    color: isDark ? '#e0e0e0' : '#333',
-                    formatter: function(params) {
-                        var name = params.name || '';
-                        if (name.length > 35) return name.substring(0, 32) + '...';
-                        return name;
-                    }
-                },
-                leaves: {
-                    label: {
-                        position: isLR ? 'right' : 'bottom',
-                        verticalAlign: 'middle',
-                        align: isLR ? 'left' : 'center'
-                    }
-                },
-                lineStyle: {
-                    color: isDark ? '#555' : '#bbb',
-                    width: 1.5,
-                    curveness: 0.5
-                },
-                emphasis: {
-                    focus: 'descendant',
-                    itemStyle: { borderWidth: 2 },
-                    label: { color: isDark ? '#fff' : '#000', fontSize: 17 }
-                },
-                expandAndCollapse: true,
-                initialTreeDepth: 2,
-                animationDuration: 550,
-                animationDurationUpdate: 750
-            }]
-        });
-        window.addEventListener('resize', function() { chart.resize(); });
-    }
-    tryRender();
-})();
-"@
-                    Invoke-UDJavaScript -JavaScript $js
-
-                    Devolutions.CIEM\Write-CIEMLog -Message "Environment tree rendered: $resCount resources, $subCount subs, $rgCount RGs" -Severity INFO -Component 'PSU-EnvironmentPage'
+                    Devolutions.CIEM\Write-CIEMLog -Message "Environment tree rendered: view=$viewMode, orient=$orient" -Severity INFO -Component 'PSU-EnvironmentPage'
                 }
                 catch {
                     $errorMsg = $_.Exception.Message

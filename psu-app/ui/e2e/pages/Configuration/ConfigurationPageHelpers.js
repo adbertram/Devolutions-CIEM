@@ -1,3 +1,4 @@
+const path = require('path');
 const BasePage = require('../../_utils/BasePage');
 const { testConfig } = require('../../_utils/test-config');
 
@@ -24,7 +25,8 @@ class ConfigurationPageHelpers extends BasePage {
       // Azure SP Certificate fields
       azCertClientId: '#azCertClientId',
       azCertPassword: '#azCertPassword',
-      uploadCertButton: "button:has-text('Upload Certificate')",
+      uploadCertButton: "[role='button']:has-text('Upload Certificate'), button:has-text('Upload Certificate')",
+      uploadCertInput: '#azCertPfxUpload input[type="file"], input#azCertPfxUpload[type="file"]',
       // Certificate guidance text (shows upload instructions or stored status)
       certUploadGuidance: "text=Upload a PFX certificate file",
       certStoredGuidance: "text=Certificate file is stored",
@@ -36,7 +38,7 @@ class ConfigurationPageHelpers extends BasePage {
       awsSecretAccessKey: '#awsSecretAccessKey',
       // Action buttons
       testAuthBtn: '#testAuthBtn',
-      saveConfigBtn: '#saveConfigBtn',
+      saveConfigBtn: "button:has-text('Save Configuration')",
       resetConfigBtn: '#resetConfigBtn',
       getPermissionsBtn: "button:has-text('Get Required Permissions')",
       // Environment chip
@@ -61,10 +63,24 @@ class ConfigurationPageHelpers extends BasePage {
 
   async selectProvider(name) {
     await this.selectMUIOption('cloudProvider', name);
-    // Wait for auth method combobox to re-render after provider change
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'cloudProvider', expectedValue: name }
+    );
+    // Wait for auth method combobox to re-render after provider change.
     await this.waitForElement(this.selectors.authMethodCombobox);
-    // Brief wait for PSU server-side re-render of auth fields
-    await this.page.waitForTimeout(1000);
+
+    const expectedRenderedField = {
+      Azure: this.selectors.azTenantId,
+      AWS: this.selectors.awsProfile
+    }[name];
+
+    if (expectedRenderedField) {
+      await this.waitForElement(expectedRenderedField);
+    }
+    if (name === 'AWS') {
+      await this.waitForElement(this.selectors.awsCliAlert);
+    }
   }
 
   async selectAuthMethod(value) {
@@ -110,6 +126,12 @@ class ConfigurationPageHelpers extends BasePage {
 
   async fillClientSecret(value) {
     await this.fill(this.selectors.azSpClientSecret, value);
+  }
+
+  async uploadCertificateFixture(fileName = 'test-certificate.pfx') {
+    const filePath = path.join(__dirname, '..', '..', 'fixtures', fileName);
+    await this.page.locator(this.selectors.uploadCertInput).setInputFiles(filePath);
+    await this.page.locator(`text=${fileName}`).waitFor({ state: 'visible', timeout: 10000 });
   }
 
   async fillAWSAccessKey(value) {

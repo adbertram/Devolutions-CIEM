@@ -200,13 +200,11 @@ class EnvironmentPageHelpers extends BasePage {
 
   async getTreeNodeByName(nodeName) {
     await this.page.waitForFunction(() => {
-      const container = document.getElementById('ciemEnvTreeContainer');
-      return window.echarts && container && window.echarts.getInstanceByDom(container);
+      return window.__ciemEnvironmentCharts && window.__ciemEnvironmentCharts.ciemEnvTreeContainer;
     });
 
     return await this.page.evaluate((name) => {
-      const container = document.getElementById('ciemEnvTreeContainer');
-      const chart = window.echarts.getInstanceByDom(container);
+      const chart = window.__ciemEnvironmentCharts.ciemEnvTreeContainer;
       const root = chart.getOption().series[0].data[0];
       const stack = [root];
       while (stack.length > 0) {
@@ -222,13 +220,11 @@ class EnvironmentPageHelpers extends BasePage {
 
   async getTreeNodeDescendantNames(nodeName, nodeType) {
     await this.page.waitForFunction(() => {
-      const container = document.getElementById('ciemEnvTreeContainer');
-      return window.echarts && container && window.echarts.getInstanceByDom(container);
+      return window.__ciemEnvironmentCharts && window.__ciemEnvironmentCharts.ciemEnvTreeContainer;
     });
 
     return await this.page.evaluate(({ name, type }) => {
-      const container = document.getElementById('ciemEnvTreeContainer');
-      const chart = window.echarts.getInstanceByDom(container);
+      const chart = window.__ciemEnvironmentCharts.ciemEnvTreeContainer;
       const root = chart.getOption().series[0].data[0];
       const stack = [root];
       let target = null;

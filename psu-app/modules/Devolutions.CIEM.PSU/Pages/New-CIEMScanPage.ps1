@@ -17,7 +17,7 @@ function New-CIEMScanPage {
         New-UDTypography -Text 'Run CIEM Scan' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure and execute a CIEM security scan against your cloud environment' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
-        $Session:SelectedCheckIds = @()
+        $Page:SelectedCheckIds = @()
 
         # Check Selection Card
         New-UDCard -Title 'Check Selection' -Content {
@@ -27,8 +27,8 @@ function New-CIEMScanPage {
                 $allChecks = @(Devolutions.CIEM\Get-CIEMCheck)
 
                 # Initialize session state on first load
-                if ($null -eq $Session:CheckStatusFilter) {
-                    $Session:CheckStatusFilter = 'enabled'
+                if ($null -eq $Page:CheckStatusFilter) {
+                    $Page:CheckStatusFilter = 'enabled'
                 }
 
                 # Selection summary
@@ -37,7 +37,7 @@ function New-CIEMScanPage {
                     $checks = @(Devolutions.CIEM\Get-CIEMCheck)
                     $enabledCount = @($checks | Where-Object { -not $_.Disabled }).Count
                     $disabledCount = @($checks | Where-Object { $_.Disabled }).Count
-                    $selectedCount = @($Session:SelectedCheckIds).Count
+                    $selectedCount = @($Page:SelectedCheckIds).Count
                     New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '8px' } } -Content {
                         New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                             New-UDTypography -Text "$selectedCount / $enabledCount enabled checks selected ($disabledCount disabled)" -Variant 'body2' -Style @{ color = '#666' }
@@ -50,8 +50,8 @@ function New-CIEMScanPage {
                     New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
                         New-UDTypography -Text 'Status:' -Variant 'body2' -Style @{ color = '#666'; marginRight = '4px' }
                         New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '140px' } } -Content {
-                            New-UDSelect -Id 'checkStatusFilter' -DefaultValue $Session:CheckStatusFilter -OnChange {
-                                $Session:CheckStatusFilter = $EventData
+                            New-UDSelect -Id 'checkStatusFilter' -DefaultValue $Page:CheckStatusFilter -OnChange {
+                                $Page:CheckStatusFilter = $EventData
                                 Sync-UDElement -Id 'checkSelectionGrid'
                             } -Option {
                                 New-UDSelectOption -Name 'Enabled' -Value 'enabled'
@@ -67,7 +67,7 @@ function New-CIEMScanPage {
                     $checks = @(Devolutions.CIEM\Get-CIEMCheck)
 
                     # Apply status filter
-                    $statusFilter = $Session:CheckStatusFilter
+                    $statusFilter = $Page:CheckStatusFilter
                     if ($statusFilter -eq 'enabled') {
                         $checks = @($checks | Where-Object { -not $_.Disabled })
                     } elseif ($statusFilter -eq 'disabled') {
@@ -92,7 +92,7 @@ function New-CIEMScanPage {
                     }
                     @($checksData) | Out-UDDataGridData -Context $EventData -TotalRows @($checksData).Count
                 } -CheckboxSelection -CheckboxSelectionVisibleOnly -OnSelectionChange {
-                    $Session:SelectedCheckIds = @($EventData)
+                    $Page:SelectedCheckIds = @($EventData)
                     Sync-UDElement -Id 'selectionSummary'
                 } -Columns @(
                     New-UDDataGridColumn -Field 'info' -HeaderName 'Info' -Width 60 -Render {
@@ -116,12 +116,13 @@ function New-CIEMScanPage {
                             @{ Name = 'risk'; Value = $checkRisk },
                             @{ Name = 'checkId'; Value = $checkId }
                         )) {
-                            if ([string]::IsNullOrWhiteSpace($requiredInfoField.Value)) {
-                                throw "Cannot render Scan check info button because row field '$($requiredInfoField.Name)' is empty."
-                            }
+                        if ([string]::IsNullOrWhiteSpace($requiredInfoField.Value)) {
+                            throw "Cannot render Scan check info button because row field '$($requiredInfoField.Name)' is empty."
                         }
+                    }
 
-                        New-UDIconButton -Icon (New-UDIcon -Icon 'InfoCircle') -Size 'small' -OnClick {
+                        $infoButtonId = 'scanCheckInfo_' + ($checkId -replace '[^A-Za-z0-9_-]', '_')
+                        New-UDIconButton -Id $infoButtonId -Icon (New-UDIcon -Icon 'InfoCircle') -Size 'small' -OnClick {
                             Show-UDModal -Header {
                                 New-UDTypography -Text $checkTitle -Variant 'h6'
                             } -Content {
@@ -214,7 +215,7 @@ function New-CIEMScanPage {
                         Devolutions.CIEM\Write-CIEMLog -Message "Start Scan button clicked" -Severity INFO -Component 'PSU-ScanPage'
 
                         # Read selected check IDs from session state (synced by OnSelectionChange)
-                        $selectedCheckIds = @($Session:SelectedCheckIds | Where-Object { $_ })
+                        $selectedCheckIds = @($Page:SelectedCheckIds | Where-Object { $_ })
 
                         if ($selectedCheckIds.Count -eq 0) {
                             Show-UDToast -Message 'Please select at least one check.' -Duration 5000 -BackgroundColor '#ff9800'
@@ -268,9 +269,9 @@ function New-CIEMScanPage {
                         Devolutions.CIEM\Write-CIEMLog -Message "Scan complete. Results: $($allResults.Count), Duration: $durationStr" -Severity INFO -Component 'PSU-ScanPage'
 
                         # Store in session for quick page access
-                        $Session:CIEMScanResults = $allResults
-                        $Session:CIEMScanTimestamp = $scanRun.EndTime
-                        $Session:CIEMIncludePassed = $true
+                        $Page:CIEMScanResults = $allResults
+                        $Page:CIEMScanTimestamp = $scanRun.EndTime
+                        $Page:CIEMIncludePassed = $true
 
                         Devolutions.CIEM\Write-CIEMLog -Message "Persisted $($allResults.Count) scan results (ScanRunId: $($scanRun.Id))" -Severity INFO -Component 'PSU-ScanPage'
 

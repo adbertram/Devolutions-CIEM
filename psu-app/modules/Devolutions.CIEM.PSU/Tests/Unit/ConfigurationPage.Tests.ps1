@@ -17,3 +17,44 @@ Describe 'Configuration page required permissions modal' {
         $script:PageContent | Should -Not -Match 'New-UDDivider\s+-Style'
     }
 }
+
+Describe 'Configuration page PSU-native form and certificate upload' {
+    It 'uses a PSU form submit handler for saving configuration values' {
+        $script:PageContent | Should -Match "New-UDForm\s+-Id\s+'ciemConfigForm'"
+        $script:PageContent | Should -Match '-OnSubmit\s*{'
+        $script:PageContent | Should -Match '\$EventData\.cloudProvider'
+        $script:PageContent | Should -Match '\$EventData\.authMethod'
+    }
+
+    It 'reads save values from EventData instead of scraping UD controls' {
+        foreach ($fieldId in @(
+            'azTenantId',
+            'azSpClientId',
+            'azSpClientSecret',
+            'azCertClientId',
+            'azCertPassword',
+            'awsRegion',
+            'awsProfile',
+            'awsAccessKeyId',
+            'awsSecretAccessKey'
+        )) {
+            $script:PageContent | Should -Not -Match "Get-UDElement\s+-Id\s+'$fieldId'"
+        }
+    }
+
+    It 'uses New-UDUpload for certificate files instead of browser-local JavaScript transport' {
+        $script:PageContent | Should -Match "New-UDUpload\s+-Id\s+'azCertPfxUpload'"
+        $script:PageContent | Should -Match "-Accept\s+'\.pfx,\.p12'"
+        $script:PageContent | Should -Not -Match 'localStorage'
+        $script:PageContent | Should -Not -Match 'FileReader'
+        $script:PageContent | Should -Not -Match 'azCertProcess'
+        $script:PageContent | Should -Not -Match 'document\.createElement'
+    }
+
+    It 'keeps temporary certificate upload state in Page scope' {
+        $script:PageContent | Should -Match '\$Page:UploadedCertBase64'
+        $script:PageContent | Should -Match '\$Page:UploadedCertFileName'
+        $script:PageContent | Should -Not -Match '\$Session:UploadedCertBase64'
+        $script:PageContent | Should -Not -Match '\$Session:UploadedCertFileName'
+    }
+}

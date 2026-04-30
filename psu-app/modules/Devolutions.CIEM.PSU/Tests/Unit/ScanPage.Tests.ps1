@@ -4,7 +4,7 @@ BeforeAll {
 
 Describe 'Scan page selection state' {
     It 'clears stale selected check IDs before rendering the selection grid' {
-        $script:PageContent | Should -Match 'New-UDPage[\s\S]*\$Session:SelectedCheckIds\s*=\s*@\(\)[\s\S]*New-UDCard\s+-Title\s+''Check Selection'''
+        $script:PageContent | Should -Match 'New-UDPage[\s\S]*\$Page:SelectedCheckIds\s*=\s*@\(\)[\s\S]*New-UDCard\s+-Title\s+''Check Selection'''
     }
 
     It 'uses a literal PSU cache key inside the Start Scan event handler' {
@@ -28,5 +28,10 @@ Describe 'Scan page selection state' {
         $infoClickBlock | Should -Not -Match '\$EventData\.'
         $infoClickBlock | Should -Match '\$checkTitle'
         $infoClickBlock | Should -Match '\$checkSeverity'
+    }
+
+    It 'uses stable check-specific ids for info modal buttons' {
+        $script:PageContent | Should -Match '\$infoButtonId\s*=\s*''scanCheckInfo_''\s*\+\s*\(\$checkId -replace ''\[\^A-Za-z0-9_-\]'', ''_''\)'
+        $script:PageContent | Should -Match 'New-UDIconButton -Id \$infoButtonId'
     }
 }

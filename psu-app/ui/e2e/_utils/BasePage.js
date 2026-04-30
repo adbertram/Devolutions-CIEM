@@ -74,9 +74,13 @@ class BasePage {
     // PSU MUI Select: hidden <input id="selectId"> + visible <div role="combobox">
     // Click the combobox div (not the hidden input) to open the dropdown
     const combobox = this.page.locator(`[role="combobox"][aria-labelledby="${selectId}label"]`);
+    await combobox.waitFor({ state: 'visible', timeout: 15000 });
+    await combobox.scrollIntoViewIfNeeded();
     await combobox.click();
     // Click the option by data-value attribute
-    await this.page.locator(`[role="option"][data-value="${optionValue}"]`).click();
+    const option = this.page.locator(`[role="listbox"] [role="option"][data-value="${optionValue}"]`);
+    await option.waitFor({ state: 'visible', timeout: 15000 });
+    await option.click();
   }
 
   async getMUISelectValue(selectId) {

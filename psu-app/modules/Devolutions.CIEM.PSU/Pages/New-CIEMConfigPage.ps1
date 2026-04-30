@@ -90,6 +90,7 @@ function New-CIEMConfigPage {
                 }
             }
 
+            New-UDForm -Id 'ciemConfigForm' -SubmitText 'Save Configuration' -ButtonVariant 'contained' -Children {
             # Provider Selection
             New-UDElement -Tag 'div' -Content {
                 New-UDSelect -Id 'cloudProvider' -Label 'Cloud Provider' -Option {
@@ -206,41 +207,25 @@ function New-CIEMConfigPage {
                                     } -Attributes @{ style = @{ marginTop = '8px'; marginBottom = '8px' } }
                                 }
                                 New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                    # Hidden button — reads uploaded file data from localStorage
-                                    New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'none' } } -Content {
-                                        New-UDButton -Id 'azCertProcess' -Text 'Go' -OnClick {
-                                            $Session:UploadedCertBase64 = Invoke-UDJavaScript "localStorage.getItem('__certB64')"
-                                            $Session:UploadedCertFileName = Invoke-UDJavaScript "localStorage.getItem('__certName')"
-                                            Invoke-UDJavaScript "localStorage.removeItem('__certB64'); localStorage.removeItem('__certName')" -IgnoreResult
-                                            Sync-UDElement -Id 'azCertFileDisplay'
+                                    New-UDUpload -Id 'azCertPfxUpload' -Text 'Upload Certificate' -Accept '.pfx,.p12' -Icon (New-UDIcon -Icon 'Upload') -Variant 'outlined' -OnUpload {
+                                        $upload = $Body | ConvertFrom-Json -ErrorAction Stop
+                                        if ([string]::IsNullOrWhiteSpace([string]$upload.data)) {
+                                            throw 'Certificate upload did not include file data.'
                                         }
-                                    }
-                                    New-UDButton -Text 'Upload Certificate' -Icon (New-UDIcon -Icon 'Upload') -Variant 'outlined' -OnClick {
-                                        Invoke-UDJavaScript @"
-var inp = document.createElement('input');
-inp.type = 'file';
-inp.accept = '.pfx,.p12';
-inp.onchange = function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(evt) {
-        var base64 = evt.target.result.split(',')[1];
-        localStorage.setItem('__certB64', base64);
-        localStorage.setItem('__certName', file.name);
-        document.getElementById('azCertProcess').click();
-    };
-    reader.readAsDataURL(file);
-};
-inp.click();
-"@
+                                        if ([string]::IsNullOrWhiteSpace([string]$upload.name)) {
+                                            throw 'Certificate upload did not include a file name.'
+                                        }
+
+                                        $Page:UploadedCertBase64 = [string]$upload.data
+                                        $Page:UploadedCertFileName = [string]$upload.name
+                                        Sync-UDElement -Id 'azCertFileDisplay'
                                     }
                                     # Pill showing selected file with remove button
                                     New-UDDynamic -Id 'azCertFileDisplay' -Content {
-                                        if ($Session:UploadedCertFileName) {
-                                            New-UDChip -Label $Session:UploadedCertFileName -Icon (New-UDIcon -Icon 'File') -OnDelete {
-                                                $Session:UploadedCertBase64 = $null
-                                                $Session:UploadedCertFileName = $null
+                                        if ($Page:UploadedCertFileName) {
+                                            New-UDChip -Label $Page:UploadedCertFileName -Icon (New-UDIcon -Icon 'File') -OnDelete {
+                                                $Page:UploadedCertBase64 = $null
+                                                $Page:UploadedCertFileName = $null
                                                 Sync-UDElement -Id 'azCertFileDisplay'
                                             } -Style @{ marginTop = '8px' }
                                         }
@@ -292,6 +277,126 @@ inp.click();
                             }
                         }
                     }
+                }
+            }
+            } -OnSubmit {
+                try {
+
+                    Devolutions.CIEM\Write-CIEMLog -Message "Save Configuration button clicked" -Severity INFO -Component 'PSU-ConfigPage'
+
+                    $provider = [string]$EventData.cloudProvider
+                    $authMethod = [string]$EventData.authMethod
+                    Devolutions.CIEM\Write-CIEMLog -Message "Form values - Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
+
+                    # Validate ManagedIdentity is only saved when supported
+                    $envInfo = Devolutions.CIEM\Get-PSUInstalledEnvironment
+                    Devolutions.CIEM\Write-CIEMLog -Message "Environment: $($envInfo.Environment), SupportsManagedIdentity: $($envInfo.SupportsManagedIdentity)" -Severity DEBUG -Component 'PSU-ConfigPage'
+                    if ($authMethod -eq 'ManagedIdentity' -and -not $envInfo.SupportsManagedIdentity) {
+                        Devolutions.CIEM\Write-CIEMLog -Message "ManagedIdentity selected but not supported in this environment" -Severity WARNING -Component 'PSU-ConfigPage'
+                        Show-UDToast -Message 'Managed Identity is not available in on-premises deployments.' -Duration 8000 -BackgroundColor '#f44336'
+                        return
+                    }
+
+                    # Collect form values
+                    Devolutions.CIEM\Write-CIEMLog -Message "Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
+
+                    # Track save params for change detection
+                    $saveParams = @{ Provider = $provider; Method = $authMethod }
+
+                    if ($provider -eq 'Azure') {
+                        $tenantId = [string]$EventData.azTenantId
+                        $saveParams['TenantId'] = $tenantId
+
+                        $activeProfile = @(Devolutions.CIEM\Get-CIEMAzureAuthenticationProfile -IsActive $true) | Select-Object -First 1
+                        $profileId = if ($activeProfile.Id) { $activeProfile.Id } else { [guid]::NewGuid().ToString() }
+                        $secretName = $null
+                        $secretType = $null
+                        $clientId = $null
+
+                        switch ($authMethod) {
+                            'ServicePrincipalSecret' {
+                                $clientId = [string]$EventData.azSpClientId
+                                $saveParams['ClientId'] = $clientId
+                                $clientSecret = [string]$EventData.azSpClientSecret
+                                $secretName = "CIEM_Azure_${profileId}_ClientSecret"
+                                $secretType = 'ClientSecret'
+                                if ($clientSecret -and $clientSecret -ne '********') {
+                                    $saveParams['ClientSecret'] = $clientSecret
+                                    Devolutions.CIEM\Set-CIEMSecret $secretName $clientSecret
+                                    Devolutions.CIEM\Write-CIEMLog -Message "Saved secret to $secretName" -Severity DEBUG -Component 'PSU-ConfigPage'
+                                }
+                            }
+                            'ServicePrincipalCertificate' {
+                                $clientId = [string]$EventData.azCertClientId
+                                $saveParams['ClientId'] = $clientId
+                                $secretName = "CIEM_Azure_${profileId}_CertPfx"
+                                $secretType = 'CertPfx'
+
+                                # Store uploaded PFX certificate (base64) in PSU vault
+                                if ($Page:UploadedCertBase64) {
+                                    $saveParams['CertUploaded'] = $true
+                                    Devolutions.CIEM\Set-CIEMSecret $secretName $Page:UploadedCertBase64
+                                    Devolutions.CIEM\Write-CIEMLog -Message "Saved PFX certificate to $secretName (file: $($Page:UploadedCertFileName))" -Severity INFO -Component 'PSU-ConfigPage'
+                                    $Page:UploadedCertBase64 = $null
+                                    $Page:UploadedCertFileName = $null
+                                }
+
+                                # Store certificate password if provided
+                                $certPassword = [string]$EventData.azCertPassword
+                                if ($certPassword -and $certPassword -ne '********') {
+                                    Devolutions.CIEM\Set-CIEMSecret "CIEM_Azure_${profileId}_CertPassword" $certPassword
+                                    Devolutions.CIEM\Write-CIEMLog -Message "Saved certificate password" -Severity DEBUG -Component 'PSU-ConfigPage'
+                                }
+                            }
+                            'ManagedIdentity' {
+                                # No secrets needed
+                            }
+                        }
+
+                        # Save auth profile
+                        Devolutions.CIEM\Write-CIEMLog -Message "Saving Azure auth profile ($authMethod)..." -Severity INFO -Component 'PSU-ConfigPage'
+                        Devolutions.CIEM\Save-CIEMAzureAuthenticationProfile -Id $profileId -ProviderId 'azure' -Name 'Default' -Method $authMethod -IsActive $true -TenantId $tenantId -ClientId $clientId -SecretName $secretName -SecretType $secretType
+
+                        # Activate the profile
+                        Devolutions.CIEM\Set-CIEMAzureAuthenticationProfileActive -Id $profileId
+                        Devolutions.CIEM\Write-CIEMLog -Message "Azure auth profile saved and activated" -Severity INFO -Component 'PSU-ConfigPage'
+
+                        # Enable the provider
+                        Devolutions.CIEM\Update-CIEMProvider -Name 'Azure' -Enabled $true | Out-Null
+                    }
+                    elseif ($provider -eq 'AWS') {
+                        $region = [string]$EventData.awsRegion
+                        $saveParams['Region'] = $region
+
+                        switch ($authMethod) {
+                            'CurrentProfile' {
+                                $saveParams['Profile'] = [string]$EventData.awsProfile
+                            }
+                            'AccessKey' {
+                                $accessKeyId = [string]$EventData.awsAccessKeyId
+                                $secretAccessKey = [string]$EventData.awsSecretAccessKey
+                                if ($accessKeyId -and $accessKeyId -ne '********') {
+                                    $saveParams['AccessKeyId'] = $accessKeyId
+                                    Devolutions.CIEM\Set-CIEMSecret 'CIEM_AWS_AccessKeyId' $accessKeyId
+                                }
+                                if ($secretAccessKey -and $secretAccessKey -ne '********') {
+                                    $saveParams['SecretAccessKey'] = $secretAccessKey
+                                    Devolutions.CIEM\Set-CIEMSecret 'CIEM_AWS_SecretAccessKey' $secretAccessKey
+                                }
+                            }
+                        }
+
+                        # Enable the provider
+                        Devolutions.CIEM\Update-CIEMProvider -Name 'AWS' -Enabled $true | Out-Null
+                        Devolutions.CIEM\Write-CIEMLog -Message "AWS configuration saved" -Severity INFO -Component 'PSU-ConfigPage'
+                    }
+
+                    Show-UDToast -Message 'Configuration saved successfully.' -Duration 5000 -BackgroundColor '#4caf50'
+                    Devolutions.CIEM\Write-CIEMLog -Message "Save Configuration completed successfully" -Severity INFO -Component 'PSU-ConfigPage'
+                } catch {
+                    Devolutions.CIEM\Write-CIEMLog -Message "Save Configuration failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                    Devolutions.CIEM\Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
+                    Show-UDToast -Message "Save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
                 }
             }
 
@@ -398,127 +503,6 @@ inp.click();
 
         New-UDElement -Tag 'div' -Content {
             New-UDStack -Direction 'row' -Spacing 2 -Content {
-                New-UDButton -Id 'saveConfigBtn' -Text 'Save Configuration' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
-                    try {
-        
-                        Devolutions.CIEM\Write-CIEMLog -Message "Save Configuration button clicked" -Severity INFO -Component 'PSU-ConfigPage'
-
-                        $provider = (Get-UDElement -Id 'cloudProvider').value
-                        $authMethod = (Get-UDElement -Id 'authMethod').value
-                        Devolutions.CIEM\Write-CIEMLog -Message "Form values - Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
-
-                        # Validate ManagedIdentity is only saved when supported
-                        $envInfo = Devolutions.CIEM\Get-PSUInstalledEnvironment
-                        Devolutions.CIEM\Write-CIEMLog -Message "Environment: $($envInfo.Environment), SupportsManagedIdentity: $($envInfo.SupportsManagedIdentity)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                        if ($authMethod -eq 'ManagedIdentity' -and -not $envInfo.SupportsManagedIdentity) {
-                            Devolutions.CIEM\Write-CIEMLog -Message "ManagedIdentity selected but not supported in this environment" -Severity WARNING -Component 'PSU-ConfigPage'
-                            Show-UDToast -Message 'Managed Identity is not available in on-premises deployments.' -Duration 8000 -BackgroundColor '#f44336'
-                            return
-                        }
-
-                        # Collect form values
-                        Devolutions.CIEM\Write-CIEMLog -Message "Provider: $provider, AuthMethod: $authMethod" -Severity DEBUG -Component 'PSU-ConfigPage'
-
-                        # Track save params for change detection
-                        $saveParams = @{ Provider = $provider; Method = $authMethod }
-
-                        if ($provider -eq 'Azure') {
-                            $tenantId = (Get-UDElement -Id 'azTenantId' -ErrorAction SilentlyContinue).value
-                            $saveParams['TenantId'] = $tenantId
-
-                            $activeProfile = @(Devolutions.CIEM\Get-CIEMAzureAuthenticationProfile -IsActive $true) | Select-Object -First 1
-                            $profileId = if ($activeProfile.Id) { $activeProfile.Id } else { [guid]::NewGuid().ToString() }
-                            $secretName = $null
-                            $secretType = $null
-                            $clientId = $null
-
-                            switch ($authMethod) {
-                                'ServicePrincipalSecret' {
-                                    $clientId = (Get-UDElement -Id 'azSpClientId').value
-                                    $saveParams['ClientId'] = $clientId
-                                    $clientSecret = (Get-UDElement -Id 'azSpClientSecret').value
-                                    $secretName = "CIEM_Azure_${profileId}_ClientSecret"
-                                    $secretType = 'ClientSecret'
-                                    if ($clientSecret -and $clientSecret -ne '********') {
-                                        $saveParams['ClientSecret'] = $clientSecret
-                                        Devolutions.CIEM\Set-CIEMSecret $secretName $clientSecret
-                                        Devolutions.CIEM\Write-CIEMLog -Message "Saved secret to $secretName" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                    }
-                                }
-                                'ServicePrincipalCertificate' {
-                                    $clientId = (Get-UDElement -Id 'azCertClientId').value
-                                    $saveParams['ClientId'] = $clientId
-                                    $secretName = "CIEM_Azure_${profileId}_CertPfx"
-                                    $secretType = 'CertPfx'
-
-                                    # Store uploaded PFX certificate (base64) in PSU vault
-                                    if ($Session:UploadedCertBase64) {
-                                        $saveParams['CertUploaded'] = $true
-                                        Devolutions.CIEM\Set-CIEMSecret $secretName $Session:UploadedCertBase64
-                                        Devolutions.CIEM\Write-CIEMLog -Message "Saved PFX certificate to $secretName (file: $($Session:UploadedCertFileName))" -Severity INFO -Component 'PSU-ConfigPage'
-                                        $Session:UploadedCertBase64 = $null
-                                        $Session:UploadedCertFileName = $null
-                                    }
-
-                                    # Store certificate password if provided
-                                    $certPassword = (Get-UDElement -Id 'azCertPassword').value
-                                    if ($certPassword -and $certPassword -ne '********') {
-                                        Devolutions.CIEM\Set-CIEMSecret "CIEM_Azure_${profileId}_CertPassword" $certPassword
-                                        Devolutions.CIEM\Write-CIEMLog -Message "Saved certificate password" -Severity DEBUG -Component 'PSU-ConfigPage'
-                                    }
-                                }
-                                'ManagedIdentity' {
-                                    # No secrets needed
-                                }
-                            }
-
-                            # Save auth profile
-                            Devolutions.CIEM\Write-CIEMLog -Message "Saving Azure auth profile ($authMethod)..." -Severity INFO -Component 'PSU-ConfigPage'
-                            Devolutions.CIEM\Save-CIEMAzureAuthenticationProfile -Id $profileId -ProviderId 'azure' -Name 'Default' -Method $authMethod -IsActive $true -TenantId $tenantId -ClientId $clientId -SecretName $secretName -SecretType $secretType
-
-                            # Activate the profile
-                            Devolutions.CIEM\Set-CIEMAzureAuthenticationProfileActive -Id $profileId
-                            Devolutions.CIEM\Write-CIEMLog -Message "Azure auth profile saved and activated" -Severity INFO -Component 'PSU-ConfigPage'
-
-                            # Enable the provider
-                            Devolutions.CIEM\Update-CIEMProvider -Name 'Azure' -Enabled $true | Out-Null
-                        }
-                        elseif ($provider -eq 'AWS') {
-                            $region = (Get-UDElement -Id 'awsRegion' -ErrorAction SilentlyContinue).value
-                            $saveParams['Region'] = $region
-
-                            switch ($authMethod) {
-                                'CurrentProfile' {
-                                    $saveParams['Profile'] = (Get-UDElement -Id 'awsProfile' -ErrorAction SilentlyContinue).value
-                                }
-                                'AccessKey' {
-                                    $accessKeyId = (Get-UDElement -Id 'awsAccessKeyId').value
-                                    $secretAccessKey = (Get-UDElement -Id 'awsSecretAccessKey').value
-                                    if ($accessKeyId -and $accessKeyId -ne '********') {
-                                        $saveParams['AccessKeyId'] = $accessKeyId
-                                        Devolutions.CIEM\Set-CIEMSecret 'CIEM_AWS_AccessKeyId' $accessKeyId
-                                    }
-                                    if ($secretAccessKey -and $secretAccessKey -ne '********') {
-                                        $saveParams['SecretAccessKey'] = $secretAccessKey
-                                        Devolutions.CIEM\Set-CIEMSecret 'CIEM_AWS_SecretAccessKey' $secretAccessKey
-                                    }
-                                }
-                            }
-
-                            # Enable the provider
-                            Devolutions.CIEM\Update-CIEMProvider -Name 'AWS' -Enabled $true | Out-Null
-                            Devolutions.CIEM\Write-CIEMLog -Message "AWS configuration saved" -Severity INFO -Component 'PSU-ConfigPage'
-                        }
-
-                        Show-UDToast -Message 'Configuration saved successfully.' -Duration 5000 -BackgroundColor '#4caf50'
-                        Devolutions.CIEM\Write-CIEMLog -Message "Save Configuration completed successfully" -Severity INFO -Component 'PSU-ConfigPage'
-                    } catch {
-                        Devolutions.CIEM\Write-CIEMLog -Message "Save Configuration failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
-                        Devolutions.CIEM\Write-CIEMLog -Message "Stack: $($_.ScriptStackTrace)" -Severity DEBUG -Component 'PSU-ConfigPage'
-                        Show-UDToast -Message "Save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
-                    }
-                }
-
                 New-UDButton -Id 'resetConfigBtn' -Text 'Reset to Defaults' -Variant 'outlined' -Color 'secondary' -OnClick {
                     try {
                         Set-UDElement -Id 'cloudProvider' -Properties @{ value = 'Azure' }

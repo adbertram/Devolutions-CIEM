@@ -26,8 +26,8 @@ function New-CIEMDashboardPage {
 
             if ($scanRuns -and $scanRuns.Count -gt 0) {
                 # Initialize selected scan run to most recent if not already set
-                if (-not $Session:SelectedScanRunId) {
-                    $Session:SelectedScanRunId = $scanRuns[0].Id
+                if (-not $Page:SelectedScanRunId) {
+                    $Page:SelectedScanRunId = $scanRuns[0].Id
                 }
 
                 # Scan Run Selector + Run New Scan button
@@ -41,8 +41,8 @@ function New-CIEMDashboardPage {
                                     $label = "$statusIcon $(([datetime]$run.StartTime).ToString('yyyy-MM-dd HH:mm')) - $($run.Providers -join ', ') ($($run.TotalResults) results, $($run.FailedResults) failed)"
                                     New-UDSelectOption -Name $label -Value $run.Id
                                 }
-                            } -DefaultValue $Session:SelectedScanRunId -OnChange {
-                                $Session:SelectedScanRunId = $EventData
+                            } -DefaultValue $Page:SelectedScanRunId -OnChange {
+                                $Page:SelectedScanRunId = $EventData
                                 Sync-UDElement -Id 'dashboardContent'
                             } -FullWidth
                         }
@@ -54,7 +54,7 @@ function New-CIEMDashboardPage {
 
                 # Dynamic dashboard content that refreshes when scan run selection changes
                 New-UDDynamic -Id 'dashboardContent' -Content {
-                    $scanRunId = $Session:SelectedScanRunId
+                    $scanRunId = $Page:SelectedScanRunId
                     if (-not $scanRunId) { return }
 
                     $scanRun = Devolutions.CIEM\Get-CIEMScanRun -Id $scanRunId -IncludeResults
