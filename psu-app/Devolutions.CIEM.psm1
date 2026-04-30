@@ -103,7 +103,7 @@ _BootLog "Loading provider classes..."
 foreach ($root in @($script:CIEMModuleRoots | Where-Object { [bool]$_.LoadClasses } | ForEach-Object {
     Get-Variable -Name ([string]$_.Variable) -Scope Script -ValueOnly
 })) {
-    foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction SilentlyContinue)) {
+    foreach ($file in (Get-ChildItem (Join-Path $root 'Classes/*.ps1') -ErrorAction Stop)) {
         try { . $file.FullName } catch { _BootLog "FAILED to load class $($file.Name) : $_" 'ERROR'; throw }
     }
 }
@@ -112,13 +112,16 @@ foreach ($root in @($script:CIEMModuleRoots | Where-Object { [bool]$_.LoadClasse
 $_loadedCount = 0
 $_failedCount = 0
 foreach ($subdir in @('Private', 'Public')) {
-    foreach ($file in (Get-ChildItem "$PSScriptRoot/$subdir/*.ps1" -ErrorAction SilentlyContinue)) {
+    foreach ($file in (Get-ChildItem "$PSScriptRoot/$subdir/*.ps1" -ErrorAction Stop)) {
         try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++; throw }
     }
     foreach ($root in $subModuleRoots) {
         $rootName = Split-Path $root -Leaf
-        foreach ($file in (Get-ChildItem (Join-Path $root "$subdir/*.ps1") -ErrorAction SilentlyContinue)) {
-            try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $rootName/$subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++; throw }
+        $sourceDirectory = Join-Path $root $subdir
+        if (Test-Path -Path $sourceDirectory -PathType Container) {
+            foreach ($file in (Get-ChildItem (Join-Path $sourceDirectory '*.ps1') -ErrorAction Stop)) {
+                try { . $file.FullName; $_loadedCount++ } catch { _BootLog "FAILED to load $rootName/$subdir/$($file.Name) : $_" 'ERROR'; $_failedCount++; throw }
+            }
         }
     }
 }
@@ -127,7 +130,7 @@ foreach ($subdir in @('Private', 'Public')) {
 Write-CIEMLog -Message "Loaded $_loadedCount functions ($_failedCount failures)" -Component 'ModuleInit'
 
 # --- Load PSU page functions (must be exported for PSU's scriptblock resolution) ---
-foreach ($file in (Get-ChildItem "$script:PSURoot/Pages/*.ps1" -ErrorAction SilentlyContinue)) {
+foreach ($file in (Get-ChildItem "$script:PSURoot/Pages/*.ps1" -ErrorAction Stop)) {
     try { . $file.FullName; $_loadedCount++ } catch { Write-CIEMLog "FAILED to load Page $($file.Name) : $_" -Severity ERROR -Component 'ModuleInit'; $_failedCount++; throw }
 }
 Write-CIEMLog -Message "PSU pages loaded (total: $_loadedCount functions, $_failedCount failures)" -Component 'ModuleInit'
@@ -184,7 +187,7 @@ foreach ($root in $subModuleRoots) {
 
 $exportFunctions = @()
 foreach ($dir in $exportDirs) {
-    $files = Get-ChildItem "$dir/*.ps1" -ErrorAction SilentlyContinue
+    $files = Get-ChildItem "$dir/*.ps1" -ErrorAction Stop
     if ($files) { $exportFunctions += $files.BaseName }
 }
 

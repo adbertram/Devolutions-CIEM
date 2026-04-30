@@ -67,9 +67,8 @@ Describe 'Get-CIEMConfig' {
             Mock -ModuleName Devolutions.CIEM Get-Command { $null } -ParameterFilter { $Name -eq 'Get-PSUCache' }
         }
 
-        It 'returns in-memory defaults' {
-            $result = Get-CIEMConfig
-            $result | Should -Not -BeNullOrEmpty
+        It 'throws requiring PSU cache access' {
+            { Get-CIEMConfig } | Should -Throw -ExpectedMessage '*Get-PSUCache*'
         }
     }
 }

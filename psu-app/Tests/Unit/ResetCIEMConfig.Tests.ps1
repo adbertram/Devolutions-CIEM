@@ -37,8 +37,8 @@ Describe 'Reset-CIEMConfig' {
             Mock -ModuleName Devolutions.CIEM Get-Command { $null } -ParameterFilter { $Name -eq 'Set-PSUCache' }
         }
 
-        It 'skips cache write without error' {
-            { Reset-CIEMConfig -Confirm:$false } | Should -Not -Throw
+        It 'throws requiring PSU cache access' {
+            { Reset-CIEMConfig -Confirm:$false } | Should -Throw -ExpectedMessage '*Set-PSUCache*'
         }
     }
 }

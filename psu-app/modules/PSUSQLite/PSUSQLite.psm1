@@ -1,5 +1,5 @@
 # Load private functions
-foreach ($file in (Get-ChildItem "$PSScriptRoot/Private/*.ps1" -ErrorAction SilentlyContinue)) {
+foreach ($file in (Get-ChildItem "$PSScriptRoot/Private/*.ps1" -ErrorAction Stop)) {
     . $file.FullName
 }
 
@@ -7,6 +7,6 @@ foreach ($file in (Get-ChildItem "$PSScriptRoot/Private/*.ps1" -ErrorAction Sile
 ResolvePSUSQLiteAssembly
 
 # Load public functions
-foreach ($file in (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue)) {
+foreach ($file in (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction Stop)) {
     . $file.FullName
 }

@@ -95,7 +95,7 @@ function InvokeCIEMDiscoveryPhase {
 
     if ($succeeded) {
         $detail = if ($DetailBuilder) {
-            try { & $DetailBuilder $result } catch { $null }
+            & $DetailBuilder $result
         }
         else { $null }
 

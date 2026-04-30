@@ -184,5 +184,22 @@ Describe 'InvokeCIEMDiscoveryPhase' {
                 $result.Succeeded | Should -BeTrue
             }
         }
+
+        It 'throws when DetailBuilder fails' {
+            InModuleScope Devolutions.CIEM {
+                $errors = [System.Collections.Generic.List[string]]::new()
+                $warnings = [ref]0
+
+                {
+                    InvokeCIEMDiscoveryPhase `
+                        -Name 'DetailPhase' `
+                        -FailureMode 'FailRun' `
+                        -ErrorMessages $errors `
+                        -WarningCounter $warnings `
+                        -DetailBuilder { throw 'mock detail failed' } `
+                        -Action { 99 }
+                } | Should -Throw -ExpectedMessage '*mock detail failed*'
+            }
+        }
     }
 }

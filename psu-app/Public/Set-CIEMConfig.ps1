@@ -10,8 +10,6 @@ function Set-CIEMConfig {
 
         Supports nested paths using dot notation in the hashtable keys.
 
-        When running outside of PSU context, updates only the in-memory config.
-
     .PARAMETER Settings
         A hashtable containing the settings to update. Supports nested paths using
         dot notation in the hashtable keys.
@@ -38,7 +36,7 @@ function Set-CIEMConfig {
 
         # Helper function to set nested property values using dot notation
         # Works with PSCustomObject (from PSU cache) or hashtable
-        function Resolve-NestedPropertyPath {
+        function ResolveNestedPropertyPath {
             param(
                 $Object,
                 [string]$Path,
@@ -65,15 +63,18 @@ function Set-CIEMConfig {
     process {
         $ErrorActionPreference = 'Stop'
 
-        # Check if PSU cache cmdlets are available
-        $psuCacheAvailable = Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue
+        $getCacheCommand = Get-Command -Name 'Get-PSUCache' -ErrorAction Stop
+        if (-not $getCacheCommand) {
+            throw "PSU cache command Get-PSUCache is required to update CIEM configuration."
+        }
+
+        $setCacheCommand = Get-Command -Name 'Set-PSUCache' -ErrorAction Stop
+        if (-not $setCacheCommand) {
+            throw "PSU cache command Set-PSUCache is required to update CIEM configuration."
+        }
 
         # Get current config
-        $config = $null
-        if ($psuCacheAvailable) {
-            # PSU context — read from cache (throws on infrastructure failure)
-            $config = ReadPSUCache -Key $script:CIEMConfigCacheKey
-        }
+        $config = ReadPSUCache -Key $script:CIEMConfigCacheKey
 
         if (-not $config) {
             $config = Get-CIEMDefaultConfig
@@ -82,15 +83,12 @@ function Set-CIEMConfig {
         # Apply each setting from the provided hashtable
         foreach ($key in $Settings.Keys) {
             $value = $Settings[$key]
-            Resolve-NestedPropertyPath -Object $config -Path $key -Value $value
+            ResolveNestedPropertyPath -Object $config -Path $key -Value $value
         }
 
         if ($PSCmdlet.ShouldProcess($script:CIEMConfigCacheKey, 'Update configuration in PSU cache')) {
-            # Write to PSU cache if available (throws on failure)
-            if ($psuCacheAvailable) {
-                Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
-                Write-Verbose "Configuration saved to PSU cache"
-            }
+            Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $config -Persist -Integrated -ErrorAction Stop
+            Write-Verbose "Configuration saved to PSU cache"
 
             # Update in-memory config
             $script:Config = [PSCustomObject]$config

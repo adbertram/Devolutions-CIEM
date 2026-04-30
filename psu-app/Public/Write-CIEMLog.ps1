@@ -34,14 +34,28 @@ function Write-CIEMLog {
 
     $ErrorActionPreference = 'Stop'
 
-    # Log file path - uses $script:DataRoot (resolved in psm1 to survive module upgrades).
-    $logPath = Join-Path -Path $script:DataRoot -ChildPath 'ciem.log'
-
     # Format timestamp
     $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'
 
     # Build log entry
     $logEntry = "[$timestamp] [$Severity] [$Component] $Message"
+
+    $writePSULogCommand = Get-Command Write-PSULog -ErrorAction SilentlyContinue
+    if ($writePSULogCommand) {
+        $psuLevel = @{
+            DEBUG   = 'Debug'
+            INFO    = 'Information'
+            WARNING = 'Warning'
+            ERROR   = 'Error'
+        }[$Severity]
+
+        Write-PSULog -Feature 'CIEM' -Resource $Component -Level $psuLevel -Message $Message
+        Write-Verbose $logEntry
+        return
+    }
+
+    # Log file path - uses $script:DataRoot (resolved in psm1 to survive module upgrades).
+    $logPath = Join-Path -Path $script:DataRoot -ChildPath 'ciem.log'
 
     # Append to log file (thread-safe with mutex for PSU concurrent access)
     if (-not $script:_LogMutex) {

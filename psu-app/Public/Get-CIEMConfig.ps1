@@ -8,9 +8,6 @@ function Get-CIEMConfig {
         If the cache is empty (first run), initializes it with default values.
         Returns the configuration as a PSCustomObject.
 
-        When running outside of PSU context (e.g., local development), returns
-        in-memory defaults.
-
     .OUTPUTS
         [PSCustomObject] Configuration values including Azure settings, scan options,
         output settings, and PAM remediation URLs.
@@ -30,13 +27,9 @@ function Get-CIEMConfig {
 
     $ErrorActionPreference = 'Stop'
 
-    # Check if PSU cache cmdlets are available
-    $psuCacheAvailable = Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue
-
-    if (-not $psuCacheAvailable) {
-        # Not in PSU context — return in-memory defaults (legitimate)
-        Write-Verbose "PSU cache not available. Using in-memory defaults."
-        return [PSCustomObject](Get-CIEMDefaultConfig)
+    $getCacheCommand = Get-Command -Name 'Get-PSUCache' -ErrorAction Stop
+    if (-not $getCacheCommand) {
+        throw "Get-PSUCache is required to read CIEM configuration."
     }
 
     # PSU context — read from cache (throws on infrastructure failure)

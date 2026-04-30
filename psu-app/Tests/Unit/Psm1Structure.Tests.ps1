@@ -194,4 +194,14 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:Psm1Content | Should -Match 'Export-ModuleMember\s+-Function\s+\$exportFunctions'
         }
     }
+
+    Context 'Required loader paths fail fast' {
+        It 'Does not silence required source discovery failures' {
+            $script:Psm1Content | Should -Not -Match 'Get-ChildItem[^\r\n]+-ErrorAction\s+SilentlyContinue'
+        }
+
+        It 'Does not register page component assets during module import' {
+            $script:Psm1Content | Should -Not -Match 'RegisterCIEMEnvironmentTreeAsset'
+        }
+    }
 }

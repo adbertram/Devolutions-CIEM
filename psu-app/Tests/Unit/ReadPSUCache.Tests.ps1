@@ -11,13 +11,12 @@ Describe 'ReadPSUCache' {
         BeforeAll {
             InModuleScope Devolutions.CIEM {
                 Mock Get-Command { $null } -ParameterFilter { $Name -eq 'Get-PSUCache' }
-                $script:testResult = ReadPSUCache -Key 'CIEM:TestKey'
             }
         }
 
-        It 'returns $null' {
+        It 'throws requiring PSU cache access' {
             InModuleScope Devolutions.CIEM {
-                $script:testResult | Should -BeNullOrEmpty
+                { ReadPSUCache -Key 'CIEM:TestKey' } | Should -Throw -ExpectedMessage '*Get-PSUCache*'
             }
         }
     }

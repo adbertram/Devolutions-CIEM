@@ -51,4 +51,16 @@ Describe 'Set-CIEMConfig' {
             { Set-CIEMConfig -Settings @{ 'scan.throttleLimit' = 20 } } | Should -Throw '*PSU cache write failed*'
         }
     }
+
+    Context 'when PSU cache commands are absent' {
+
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM Get-Command { $null } -ParameterFilter { $Name -eq 'Get-PSUCache' -or $Name -eq 'Set-PSUCache' }
+        }
+
+        It 'throws requiring PSU cache access' {
+            { Set-CIEMConfig -Settings @{ 'scan.throttleLimit' = 20 } } |
+                Should -Throw -ExpectedMessage '*PSU cache*'
+        }
+    }
 }

@@ -9,12 +9,15 @@ BeforeDiscovery {
 
     $resolvedRoot = $repoRoot.Path
 
-    $trackedPowerShellFiles = & git -C $resolvedRoot ls-files '*.ps1' '*.psm1'
-    $ps1Files = foreach ($relativePath in $trackedPowerShellFiles) {
-        if ($relativePath -match '\.Tests\.ps1$') { continue }
-        if ($relativePath -match '(^|/)Classes/') { continue }
-        Get-Item (Join-Path $resolvedRoot $relativePath)
-    }
+    $ps1Files = Get-ChildItem -Path $resolvedRoot -Recurse -File -Include '*.ps1', '*.psm1' |
+        Where-Object {
+            $relativePath = $_.FullName -replace [regex]::Escape($resolvedRoot + [IO.Path]::DirectorySeparatorChar), ''
+            $relativePath -notmatch '\.Tests\.ps1$' -and
+            $relativePath -notmatch '(^|/)Classes/' -and
+            $relativePath -notmatch '(^|/)_temp/' -and
+            $relativePath -notmatch '(^|/)\.git/' -and
+            $relativePath -notmatch '(^|/)node_modules/'
+        }
 
     function Get-FirstFunctionStatement {
         param(
@@ -75,7 +78,7 @@ BeforeDiscovery {
 
 Describe 'ErrorActionPreference Enforcement' {
 
-    It "Scanned tracked PowerShell source files" -ForEach $scanSummary {
+    It "Scanned PowerShell source files from the working tree" -ForEach $scanSummary {
         $FileCount | Should -BeGreaterThan 0
     }
 

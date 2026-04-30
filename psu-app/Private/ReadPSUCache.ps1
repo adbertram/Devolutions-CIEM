@@ -7,7 +7,7 @@ function ReadPSUCache {
         Wraps Get-PSUCache to provide clear semantics:
         - Key exists: returns the cached value
         - Key does not exist: returns $null
-        - PSU cache unavailable (not in PSU context): returns $null
+        - PSU cache unavailable (not in PSU context): throws
         - Infrastructure failure (connection error, etc.): throws
 
         PSU's Get-PSUCache throws "You cannot call a method on a null-valued expression"
@@ -18,7 +18,7 @@ function ReadPSUCache {
         The PSU cache key to read.
 
     .OUTPUTS
-        The cached value, or $null if the key doesn't exist or PSU is not available.
+        The cached value, or $null if the key doesn't exist.
     #>
     [CmdletBinding()]
     param(
@@ -28,9 +28,9 @@ function ReadPSUCache {
 
     $ErrorActionPreference = 'Stop'
 
-    $psuCacheAvailable = Get-Command -Name 'Get-PSUCache' -ErrorAction SilentlyContinue
-    if (-not $psuCacheAvailable) {
-        return $null
+    $getCacheCommand = Get-Command -Name 'Get-PSUCache' -ErrorAction Stop
+    if (-not $getCacheCommand) {
+        throw "Get-PSUCache is required to read PSU cache key '$Key'."
     }
 
     try {

@@ -8,8 +8,6 @@ function Reset-CIEMConfig {
         updates the $script:Config variable. Use this to restore factory
         defaults after configuration changes.
 
-        When running outside of PSU context, resets only the in-memory config.
-
     .EXAMPLE
         Reset-CIEMConfig
         # Configuration is now reset to defaults
@@ -28,12 +26,13 @@ function Reset-CIEMConfig {
     if ($PSCmdlet.ShouldProcess($script:CIEMConfigCacheKey, 'Reset configuration to defaults')) {
         $defaults = Get-CIEMDefaultConfig
 
-        # Check if PSU cache cmdlets are available
-        $psuCacheAvailable = Get-Command -Name 'Set-PSUCache' -ErrorAction SilentlyContinue
-        if ($psuCacheAvailable) {
-            Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $defaults -Persist -Integrated -ErrorAction Stop
-            Write-Verbose "Configuration reset to defaults in PSU cache"
+        $setCacheCommand = Get-Command -Name 'Set-PSUCache' -ErrorAction Stop
+        if (-not $setCacheCommand) {
+            throw "Set-PSUCache is required to reset CIEM configuration."
         }
+
+        Set-PSUCache -Key $script:CIEMConfigCacheKey -Value $defaults -Persist -Integrated -ErrorAction Stop
+        Write-Verbose "Configuration reset to defaults in PSU cache"
 
         # Update in-memory config
         $script:Config = [PSCustomObject]$defaults
