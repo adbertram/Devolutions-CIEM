@@ -1,4 +1,10 @@
 BeforeAll {
+    if (-not (Get-Module -Name Universal)) {
+        New-Module -Name Universal -ScriptBlock {
+            function Sync-PSUConfiguration { param([switch]$Reset) }
+        } | Import-Module
+    }
+
     $moduleRoot = Resolve-Path (Join-Path $PSScriptRoot '../..')
     $manifest = Join-Path $moduleRoot 'Devolutions.CIEM.Admin.psd1'
 
@@ -12,7 +18,7 @@ BeforeAll {
     }
 }
 
-# Every public PSU REST cmdlet in this module must include the
+# Every remaining public PSU REST cmdlet in this module must include the
 # 'ngrok-skip-browser-warning' header on every Invoke-RestMethod call.
 # Without it, ngrok free tunnels return an HTML interstitial that silently
 # breaks JSON parsing — which manifests as "App not found" / empty list bugs
@@ -51,17 +57,6 @@ Describe 'PSU admin REST cmdlets send the ngrok-skip-browser-warning header' {
         }
     }
 
-    Context 'Get-PSUApp' {
-        It 'sends ngrok-skip-browser-warning on every request' {
-            Get-PSUApp | Out-Null
-            $script:capturedCalls.Count | Should -BeGreaterThan 0
-            foreach ($call in $script:capturedCalls) {
-                $call.Headers['ngrok-skip-browser-warning'] |
-                    Should -Not -BeNullOrEmpty -Because "GET $($call.Uri) must bypass the ngrok interstitial"
-            }
-        }
-    }
-
     Context 'Get-PSUModule' {
         It 'sends ngrok-skip-browser-warning on every request' {
             Get-PSUModule | Out-Null
@@ -69,50 +64,6 @@ Describe 'PSU admin REST cmdlets send the ngrok-skip-browser-warning header' {
             foreach ($call in $script:capturedCalls) {
                 $call.Headers['ngrok-skip-browser-warning'] |
                     Should -Not -BeNullOrEmpty -Because "GET $($call.Uri) must bypass the ngrok interstitial"
-            }
-        }
-    }
-
-    Context 'Restart-PSUApp' {
-        It 'sends ngrok-skip-browser-warning on every request' {
-            Restart-PSUApp -Name 'Devolutions CIEM' -Confirm:$false | Out-Null
-            $script:capturedCalls.Count | Should -BeGreaterThan 0
-            foreach ($call in $script:capturedCalls) {
-                $call.Headers['ngrok-skip-browser-warning'] |
-                    Should -Not -BeNullOrEmpty -Because "$($call.Method) $($call.Uri) must bypass the ngrok interstitial"
-            }
-        }
-    }
-
-    Context 'Stop-PSUApp' {
-        It 'sends ngrok-skip-browser-warning on every request' {
-            Stop-PSUApp -Name 'Devolutions CIEM' -Confirm:$false | Out-Null
-            $script:capturedCalls.Count | Should -BeGreaterThan 0
-            foreach ($call in $script:capturedCalls) {
-                $call.Headers['ngrok-skip-browser-warning'] |
-                    Should -Not -BeNullOrEmpty -Because "$($call.Method) $($call.Uri) must bypass the ngrok interstitial"
-            }
-        }
-    }
-
-    Context 'Start-PSUApp' {
-        It 'sends ngrok-skip-browser-warning on every request' {
-            Start-PSUApp -Name 'Devolutions CIEM' -Confirm:$false | Out-Null
-            $script:capturedCalls.Count | Should -BeGreaterThan 0
-            foreach ($call in $script:capturedCalls) {
-                $call.Headers['ngrok-skip-browser-warning'] |
-                    Should -Not -BeNullOrEmpty -Because "$($call.Method) $($call.Uri) must bypass the ngrok interstitial"
-            }
-        }
-    }
-
-    Context 'Sync-PSUConfiguration' {
-        It 'sends ngrok-skip-browser-warning on every request' {
-            Sync-PSUConfiguration | Out-Null
-            $script:capturedCalls.Count | Should -BeGreaterThan 0
-            foreach ($call in $script:capturedCalls) {
-                $call.Headers['ngrok-skip-browser-warning'] |
-                    Should -Not -BeNullOrEmpty -Because "$($call.Method) $($call.Uri) must bypass the ngrok interstitial"
             }
         }
     }
@@ -126,16 +77,45 @@ Describe 'PSU admin REST cmdlets send the ngrok-skip-browser-warning header' {
                     Should -Not -BeNullOrEmpty -Because "$($call.Method) $($call.Uri) must bypass the ngrok interstitial"
             }
         }
+
+        It 'throws when configuration sync fails after module save' {
+            Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration { throw 'mock sync failed' }
+
+            { Install-PSUModule -Name 'Devolutions.CIEM' } |
+                Should -Throw -ExpectedMessage '*mock sync failed*'
+        }
     }
 
     Context 'Remove-PSUModule' {
         It 'sends ngrok-skip-browser-warning on every request' {
+            Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration {}
+
             Remove-PSUModule -Name 'Devolutions.CIEM' -Force -WarningAction SilentlyContinue | Out-Null
             $script:capturedCalls.Count | Should -BeGreaterThan 0
             foreach ($call in $script:capturedCalls) {
                 $call.Headers['ngrok-skip-browser-warning'] |
                     Should -Not -BeNullOrEmpty -Because "$($call.Method) $($call.Uri) must bypass the ngrok interstitial"
             }
+        }
+
+        It 'throws when module delete fails' {
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod {
+                if ($Method -eq 'Delete') {
+                    throw 'mock delete failed'
+                }
+
+                @([PSCustomObject]@{ id = 1; name = 'Devolutions.CIEM'; version = '0.1.0' })
+            }
+
+            { Remove-PSUModule -Name 'Devolutions.CIEM' -Force -WarningAction SilentlyContinue } |
+                Should -Throw -ExpectedMessage '*mock delete failed*'
+        }
+
+        It 'throws when configuration sync fails after module delete' {
+            Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration { throw 'mock remove sync failed' }
+
+            { Remove-PSUModule -Name 'Devolutions.CIEM' -Force -WarningAction SilentlyContinue } |
+                Should -Throw -ExpectedMessage '*mock remove sync failed*'
         }
     }
 }

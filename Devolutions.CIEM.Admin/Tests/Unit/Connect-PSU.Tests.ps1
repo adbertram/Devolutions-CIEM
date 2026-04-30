@@ -66,4 +66,16 @@ LOCAL_PSU_TOKEN=fake-local-token
             $script:capturedHeaders['ngrok-skip-browser-warning'] | Should -Not -BeNullOrEmpty
         }
     }
+
+    Context 'when the official PSU connection cmdlet is unavailable' {
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod { @() }
+            Mock -ModuleName Devolutions.CIEM.Admin Get-Command { $null } -ParameterFilter { $Name -eq 'Connect-PSUServer' }
+        }
+
+        It 'throws instead of reporting a connected status' {
+            { Connect-PSU -Url 'https://fake.psu' -Token 'fake-token' -EnvFilePath 'NO_ENV_FILE' -WarningAction SilentlyContinue } |
+                Should -Throw -ExpectedMessage '*Connect-PSUServer*'
+        }
+    }
 }

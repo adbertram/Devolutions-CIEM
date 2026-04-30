@@ -1,4 +1,12 @@
 BeforeAll {
+    if (-not (Get-Module -Name Universal)) {
+        New-Module -Name Universal -ScriptBlock {
+            function Start-PSUApp { param([string]$Name) }
+            function Stop-PSUApp { param([string]$Name) }
+            function Sync-PSUConfiguration { param([switch]$Reset) }
+        } | Import-Module
+    }
+
     $moduleRoot = Resolve-Path (Join-Path $PSScriptRoot '../..')
     $manifest = Join-Path $moduleRoot 'Devolutions.CIEM.Admin.psd1'
 
@@ -38,7 +46,7 @@ LOCAL_PSU_TOKEN=fake-token
 '@
     }
 
-    Context 'when rsync push succeeds and Restart-PSUApp fails' {
+    Context 'when rsync push succeeds and native app restart fails' {
         BeforeAll {
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { [PSCustomObject]@{ Url = 'https://mocked'; Status = 'Connected' } }
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
@@ -48,17 +56,18 @@ LOCAL_PSU_TOKEN=fake-token
                 $script:rsyncArgs = @($args)
                 $global:LASTEXITCODE = 0
             }
-            Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp { throw 'Mocked restart failure: PSU connection stale' }
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Mocked restart failure: PSU connection stale' }
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
         }
 
-        It 'rethrows the Restart-PSUApp failure instead of emitting a warning' {
+        It 'rethrows the native restart failure instead of emitting a warning' {
             { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } |
                 Should -Throw -ExpectedMessage '*Mocked restart failure*'
         }
 
-        It 'invokes Restart-PSUApp with the CIEM app name' {
+        It 'invokes native Stop-PSUApp with the CIEM app name' {
             try { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } catch {}
-            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Restart-PSUApp -Times 1 -ParameterFilter { $Name -eq 'Devolutions CIEM' }
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 1 -ParameterFilter { $Name -eq 'Devolutions CIEM' }
         }
 
         It 'excludes local test dependencies and Playwright artifacts from rsync' {
@@ -96,12 +105,29 @@ LOCAL_PSU_TOKEN=fake-token
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
             Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
             Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 1 }
-            Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
         }
 
         It 'throws on rsync failure' {
             { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } |
                 Should -Throw -ExpectedMessage '*rsync*failed*'
+        }
+    }
+
+    Context 'when PowerShell Gallery version lookup fails' {
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { [PSCustomObject]@{ Url = 'https://mocked'; Status = 'Connected' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { throw 'mock gallery unavailable' }
+            Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
+            Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
+        }
+
+        It 'throws instead of silently using only the local version baseline' {
+            { Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -EnvFilePath $script:envFile -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*mock gallery unavailable*'
         }
     }
 }
@@ -136,7 +162,8 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { throw 'Mocked connect failure: AZURE_PSU_URL missing' }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {}
-            Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
         }
 
         It 'rethrows the Connect-PSU failure instead of warning and returning Published' {
@@ -172,7 +199,8 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
             Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule { throw 'Mocked install failure: PSU rejected module upload' }
-            Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp {}
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
         }
 
         It 'rethrows the Install-PSUModule failure instead of writing an [ERROR] line and returning Published' {
@@ -184,18 +212,18 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             } | Should -Throw -ExpectedMessage '*Mocked install failure*'
         }
 
-        It 'never calls Restart-PSUApp when Install-PSUModule fails' {
+        It 'never calls native Stop-PSUApp when Install-PSUModule fails' {
             try {
                 Publish-PSUModule -ModulePath $script:remoteSrcDir `
                     -NuGetApiKey 'fake-key' `
                     -EnvFilePath 'NO_ENV_FILE' `
                     -Confirm:$false
             } catch {}
-            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Restart-PSUApp -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 0 -Scope It
         }
     }
 
-    Context 'when Restart-PSUApp fails after a successful Install-PSUModule' {
+    Context 'when native app restart fails after a successful Install-PSUModule' {
         BeforeAll {
             InModuleScope Devolutions.CIEM.Admin {
                 $script:PSUConnection.Url = 'https://fake.psu'
@@ -208,10 +236,11 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
             Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {}
-            Mock -ModuleName Devolutions.CIEM.Admin Restart-PSUApp { throw 'Mocked restart failure: remote PSU restart denied' }
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Mocked restart failure: remote PSU restart denied' }
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
         }
 
-        It 'rethrows the Restart-PSUApp failure instead of emitting a warning' {
+        It 'rethrows the native app restart failure instead of emitting a warning' {
             {
                 Publish-PSUModule -ModulePath $script:remoteSrcDir `
                     -NuGetApiKey 'fake-key' `

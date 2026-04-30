@@ -113,14 +113,8 @@ function Install-PSUModule {
 
     if (-not $NoSync) {
         Write-Verbose "Syncing PSU configuration to load the module..."
-        try {
-            Sync-PSUConfiguration | Out-Null
-            Write-Verbose "Configuration synced."
-        }
-        catch {
-            Write-Warning "Module installed but configuration sync failed: $_"
-            Write-Warning "You may need to manually call: Sync-PSUConfiguration"
-        }
+        Sync-PSUConfiguration | Out-Null
+        Write-Verbose "Configuration synced."
     }
 
     [PSCustomObject]@{

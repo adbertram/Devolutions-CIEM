@@ -110,17 +110,22 @@ function Connect-PSU {
     # Also call Connect-PSUServer (the official Universal module cmdlet) so that
     # PSU cmdlets like Get-PSUScript, Invoke-PSUScript, Get-PSUJob, etc. work
     # without needing -ComputerName/-AppToken on every call.
-    if (Get-Command Connect-PSUServer -ErrorAction SilentlyContinue) {
-        Write-Verbose "Calling Connect-PSUServer for Universal module cmdlets..."
-        if ($Token) {
-            Connect-PSUServer -ComputerName $Url -AppToken $Token
-        }
-        else {
-            Connect-PSUServer -ComputerName $Url
-        }
+    try {
+        $connectPSUServerCommand = Get-Command Connect-PSUServer -ErrorAction Stop
+    }
+    catch {
+        throw "Connect-PSUServer was not found. Install or import the Universal module before calling Connect-PSU."
+    }
+    if (-not $connectPSUServerCommand) {
+        throw "Connect-PSUServer was not found. Install or import the Universal module before calling Connect-PSU."
+    }
+
+    Write-Verbose "Calling Connect-PSUServer for Universal module cmdlets..."
+    if ($Token) {
+        Connect-PSUServer -ComputerName $Url -AppToken $Token
     }
     else {
-        Write-Warning "Connect-PSUServer not found. Install the 'Universal' module to use PSU cmdlets (Get-PSUScript, Invoke-PSUScript, etc.) directly."
+        Connect-PSUServer -ComputerName $Url
     }
 
     # Return connection info

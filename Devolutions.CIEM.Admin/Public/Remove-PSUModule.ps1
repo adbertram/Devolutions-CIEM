@@ -76,13 +76,8 @@ function Remove-PSUModule {
         Write-Verbose "Removing $($mod.name) v$($mod.version) (ID: $($mod.id)) from PSU database..."
         $uri = "$($script:PSUConnection.Url)/api/v1/module/$($mod.id)"
 
-        try {
-            Invoke-RestMethod -Uri $uri -Headers $headers -Method Delete -ErrorAction Stop
-            Write-Verbose "Database entry removed for $($mod.name) v$($mod.version)"
-        }
-        catch {
-            Write-Warning "Failed to remove database entry for $($mod.name) v$($mod.version): $_"
-        }
+        Invoke-RestMethod -Uri $uri -Headers $headers -Method Delete -ErrorAction Stop
+        Write-Verbose "Database entry removed for $($mod.name) v$($mod.version)"
     }
 
     if ($script:PSUConnection.IsAzure) {
@@ -92,94 +87,76 @@ function Remove-PSUModule {
         $webApp = $script:PSUConnection.WebAppName
 
         if (-not $rg -or -not $webApp) {
-            Write-Warning "Azure resource group or webapp name not configured. Filesystem cleanup skipped."
+            throw "Azure resource group and web app name are required for module filesystem cleanup."
         }
         else {
-            try {
-                $azParams = @(
-                    'webapp', 'deployment', 'list-publishing-profiles',
-                    '--resource-group', $rg,
-                    '--name', $webApp,
-                    '--query', "[?publishMethod=='MSDeploy']",
-                    '--output', 'json'
-                )
-                $publishProfile = az @azParams 2>$null | ConvertFrom-Json
+            $azParams = @(
+                'webapp', 'deployment', 'list-publishing-profiles',
+                '--resource-group', $rg,
+                '--name', $webApp,
+                '--query', "[?publishMethod=='MSDeploy']",
+                '--output', 'json'
+            )
+            $publishProfile = az @azParams 2>$null | ConvertFrom-Json
 
-                if (-not $publishProfile) {
-                    throw "Could not get publishing profile"
-                }
-
-                $kuduUser = $publishProfile[0].userName
-                $kuduPass = $publishProfile[0].userPWD
-                $kuduBase = "https://$webApp.scm.azurewebsites.net"
-
-                $kuduAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("${kuduUser}:${kuduPass}"))
-
-                $deletePath = if ($Version) {
-                    "/home/Repository/Modules/$Name/$Version"
-                }
-                else {
-                    "/home/Repository/Modules/$Name"
-                }
-
-                Write-Verbose "Deleting folder: $deletePath"
-
-                $cmdUri = "$kuduBase/api/command"
-                $cmdBody = @{
-                    command = "rm -rf `"$deletePath`""
-                    dir     = "/home"
-                } | ConvertTo-Json
-
-                $cmdHeaders = @{
-                    'Authorization' = "Basic $kuduAuth"
-                    'Content-Type'  = 'application/json'
-                }
-
-                $cmdResult = Invoke-RestMethod -Uri $cmdUri -Headers $cmdHeaders -Method Post -Body $cmdBody -ErrorAction Stop
-
-                if ($cmdResult.ExitCode -ne 0) {
-                    throw "Command failed with exit code $($cmdResult.ExitCode): $($cmdResult.Error)"
-                }
-
-                $results += [PSCustomObject]@{
-                    Name    = $Name
-                    Version = if ($Version) { $Version } else { 'All' }
-                    Status  = 'Removed'
-                    Source  = 'Filesystem'
-                }
-
-                Write-Verbose "Filesystem cleanup completed successfully."
+            if (-not $publishProfile) {
+                throw "Could not get publishing profile"
             }
-            catch {
-                Write-Warning "Failed to remove module files from Azure filesystem: $_"
-                Write-Warning "You may need to manually delete: Repository/Modules/$Name/"
+
+            $kuduUser = $publishProfile[0].userName
+            $kuduPass = $publishProfile[0].userPWD
+            $kuduBase = "https://$webApp.scm.azurewebsites.net"
+
+            $kuduAuth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("${kuduUser}:${kuduPass}"))
+
+            $deletePath = if ($Version) {
+                "/home/Repository/Modules/$Name/$Version"
             }
+            else {
+                "/home/Repository/Modules/$Name"
+            }
+
+            Write-Verbose "Deleting folder: $deletePath"
+
+            $cmdUri = "$kuduBase/api/command"
+            $cmdBody = @{
+                command = "rm -rf `"$deletePath`""
+                dir     = "/home"
+            } | ConvertTo-Json
+
+            $cmdHeaders = @{
+                'Authorization' = "Basic $kuduAuth"
+                'Content-Type'  = 'application/json'
+            }
+
+            $cmdResult = Invoke-RestMethod -Uri $cmdUri -Headers $cmdHeaders -Method Post -Body $cmdBody -ErrorAction Stop
+
+            if ($cmdResult.ExitCode -ne 0) {
+                throw "Command failed with exit code $($cmdResult.ExitCode): $($cmdResult.Error)"
+            }
+
+            $results += [PSCustomObject]@{
+                Name    = $Name
+                Version = if ($Version) { $Version } else { 'All' }
+                Status  = 'Removed'
+                Source  = 'Filesystem'
+            }
+
+            Write-Verbose "Filesystem cleanup completed successfully."
         }
     }
     else {
-        Write-Warning "Non-Azure PSU detected. REST API DELETE only removes database entries."
-        Write-Warning "Module files may still exist on the PSU server filesystem."
+        $results += [PSCustomObject]@{
+            Name    = $Name
+            Version = if ($Version) { $Version } else { 'All' }
+            Status  = 'Removed'
+            Source  = 'Database'
+        }
     }
 
     Write-Verbose "Syncing PSU configuration to clear module cache..."
-    try {
-        Sync-PSUConfiguration -Reset | Out-Null
-        Write-Verbose "Configuration sync completed."
-    }
-    catch {
-        Write-Warning "Failed to sync configuration: $_"
-        Write-Warning "You may need to manually call: Sync-PSUConfiguration -Reset"
-    }
+    Sync-PSUConfiguration -Reset | Out-Null
+    Write-Verbose "Configuration sync completed."
 
-    if ($results.Count -eq 0) {
-        [PSCustomObject]@{
-            Name    = $Name
-            Version = if ($Version) { $Version } else { 'All' }
-            Status  = 'RemovedFromDatabase'
-            Note    = 'Filesystem cleanup may be required'
-        }
-    }
-    else {
-        $results
-    }
+    $results
 }

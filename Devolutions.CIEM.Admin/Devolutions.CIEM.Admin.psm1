@@ -18,15 +18,15 @@ $script:PSUConnection = @{
 }
 
 # --- Load private functions ---
-foreach ($file in (Get-ChildItem "$PSScriptRoot/Private/*.ps1" -ErrorAction SilentlyContinue)) {
+foreach ($file in (Get-ChildItem "$PSScriptRoot/Private/*.ps1" -ErrorAction Stop)) {
     . $file.FullName
 }
 
 # --- Load public functions ---
-foreach ($file in (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue)) {
+foreach ($file in (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction Stop)) {
     . $file.FullName
 }
 
 # --- Export public functions ---
-$exportFunctions = (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue).BaseName
+$exportFunctions = (Get-ChildItem "$PSScriptRoot/Public/*.ps1" -ErrorAction Stop).BaseName
 Export-ModuleMember -Function $exportFunctions

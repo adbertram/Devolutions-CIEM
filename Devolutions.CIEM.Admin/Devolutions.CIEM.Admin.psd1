@@ -9,7 +9,6 @@
     FunctionsToExport = @(
         'Connect-PSU'
         'Get-ProwlerCheck'
-        'Get-PSUApp'
         'Get-PSUModule'
         'Install-PSUModule'
         'Invoke-CIEMCommand'
@@ -17,11 +16,7 @@
         'Invoke-TestCommand'
         'Publish-PSUModule'
         'Remove-PSUModule'
-        'Restart-PSUApp'
-        'Start-PSUApp'
-        'Stop-PSUApp'
         'Sync-ProwlerCheck'
-        'Sync-PSUConfiguration'
     )
     CmdletsToExport   = @()
     VariablesToExport  = @()

@@ -139,11 +139,14 @@ function Publish-PSUModule {
         # Check PowerShell Gallery version
         $galleryVersion = $null
         try {
-            $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue 3>$null
+            $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction Stop 3>$null
             if ($existing) {
                 $galleryVersion = [version]($existing.Version -replace '-.*$', '')
             }
-        } catch {}
+        }
+        catch {
+            throw "Failed to query PowerShell Gallery for module '$moduleName'. Error: $_"
+        }
 
         # Use the highest of manifest, installed, and gallery versions
         $baseVersion = $localVersion
@@ -216,7 +219,8 @@ function Publish-PSUModule {
                     $appName = $matches[1]
                 }
             }
-            Restart-PSUApp -Name $appName
+            Stop-PSUApp -Name $appName
+            Start-PSUApp -Name $appName
             Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
 
             Write-Host ''
@@ -318,7 +322,7 @@ function Publish-PSUModule {
 
     $galleryVersion = $null
     try {
-        $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
+        $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction Stop
         if ($existing) {
             $versionString = $existing.Version -replace '-.*$', ''
             $galleryVersion = [version]$versionString
@@ -329,7 +333,7 @@ function Publish-PSUModule {
         }
     }
     catch {
-        Write-Host '  Gallery version: Not published yet (first release)' -ForegroundColor Cyan
+        throw "Failed to query PowerShell Gallery for module '$moduleName'. Error: $_"
     }
 
     if ($galleryVersion) {
@@ -500,7 +504,8 @@ NuGet API key required. Options:
             }
         }
         Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
-        Restart-PSUApp -Name $appName
+        Stop-PSUApp -Name $appName
+        Start-PSUApp -Name $appName
         Write-Host "  [OK] App restarted" -ForegroundColor Green
 
         Write-Host ''
