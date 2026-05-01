@@ -40,9 +40,13 @@ test.describe('Configuration Page', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display CIEM Database card with explicit initializer action', async () => {
+    test('should display CIEM Database card with explicit schema maintenance action and no initialized chip', async () => {
       expect(await configPage.isDatabaseCardVisible()).toBe(true);
       expect(await configPage.isDatabaseInitializerVisible()).toBe(true);
+      expect(await configPage.isDatabaseInitializedChipVisible()).toBe(false);
+      const databaseText = await configPage.getDatabaseCardText();
+      expect(databaseText).toContain('Creates missing CIEM tables');
+      expect(databaseText).toContain('refreshes provider and check catalogs');
     });
   });
 

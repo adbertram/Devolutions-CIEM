@@ -32,31 +32,29 @@ function cleanupTestData() {
 function seedChecks() {
   const checks = loadFixture(SCAN_HISTORY_FIXTURE).tables.checks;
   const stmts = checks.map(c => {
-    const vals = [c.id, c.disabled].map(v => typeof v === 'number' ? v : `'${String(v).replace(/'/g, "''")}'`).join(', ');
-    return `INSERT OR REPLACE INTO checks (id, disabled) VALUES (${vals})`;
+    return `INSERT OR REPLACE INTO checks (id, disabled) VALUES (${sqlValue(c.id)}, ${sqlValue(c.disabled)})`;
   });
   sshNonQuery(stmts.join('; '));
   console.log(`[seed] Seeded mutable state for ${checks.length} catalog checks.`);
 }
 
 function backupAndClearAllChecks() {
-  const rows = sshQuery('SELECT * FROM checks');
-  sshNonQuery('DELETE FROM checks');
-  console.log(`[setup] Backed up ${rows.length} checks and cleared table.`);
+  const checks = loadFixture(SCAN_HISTORY_FIXTURE).tables.checks;
+  const ids = checks.map(c => sqlValue(c.id)).join(', ');
+  const rows = sshQuery(`SELECT id, disabled FROM checks WHERE id IN (${ids})`);
+  sshNonQuery(`DELETE FROM checks WHERE id IN (${ids})`);
+  console.log(`[setup] Backed up mutable state for ${rows.length} catalog checks.`);
   return rows;
 }
 
 function restoreChecks(rows) {
   if (!rows) return;
 
-  const cols = ['id', 'disabled'];
-  const stmts = ['DELETE FROM checks'];
-  for (const r of rows) {
-    const vals = cols.map(c => sqlValue(r[c])).join(', ');
-    stmts.push(`INSERT OR REPLACE INTO checks (${cols.join(', ')}) VALUES (${vals})`);
+  if (rows.length > 0) {
+    const stmts = rows.map(r => `INSERT OR REPLACE INTO checks (id, disabled) VALUES (${sqlValue(r.id)}, ${sqlValue(r.disabled)})`);
+    sshNonQuery(stmts.join('; '));
   }
-  sshNonQuery(stmts.join('; '));
-  console.log(`[teardown] Restored ${rows.length} checks.`);
+  console.log(`[teardown] Restored mutable state for ${rows.length} catalog checks.`);
 }
 
 function seedTestData() {

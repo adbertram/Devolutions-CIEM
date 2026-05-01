@@ -17,23 +17,31 @@ function New-CIEMAboutPage {
         New-UDTypography -Text 'About Devolutions CIEM' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
 
         New-UDCard -Title 'Cloud Infrastructure Entitlement Management' -Content {
-            New-UDTypography -Text 'Devolutions CIEM is a security scanning solution that helps identify identity and access management issues across your cloud infrastructure.' -Variant 'body1' -Style @{ marginBottom = '20px' }
+            New-UDTypography -Text 'Devolutions CIEM identifies cloud entitlement risk by combining provider checks with identity and access relationship data.' -Variant 'body1' -Style @{ marginBottom = '20px' }
 
             # Dynamic provider/check info
             $providers = @(Devolutions.CIEM\Get-CIEMProvider)
-            $featureItems = @()
-            foreach ($p in $providers) {
-                $featureItems += "$($p.CheckCount) $($p.Name) security checks"
-            }
 
-            New-UDTypography -Text 'Key Features:' -Variant 'h6' -Style @{ marginTop = '20px' }
-            New-UDList -Content {
-                foreach ($item in $featureItems) {
-                    New-UDListItem -Label $item
+            New-UDGrid -Container -Spacing 3 -Content {
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    New-UDElement -Tag 'section' -Attributes @{ 'data-ciem-about-section' = 'checks' } -Content {
+                        New-UDTypography -Text 'Checks' -Variant 'h5' -Style @{ marginBottom = '10px' }
+                        New-UDTypography -Text 'Checks validate cloud configuration, entitlement, and control conditions across supported providers. Each result includes severity, evidence, and remediation guidance for scan review.' -Variant 'body1' -Style @{ marginBottom = '14px' }
+                        New-UDList -Content {
+                            foreach ($p in $providers) {
+                                New-UDListItem -Label "$($p.CheckCount) $($p.Name) security checks"
+                            }
+                        }
+                    }
                 }
-                New-UDListItem -Label 'Multi-provider support (Azure + AWS)'
-                New-UDListItem -Label 'Identity and entitlement focused checks'
-                New-UDListItem -Label 'Integration with Devolutions PAM for remediation'
+
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    New-UDElement -Tag 'section' -Attributes @{ 'data-ciem-about-section' = 'identities' } -Content {
+                        New-UDTypography -Text 'Identities' -Variant 'h5' -Style @{ marginBottom = '10px' }
+                        New-UDTypography -Text 'Identities cover identity inventory, role assignments, effective entitlement computation, and relationship paths that explain who can reach privileged cloud resources.' -Variant 'body1' -Style @{ marginBottom = '14px' }
+                        New-UDTypography -Text 'Devolutions CIEM surfaces these findings so remediation can move into Devolutions PAM workflows where privileged access can be controlled.' -Variant 'body1'
+                    }
+                }
             }
 
             New-UDTypography -Text 'Version Information:' -Variant 'h6' -Style @{ marginTop = '20px' }

@@ -193,17 +193,60 @@ function sqlValue(value) {
   throw new Error(`Unsupported SQL value type '${typeof value}'`);
 }
 
+function sqlInList(values) {
+  if (values.length === 0) {
+    throw new Error('SQL IN list must include at least one value');
+  }
+
+  return values.map(sqlValue).join(', ');
+}
+
+function isMutableCatalogTable(table) {
+  return table === 'checks';
+}
+
+function getFixtureTableIds(fixture, table) {
+  const ids = fixture.tables[table].map(row => {
+    if (!hasOwn(row, 'id')) {
+      throw new Error(`fixture.tables.${table} rows must include id`);
+    }
+    return row.id;
+  });
+
+  return ids;
+}
+
 function selectAllRows(table) {
   assertSqlIdentifier(table, 'table');
   return sshQuery(`SELECT * FROM ${table}`);
 }
 
-function deleteTables(touchedTables) {
+function selectFixtureRows(fixture, table) {
+  assertSqlIdentifier(table, 'table');
+
+  if (!isMutableCatalogTable(table)) {
+    return selectAllRows(table);
+  }
+
+  return sshQuery(`SELECT id, disabled FROM ${table} WHERE id IN (${sqlInList(getFixtureTableIds(fixture, table))})`);
+}
+
+function deleteTables(touchedTables, tables = null) {
   const statements = touchedTables.map(table => {
     assertSqlIdentifier(table, 'table');
+    if (isMutableCatalogTable(table)) {
+      if (!tables || !Array.isArray(tables[table])) {
+        throw new Error(`Cannot delete mutable catalog table '${table}' without fixture rows`);
+      }
+
+      return `DELETE FROM ${table} WHERE id IN (${sqlInList(tables[table].map(row => row.id))})`;
+    }
+
     return `DELETE FROM ${table}`;
   });
-  sshNonQuery(statements.join('; '));
+  if (statements.length > 0) {
+    sshNonQuery(statements.join('; '));
+  }
 }
 
 function buildInsertStatements(table, rows) {
@@ -227,12 +270,30 @@ function buildInsertStatements(table, rows) {
   return statements;
 }
 
+function buildCheckUpdateStatements(rows) {
+  const statements = [];
+
+  for (const row of rows) {
+    if (!hasOwn(row, 'id') || !hasOwn(row, 'disabled')) {
+      throw new Error('checks fixture rows must include id and disabled');
+    }
+
+    statements.push(`INSERT OR REPLACE INTO checks (id, disabled) VALUES (${sqlValue(row.id)}, ${sqlValue(row.disabled)})`);
+  }
+
+  return statements;
+}
+
 function insertTableRows(tables, touchedTables) {
   const statements = [];
   const insertOrder = [...touchedTables].reverse();
 
   for (const table of insertOrder) {
-    statements.push(...buildInsertStatements(table, tables[table]));
+    if (isMutableCatalogTable(table)) {
+      statements.push(...buildCheckUpdateStatements(tables[table]));
+    } else {
+      statements.push(...buildInsertStatements(table, tables[table]));
+    }
   }
 
   if (statements.length > 0) {
@@ -245,7 +306,10 @@ function getFixtureTableCounts(fixtureName) {
   const counts = {};
 
   for (const table of fixture.touchedTables) {
-    const row = sshQuery(`SELECT COUNT(*) as count FROM ${table}`)[0];
+    const sql = isMutableCatalogTable(table)
+      ? `SELECT COUNT(*) as count FROM ${table} WHERE id IN (${sqlInList(getFixtureTableIds(fixture, table))})`
+      : `SELECT COUNT(*) as count FROM ${table}`;
+    const row = sshQuery(sql)[0];
     counts[table] = Number(row.count);
   }
 
@@ -269,7 +333,7 @@ function backupFixtureTables(fixtureName) {
   const tables = {};
 
   for (const table of fixture.touchedTables) {
-    tables[table] = selectAllRows(table);
+    tables[table] = selectFixtureRows(fixture, table);
   }
 
   return {
@@ -283,7 +347,7 @@ function backupAndApplyFixture(fixtureName) {
   const fixture = loadFixture(fixtureName);
   const backup = backupFixtureTables(fixtureName);
 
-  deleteTables(fixture.touchedTables);
+  deleteTables(fixture.touchedTables, fixture.tables);
   insertTableRows(fixture.tables, fixture.touchedTables);
   verifyFixtureCounts(fixture);
   console.log(`[fixture] Applied '${fixture.name}'.`);
@@ -309,7 +373,8 @@ function restoreFixtureBackup(backup) {
     assertArray(backup.tables[table], `backup.tables.${table}`);
   }
 
-  deleteTables(backup.touchedTables);
+  const fixture = loadFixture(backup.fixtureName);
+  deleteTables(backup.touchedTables, fixture.tables);
   insertTableRows(backup.tables, backup.touchedTables);
   console.log(`[fixture] Restored '${backup.fixtureName}'.`);
 }

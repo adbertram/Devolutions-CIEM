@@ -28,13 +28,7 @@ function New-CIEMConfigPage {
 
         New-UDCard -Title 'CIEM Database' -Content {
             New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                if ($databaseExists) {
-                    New-UDChip -Label 'Initialized' -Icon (New-UDIcon -Icon 'CheckCircle') -Size 'small' -Style @{
-                        backgroundColor = '#4caf50'
-                        color = 'white'
-                    }
-                }
-                else {
+                if (-not $databaseExists) {
                     New-UDChip -Label 'Not Initialized' -Icon (New-UDIcon -Icon 'Warning') -Size 'small' -Style @{
                         backgroundColor = '#ff9800'
                         color = 'white'
@@ -44,11 +38,17 @@ function New-CIEMConfigPage {
                 New-UDTypography -Text $databasePath -Variant 'body2' -Style @{ color = '#666' }
             }
 
+            New-UDTypography -Text 'Creates missing CIEM tables and refreshes provider and check catalogs. Use this after CIEM updates or when the database has not been initialized.' -Variant 'body2' -Style @{
+                color = '#666'
+                marginTop = '12px'
+                marginBottom = '12px'
+            }
+
             if (-not $databaseExists) {
                 New-UDAlert -Severity 'warning' -Text 'Initialize the CIEM database before configuring providers or running scans.' -Style @{ marginTop = '16px'; marginBottom = '16px' }
             }
 
-            $databaseButtonText = if ($databaseExists) { 'Update Database Schema' } else { 'Initialize Database' }
+            $databaseButtonText = if ($databaseExists) { 'Reapply Schema and Catalogs' } else { 'Initialize Database' }
             New-UDButton -Id 'initializeCiemDatabaseBtn' -Text $databaseButtonText -Icon (New-UDIcon -Icon 'Storage') -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
                 try {
                     $initializedPath = Devolutions.CIEM\New-CIEMDatabase -PassThru

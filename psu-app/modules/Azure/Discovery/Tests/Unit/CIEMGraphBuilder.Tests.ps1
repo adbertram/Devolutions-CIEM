@@ -1498,6 +1498,77 @@ Describe 'Graph Builder Functions' {
             }
         }
 
+        It 'Does not reuse node-existence cache entries across different ARM ID casing' {
+            InModuleScope Devolutions.CIEM {
+                $ts = '2026-03-31T00:00:00Z'
+
+                $targetId = '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.KeyVault/vaults/vault1'
+                $differentCaseTargetId = '/subscriptions/sub1/resourcegroups/rg1/providers/Microsoft.KeyVault/vaults/vault1'
+
+                Save-CIEMGraphNode -Id $targetId -Kind 'AzureKeyVault' -DisplayName 'vault1' -Provider 'azure' -SubscriptionId 'sub1' -ResourceGroup 'rg1'
+                Save-CIEMGraphNode -Id 'user-case-exact' -Kind 'EntraUser' -DisplayName 'Exact User' -Provider 'azure'
+                Save-CIEMGraphNode -Id 'user-case-mismatch' -Kind 'EntraUser' -DisplayName 'Mismatch User' -Provider 'azure'
+
+                $roleDefId = '/subscriptions/sub1/providers/Microsoft.Authorization/roleDefinitions/rd-reader-case'
+                $roleDefProps = @{
+                    roleName = 'Reader'
+                    permissions = @(@{ actions = @('*/read'); notActions = @() })
+                } | ConvertTo-Json -Depth 5 -Compress
+
+                $armResources = @(
+                    [PSCustomObject]@{
+                        Id = $roleDefId
+                        Type = 'microsoft.authorization/roledefinitions'
+                        Name = 'rd-reader-case'; Location = $null; ResourceGroup = $null
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = $roleDefProps
+                        CollectedAt = $ts
+                    },
+                    [PSCustomObject]@{
+                        Id = '/subscriptions/sub1/providers/Microsoft.Authorization/roleAssignments/ra-case-exact'
+                        Type = 'microsoft.authorization/roleassignments'
+                        Name = 'ra-case-exact'; Location = $null; ResourceGroup = $null
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = @{
+                            principalId = 'user-case-exact'
+                            principalType = 'User'
+                            roleDefinitionId = $roleDefId
+                            scope = $targetId
+                        } | ConvertTo-Json -Depth 5 -Compress
+                        CollectedAt = $ts
+                    },
+                    [PSCustomObject]@{
+                        Id = '/subscriptions/sub1/providers/Microsoft.Authorization/roleAssignments/ra-case-mismatch'
+                        Type = 'microsoft.authorization/roleassignments'
+                        Name = 'ra-case-mismatch'; Location = $null; ResourceGroup = $null
+                        SubscriptionId = 'sub1'; TenantId = 'tenant1'
+                        Kind = $null; Sku = $null; Identity = $null; ManagedBy = $null
+                        Plan = $null; Zones = $null; Tags = $null
+                        Properties = @{
+                            principalId = 'user-case-mismatch'
+                            principalType = 'User'
+                            roleDefinitionId = $roleDefId
+                            scope = $differentCaseTargetId
+                        } | ConvertTo-Json -Depth 5 -Compress
+                        CollectedAt = $ts
+                    }
+                )
+
+                { InvokeCIEMGraphComputedEdgeBuild -ArmResources $armResources -EntraResources @() -Relationships @() -Connection $null -CollectedAt $ts } | Should -Not -Throw
+
+                $exactEdges = @(Get-CIEMGraphEdge -SourceId 'user-case-exact' -Kind 'HasRole')
+                $exactEdges | Should -HaveCount 1
+                $exactEdges[0].TargetId | Should -Be $targetId
+
+                $mismatchEdges = @(Get-CIEMGraphEdge -SourceId 'user-case-mismatch' -Kind 'HasRole')
+                $mismatchEdges | Should -BeNullOrEmpty
+            }
+        }
+
         It 'Skips HasManagedIdentity edges where MI node does not exist' {
             InModuleScope Devolutions.CIEM {
                 $ts = '2026-03-31T00:00:00Z'

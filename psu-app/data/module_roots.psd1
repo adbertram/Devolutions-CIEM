@@ -26,7 +26,7 @@
             Variable    = 'AWSRoot'
             Path        = 'modules/AWS/Infrastructure'
             LoadOrder   = 40
-            LoadClasses = $true
+            LoadClasses = $false
         }
         @{
             Name        = 'Checks'

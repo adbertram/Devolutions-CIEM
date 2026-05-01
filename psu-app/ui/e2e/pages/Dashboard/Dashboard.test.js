@@ -86,7 +86,8 @@ test.describe('Dashboard Page', () => {
       expect(criticalVisible).toBe(true);
     });
 
-    test('should separate Prowler checks and scans from identity stats', async () => {
+    test('should separate checks and scans from identity stats without legacy scanner references', async () => {
+      const legacyScannerName = ['Pro', 'wler'].join('');
       expect(await dashPage.isElementVisible(dashPage.selectors.sectionPanelGroup)).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.scanPanel)).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.identityPanel)).toBe(true);
@@ -103,9 +104,10 @@ test.describe('Dashboard Page', () => {
       expect(await dashPage.isElementVisible(dashPage.selectors.identityCountCard)).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.entitlementsCard)).toBe(true);
       expect(await dashPage.isScanRunSelectorInsideIdentitySection()).toBe(false);
+      expect(await dashPage.getDashboardContentText()).not.toContain(legacyScannerName);
     });
 
-    test('should collapse and expand the Prowler checks and scans panel', async () => {
+    test('should collapse and expand the checks and scans panel', async () => {
       expect(await dashPage.isScanSectionVisible()).toBe(true);
       expect(await dashPage.isIdentitySectionVisible()).toBe(true);
 

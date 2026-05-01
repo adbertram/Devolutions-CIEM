@@ -165,6 +165,19 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             )
         }
 
+        It 'Only enables class loading for modules that contain class files' {
+            $registry = Import-PowerShellDataFile -Path $script:ModuleRootsPath
+            foreach ($module in $registry.Modules) {
+                if (-not [bool]$module.LoadClasses) {
+                    continue
+                }
+
+                $classesPath = Join-Path (Join-Path $repoRoot ([string]$module.Path)) 'Classes'
+                $classFiles = @(Get-ChildItem -LiteralPath $classesPath -Filter '*.ps1' -File)
+                $classFiles.Count | Should -BeGreaterThan 0 -Because "$($module.Name) sets LoadClasses=true"
+            }
+        }
+
         It 'Loads sub-module roots from the data manifest' {
             $script:Psm1Content | Should -Match 'Data/module_roots\.psd1'
             $script:Psm1Content | Should -Match 'Import-PowerShellDataFile'

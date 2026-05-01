@@ -43,8 +43,8 @@ function InvokeCIEMGraphEdgeBuild {
 
     $edgeCount = 0
 
-    # Node existence cache to avoid repeated DB queries (N+1 prevention)
-    $nodeExistsCache = @{}
+    # PowerShell hashtables are case-insensitive; SQLite text foreign keys are not.
+    $nodeExistsCache = [System.Collections.Generic.Dictionary[string, bool]]::new([System.StringComparer]::Ordinal)
 
     # Helper: check if node exists in graph, with caching
     # Must use same $Connection to see uncommitted nodes within a transaction

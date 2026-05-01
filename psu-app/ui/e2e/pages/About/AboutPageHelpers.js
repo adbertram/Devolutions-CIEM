@@ -7,9 +7,8 @@ class AboutPageHelpers extends BasePage {
     this.selectors = {
       pageTitle: "h4:has-text('About Devolutions CIEM')",
       mainCard: ".MuiCard-root:has-text('Cloud Infrastructure Entitlement Management')",
-      description: "text=security scanning solution",
-      featuresHeading: "h6:has-text('Key Features:')",
-      featureItems: '.MuiListItem-root',
+      checksSection: '[data-ciem-about-section="checks"]',
+      identitiesSection: '[data-ciem-about-section="identities"]',
       versionHeading: "h6:has-text('Version Information:')",
       versionTable: 'table',
       learnMoreHeading: "h6:has-text('Learn More:')",
@@ -27,19 +26,29 @@ class AboutPageHelpers extends BasePage {
   }
 
   async getFeatureCount() {
-    await this.waitForSelector(this.selectors.featureItems);
-    return await this.page.locator(this.selectors.featureItems).count();
+    await this.waitForSelector(this.selectors.checksSection);
+    return await this.page.locator(`${this.selectors.checksSection} li, ${this.selectors.identitiesSection} li`).count();
   }
 
   async getFeatureTexts() {
-    await this.waitForSelector(this.selectors.featureItems);
-    const items = this.page.locator(this.selectors.featureItems);
+    await this.waitForSelector(this.selectors.checksSection);
+    const items = this.page.locator(`${this.selectors.checksSection} li, ${this.selectors.identitiesSection} li`);
     const count = await items.count();
     const texts = [];
     for (let i = 0; i < count; i++) {
       texts.push(await items.nth(i).textContent());
     }
     return texts;
+  }
+
+  async getChecksSectionText() {
+    await this.waitForSelector(this.selectors.checksSection);
+    return await this.page.locator(this.selectors.checksSection).textContent();
+  }
+
+  async getIdentitiesSectionText() {
+    await this.waitForSelector(this.selectors.identitiesSection);
+    return await this.page.locator(this.selectors.identitiesSection).textContent();
   }
 
   async isVersionTableVisible() {

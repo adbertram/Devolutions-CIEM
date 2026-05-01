@@ -32,7 +32,8 @@ Describe 'Dashboard last discovery ownership' {
 
 Describe 'Dashboard section layout' {
 
-    It 'Renders separate Prowler scan and identity stats sections' {
+    It 'Renders separate checks and scans and identity stats sections without legacy scanner references' {
+        $legacyScannerName = 'Pro' + 'wler'
         $script:PageSource | Should -Match 'New-UDExpansionPanelGroup'
         $script:PageSource | Should -Match "New-UDExpansionPanelGroup\s+-Id 'dashboardSectionPanels'\s+-Type 'Expandable'"
         $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardScanPanel'"
@@ -40,7 +41,8 @@ Describe 'Dashboard section layout' {
         $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardScanSection'"
         $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardIdentitySection'"
         $script:PageSource | Should -Match "'data-hideable'\s*=\s*'true'"
-        $script:PageSource | Should -Match 'Prowler Checks & Scans'
+        $script:PageSource | Should -Match 'Checks & Scans'
+        $script:PageSource | Should -Not -Match "\b$legacyScannerName\b"
         $script:PageSource | Should -Match 'Identity Stats'
     }
 

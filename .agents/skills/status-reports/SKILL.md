@@ -19,6 +19,8 @@ Manage CIEM weekly status reports to the Devolutions team group DM `C0AFCLP7SUF`
 - **Team channel:** `C0AFCLP7SUF` (group DM with mamoreau, schalifoux, alistek, adbertram)
 - **Slack profile:** `devolutions` — always pass `--profile devolutions`
 - **Report archive:** `{baseDir}/reports/YYYY-MM-DD/` — each week is a folder containing `report.md` (and optionally `*.png` screenshots if the user requested them)
+- **Historical report query:** `{baseDir}/scripts/get-status-report.sh` — run this before drafting a new report; default review window is the last 7 days
+- **Codex session review:** use `codex-sessions` for the last 7 days of this repo before drafting a new report, so session work that is not obvious from git still informs the update
 - **Screenshots are OPTIONAL:** Text-only is the default. Only capture screenshots when the user explicitly asks (e.g., "with screenshots", "include screenshots")
 - **Send script:** `{baseDir}/scripts/send-report.sh` (supports `--dryrun`)
 - **Dryrun target:** DM to `adbertram` (Adam) for personal preview before team send
@@ -44,4 +46,6 @@ If ambiguous, ask once which one.
 - Correct workflow selected based on user intent
 - All Slack operations use `--profile devolutions` and channel `C0AFCLP7SUF`
 - Reports always read from / written to `{baseDir}/reports/`
+- Send workflow checks the last 7 days of archived reports before drafting to avoid duplicate topics
+- Send workflow reviews the last 7 days of Codex sessions for this repo before drafting
 </success_criteria>

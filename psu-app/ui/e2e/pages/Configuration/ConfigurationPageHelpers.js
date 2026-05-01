@@ -10,6 +10,7 @@ class ConfigurationPageHelpers extends BasePage {
       subtitle: "text=Configure cloud provider authentication for CIEM security scans",
       databaseCard: ".MuiCard-root:has-text('CIEM Database')",
       initializeDatabaseBtn: '#initializeCiemDatabaseBtn',
+      databaseInitializedChip: ".MuiCard-root:has-text('CIEM Database') .MuiChip-root:has-text('Initialized')",
       authCard: ".MuiCard-root:has-text('Cloud Provider Authentication')",
       // Provider and auth dropdowns (MUI renders hidden input + visible combobox)
       cloudProvider: '#cloudProvider',
@@ -268,6 +269,15 @@ class ConfigurationPageHelpers extends BasePage {
 
   async isDatabaseInitializerVisible() {
     return await this.isElementVisible(this.selectors.initializeDatabaseBtn);
+  }
+
+  async isDatabaseInitializedChipVisible() {
+    return await this.isElementVisible(this.selectors.databaseInitializedChip);
+  }
+
+  async getDatabaseCardText() {
+    await this.waitForSelector(this.selectors.databaseCard);
+    return await this.page.locator(this.selectors.databaseCard).textContent();
   }
 
   async isAuthMethodHelpTextVisible() {

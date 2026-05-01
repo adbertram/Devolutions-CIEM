@@ -43,6 +43,23 @@ Describe 'Reports PSU page registration' {
         $reportsPageContent | Should -Match 'Devolutions\.CIEM\\Invoke-CIEMReport'
     }
 
+    It 'Provides an on-demand report generation action' {
+        $script:ReportsPagePath | Should -Exist
+        $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
+        $reportsPageContent | Should -Match "New-UDButton\s+-Id 'generateReportBtn'\s+-Text 'Generate Report'"
+        $reportsPageContent | Should -Match 'Devolutions\.CIEM\\Invoke-CIEMReport'
+        $reportsPageContent | Should -Match 'RunId\s*=\s*\$selectedRunId'
+        $reportsPageContent | Should -Match "Sync-UDElement\s+-Id 'ciemReportsPanel'"
+    }
+
+    It 'Renders completed discovery run selection for past report views' {
+        $script:ReportsPagePath | Should -Exist
+        $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
+        $reportsPageContent | Should -Match "New-UDSelect\s+-Id 'reportRunSelector'"
+        $reportsPageContent | Should -Match "Devolutions\.CIEM\\Get-CIEMAzureDiscoveryRun\s+-Status 'Completed'\s+-Last"
+        $reportsPageContent | Should -Match 'data-ciem-report-history'
+    }
+
     It 'Renders report context, summary, and result table regions' {
         $script:ReportsPagePath | Should -Exist
         $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw

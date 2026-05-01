@@ -9,7 +9,10 @@ class ReportsPageHelpers extends BasePage {
       reportResult: '[data-ciem-report-result="true"]',
       reportContext: '[data-ciem-report-context="true"]',
       reportSummary: '[data-ciem-report-summary="true"]',
-      reportResultTable: '[data-ciem-report-result-table="true"]'
+      reportResultTable: '[data-ciem-report-result-table="true"]',
+      generateReportButton: '#generateReportBtn',
+      reportHistory: '[data-ciem-report-history="true"]',
+      reportRunSelector: '#reportRunSelector'
     };
   }
 
@@ -38,6 +41,24 @@ class ReportsPageHelpers extends BasePage {
   async getReportResultTableText() {
     await this.waitForSelector(this.selectors.reportResultTable);
     return (await this.page.locator(this.selectors.reportResultTable).textContent()).trim();
+  }
+
+  async isGenerateReportButtonVisible() {
+    return await this.isElementVisible(this.selectors.generateReportButton);
+  }
+
+  async clickGenerateReport() {
+    await this.click(this.selectors.generateReportButton);
+    await this.waitForSelector(this.selectors.reportResult);
+  }
+
+  async getReportHistoryText() {
+    await this.waitForSelector(this.selectors.reportHistory);
+    return (await this.page.locator(this.selectors.reportHistory).textContent()).trim();
+  }
+
+  async isReportRunSelectorVisible() {
+    return await this.isElementVisible(this.selectors.reportRunSelector);
   }
 }
 

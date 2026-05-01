@@ -433,7 +433,9 @@ NuGet API key required. Options:
                 Where-Object { $_.Name -in @('Tests', 'node_modules', 'playwright-report', 'test-results', 'source-packs') -or $_.FullName -like '*/ui/e2e' }
         )
         foreach ($directory in $stagingExcludeDirectories) {
-            Remove-Item -Path $directory.FullName -Recurse -Force
+            if (Test-Path -LiteralPath $directory.FullName) {
+                Remove-Item -LiteralPath $directory.FullName -Recurse -Force
+            }
         }
         Write-Host "  [OK] Staged clean copy (excluded *.db files)" -ForegroundColor Green
 

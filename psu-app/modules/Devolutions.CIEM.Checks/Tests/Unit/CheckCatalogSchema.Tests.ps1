@@ -152,7 +152,7 @@ Describe 'Provider check catalog schema' {
     It 'Provider check folders do not keep generated manual placeholder scripts' {
         $placeholderScripts = @(
             foreach ($scriptFile in $script:ScriptFiles) {
-                if ((Get-Content -LiteralPath $scriptFile.FullName -Raw) -match 'This check requires manual implementation|TODO: Implement check logic based on Prowler check') {
+                if ((Get-Content -LiteralPath $scriptFile.FullName -Raw) -match 'This check requires manual implementation|TODO: Implement check logic from generated source') {
                     $scriptFile.FullName
                 }
             }

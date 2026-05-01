@@ -20,9 +20,9 @@ function New-CIEMDashboardPage {
         $scanRuns = @(Devolutions.CIEM\Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
 
         New-UDExpansionPanelGroup -Id 'dashboardSectionPanels' -Type 'Expandable' -Children {
-            New-UDExpansionPanel -Id 'dashboardScanPanel' -Title 'Prowler Checks & Scans' -Icon (New-UDIcon -Icon 'Search') -Active -Children {
+            New-UDExpansionPanel -Id 'dashboardScanPanel' -Title 'Checks & Scans' -Icon (New-UDIcon -Icon 'Search') -Active -Children {
                 New-UDElement -Tag 'section' -Id 'dashboardScanSection' -Attributes @{ 'data-hideable' = 'true'; style = @{ marginBottom = '28px' } } -Content {
-                    New-UDTypography -Text 'Cloud checks, scan results, and Prowler-based findings.' -Variant 'body2' -Style @{ marginBottom = '16px'; color = '#666' }
+                    New-UDTypography -Text 'Cloud checks, scan results, and finding evidence.' -Variant 'body2' -Style @{ marginBottom = '16px'; color = '#666' }
 
             if ($scanRuns -and $scanRuns.Count -gt 0) {
                 # Initialize selected scan run to most recent if not already set

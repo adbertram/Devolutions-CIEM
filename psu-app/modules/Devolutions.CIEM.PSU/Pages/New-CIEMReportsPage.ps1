@@ -29,7 +29,15 @@ function New-CIEMReportsPage {
                         New-UDTypography -Text 'No CIEM reports are registered.' -Variant 'body2' -Style @{ opacity = 0.5; fontStyle = 'italic'; padding = '16px' }
                     }
                     else {
-                        $selectedReport = $reports[0]
+                        if (-not $Page:SelectedReportId) {
+                            $Page:SelectedReportId = [string]$reports[0].Id
+                        }
+
+                        $selectedReport = $reports | Where-Object { $_.Id -eq $Page:SelectedReportId } | Select-Object -First 1
+                        if (-not $selectedReport) {
+                            throw "Selected CIEM report '$($Page:SelectedReportId)' is not registered."
+                        }
+
                         $registryRows = @(
                             foreach ($report in $reports) {
                                 [pscustomobject]@{
@@ -50,55 +58,131 @@ function New-CIEMReportsPage {
                             )
                         }
 
-                        $result = Devolutions.CIEM\Invoke-CIEMReport -Id $selectedReport.Id
-                        $reportRows = @($result.Rows)
-                        $tableRows = @(
-                            foreach ($row in $reportRows) {
-                                $tableRow = [ordered]@{}
-                                foreach ($column in $result.Columns) {
-                                    $property = $row.PSObject.Properties[$column]
-                                    if (-not $property) {
-                                        throw "CIEM report '$($result.ReportId)' row is missing configured column '$column'."
-                                    }
-                                    $tableRow[$column] = $property.Value
-                                }
-                                [pscustomobject]$tableRow
-                            }
-                        )
+                        $completedRuns = @(Devolutions.CIEM\Get-CIEMAzureDiscoveryRun -Status 'Completed' -Last 25)
 
-                        New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-result' = 'true'; style = @{ display = 'grid'; gap = '14px' } } -Content {
-                            New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-context' = 'true' } -Content {
-                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                                    New-UDTypography -Text $result.Title -Variant 'h5'
-                                    New-UDChip -Label "Run #$($result.Context.RunId)" -Size 'small' -Variant 'outlined'
-                                    New-UDChip -Label "Scope $($result.Context.Scope)" -Size 'small' -Variant 'outlined'
-                                    New-UDChip -Label "Status $($result.Context.Status)" -Size 'small' -Variant 'outlined'
-                                    New-UDChip -Label "Generated $($result.GeneratedAt.ToString('yyyy-MM-dd HH:mm')) UTC" -Size 'small' -Variant 'outlined'
-                                }
-                            }
+                        New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-history' = 'true'; style = @{ marginBottom = '18px' } } -Content {
+                            New-UDTypography -Text 'Completed Discovery Runs' -Variant 'h5' -Style @{ marginBottom = '8px' }
+                            New-UDTypography -Text 'Generate the selected report against any completed discovery run to view current or past report evidence.' -Variant 'body2' -Style @{ opacity = 0.7; marginBottom = '14px' }
 
-                            New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-summary' = 'true' } -Content {
-                                New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
-                                    foreach ($summary in @($selectedReport.StatusSummary)) {
-                                        $status = [string]$summary.status
-                                        $count = @($reportRows | Where-Object { $_.Status -eq $status }).Count
-                                        New-UDChip -Label "$status $count" -Size 'small' -Style @{ backgroundColor = [string]$summary.color; color = 'white' }
-                                    }
-                                }
-                            }
-
-                            if ($tableRows.Count -eq 0) {
-                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-result-table' = 'true' } -Content {
-                                    New-UDTypography -Text $selectedReport.EmptyState -Variant 'body2' -Style @{ opacity = 0.6; fontStyle = 'italic'; padding = '12px' }
-                                }
+                            if ($completedRuns.Count -eq 0) {
+                                New-UDTypography -Text 'No completed discovery runs are available for report generation.' -Variant 'body2' -Style @{ opacity = 0.6; fontStyle = 'italic'; padding = '12px' }
                             }
                             else {
-                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-result-table' = 'true' } -Content {
-                                    New-UDTable -Data $tableRows -Columns @(
-                                        foreach ($column in $result.Columns) {
-                                            New-UDTableColumn -Property $column -Title $column
+                                if (-not $Page:SelectedReportRunId) {
+                                    $Page:SelectedReportRunId = [int]$completedRuns[0].Id
+                                }
+
+                                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                    New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '300px' } } -Content {
+                                        New-UDSelect -Id 'reportSelector' -Label 'Report' -Option {
+                                            foreach ($report in $reports) {
+                                                New-UDSelectOption -Name $report.Title -Value $report.Id
+                                            }
+                                        } -DefaultValue $Page:SelectedReportId -OnChange {
+                                            $Page:SelectedReportId = [string]$EventData
+                                            $Page:ReportRequest = $null
+                                            Sync-UDElement -Id 'ciemReportsPanel'
+                                        } -FullWidth
+                                    }
+
+                                    New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '420px' } } -Content {
+                                        New-UDSelect -Id 'reportRunSelector' -Label 'Discovery Run' -Option {
+                                            foreach ($run in $completedRuns) {
+                                                $completedAt = ([datetime]$run.CompletedAt).ToString('yyyy-MM-dd HH:mm')
+                                                New-UDSelectOption -Name "Run #$($run.Id) - $completedAt UTC - Scope $($run.Scope)" -Value $run.Id
+                                            }
+                                        } -DefaultValue $Page:SelectedReportRunId -OnChange {
+                                            $Page:SelectedReportRunId = [int]$EventData
+                                            $Page:ReportRequest = $null
+                                            Sync-UDElement -Id 'ciemReportsPanel'
+                                        } -FullWidth
+                                    }
+
+                                    New-UDButton -Id 'generateReportBtn' -Text 'Generate Report' -Variant 'contained' -Color 'primary' -OnClick {
+                                        $selectedReportId = [string](Get-UDElement -Id 'reportSelector').value
+                                        $selectedRunId = [int](Get-UDElement -Id 'reportRunSelector').value
+
+                                        if ([string]::IsNullOrWhiteSpace($selectedReportId)) {
+                                            throw 'Report selection is required.'
                                         }
-                                    )
+                                        if ($selectedRunId -le 0) {
+                                            throw 'Completed discovery run selection is required.'
+                                        }
+
+                                        $Page:SelectedReportId = $selectedReportId
+                                        $Page:SelectedReportRunId = $selectedRunId
+                                        $Page:ReportRequest = @{
+                                            ReportId = $selectedReportId
+                                            RunId    = $selectedRunId
+                                        }
+                                        Sync-UDElement -Id 'ciemReportsPanel'
+                                    }
+                                }
+                            }
+                        }
+
+                        if (-not $Page:ReportRequest) {
+                            New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-placeholder' = 'true'; style = @{ padding = '14px'; opacity = 0.7 } } -Content {
+                                New-UDTypography -Text 'Select a report and completed discovery run, then generate the report.' -Variant 'body2'
+                            }
+                        }
+                        else {
+                            $selectedRunId = [int]$Page:ReportRequest.RunId
+                            $selectedReport = $reports | Where-Object { $_.Id -eq $Page:ReportRequest.ReportId } | Select-Object -First 1
+                            if (-not $selectedReport) {
+                                throw "Selected CIEM report '$($Page:ReportRequest.ReportId)' is not registered."
+                            }
+
+                            $result = Devolutions.CIEM\Invoke-CIEMReport -Id $selectedReport.Id -Parameter @{ RunId = $selectedRunId }
+                            $reportRows = @($result.Rows)
+                            $tableRows = @(
+                                foreach ($row in $reportRows) {
+                                    $tableRow = [ordered]@{}
+                                    foreach ($column in $result.Columns) {
+                                        $property = $row.PSObject.Properties[$column]
+                                        if (-not $property) {
+                                            throw "CIEM report '$($result.ReportId)' row is missing configured column '$column'."
+                                        }
+                                        $tableRow[$column] = $property.Value
+                                    }
+                                    [pscustomobject]$tableRow
+                                }
+                            )
+
+                            New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-result' = 'true'; style = @{ display = 'grid'; gap = '14px' } } -Content {
+                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-context' = 'true' } -Content {
+                                    New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                                        New-UDTypography -Text $result.Title -Variant 'h5'
+                                        New-UDChip -Label "Run #$($result.Context.RunId)" -Size 'small' -Variant 'outlined'
+                                        New-UDChip -Label "Scope $($result.Context.Scope)" -Size 'small' -Variant 'outlined'
+                                        New-UDChip -Label "Status $($result.Context.Status)" -Size 'small' -Variant 'outlined'
+                                        New-UDChip -Label "Generated $($result.GeneratedAt.ToString('yyyy-MM-dd HH:mm')) UTC" -Size 'small' -Variant 'outlined'
+                                    }
+                                }
+
+                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-summary' = 'true' } -Content {
+                                    New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                        foreach ($summary in @($selectedReport.StatusSummary)) {
+                                            $status = [string]$summary.status
+                                            $count = @($reportRows | Where-Object { $_.Status -eq $status }).Count
+                                            New-UDChip -Label "$status $count" -Size 'small' -Style @{ backgroundColor = [string]$summary.color; color = 'white' }
+                                        }
+                                    }
+                                }
+
+                                if ($tableRows.Count -eq 0) {
+                                    New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-result-table' = 'true' } -Content {
+                                        New-UDTypography -Text $selectedReport.EmptyState -Variant 'body2' -Style @{ opacity = 0.6; fontStyle = 'italic'; padding = '12px' }
+                                    }
+                                }
+                                else {
+                                    New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-report-result-table' = 'true' } -Content {
+                                        New-UDTable -Data $tableRows -Columns @(
+                                            foreach ($column in $result.Columns) {
+                                                New-UDTableColumn -Property $column -Title $column
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

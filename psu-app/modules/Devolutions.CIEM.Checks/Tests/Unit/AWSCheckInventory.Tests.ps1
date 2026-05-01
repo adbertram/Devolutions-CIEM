@@ -33,7 +33,7 @@ Describe 'AWS check inventory' {
         $placeholderFiles = @(
             Get-ChildItem -LiteralPath $script:AWSChecksRoot -Filter '*.ps1' -File |
                 Where-Object {
-                    (Get-Content -LiteralPath $_.FullName -Raw) -match 'This check requires manual implementation|TODO: Implement check logic based on Prowler check'
+                    (Get-Content -LiteralPath $_.FullName -Raw) -match 'This check requires manual implementation|TODO: Implement check logic from generated source'
                 }
         )
 

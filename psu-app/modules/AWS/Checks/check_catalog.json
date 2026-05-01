@@ -10,7 +10,7 @@
     "Severity": "critical",
     "Remediation": {
       "Text": "Delete root access keys and use IAM roles with temporary credentials for automation.",
-      "Url": "https://hub.prowler.com/check/iam_no_root_access_key"
+      "Url": ""
     },
     "RelatedUrl": "",
     "CheckScript": "Test-IamNoRootAccessKey.ps1",
@@ -39,7 +39,7 @@
     "Severity": "low",
     "Remediation": {
       "Text": "Enable the lowercase-character requirement in the IAM account password policy.",
-      "Url": "https://hub.prowler.com/check/iam_password_policy_lowercase"
+      "Url": ""
     },
     "RelatedUrl": "",
     "CheckScript": "Test-IamPasswordPolicyLowercase.ps1",
@@ -67,7 +67,7 @@
     "Severity": "critical",
     "Remediation": {
       "Text": "Enable MFA for the root account and remove root access keys.",
-      "Url": "https://hub.prowler.com/check/iam_root_mfa_enabled"
+      "Url": ""
     },
     "RelatedUrl": "",
     "CheckScript": "Test-IamRootMfaEnabled.ps1",
@@ -96,7 +96,7 @@
     "Severity": "high",
     "Remediation": {
       "Text": "Require MFA for IAM users with console passwords, or remove console passwords for users that do not need console access.",
-      "Url": "https://hub.prowler.com/check/iam_user_mfa_enabled_console_access"
+      "Url": ""
     },
     "RelatedUrl": "",
     "CheckScript": "Test-IamUserMfaEnabledConsoleAccess.ps1",

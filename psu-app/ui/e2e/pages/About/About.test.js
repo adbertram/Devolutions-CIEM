@@ -10,44 +10,27 @@ test.describe('About Page', () => {
   });
 
   test.describe('when the CIEM module is loaded with providers', () => {
-    test('should display module description mentioning security scanning', async () => {
+    test('should display checks and identities sections', async () => {
       const cardVisible = await aboutPage.isMainCardVisible();
       expect(cardVisible).toBe(true);
       const bodyText = await aboutPage.getText(aboutPage.selectors.mainCard);
-      expect(bodyText).toContain('security scanning solution');
+      expect(bodyText).toContain('Checks');
+      expect(bodyText).toContain('Identities');
     });
 
-    test('should list Azure security checks with count from provider data', async () => {
-      const features = await aboutPage.getFeatureTexts();
-      const azureFeature = features.find(f => f.includes('Azure') && f.includes('security checks'));
-      expect(azureFeature).toBeTruthy();
-      // Should contain a number (the check count)
-      expect(azureFeature).toMatch(/\d+/);
+    test('should explain checks support with provider check counts', async () => {
+      const checksText = await aboutPage.getChecksSectionText();
+      expect(checksText).toContain('Azure');
+      expect(checksText).toContain('AWS');
+      expect(checksText).toContain('security checks');
+      expect(checksText).toMatch(/\d+/);
     });
 
-    test('should list AWS security checks with count from provider data', async () => {
-      const features = await aboutPage.getFeatureTexts();
-      const awsFeature = features.find(f => f.includes('AWS') && f.includes('security checks'));
-      expect(awsFeature).toBeTruthy();
-      expect(awsFeature).toMatch(/\d+/);
-    });
-
-    test('should include multi-provider support in features list', async () => {
-      const features = await aboutPage.getFeatureTexts();
-      const multiProvider = features.find(f => f.includes('Multi-provider'));
-      expect(multiProvider).toBeTruthy();
-    });
-
-    test('should include identity and entitlement focused checks in features list', async () => {
-      const features = await aboutPage.getFeatureTexts();
-      const identityFeature = features.find(f => f.includes('Identities') || f.includes('entitlement'));
-      expect(identityFeature).toBeTruthy();
-    });
-
-    test('should include PAM integration in features list', async () => {
-      const features = await aboutPage.getFeatureTexts();
-      const pamFeature = features.find(f => f.includes('PAM') || f.includes('remediation'));
-      expect(pamFeature).toBeTruthy();
+    test('should explain identity support and PAM remediation path', async () => {
+      const identitiesText = await aboutPage.getIdentitiesSectionText();
+      expect(identitiesText).toContain('identity inventory');
+      expect(identitiesText).toContain('effective entitlement');
+      expect(identitiesText).toContain('Devolutions PAM');
     });
   });
 

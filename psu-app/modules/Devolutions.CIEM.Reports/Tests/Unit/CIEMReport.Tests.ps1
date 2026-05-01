@@ -36,6 +36,7 @@ Describe 'CIEM Reports' {
             $props | Should -Contain 'Visuals'
             $props | Should -Contain 'Context'
         }
+
     }
 
     Context 'Get-CIEMReport' {
@@ -120,4 +121,5 @@ Describe 'CIEM Reports' {
                 Should -Throw "*row is missing configured column 'SourceApi'*"
         }
     }
+
 }

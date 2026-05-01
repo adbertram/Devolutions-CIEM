@@ -186,7 +186,12 @@ psu-app/data/ciem.log
 agent_workspaces/
 test-results/
 .agents/skills/status-reports/reports/
+.agents/skills/status-reports/scripts/*.log
 
 # Claude Code local config (skills, commands, agents, hooks)
 .claude/
-.codex/
+.codex/*
+!.codex/scripts/
+!.codex/scripts/environment_setup.sh
+!.codex/environments/
+!.codex/environments/environment.toml

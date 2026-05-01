@@ -10,7 +10,31 @@ Supports `dryrun` mode: invoke with "dryrun" in the arguments to send the report
 
 <process>
 
-**Step 1 — Gather Recent Work (Internal Only)**
+**Step 1 — Check Previous Reports and Gather Recent Work (Internal Only)**
+
+Run the historical report query first, then read the output before drafting anything:
+
+```bash
+{baseDir}/scripts/get-status-report.sh --days 7
+```
+
+Use this output to avoid duplicate status items. Do not report a task again if it was already covered in the last week. If work continued on an already-reported item, include only the new user-facing progress since the earlier report.
+
+Review Codex sessions from the last 7 days for this repo before drafting. This catches meaningful work that may not be obvious from git alone, including troubleshooting, validation, and in-progress implementation context.
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"
+codex-sessions sessions list --project-path "$repo_root" --since 7d --limit 100
+codex-sessions conversations list --project-path "$repo_root" --since 7d --limit 100 --properties session_id,conversation_id,created_at,last_activity,summary
+```
+
+Read the session and conversation summaries. If a summary points to user-facing CIEM work but lacks enough detail for an accurate status item, inspect that session timeline:
+
+```bash
+codex-sessions timeline consolidated --session-id <session-id> --limit 200 --properties time,event_type,conversation_id,role,name,text
+```
+
+Use session history as evidence for what happened, but do not report internal workflow maintenance, status-report drafting, or Codex/Claude skill updates unless the update itself is relevant to the CIEM team. Do not fabricate details from vague summaries; inspect the timeline or omit the item.
 
 Run BOTH git log AND git status to understand what changed. Pending uncommitted work is in-progress but still real progress — include it in the report. This is for YOUR reference only — NEVER include branch names, commit hashes, merge references, file paths, or any git terminology in the report.
 
@@ -143,6 +167,8 @@ Channel `C0AFCLP7SUF` members: Marc-Andre Moreau (mamoreau), Simon Chalifoux (sc
 </rules>
 
 <success_criteria>
+- [ ] Last 7 days of archived status reports reviewed with `scripts/get-status-report.sh --days 7`
+- [ ] Last 7 days of Codex sessions reviewed with `codex-sessions` for this repo
 - [ ] Git log from past week gathered (internal only)
 - [ ] Report folder created at `{baseDir}/reports/YYYY-MM-DD/`
 - [ ] Screenshots captured ONLY if user explicitly asked (otherwise skip entirely)

@@ -19,6 +19,18 @@ Describe 'Configuration page required permissions modal' {
 }
 
 Describe 'Configuration page PSU-native form and certificate upload' {
+    It 'does not render an initialized status chip in the CIEM Database card' {
+        $script:PageContent | Should -Not -Match "New-UDChip\s+-Label\s+'Initialized'"
+        $script:PageContent | Should -Not -Match 'New-UDChip\s+-Label\s+"Initialized"'
+    }
+
+    It 'explains that the database schema action creates CIEM tables and refreshes catalogs' {
+        $script:PageContent | Should -Match 'Creates missing CIEM tables'
+        $script:PageContent | Should -Match 'refreshes provider and check catalogs'
+        $script:PageContent | Should -Match 'New-CIEMDatabase'
+        $script:PageContent | Should -Match 'Reapply Schema and Catalogs'
+    }
+
     It 'uses a PSU form submit handler for saving configuration values' {
         $script:PageContent | Should -Match "New-UDForm\s+-Id\s+'ciemConfigForm'"
         $script:PageContent | Should -Match '-OnSubmit\s*{'

@@ -17,7 +17,7 @@ class DashboardPageHelpers extends BasePage {
       identityPanel: '#dashboardIdentityPanel',
       scanSection: '#dashboardScanSection',
       identitySection: '#dashboardIdentitySection',
-      scanSectionHeading: "#dashboardScanPanel:has-text('Prowler Checks & Scans')",
+      scanSectionHeading: "#dashboardScanPanel:has-text('Checks & Scans')",
       identitySectionHeading: "#dashboardIdentityPanel:has-text('Identity Stats')",
       // Summary cards
       summaryCards: '.MuiGrid-container .MuiCard-root',
@@ -94,8 +94,13 @@ class DashboardPageHelpers extends BasePage {
   async clickScanPanelHeader() {
     const section = this.page.locator(this.selectors.scanSection);
     const visibleBeforeClick = await section.isVisible();
-    await this.page.locator(this.selectors.scanPanel).getByText('Prowler Checks & Scans').first().click();
+    await this.page.locator(this.selectors.scanPanel).getByText('Checks & Scans').first().click();
     await section.waitFor({ state: visibleBeforeClick ? 'hidden' : 'visible', timeout: 15000 });
+  }
+
+  async getDashboardContentText() {
+    await this.waitForDashboardState();
+    return await this.page.locator('body').textContent();
   }
 
   async clickIdentityPanelHeader() {

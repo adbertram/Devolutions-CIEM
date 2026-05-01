@@ -36,7 +36,18 @@ test.describe('Reports Page', () => {
       expect(title.trim()).toBe('Reports');
     });
 
-    test('should render the Azure Discovery Coverage report for the latest completed discovery run', async () => {
+    test('should display report generation controls and completed discovery run history', async () => {
+      expect(await reportsPage.isGenerateReportButtonVisible()).toBe(true);
+      expect(await reportsPage.isReportRunSelectorVisible()).toBe(true);
+
+      const historyText = await reportsPage.getReportHistoryText();
+      expect(historyText).toContain('Completed Discovery Runs');
+      expect(historyText).toContain(`Run #${seededRunId}`);
+    });
+
+    test('should render the Azure Discovery Coverage report on demand', async () => {
+      await reportsPage.clickGenerateReport();
+
       const resultVisible = await reportsPage.isReportResultVisible();
       expect(resultVisible).toBe(true);
 

@@ -397,19 +397,49 @@ function getPipelineValue(result) {
 
 function psuSqlCommand(sql, returnRows) {
   const encodedSql = Buffer.from(sql, 'utf8').toString('base64');
-  const operation = returnRows
-    ? '$rows = Invoke-CIEMQuery -Query $query'
-    : '$rows = Invoke-CIEMQuery -Query $query -AsNonQuery';
   return `
 $ErrorActionPreference = 'Stop'
 $query = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedSql}'))
-${operation}
+$rows = Invoke-CIEMQuery -Query $query
 if ($null -eq $rows) {
     '[]'
 }
 else {
-    @($rows) | ConvertTo-Json -Depth 30 -Compress
+    ConvertTo-Json -InputObject @($rows) -Depth 30 -Compress
 }
+`;
+}
+
+function splitSqlStatements(sql) {
+  return sql
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(statement => statement.length > 0);
+}
+
+function psuSqlNonQueryCommand(sql) {
+  const statements = splitSqlStatements(sql);
+  const encodedStatements = Buffer.from(JSON.stringify(statements), 'utf8').toString('base64');
+  return `
+$ErrorActionPreference = 'Stop'
+$statementsJson = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedStatements}'))
+$statements = @($statementsJson | ConvertFrom-Json)
+$databasePath = Get-CIEMDatabasePath
+$connection = Open-PSUSQLiteConnection -Database $databasePath
+try {
+    foreach ($statement in $statements) {
+        try {
+            Invoke-PSUSQLiteQuery -Connection $connection -Query $statement -AsNonQuery | Out-Null
+        }
+        catch {
+            throw ('SQL non-query failed for statement: {0}{1}{2}' -f $statement, [Environment]::NewLine, $_.Exception.Message)
+        }
+    }
+}
+finally {
+    $connection.Dispose()
+}
+'[]'
 `;
 }
 
@@ -443,7 +473,7 @@ function sshQuery(sql) {
  */
 function sshNonQuery(sql) {
   if (!testConfig.environment.usesPublishPointDatabase) {
-    getPipelineValue(runPSUCommandSync(psuSqlCommand(sql, false), 120000));
+    getPipelineValue(runPSUCommandSync(psuSqlNonQueryCommand(sql), 120000));
     return;
   }
 

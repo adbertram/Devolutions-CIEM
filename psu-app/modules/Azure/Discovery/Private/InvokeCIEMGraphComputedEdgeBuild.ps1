@@ -56,8 +56,8 @@ function InvokeCIEMGraphComputedEdgeBuild {
 
     $edgeCount = 0
 
-    # Node existence cache to avoid repeated DB queries
-    $nodeExistsCache = @{}
+    # PowerShell hashtables are case-insensitive; SQLite text foreign keys are not.
+    $nodeExistsCache = [System.Collections.Generic.Dictionary[string, bool]]::new([System.StringComparer]::Ordinal)
 
     # Build Save-CIEMGraphEdge splat base
     $baseSplat = @{ Computed = 1; CollectedAt = $CollectedAt }
@@ -94,7 +94,12 @@ function InvokeCIEMGraphComputedEdgeBuild {
 
     function SaveEdgeStrict([hashtable]$splat) {
         $ErrorActionPreference = 'Stop'
-        Save-CIEMGraphEdge @splat
+        try {
+            Save-CIEMGraphEdge @splat
+        }
+        catch {
+            throw "Failed to save computed graph edge Kind='$($splat.Kind)' SourceId='$($splat.SourceId)' TargetId='$($splat.TargetId)': $($_.Exception.Message)"
+        }
         $true
     }
 
