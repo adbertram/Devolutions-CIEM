@@ -5,6 +5,37 @@
 #   . (Join-Path $projectRoot 'psu-app' 'Tests' 'E2E' 'PesterE2EHelper.ps1')
 #   Initialize-PesterE2E -ProjectRoot $projectRoot
 
+$script:PesterE2EAzureCommandTimeoutSeconds = 300
+$script:PesterE2EAzureLongRunningTimeoutSeconds = 3600
+
+function script:GetPesterE2ECommandTimeout {
+    param(
+        [Parameter(Mandatory)][int]$RequestedSeconds
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if ($script:PesterE2EEnvironment -eq 'azure' -and $RequestedSeconds -lt $script:PesterE2EAzureCommandTimeoutSeconds) {
+        return $script:PesterE2EAzureCommandTimeoutSeconds
+    }
+
+    $RequestedSeconds
+}
+
+function script:GetPesterE2ELongRunningTimeout {
+    param(
+        [Parameter(Mandatory)][int]$RequestedSeconds
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if ($script:PesterE2EEnvironment -eq 'azure' -and $RequestedSeconds -lt $script:PesterE2EAzureLongRunningTimeoutSeconds) {
+        return $script:PesterE2EAzureLongRunningTimeoutSeconds
+    }
+
+    $RequestedSeconds
+}
+
 function script:Initialize-PesterE2E {
     param(
         [Parameter(Mandatory)][string]$ProjectRoot,
@@ -48,7 +79,8 @@ function script:Initialize-PesterE2E {
     $lastHealthError = $null
 
     try {
-        $response = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 5 -ErrorAction Stop
+        $healthTimeoutSeconds = if ($Environment -eq 'azure') { 30 } else { 5 }
+        $response = Invoke-RestMethod -Uri $healthUrl -TimeoutSec $healthTimeoutSeconds -ErrorAction Stop
         $isReady = $response.loading -eq $false
     } catch {
         $lastHealthError = $_.Exception.Message
@@ -105,13 +137,14 @@ function script:Run-OnPSU {
     )
 
     $ErrorActionPreference = 'Stop'
+    $effectiveTimeoutSeconds = GetPesterE2ECommandTimeout -RequestedSeconds $TimeoutSeconds
 
     $wrappedCommand = @"
 `$ErrorActionPreference = 'Stop'
 `$__result = & { $Command }
 if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
 "@
-    $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -Environment $script:PesterE2EEnvironment -TimeoutSeconds $TimeoutSeconds)
+    $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -Environment $script:PesterE2EEnvironment -TimeoutSeconds $effectiveTimeoutSeconds)
     $jobResult = $allOutput | Where-Object { $_.PSObject.Properties.Name -contains 'JobId' } | Select-Object -Last 1
 
     if (-not $jobResult) { throw "PSU command returned no job result." }
@@ -146,6 +179,7 @@ function script:Run-OnPSU-LongRunning {
     )
 
     $ErrorActionPreference = 'Stop'
+    $effectiveTimeoutSeconds = GetPesterE2ELongRunningTimeout -RequestedSeconds $TimeoutSeconds
 
-    Run-OnPSU -Command $Command -TimeoutSeconds $TimeoutSeconds
+    Run-OnPSU -Command $Command -TimeoutSeconds $effectiveTimeoutSeconds
 }

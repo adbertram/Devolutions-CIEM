@@ -23,4 +23,14 @@ Describe 'PesterE2EHelper environment routing' {
     It 'runs remote commands with ErrorActionPreference Stop' {
         $script:helperSource | Should -Match "\`$ErrorActionPreference = 'Stop'"
     }
+
+    It 'defines an Azure minimum command timeout for slow App Service runs' {
+        $script:helperSource | Should -Match "\`$script:PesterE2EAzureCommandTimeoutSeconds = 300"
+        $script:helperSource | Should -Match 'GetPesterE2ECommandTimeout'
+    }
+
+    It 'defines an Azure minimum long-running timeout for full discovery runs' {
+        $script:helperSource | Should -Match "\`$script:PesterE2EAzureLongRunningTimeoutSeconds = 3600"
+        $script:helperSource | Should -Match 'GetPesterE2ELongRunningTimeout'
+    }
 }

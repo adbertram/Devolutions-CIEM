@@ -145,6 +145,7 @@ param([string]$ScriptContent)
 
     $startTime = Get-Date
     $jobStatus = $null
+    $pollDelayMilliseconds = if ($script:PSUConnection.IsAzure) { 10000 } else { 500 }
     $terminalStatuses = @(2, 3, 5, 9, 10, 11)  # Completed, Failed, Canceled, TimedOut, Warning, WarningOutput
     $statusNames = @{
         0  = 'Queued'
@@ -161,22 +162,25 @@ param([string]$ScriptContent)
         11 = 'WarningOutput'
     }
 
-    do {
-        Start-Sleep -Milliseconds 500
-
+    while ($true) {
         $jobUri = "$baseUrl/api/v1/job/$jobId"
         $jobDetails = & $invokePSURestRequest -Uri $jobUri -Method Get
         $jobStatus = [int]$jobDetails.status
         $statusName = $statusNames[$jobStatus]
 
+        if ($jobStatus -in $terminalStatuses) {
+            break
+        }
+
         $elapsed = (Get-Date) - $startTime
-        if ($jobStatus -notin $terminalStatuses -and $elapsed.TotalSeconds -ge $TimeoutSeconds) {
+        if ($elapsed.TotalSeconds -ge $TimeoutSeconds) {
             throw "Job timed out after ${TimeoutSeconds}s. Status: $statusName"
         }
 
         Write-Verbose "Job status: $statusName (elapsed: $([math]::Round($elapsed.TotalSeconds, 1))s)"
 
-    } while ($jobStatus -notin $terminalStatuses)
+        Start-Sleep -Milliseconds $pollDelayMilliseconds
+    }
 
     $finalStatusName = $statusNames[$jobStatus]
     Write-Verbose "Job completed with status: $finalStatusName"

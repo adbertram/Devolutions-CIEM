@@ -219,6 +219,21 @@ Describe 'Invoke-CIEMCommand' {
         }
     }
 
+    Context 'when polling an Azure PSU job that is still running' {
+        BeforeAll {
+            $adminRoot = Resolve-Path (Join-Path $PSScriptRoot '../..')
+            $script:commandSource = Get-Content (Join-Path $adminRoot 'Public/Invoke-CIEMCommand.ps1') -Raw
+        }
+
+        It 'uses a ten-second poll delay for Azure targets' {
+            $script:commandSource | Should -Match "if \(\`$script:PSUConnection\.IsAzure\) \{ 10000 \} else \{ 500 \}"
+        }
+
+        It 'polls job status before sleeping between non-terminal polls' {
+            $script:commandSource | Should -Match 'while \(\$true\)[\s\S]+/api/v1/job/\$jobId[\s\S]+if \(\$jobStatus -in \$terminalStatuses\)[\s\S]+Start-Sleep -Milliseconds \$pollDelayMilliseconds'
+        }
+    }
+
     Context 'when talking to an ngrok-fronted PSU over HTTPS' {
         BeforeAll {
             $script:ngrokCalls = [System.Collections.Generic.List[object]]::new()
