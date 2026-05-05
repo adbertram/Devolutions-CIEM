@@ -331,3 +331,45 @@ function Test-CIEMOwnedPSUSchedule {
 
     $isOwned
 }
+
+function Test-CIEMOwnedPSUApp {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$App,
+
+        [Parameter(Mandatory)]
+        [string]$ModuleName
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $isOwned = $false
+
+    $nameProperty = $App.PSObject.Properties['Name']
+    if ($nameProperty -and [string]$nameProperty.Value -eq 'Devolutions CIEM') {
+        $isOwned = $true
+    }
+
+    $baseUrlProperty = $App.PSObject.Properties['BaseUrl']
+    if ($baseUrlProperty -and [string]$baseUrlProperty.Value -eq '/ciem') {
+        $isOwned = $true
+    }
+
+    $urlProperty = $App.PSObject.Properties['Url']
+    if ($urlProperty -and [string]$urlProperty.Value -eq '/ciem') {
+        $isOwned = $true
+    }
+
+    $moduleProperty = $App.PSObject.Properties['Module']
+    if ($moduleProperty -and [string]$moduleProperty.Value -eq $ModuleName) {
+        $isOwned = $true
+    }
+
+    $commandProperty = $App.PSObject.Properties['Command']
+    if ($commandProperty -and [string]$commandProperty.Value -eq 'New-DevolutionsCIEMApp') {
+        $isOwned = $true
+    }
+
+    $isOwned
+}

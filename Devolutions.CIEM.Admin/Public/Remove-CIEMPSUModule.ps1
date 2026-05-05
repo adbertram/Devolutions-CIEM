@@ -4,8 +4,8 @@ function Remove-CIEMPSUModule {
         Removes CIEM-owned PSU resources from a PSU target.
 
     .DESCRIPTION
-        Connects to local or Azure PSU, removes CIEM-owned jobs, schedules, and
-        scripts registered by Import-CIEMScript, then removes the CIEM module.
+        Connects to local or Azure PSU, removes CIEM-owned jobs, schedules, apps,
+        and scripts registered by Import-CIEMScript, then removes the CIEM module.
         PSU job history is reported but not deleted because PSU does not expose a
         supported job deletion surface.
     #>
@@ -118,6 +118,38 @@ function Remove-CIEMPSUModule {
         }
     }
 
+    $existingApps = @(Get-PSUApp)
+    $ownedApps = @($existingApps | Where-Object { Test-CIEMOwnedPSUApp -App $_ -ModuleName $ModuleName })
+
+    $removedApps = 0
+    foreach ($ownedApp in $ownedApps) {
+        $appIdProperty = $ownedApp.PSObject.Properties['Id']
+        if (-not $appIdProperty) {
+            throw 'PSU app resource is missing Id.'
+        }
+
+        [long]$appId = $appIdProperty.Value
+        $appName = [string]$ownedApp.Name
+        if ([string]::IsNullOrWhiteSpace($appName)) {
+            $appName = [string]$appId
+        }
+
+        $shouldRemoveApp = if ($WhatIfPreference) {
+            $false
+        }
+        elseif ($Force) {
+            $true
+        }
+        else {
+            $PSCmdlet.ShouldProcess($appName, 'Remove CIEM PSU app resource')
+        }
+
+        if ($shouldRemoveApp) {
+            Remove-PSUApp -Id $appId | Out-Null
+            $removedApps++
+        }
+    }
+
     $existingScripts = @(Get-PSUScript)
     $ownedScripts = @($existingScripts | Where-Object { Test-CIEMOwnedPSUScript -Script $_ -RemovalModel $removalModel })
 
@@ -167,9 +199,10 @@ function Remove-CIEMPSUModule {
         ($stoppedJobs -lt $activeOwnedJobs.Count) -or
         ($queuedOwnedJobs.Count -gt 0) -or
         ($removedSchedules -lt $ownedSchedules.Count) -or
+        ($removedApps -lt $ownedApps.Count) -or
         ($removedScripts -lt $ownedScripts.Count)
     )
-    $resourceActionCount = $stoppedJobs + $removedSchedules + $removedScripts
+    $resourceActionCount = $stoppedJobs + $removedSchedules + $removedApps + $removedScripts
 
     $status = if ($WhatIfPreference) {
         'WhatIf'
@@ -203,6 +236,8 @@ function Remove-CIEMPSUModule {
         JobHistoryRetained          = $historyOwnedJobs.Count
         ScheduleResourcesScanned    = $existingSchedules.Count
         ScheduleResourcesRemoved    = $removedSchedules
+        AppResourcesScanned         = $existingApps.Count
+        AppResourcesRemoved         = $removedApps
         ScriptResourcesScanned      = $existingScripts.Count
         ScriptResourcesRemoved      = $removedScripts
         ModuleRemoval               = $moduleRemoval

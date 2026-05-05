@@ -18,6 +18,7 @@ BeforeAll {
         function Get-PSUSchedule {}
         function Remove-PSUSchedule { param([object]$Schedule) }
         function Get-PSUApp {}
+        function Remove-PSUApp { param([long]$Id) }
         function New-PSUApp {
             param(
                 [string]$Name,
@@ -290,9 +291,16 @@ Describe 'Remove-CIEMPSUModule' {
         Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUScript {}
         Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUJob {}
         Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUSchedule {}
+        Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUApp {}
     }
 
-    It 'removes CIEM-owned scripts, schedules, active jobs, and the module from Azure' {
+    It 'removes CIEM-owned apps, scripts, schedules, active jobs, and the module from Azure' {
+        Mock -ModuleName Devolutions.CIEM.Admin Get-PSUApp {
+            @(
+                [pscustomobject]@{ Id = 30; Name = 'Devolutions CIEM'; BaseUrl = '/ciem'; Module = 'Devolutions.CIEM'; Command = 'New-DevolutionsCIEMApp' }
+                [pscustomobject]@{ Id = 31; Name = 'Operations'; BaseUrl = '/ops'; Module = 'Operations.Tools'; Command = 'New-OperationsApp' }
+            )
+        }
         Mock -ModuleName Devolutions.CIEM.Admin Get-PSUScript {
             if ($PSBoundParameters.ContainsKey('Name')) {
                 throw 'Remove-CIEMPSUModule must not use Get-PSUScript -Name against Azure'
@@ -324,6 +332,8 @@ Describe 'Remove-CIEMPSUModule' {
         $result = Remove-CIEMPSUModule -Environment azure -ModulePath $script:ModulePath -EnvFilePath 'NO_ENV_FILE' -Force
 
         $result.Status | Should -Be 'Partial'
+        $result.AppResourcesScanned | Should -Be 2
+        $result.AppResourcesRemoved | Should -Be 1
         $result.ScriptResourcesScanned | Should -Be 3
         $result.ScriptResourcesRemoved | Should -Be 2
         $result.JobResourcesScanned | Should -Be 6
@@ -339,6 +349,7 @@ Describe 'Remove-CIEMPSUModule' {
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Get-PSUScript -Times 1 -ParameterFilter {
             -not $PSBoundParameters.ContainsKey('Name')
         }
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUApp -Times 1 -ParameterFilter { $Id -eq 30 }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Stop-PSUJob -Times 1 -ParameterFilter { $Id -eq 10 }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUSchedule -Times 1 -ParameterFilter { $Schedule.Id -eq 20 }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 1 -ParameterFilter { $Script.Name -eq 'Checks/New-CIEMScanRun' }
@@ -352,6 +363,9 @@ Describe 'Remove-CIEMPSUModule' {
     }
 
     It 'reports WhatIf without removing CIEM resources or the module' {
+        Mock -ModuleName Devolutions.CIEM.Admin Get-PSUApp {
+            @([pscustomobject]@{ Id = 30; Name = 'Devolutions CIEM'; BaseUrl = '/ciem'; Module = 'Devolutions.CIEM'; Command = 'New-DevolutionsCIEMApp' })
+        }
         Mock -ModuleName Devolutions.CIEM.Admin Get-PSUScript {
             @([pscustomobject]@{ Name = 'Checks/New-CIEMScanRun' })
         }
@@ -365,9 +379,11 @@ Describe 'Remove-CIEMPSUModule' {
         $result = Remove-CIEMPSUModule -Environment azure -ModulePath $script:ModulePath -Force -WhatIf
 
         $result.Status | Should -Be 'WhatIf'
+        $result.AppResourcesRemoved | Should -Be 0
         $result.ScriptResourcesRemoved | Should -Be 0
         $result.JobResourcesStopped | Should -Be 0
         $result.ScheduleResourcesRemoved | Should -Be 0
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUApp -Times 0 -Scope It
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 0 -Scope It
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUSchedule -Times 0 -Scope It
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Stop-PSUJob -Times 0 -Scope It
