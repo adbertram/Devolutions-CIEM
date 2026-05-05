@@ -478,7 +478,9 @@ try {
     }
 
     $ciemApp = Invoke-DiagnosticStep -Name 'CIEMApp' -FailurePlane 'PSURuntime' -ScriptBlock {
-        @(Get-PSUApp -Name '*CIEM*') | Select-Object id, name, baseUrl, framework
+        @(Get-PSUApp) |
+            Where-Object { $_.Name -eq 'Devolutions CIEM' } |
+            Select-Object id, name, baseUrl, framework
     }
 
     $ciemModule = Invoke-DiagnosticStep -Name 'CIEMModule' -FailurePlane 'PSURuntime' -ScriptBlock {

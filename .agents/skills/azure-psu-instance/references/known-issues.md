@@ -41,6 +41,24 @@ not during app creation or render.
 </action>
 </issue>
 
+<issue name="get-psuapp-name-filter-can-miss-ciem-app">
+<symptom>
+`scripts/azure-psu-diagnostics.ps1` can report `CIEMApp = null` even when
+`Get-PSUApp` lists `Devolutions CIEM` and `/ciem` renders the dashboard.
+</symptom>
+
+<cause>
+On Azure PSU, `Get-PSUApp -Name '*CIEM*'` can return no rows while the unfiltered
+`Get-PSUApp` result contains the CIEM app.
+</cause>
+
+<action>
+Diagnostics must query `Get-PSUApp` without `-Name` and filter locally for the
+exact app name `Devolutions CIEM`. Keep the regression test
+`Devolutions.CIEM.Admin/Tests/Unit/AzurePSUDiagnostics.Tests.ps1`.
+</action>
+</issue>
+
 <issue name="app-tokens-can-disappear">
 <symptom>
 `Connect-PSU` returns HTTP 401 while `/api/v1/alive` is healthy, or publish to
