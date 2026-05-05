@@ -185,6 +185,7 @@ psu-app/data/ciem.log
 # Agent workspaces and test results (runtime artifacts)
 agent_workspaces/
 test-results/
+.fallow/*.bin
 .agents/skills/status-reports/reports/
 .agents/skills/status-reports/scripts/*.log
 
