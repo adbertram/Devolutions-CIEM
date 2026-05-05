@@ -65,6 +65,14 @@ Key context from discussions with Marc-André Moreau:
 - **Differentiation**: CIEM is niche and valuable — CSPM is a commodity already bundled free in cloud platforms
 - **Action Flow**: CIEM identifies findings → users are redirected to Devolutions PAM to take action
 
+### Product Purpose And Expected Features
+
+- `docs/ciem-feature-todos.md` is the source of truth for the project's purpose and expected product capabilities. Treat it as project direction, not an optional idea list.
+- CIEM should discover cloud and identity entitlement data, build the environment hierarchy, detect attack paths, detect exposure changes over time, and make findings actionable through existing security and PAM workflows.
+- Expected discovery priorities are scheduled discovery scans, exposure change detection, AWS effective access graph, least-privilege recommendation previews, privilege drift detection, sensitive resource access inventory, expanded attack path patterns, and discovery coverage reporting.
+- Expected action and connector priorities are outbound risk signal delivery, finding-to-action queue, PAM-backed JIT access requests, manual approval and evidence capture, least-privilege change packages, controlled role or policy updates, and automatic expiration or revocation.
+- Discovery remains read-only by default. Action, connector, PAM, SIEM, ticketing, IdP, or cloud write workflows require explicit re-scoping before implementation.
+
 ### CSPM vs CIEM Positioning (CRITICAL)
 
 Per Simon Chalifoux's detailed review (March 2026): the initial implementation was CSPM (CIS best-practice checks), not true CIEM. CSPM is a commodity — Azure Defender for Cloud offers it free. The project must focus on **CIEM-specific features** that differentiate from free tools:
@@ -377,7 +385,7 @@ The architecture planning document is at `docs/devolutions-ciem-app-architecture
 - **PSU Integration**: PSU App with scan configuration and results viewer pages
 - **Data Model**: Finding objects stored as job output (no custom tables)
 
-For new CIEM feature ideas, consult `docs/ciem-feature-todos.md`. Discovery ideas are read-only by default. Write/action ideas in that backlog must not be implemented as cloud, IdP, PAM, ticketing, or infrastructure write operations unless the user explicitly re-scopes the work.
+`docs/ciem-feature-todos.md` is the source of truth for project purpose, expected features, product feedback, build order, and discovery/action guardrails.
 
 Resource icons exist at `psu-app/modules/Devolutions.CIEM.PSU/Data/icons/`. The folder contains official Azure, Microsoft Entra, and AWS source packs in `source-packs/`, curated SVGs in `resources/`, and `resource-icon-map.json` for mapping CIEM resource types to icon assets.
 

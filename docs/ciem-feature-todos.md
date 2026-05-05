@@ -11,15 +11,31 @@ Discovery-only features are the default. Write/action features must not perform 
 - Show evidence for every finding: source API, identity, entitlement, scope, inherited path, activity timestamp, and risk reason.
 - Output recommendations as preview artifacts unless the user explicitly asks for an action workflow.
 - Treat Devolutions PAM integration as fit analysis and routing context unless write operations have been explicitly requested.
+- Treat the dashboard as an investigation and progress-measurement surface, not the only place risks are discovered.
+
+## Product Feedback
+
+Security team feedback: the dashboard is interesting as an investigation tool, but the missing product piece is surfacing new risk and pushing that signal into systems where security teams already work, such as a SIEM or alert management system. The dashboard should become the drill-in destination after a change in exposure has alerted the team, rather than assuming analysts or IT administrators will manually check CIEM on a recurring calendar task.
+
+Product implications:
+
+- Prioritize exposure-change detection over static dashboard browsing.
+- Produce alert-ready findings with enough evidence to route into SIEM, alert management, ticketing, or PSU automation workflows.
+- Keep the dashboard valuable for teams already living in PSU by making it fast to pivot from an alert into investigation.
+- Support project-based work, especially PAM implementation, by showing exposure baseline, remediation progress, remaining blockers, and before/after evidence.
+
+Implementation framing from follow-up response: CIEM currently scans an Azure tenant, stores discovered data, and parses that data with rules to build the environment hierarchy, identify attack paths, and surface risk. Ongoing risk detection requires scheduled discovery scans, then comparison of newly discovered data against prior snapshots. Notification delivery should be modeled as an optional connector feature wired to discovery results, with supported destinations such as email, SIEM messages, alert management systems, webhooks, ticketing, or PSU automation. PAM value should be evaluated as an add-on path by identifying where CIEM findings create better PAM adoption, JIT migration, remediation tracking, and exposure reduction.
 
 ## Discovery Recommended Build Order
 
-1. AWS effective access graph
-2. Least-privilege recommendation preview
-3. Privilege drift detection
-4. Sensitive resource access inventory
-5. Expanded attack path patterns
-6. Discovery coverage report
+1. Scheduled discovery scans
+2. Exposure change detection
+3. AWS effective access graph
+4. Least-privilege recommendation preview
+5. Privilege drift detection
+6. Sensitive resource access inventory
+7. Expanded attack path patterns
+8. Discovery coverage report
 
 ## Discovery-Only Features
 
@@ -91,6 +107,14 @@ Compare two local discovery snapshots and report changes:
 - New attack path appeared
 - Dormant identity became privileged
 
+### Scheduled Discovery Scans
+
+Run discovery on a schedule so CIEM can detect new exposure without requiring a user to manually start scans or check the dashboard. Scheduled scans should use the same discovery pipeline as manual scans, persist scan metadata, record success or failure evidence, and make the resulting snapshot available for exposure-change comparison.
+
+### Exposure Change Detection
+
+Compare discovery snapshots and generate alert-ready signal candidates when exposure changes. Include new risk, removed risk, risk score increase, impacted identity, impacted resource, first seen timestamp, previous state, current state, and evidence. This feature should only produce local findings and outbound-ready payload previews unless an integration workflow is explicitly scoped.
+
 ### Risk Evidence View
 
 Every finding should show the data behind the conclusion: source API, role name, scope, inherited path, last activity timestamp, resource sensitivity, and score inputs.
@@ -125,6 +149,10 @@ Report which findings are PAM candidates without creating PAM records or changin
 - Should use secret rotation
 - Should be reviewed by owner
 
+### PAM Implementation Progress View
+
+Track project progress for PAM implementation and entitlement cleanup. Show exposure baseline, current exposure, risk burn-down, findings converted to PAM candidates, remaining privileged standing access, accepted exceptions, before/after evidence for stakeholders, and where CIEM findings increase PAM value.
+
 ## Write Operation Guardrails
 
 These ideas intentionally perform actions. Do not implement or execute them from the discovery backlog alone.
@@ -138,14 +166,19 @@ These ideas intentionally perform actions. Do not implement or execute them from
 
 ## Action Recommended Build Order
 
-1. Finding-to-action queue
-2. PAM-backed JIT request workflow
-3. Manual approval and evidence capture
-4. Least-privilege change package generation
-5. Controlled role or policy update workflow
-6. Automatic expiration and revocation workflow
+1. Outbound risk signal delivery
+2. Finding-to-action queue
+3. PAM-backed JIT request workflow
+4. Manual approval and evidence capture
+5. Least-privilege change package generation
+6. Controlled role or policy update workflow
+7. Automatic expiration and revocation workflow
 
 ## Write/Action Features
+
+### Outbound Risk Signal Delivery
+
+Push new exposure-change signals to an explicitly scoped external system through a connector wired to discovery results. Supported connector targets can include email, SIEM message delivery, alert management platforms, ticketing queues, webhook endpoints, or PSU automation. Payloads should include finding evidence, previous state, current state, severity, owner or routing context when known, dashboard drill-in link, and verification steps.
 
 ### Finding-To-Action Queue
 

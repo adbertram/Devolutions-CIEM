@@ -17,6 +17,13 @@
 - CIEM is a free PSU Gallery add-on that identifies findings and routes users to Devolutions PAM for action.
 - The product direction is **identity-first CIEM**, not generic CSPM. Prioritize entitlements, dormant permissions, role right-sizing, and control relationships. Prowler-ported CSPM checks are secondary.
 
+## Product Purpose And Expected Features
+- `docs/ciem-feature-todos.md` is the source of truth for the project's purpose and expected product capabilities. Treat it as project direction, not an optional idea list.
+- CIEM should discover cloud and identity entitlement data, build the environment hierarchy, detect attack paths, detect exposure changes over time, and make findings actionable through existing security and PAM workflows.
+- Expected discovery priorities are scheduled discovery scans, exposure change detection, AWS effective access graph, least-privilege recommendation previews, privilege drift detection, sensitive resource access inventory, expanded attack path patterns, and discovery coverage reporting.
+- Expected action and connector priorities are outbound risk signal delivery, finding-to-action queue, PAM-backed JIT access requests, manual approval and evidence capture, least-privilege change packages, controlled role or policy updates, and automatic expiration or revocation.
+- Discovery remains read-only by default. Action, connector, PAM, SIEM, ticketing, IdP, or cloud write workflows require explicit re-scoping before implementation.
+
 ## Global Blocker Ownership
 - A blocker report is a progress update, not task completion.
 - Autonomously remediate blockers as part of the requested work.
@@ -120,6 +127,6 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
-- CIEM feature todos: `docs/ciem-feature-todos.md` - consult this when looking for new CIEM feature ideas. Discovery ideas are read-only by default; write/action ideas require explicit re-scoping before implementation.
+- CIEM feature todos: `docs/ciem-feature-todos.md` - source of truth for project purpose, expected features, product feedback, build order, and discovery/action guardrails.
 - Resource icons: `psu-app/modules/Devolutions.CIEM.PSU/Data/icons/` contains official Azure, Entra, and AWS icon source packs, curated SVGs in `resources/`, and `resource-icon-map.json` for CIEM resource type mappings.
 - PSU Azure hosting docs: `docs/psu-docs/config/hosting/azure.md`
