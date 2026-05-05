@@ -13,6 +13,25 @@ function Remove-PSUModule {
     .PARAMETER Version
         Specific version to remove. If not specified, removes all versions.
 
+    .PARAMETER Environment
+        PSU target to connect to before removal. Use azure for the Azure PSU
+        instance or local for the publish point PSU instance.
+
+    .PARAMETER Url
+        PSU URL to pass to Connect-PSU when Environment is specified.
+
+    .PARAMETER Token
+        PSU token to pass to Connect-PSU when Environment is specified.
+
+    .PARAMETER EnvFilePath
+        Path to the .env file to pass to Connect-PSU when Environment is specified.
+
+    .PARAMETER ResourceGroup
+        Azure resource group to pass to Connect-PSU when Environment is azure.
+
+    .PARAMETER WebAppName
+        Azure web app name to pass to Connect-PSU when Environment is azure.
+
     .PARAMETER Force
         Skip confirmation prompt.
 
@@ -24,6 +43,12 @@ function Remove-PSUModule {
 
     .EXAMPLE
         Remove-PSUModule -Name "Devolutions.CIEM" -Force
+
+    .EXAMPLE
+        Remove-PSUModule -Name "Devolutions.CIEM" -Environment azure -Force
+
+    .EXAMPLE
+        Remove-PSUModule -Name "Devolutions.CIEM" -Environment local -Force
     #>
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     param(
@@ -34,27 +59,59 @@ function Remove-PSUModule {
         [string]$Version,
 
         [Parameter()]
+        [ValidateSet('local', 'azure')]
+        [string]$Environment,
+
+        [Parameter()]
+        [string]$Url,
+
+        [Parameter()]
+        [string]$Token,
+
+        [Parameter()]
+        [string]$EnvFilePath,
+
+        [Parameter()]
+        [string]$ResourceGroup,
+
+        [Parameter()]
+        [string]$WebAppName,
+
+        [Parameter()]
         [switch]$Force
     )
 
     $ErrorActionPreference = 'Stop'
 
+    $connectionParameterNames = @('Url', 'Token', 'EnvFilePath', 'ResourceGroup', 'WebAppName')
+    $connectionParametersSupplied = @($connectionParameterNames | Where-Object { $PSBoundParameters.ContainsKey($_) })
+
+    if ($connectionParametersSupplied.Count -gt 0 -and -not $PSBoundParameters.ContainsKey('Environment')) {
+        throw "Remove-PSUModule requires -Environment when connection parameters are supplied."
+    }
+
+    if ($PSBoundParameters.ContainsKey('Environment')) {
+        $connectParams = @{}
+        foreach ($connectionParameterName in $connectionParameterNames) {
+            if ($PSBoundParameters.ContainsKey($connectionParameterName)) {
+                $connectParams[$connectionParameterName] = Get-Variable -Name $connectionParameterName -ValueOnly
+            }
+        }
+
+        if ($Environment -eq 'local') {
+            $connectParams['Local'] = $true
+        }
+
+        $null = Connect-PSU @connectParams
+    }
+
     AssertPSUConnection
 
-    $modules = Get-PSUModule -Name $Name | Where-Object { $_.name -eq $Name }
-
-    if (-not $modules) {
-        throw "Module '$Name' not found in PSU."
-    }
+    $modules = @(Get-PSUModule -Name $Name | Where-Object { $_.name -eq $Name })
 
     if ($Version) {
-        $modules = $modules | Where-Object { $_.version -eq $Version }
-        if (-not $modules) {
-            throw "Module '$Name' version '$Version' not found in PSU."
-        }
+        $modules = @($modules | Where-Object { $_.version -eq $Version })
     }
-
-    $modules = @($modules)
 
     $headers = @{
         'Authorization'              = "Bearer $($script:PSUConnection.Token)"
@@ -64,7 +121,15 @@ function Remove-PSUModule {
         'ngrok-skip-browser-warning' = 'true'
     }
 
-    $targetDesc = if ($Version) { "$Name v$Version" } else { "$Name (all versions: $($modules.version -join ', '))" }
+    $targetDesc = if ($Version) {
+        "$Name v$Version"
+    }
+    elseif ($modules.Count -gt 0) {
+        "$Name (all versions: $($modules.version -join ', '))"
+    }
+    else {
+        "$Name (not present in PSU database)"
+    }
 
     if (-not $Force -and -not $PSCmdlet.ShouldProcess($targetDesc, "Remove module")) {
         return
@@ -146,17 +211,29 @@ function Remove-PSUModule {
         }
     }
     else {
-        $results += [PSCustomObject]@{
-            Name    = $Name
-            Version = if ($Version) { $Version } else { 'All' }
-            Status  = 'Removed'
-            Source  = 'Database'
+        if ($modules.Count -eq 0) {
+            $results += [PSCustomObject]@{
+                Name    = $Name
+                Version = if ($Version) { $Version } else { 'All' }
+                Status  = 'NotFound'
+                Source  = 'Database'
+            }
+        }
+        else {
+            $results += [PSCustomObject]@{
+                Name    = $Name
+                Version = if ($Version) { $Version } else { 'All' }
+                Status  = 'Removed'
+                Source  = 'Database'
+            }
         }
     }
 
-    Write-Verbose "Syncing PSU configuration to clear module cache..."
-    Sync-PSUConfiguration -Reset | Out-Null
-    Write-Verbose "Configuration sync completed."
+    if ($modules.Count -gt 0 -or $script:PSUConnection.IsAzure) {
+        Write-Verbose "Syncing PSU configuration to clear module cache..."
+        Sync-PSUConfiguration -Reset | Out-Null
+        Write-Verbose "Configuration sync completed."
+    }
 
     $results
 }
