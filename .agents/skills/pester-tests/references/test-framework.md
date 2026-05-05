@@ -128,5 +128,6 @@ pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path path/to/te
 | Class not found in tests | Use `InModuleScope` |
 | Private function not found | `InModuleScope` with `Get-Command FuncName` (no dash = private) |
 | Data bleeds between Contexts | Use `BeforeEach` to reset state |
+| Stubbed `Universal` module leaks across files | If a test uses `New-Module -Name Universal` for PSU cmdlets, remove it in `AfterAll`; leaked stubs can make later `Mock -ModuleName Devolutions.CIEM Get-PSUScript` assertions miss calls |
 | `Should -Not -Exist` vs `Test-Path` | Always `Should -Not -Exist` for filesystem assertions |
 | Conditional `if (Test-Path)` guards | Remove — let missing files fail loudly |

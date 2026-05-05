@@ -96,6 +96,10 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU; R
 - Local publishing uses adam-server through `Publish-PSUModule -LocalOnly`.
 - Azure publishing goes through PowerShell Gallery before PSU import.
 - Do not use `-Integrated` from the external terminal publish workflow.
+- Do not print or serialize raw PSU job objects from `Invoke-CIEMCommand`,
+  `Invoke-TestCommand`, or deployment results. PSU job objects can contain
+  `appToken.token`; report only safe fields such as job ID, status, message
+  text, module version, app count, script count, and validation status.
 </safety>
 
 <success_criteria>

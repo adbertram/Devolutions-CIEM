@@ -260,12 +260,25 @@ function Import-CIEMScript {
         }
 
         if ($existingMatches.Count -eq 1) {
+            $existingScript = $existingMatches[0]
+            $existingManagedNotes = @(
+                foreach ($propertyName in @('Notes', 'CommitNotes')) {
+                    $property = $existingScript.PSObject.Properties[$propertyName]
+                    if ($property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+                        [string]$property.Value
+                    }
+                }
+            )
+            if ($existingManagedNotes -notcontains $managedScriptNotes) {
+                throw "PSU script conflict for '$($scriptDef.Name)': existing script is not marked as $managedScriptNotes."
+            }
+
             if (-not $setScriptCommand) {
                 throw 'Import-CIEMScript requires Set-PSUScript when existing scripts are present.'
             }
 
             if ($PSCmdlet.ShouldProcess($scriptDef.Name, 'Update PSU script')) {
-                Set-PSUScript -Script $existingMatches[0] `
+                Set-PSUScript -Script $existingScript `
                     -Content $content `
                     -Description $scriptDef.Description `
                     -Status $scriptDef.Status `

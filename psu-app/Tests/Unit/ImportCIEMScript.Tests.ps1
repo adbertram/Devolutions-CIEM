@@ -8,6 +8,8 @@ BeforeAll {
     $script:UniversalScriptsContent = if ($script:UniversalScriptsExists) { Get-Content -Path $script:UniversalScriptsPath -Raw } else { '' }
     $script:ImportScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Import-CIEMScript.ps1'
     $script:ImportScriptContent = Get-Content -Path $script:ImportScriptPath -Raw
+    $script:InitializeScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Initialize-CIEMPSUInstance.ps1'
+    $script:InitializeScriptContent = if (Test-Path -Path $script:InitializeScriptPath -PathType Leaf) { Get-Content -Path $script:InitializeScriptPath -Raw } else { '' }
     $script:RepairScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Repair-CIEMLegacyScriptRegistration.ps1'
     $script:RepairScriptContent = if (Test-Path -Path $script:RepairScriptPath -PathType Leaf) { Get-Content -Path $script:RepairScriptPath -Raw } else { '' }
     $script:AppScriptPath = Join-Path $PSScriptRoot '..' '..' 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1'
@@ -27,6 +29,10 @@ Describe 'Import-CIEMScript registration model' {
 
         It 'Exposes Repair-CIEMLegacyScriptRegistration as a public module command' {
             Get-Command Repair-CIEMLegacyScriptRegistration -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Exposes Initialize-CIEMPSUInstance as a public module command' {
+            Get-Command Initialize-CIEMPSUInstance -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
     }
 
@@ -110,6 +116,11 @@ Describe 'Import-CIEMScript registration model' {
             $script:ImportScriptContent | Should -Match 'Set-PSUScript'
         }
 
+        It 'Fails on existing matching scripts that are not CIEM-owned' {
+            $script:ImportScriptContent | Should -Match 'PSU script conflict'
+            $script:ImportScriptContent | Should -Match 'ManagedBy=Devolutions\.CIEM'
+        }
+
         It 'Rejects rooted or parent-traversal script paths in the manifest' {
             $script:ImportScriptContent | Should -Match 'IsPathRooted'
             $script:ImportScriptContent | Should -Match 'parent path traversal'
@@ -128,6 +139,19 @@ Describe 'Import-CIEMScript registration model' {
             $script:RepairScriptContent | Should -Match 'Remove-PSUScript'
             $script:RepairScriptContent | Should -Match 'legacyScriptExactNames'
             $script:RepairScriptContent | Should -Match 'legacyPathPatterns'
+        }
+    }
+
+    Context 'Initialize-CIEMPSUInstance implementation' {
+        It 'Runs script registration before database initialization and verifies readiness' {
+            $script:InitializeScriptPath | Should -Exist
+            $script:InitializeScriptContent | Should -Match 'Import-CIEMScript\s+@scriptRegistrationParams'
+            $script:InitializeScriptContent | Should -Match 'New-CIEMDatabase\s+-PassThru'
+            $script:InitializeScriptContent | Should -Match 'Get-PSUApp'
+            $script:InitializeScriptContent | Should -Match 'Get-PSUScript'
+            $script:InitializeScriptContent | Should -Match 'attack_path_rules'
+            $script:InitializeScriptContent | Should -Match 'checks'
+            $script:InitializeScriptContent | Should -Match 'providers'
         }
     }
 
@@ -156,7 +180,7 @@ Describe 'Import-CIEMScript registration model' {
                 }
 
                 return @(
-                    [pscustomobject]@{ Name = 'Checks/New-CIEMScanRun' }
+                    [pscustomobject]@{ Name = 'Checks/New-CIEMScanRun'; CommitNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json' }
                     [pscustomobject]@{ Name = 'Devolutions.CIEM/Start-CIEMAzureDiscovery' }
                     [pscustomobject]@{ Name = 'Checks/AttackPathRemediation-guest-user-holding-a-privileged-role' }
                     [pscustomobject]@{ Name = 'Identities/AttackPaths/AttackPathRemediation-disabled-account-still-holding-active-role-assignments' }
@@ -191,6 +215,30 @@ Describe 'Import-CIEMScript registration model' {
             Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter { $PSBoundParameters.ContainsKey('Name') }
             Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { -not $PSBoundParameters.ContainsKey('Name') -and -not $PSBoundParameters.ContainsKey('Integrated') }
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times ($result.TotalScripts - 1) -ParameterFilter { -not $PSBoundParameters.ContainsKey('Integrated') }
+        }
+
+        It 'Throws when an existing matching script is not marked as CIEM-owned' {
+            Mock -ModuleName Devolutions.CIEM Get-Command {
+                [pscustomobject]@{
+                    Name = $Name
+                }
+            } -ParameterFilter { $Name -in @('New-PSUScript', 'Get-PSUScript', 'Remove-PSUScript', 'Set-PSUScript', 'Get-PSUFolder', 'New-PSUFolder') }
+
+            Mock -ModuleName Devolutions.CIEM New-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Set-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                @(
+                    [pscustomobject]@{
+                        Name        = 'Checks/New-CIEMScanRun'
+                        CommitNotes = 'ManagedBy=Other.Module'
+                    }
+                )
+            }
+
+            { Import-CIEMScript } | Should -Throw -ExpectedMessage "*PSU script conflict for 'Checks/New-CIEMScanRun'*"
+
+            Should -Invoke -CommandName Set-PSUScript -ModuleName Devolutions.CIEM -Times 0
+            Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times 0
         }
 
         It 'Uses integrated PSU cmdlets only when requested' {

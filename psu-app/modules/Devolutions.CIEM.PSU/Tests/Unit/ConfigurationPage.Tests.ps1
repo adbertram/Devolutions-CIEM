@@ -25,10 +25,14 @@ Describe 'Configuration page PSU-native form and certificate upload' {
     }
 
     It 'explains that the database schema action creates CIEM tables and refreshes catalogs' {
-        $script:PageContent | Should -Match 'Creates missing CIEM tables'
+        $script:PageContent | Should -Match 'Reapplies CIEM database schema'
         $script:PageContent | Should -Match 'refreshes provider and check catalogs'
         $script:PageContent | Should -Match 'New-CIEMDatabase'
         $script:PageContent | Should -Match 'Reapply Schema and Catalogs'
+        $script:PageContent | Should -Not -Match 'Initialize Database'
+        $script:PageContent | Should -Not -Match 'Initialize the CIEM database before configuring providers or running scans'
+        $script:PageContent | Should -Not -Match '\$databaseExists'
+        $script:PageContent | Should -Not -Match 'if\s*\(\s*-not\s+\$databaseExists\s*\)'
     }
 
     It 'uses a PSU form submit handler for saving configuration values' {

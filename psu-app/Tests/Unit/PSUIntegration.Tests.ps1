@@ -26,6 +26,10 @@ Describe 'PSU Integration Changes' {
     Context 'PSU script registration' {
         BeforeAll {
             $script:ScriptsPath = Join-Path $script:ModuleRoot '.universal' 'scripts.ps1'
+            $script:InitializePath = Join-Path $script:ModuleRoot '.universal' 'initialize.ps1'
+            $script:AuthenticationPath = Join-Path $script:ModuleRoot '.universal' 'authentication.ps1'
+            $script:RolesPath = Join-Path $script:ModuleRoot '.universal' 'roles.ps1'
+            $script:SettingsPath = Join-Path $script:ModuleRoot '.universal' 'settings.ps1'
             $script:AppContent = Get-Content (Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1') -Raw
         }
 
@@ -35,6 +39,17 @@ Describe 'PSU Integration Changes' {
 
         It 'Does not register PSU scripts from the app startup path' {
             $script:AppContent | Should -Not -Match 'Import-CIEMScript'
+        }
+
+        It 'runs automatic CIEM setup from the PSU initialize hook' {
+            $script:InitializePath | Should -Exist
+            Get-Content -Path $script:InitializePath -Raw | Should -Match 'Initialize-CIEMPSUInstance\s+-Integrated'
+        }
+
+        It 'does not ship dev-only global PSU authentication, role, or setting resources' {
+            $script:AuthenticationPath | Should -Not -Exist
+            $script:RolesPath | Should -Not -Exist
+            $script:SettingsPath | Should -Not -Exist
         }
 
     }

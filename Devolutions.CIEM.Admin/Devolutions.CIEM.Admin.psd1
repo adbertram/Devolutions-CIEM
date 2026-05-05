@@ -8,15 +8,19 @@
     RequiredModules   = @()
     FunctionsToExport = @(
         'Connect-PSU'
+        'Deploy-CIEMPSUInstance'
+        'Deploy-CIEMPSUModule'
         'Get-ProwlerCheck'
         'Get-PSUModule'
         'Install-PSUModule'
         'Invoke-CIEMCommand'
         'Invoke-CIEMTest'
         'Invoke-TestCommand'
+        'Remove-CIEMPSUModule'
         'Publish-PSUModule'
         'Remove-PSUModule'
         'Sync-ProwlerCheck'
+        'Test-CIEMPSUDeployment'
     )
     CmdletsToExport   = @()
     VariablesToExport  = @()

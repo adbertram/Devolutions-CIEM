@@ -36,6 +36,11 @@ function Publish-PSUModule {
         By default (LocalOnly), DB files are excluded to preserve the PSU instance's
         runtime data. Azure/PSGallery publishes always exclude data files too.
 
+    .PARAMETER SkipAppRestart
+        Skip the CIEM app restart and health check after the module is imported.
+        Use this when a higher-level deployment workflow will create or restart
+        the app after additional bootstrap steps.
+
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app
 
@@ -72,7 +77,10 @@ function Publish-PSUModule {
         [switch]$LocalOnly,
 
         [Parameter()]
-        [switch]$IncludeData
+        [switch]$IncludeData,
+
+        [Parameter()]
+        [switch]$SkipAppRestart
     )
 
     $ErrorActionPreference = 'Stop'
@@ -209,43 +217,49 @@ function Publish-PSUModule {
             }
             Write-Host "  [OK] Module pushed: $moduleName v$moduleVersion -> $sshAlias" -ForegroundColor Green
 
-            Write-Host ''
-            Write-Host 'Step 4: Restarting app...' -ForegroundColor Yellow
-            $appName = $script:DefaultAppName
-            $dashboardsFile = Get-ChildItem -Path $ModulePath -Filter 'dashboards.ps1' -Recurse | Where-Object { $_.Directory.Name -eq '.universal' } | Select-Object -First 1
-            if ($dashboardsFile) {
-                $dashboardContent = Get-Content $dashboardsFile.FullName -Raw
-                if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
-                    $appName = $matches[1]
-                }
+            if ($SkipAppRestart) {
+                Write-Host ''
+                Write-Host 'Step 4: Skipping app restart; caller will restart after bootstrap.' -ForegroundColor Yellow
             }
-            Stop-PSUApp -Name $appName
-            Start-PSUApp -Name $appName
-            Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
-
-            Write-Host ''
-            Write-Host 'Step 5: Verifying app is healthy...' -ForegroundColor Yellow
-            $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
-            $healthy = $false
-            for ($i = 1; $i -le 10; $i++) {
-                Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
-                try {
-                    $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
-                    if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
-                        $healthy = $true
-                        break
+            else {
+                Write-Host ''
+                Write-Host 'Step 4: Restarting app...' -ForegroundColor Yellow
+                $appName = $script:DefaultAppName
+                $dashboardsFile = Get-ChildItem -Path $ModulePath -Filter 'dashboards.ps1' -Recurse | Where-Object { $_.Directory.Name -eq '.universal' } | Select-Object -First 1
+                if ($dashboardsFile) {
+                    $dashboardContent = Get-Content $dashboardsFile.FullName -Raw
+                    if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
+                        $appName = $matches[1]
                     }
-                    Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
                 }
-                catch {
-                    Write-Host "  Not responding yet..." -ForegroundColor Gray
+                Stop-PSUApp -Name $appName
+                Start-PSUApp -Name $appName
+                Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
+
+                Write-Host ''
+                Write-Host 'Step 5: Verifying app is healthy...' -ForegroundColor Yellow
+                $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
+                $healthy = $false
+                for ($i = 1; $i -le 10; $i++) {
+                    Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
+                    try {
+                        $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
+                        if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
+                            $healthy = $true
+                            break
+                        }
+                        Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
+                    }
+                    catch {
+                        Write-Host "  Not responding yet..." -ForegroundColor Gray
+                    }
+                    Start-Sleep -Seconds 3
                 }
-                Start-Sleep -Seconds 3
+                if (-not $healthy) {
+                    throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
+                }
+                Write-Host "  [OK] App is healthy" -ForegroundColor Green
             }
-            if (-not $healthy) {
-                throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
-            }
-            Write-Host "  [OK] App is healthy" -ForegroundColor Green
 
             Write-Host ''
             Write-Host '========================================' -ForegroundColor Cyan
@@ -497,42 +511,47 @@ NuGet API key required. Options:
         Write-Host "  [OK] Module imported" -ForegroundColor Green
         $updatedPSU = $true
 
-        $appName = $script:DefaultAppName
-        $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
-        if (Test-Path $dashboardsPath) {
-            $dashboardContent = Get-Content $dashboardsPath -Raw
-            if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
-                $appName = $matches[1]
-            }
+        if ($SkipAppRestart) {
+            Write-Host '  Skipping app restart; caller will restart after bootstrap.' -ForegroundColor Yellow
         }
-        Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
-        Stop-PSUApp -Name $appName
-        Start-PSUApp -Name $appName
-        Write-Host "  [OK] App restarted" -ForegroundColor Green
-
-        Write-Host ''
-        Write-Host 'Step 8: Verifying app is healthy...' -ForegroundColor Yellow
-        $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
-        $healthy = $false
-        for ($i = 1; $i -le 10; $i++) {
-            Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
-            try {
-                $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
-                if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
-                    $healthy = $true
-                    break
+        else {
+            $appName = $script:DefaultAppName
+            $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
+            if (Test-Path $dashboardsPath) {
+                $dashboardContent = Get-Content $dashboardsPath -Raw
+                if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
+                    $appName = $matches[1]
                 }
-                Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
             }
-            catch {
-                Write-Host "  Not responding yet..." -ForegroundColor Gray
+            Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
+            Stop-PSUApp -Name $appName
+            Start-PSUApp -Name $appName
+            Write-Host "  [OK] App restarted" -ForegroundColor Green
+
+            Write-Host ''
+            Write-Host 'Step 8: Verifying app is healthy...' -ForegroundColor Yellow
+            $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
+            $healthy = $false
+            for ($i = 1; $i -le 10; $i++) {
+                Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
+                try {
+                    $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
+                    if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
+                        $healthy = $true
+                        break
+                    }
+                    Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
+                }
+                catch {
+                    Write-Host "  Not responding yet..." -ForegroundColor Gray
+                }
+                Start-Sleep -Seconds 3
             }
-            Start-Sleep -Seconds 3
+            if (-not $healthy) {
+                throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
+            }
+            Write-Host "  [OK] App is healthy" -ForegroundColor Green
         }
-        if (-not $healthy) {
-            throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
-        }
-        Write-Host "  [OK] App is healthy" -ForegroundColor Green
 
         Write-Host ''
         Write-Host '========================================' -ForegroundColor Cyan

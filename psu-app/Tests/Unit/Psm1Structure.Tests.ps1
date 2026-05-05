@@ -7,6 +7,12 @@ BeforeAll {
     $script:InvokeQueryContent = Get-Content (Join-Path $repoRoot 'Public' 'Invoke-CIEMQuery.ps1') -Raw
     $script:ConfigPageContent = Get-Content (Join-Path $repoRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
     $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psd1'
+    $script:UniversalRoot = Join-Path $repoRoot '.universal'
+    $script:InitializeContent = if (Test-Path (Join-Path $script:UniversalRoot 'initialize.ps1') -PathType Leaf) {
+        Get-Content (Join-Path $script:UniversalRoot 'initialize.ps1') -Raw
+    } else {
+        ''
+    }
 }
 
 Describe 'Devolutions.CIEM.psm1 Structure' {
@@ -64,6 +70,14 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:NewDatabaseContent | Should -Match "Label\s*=\s*'AzureDiscovery'"
             $script:NewDatabaseContent | Should -Match 'UpdateCIEMAttackPathStorageSchema'
             $script:NewDatabaseContent | Should -Match 'Sync-CIEMAttackPathRuleCatalog'
+        }
+
+        It 'PSU initialize hook runs the automatic CIEM bootstrap' {
+            Join-Path $script:UniversalRoot 'initialize.ps1' | Should -Exist
+            $script:InitializeContent | Should -Match 'Import-Module\s+Devolutions\.CIEM'
+            $script:InitializeContent | Should -Match 'Initialize-CIEMPSUInstance\s+-Integrated'
+            $script:InitializeContent | Should -Not -Match 'New-CIEMDatabase'
+            $script:InitializeContent | Should -Not -Match 'Import-CIEMScript'
         }
     }
 
@@ -141,10 +155,25 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:InvokeQueryContent | Should -Match 'CIEM database is not initialized'
         }
 
-        It 'Configuration page exposes the database initializer before provider queries' {
+        It 'Configuration page keeps schema refresh as maintenance instead of a first-run gate' {
             $script:ConfigPageContent | Should -Match 'initializeCiemDatabaseBtn'
             $script:ConfigPageContent | Should -Match 'Devolutions\.CIEM\\New-CIEMDatabase'
             $script:ConfigPageContent | Should -Match 'Invoke-UDRedirect\s+''/ciem/config'''
+            $script:ConfigPageContent | Should -Match 'Reapply Schema and Catalogs'
+            $script:ConfigPageContent | Should -Not -Match 'Initialize the CIEM database before configuring providers or running scans'
+            $script:ConfigPageContent | Should -Not -Match '\$databaseExists'
+            $script:ConfigPageContent | Should -Not -Match 'if\s*\(\s*-not\s+\$databaseExists\s*\)'
+        }
+    }
+
+    Context 'Production PSU package resources' {
+        It 'Ships only CIEM-owned PSU configuration resources' {
+            Join-Path $script:UniversalRoot 'dashboards.ps1' | Should -Exist
+            Join-Path $script:UniversalRoot 'initialize.ps1' | Should -Exist
+            Join-Path $script:UniversalRoot 'scripts.ps1' | Should -Not -Exist
+            Join-Path $script:UniversalRoot 'authentication.ps1' | Should -Not -Exist
+            Join-Path $script:UniversalRoot 'roles.ps1' | Should -Not -Exist
+            Join-Path $script:UniversalRoot 'settings.ps1' | Should -Not -Exist
         }
     }
 

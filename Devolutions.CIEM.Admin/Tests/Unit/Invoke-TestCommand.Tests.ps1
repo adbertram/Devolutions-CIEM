@@ -10,8 +10,11 @@ Describe 'Invoke-TestCommand' {
     Context 'remote CIEM module availability' {
         BeforeEach {
             $script:capturedScriptBlock = $null
+            $script:connectEnvFilePaths = [System.Collections.Generic.List[string]]::new()
 
-            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {}
+            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {
+                $script:connectEnvFilePaths.Add([string]$EnvFilePath)
+            }
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-CIEMCommand {
                 $script:capturedScriptBlock = $ScriptBlock
                 [PSCustomObject]@{ Status = 'Completed' }
@@ -26,6 +29,12 @@ Describe 'Invoke-TestCommand' {
             $script:capturedScriptBlock.ToString() | Should -Match 'Import-Module Devolutions\.CIEM'
             $script:capturedScriptBlock.ToString() | Should -Not -Match 'Import-Module Devolutions\.CIEM -Force'
             $script:capturedScriptBlock.ToString() | Should -Match 'Get-CIEMProvider'
+        }
+
+        It 'passes a custom env file to the selected PSU connection' {
+            Invoke-TestCommand -Environment azure -EnvFilePath '/tmp/custom-ciem.env' -ScriptBlock { Get-CIEMProvider } | Out-Null
+
+            $script:connectEnvFilePaths[0] | Should -Be '/tmp/custom-ciem.env'
         }
     }
 }

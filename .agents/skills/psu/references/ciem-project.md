@@ -49,6 +49,12 @@ Invoke-TestCommand -ScriptBlock { Get-CIEMProvider }
 Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment azure
 ```
 
+Inside `Invoke-TestCommand` script blocks, use runtime-visible CIEM and PSU
+cmdlets only. The remote PSU job imports `Devolutions.CIEM`, not
+`Devolutions.CIEM.Admin`, so use `Get-Module Devolutions.CIEM` to validate the
+loaded module inside the job. Keep Admin cmdlets such as `Get-PSUModule` in the
+external session before or after the runtime probe.
+
 Use local by default. Use Azure only when explicitly validating production behavior.
 
 ## Logs and Troubleshooting
@@ -101,4 +107,3 @@ Use `scripts/invoke_command_in_azure_webapp.sh` for commands that need shell fea
 ```
 
 Commands run in the Kudu sidecar container, which shares `/home` with the PSU app. File operations work there. Runtime state queries require the PSU REST API via the `api` command.
-

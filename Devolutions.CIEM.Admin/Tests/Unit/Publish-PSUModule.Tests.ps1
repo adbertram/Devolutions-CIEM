@@ -130,6 +130,25 @@ LOCAL_PSU_TOKEN=fake-token
                 Should -Throw -ExpectedMessage '*mock gallery unavailable*'
         }
     }
+
+    Context 'when the caller will create and restart the app after publishing' {
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { [PSCustomObject]@{ Url = 'https://mocked'; Status = 'Connected' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
+            Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
+            Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Stop-PSUApp should not run when -SkipAppRestart is set' }
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp { throw 'Start-PSUApp should not run when -SkipAppRestart is set' }
+        }
+
+        It 'skips the local app restart' {
+            $result = Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -SkipAppRestart -EnvFilePath $script:envFile -Confirm:$false
+
+            $result.Status | Should -Be 'LocalImport'
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Start-PSUApp -Times 0 -Scope It
+        }
+    }
 }
 
 Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
@@ -257,6 +276,39 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
                     -Confirm:$false
             } catch {}
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Install-PSUModule -Times 1 -Scope It
+        }
+    }
+
+    Context 'when the caller will create and restart the app after remote import' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM.Admin {
+                $script:PSUConnection.Url = 'https://fake.psu'
+                $script:PSUConnection.Token = 'fake-token'
+            }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module {
+                [PSCustomObject]@{ Version = '0.0.2' }
+            }
+            Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
+            Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
+            Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {}
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Stop-PSUApp should not run when -SkipAppRestart is set' }
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp { throw 'Start-PSUApp should not run when -SkipAppRestart is set' }
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod { throw 'Health check should not run when -SkipAppRestart is set' }
+        }
+
+        It 'skips remote app restart and health check after importing the module' {
+            $result = Publish-PSUModule -ModulePath $script:remoteSrcDir `
+                -NuGetApiKey 'fake-key' `
+                -EnvFilePath 'NO_ENV_FILE' `
+                -SkipAppRestart `
+                -Confirm:$false
+
+            $result.Status | Should -Be 'Published'
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Install-PSUModule -Times 1 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Start-PSUApp -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Invoke-RestMethod -Times 0 -Scope It
         }
     }
 }

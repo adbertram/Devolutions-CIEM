@@ -1,34 +1,50 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Deploy the Azure PSU host through Devolutions.CIEM.Admin.
+
 set -euo pipefail
 
-# Deploy PSU to Azure
-# Usage: ./scripts/deploy-psu.sh [--tier S1] [--version 5.5.4] [--location westus2]
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+# shellcheck disable=SC1091
+. "$REPO_ROOT/scripts/lib/log.sh"
 
-# Defaults
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [options]
+
+Options:
+  --resource-group  Azure resource group [default: devolutions-ciem-rg]
+  --site-name       Azure Web App name [default: devolutions-ciem-psu]
+  --tier            App Service tier [default: S1]
+  --version         PSU version [default: 5.5.4]
+  --location        Azure region [default: westus2]
+  --help            Show this help
+EOF
+}
+
 RESOURCE_GROUP="devolutions-ciem-rg"
 SITE_NAME="devolutions-ciem-psu"
 LOCATION="westus2"
 TIER="S1"
 PSU_VERSION="5.5.4"
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
-    case $1 in
+    case "$1" in
+        --resource-group) RESOURCE_GROUP="$2"; shift 2 ;;
+        --site-name) SITE_NAME="$2"; shift 2 ;;
         --tier) TIER="$2"; shift 2 ;;
         --version) PSU_VERSION="$2"; shift 2 ;;
         --location) LOCATION="$2"; shift 2 ;;
-        --help)
-            echo "Usage: $0 [options]"
-            echo ""
-            echo "Options:"
-            echo "  --tier      App Service tier (B1, S1, P1V2, etc.) [default: S1]"
-            echo "  --version   PSU version [default: 5.5.4]"
-            echo "  --location  Azure region [default: westus2]"
-            exit 0
-            ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        --help) usage; exit 0 ;;
+        *) log_error "unknown option: $1"; usage >&2; exit 2 ;;
     esac
 done
+
+log_info "starting deploy-psu.sh"
+log_info "selected resource group: $RESOURCE_GROUP"
+log_info "selected site name: $SITE_NAME"
+log_info "selected location: $LOCATION"
+log_info "selected tier: $TIER"
+log_info "selected PSU version: $PSU_VERSION"
 
 echo "=== PSU Deployment ==="
 echo "Resource Group: $RESOURCE_GROUP"
@@ -38,86 +54,24 @@ echo "Tier:           $TIER"
 echo "PSU Version:    $PSU_VERSION"
 echo ""
 
-# Check Azure CLI login
-echo "Checking Azure login..."
-if ! az account show &>/dev/null; then
-    echo "ERROR: Not logged in to Azure. Run 'az login' first."
-    exit 1
-fi
+log_info "pwsh Deploy-CIEMPSUInstance (site=$SITE_NAME)"
+# shellcheck disable=SC2016
+CIEM_REPO_ROOT="$REPO_ROOT" \
+CIEM_RESOURCE_GROUP="$RESOURCE_GROUP" \
+CIEM_SITE_NAME="$SITE_NAME" \
+CIEM_LOCATION="$LOCATION" \
+CIEM_TIER="$TIER" \
+CIEM_PSU_VERSION="$PSU_VERSION" \
+pwsh -NoProfile -Command '
+$ErrorActionPreference = "Stop"
+Import-Module (Join-Path $env:CIEM_REPO_ROOT "Devolutions.CIEM.Admin/Devolutions.CIEM.Admin.psd1")
+Deploy-CIEMPSUInstance `
+    -ResourceGroup $env:CIEM_RESOURCE_GROUP `
+    -SiteName $env:CIEM_SITE_NAME `
+    -Location $env:CIEM_LOCATION `
+    -ServicePlanPricingTier $env:CIEM_TIER `
+    -PsuVersion $env:CIEM_PSU_VERSION
+'
+log_info "pwsh Deploy-CIEMPSUInstance completed"
 
-SUBSCRIPTION=$(az account show --query name -o tsv)
-echo "Using subscription: $SUBSCRIPTION"
-echo ""
-
-# Create resource group
-echo "Creating resource group..."
-az group create --name "$RESOURCE_GROUP" --location "$LOCATION" -o none
-
-# Generate JWT signing key
-echo "Generating JWT signing key..."
-JWT_KEY=$(openssl rand -base64 48 | tr -d '\n')
-
-# Deploy Bicep template
-echo "Deploying PSU..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATE_FILE="$SCRIPT_DIR/../deploy/psu_standalone.bicep"
-
-if [[ ! -f "$TEMPLATE_FILE" ]]; then
-    echo "ERROR: Bicep template not found at $TEMPLATE_FILE"
-    exit 1
-fi
-
-az deployment group create \
-    --resource-group "$RESOURCE_GROUP" \
-    --template-file "$TEMPLATE_FILE" \
-    --parameters \
-        siteName="$SITE_NAME" \
-        version="$PSU_VERSION" \
-        servicePlanPricingTier="$TIER" \
-        jwtSigningKey="$JWT_KEY" \
-    -o none
-
-echo "Deployment complete."
-echo ""
-
-# Get the URL
-APP_URL="https://${SITE_NAME}.azurewebsites.net"
-echo "PSU URL: $APP_URL"
-echo ""
-
-# Wait for PSU to be healthy
-echo "Waiting for PSU to start (this may take 2-3 minutes)..."
-MAX_ATTEMPTS=30
-ATTEMPT=0
-
-while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
-    ATTEMPT=$((ATTEMPT + 1))
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$APP_URL" 2>/dev/null || echo "000")
-
-    if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "302" ]]; then
-        echo "PSU is ready! (HTTP $HTTP_CODE)"
-        break
-    fi
-
-    echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS: HTTP $HTTP_CODE (waiting 10s...)"
-    sleep 10
-done
-
-if [[ $ATTEMPT -eq $MAX_ATTEMPTS ]]; then
-    echo "WARNING: PSU may not be fully ready. Check manually at $APP_URL"
-fi
-
-echo ""
-echo "=== Deployment Summary ==="
-echo "URL:            $APP_URL"
-echo "Resource Group: $RESOURCE_GROUP"
-echo "Tier:           $TIER"
-echo "PSU Version:    $PSU_VERSION"
-echo ""
-echo "Next steps:"
-echo "  1. Open $APP_URL in a browser"
-echo "  2. Create an admin account on first access"
-echo "  3. Import Devolutions.CIEM module from PowerShell Gallery"
-echo ""
-echo "To update .env with PSU URL:"
-echo "  echo 'PSU_URL=$APP_URL' >> .env"
+log_info "done"

@@ -37,14 +37,17 @@ function Invoke-TestCommand {
         [string]$Environment = 'local',
 
         [Parameter()]
-        [int]$TimeoutSeconds = 30
+        [int]$TimeoutSeconds = 30,
+
+        [Parameter()]
+        [string]$EnvFilePath
     )
 
     $ErrorActionPreference = 'Stop'
 
     $connectCommands = @{
-        local = { Connect-PSU -Local }
-        azure = { Connect-PSU }
+        local = { Connect-PSU -Local -EnvFilePath $EnvFilePath }
+        azure = { Connect-PSU -EnvFilePath $EnvFilePath }
     }
 
     Write-Verbose "[$Environment] Connecting to PSU..."

@@ -21,48 +21,31 @@ function New-CIEMConfigPage {
         $envInfo = Devolutions.CIEM\Get-PSUInstalledEnvironment
 
         $databasePath = Devolutions.CIEM\Get-CIEMDatabasePath
-        $databaseExists = Test-Path $databasePath
 
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure cloud provider authentication for CIEM security scans' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
 
         New-UDCard -Title 'CIEM Database' -Content {
             New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                if (-not $databaseExists) {
-                    New-UDChip -Label 'Not Initialized' -Icon (New-UDIcon -Icon 'Warning') -Size 'small' -Style @{
-                        backgroundColor = '#ff9800'
-                        color = 'white'
-                    }
-                }
-
                 New-UDTypography -Text $databasePath -Variant 'body2' -Style @{ color = '#666' }
             }
 
-            New-UDTypography -Text 'Creates missing CIEM tables and refreshes provider and check catalogs. Use this after CIEM updates or when the database has not been initialized.' -Variant 'body2' -Style @{
+            New-UDTypography -Text 'Reapplies CIEM database schema and refreshes provider and check catalogs for module updates.' -Variant 'body2' -Style @{
                 color = '#666'
                 marginTop = '12px'
                 marginBottom = '12px'
             }
 
-            if (-not $databaseExists) {
-                New-UDAlert -Severity 'warning' -Text 'Initialize the CIEM database before configuring providers or running scans.' -Style @{ marginTop = '16px'; marginBottom = '16px' }
-            }
-
-            $databaseButtonText = if ($databaseExists) { 'Reapply Schema and Catalogs' } else { 'Initialize Database' }
-            New-UDButton -Id 'initializeCiemDatabaseBtn' -Text $databaseButtonText -Icon (New-UDIcon -Icon 'Storage') -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
+            New-UDButton -Id 'initializeCiemDatabaseBtn' -Text 'Reapply Schema and Catalogs' -Icon (New-UDIcon -Icon 'Storage') -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
                 try {
                     $initializedPath = Devolutions.CIEM\New-CIEMDatabase -PassThru
-                    Show-UDToast -Message "CIEM database initialized at $initializedPath" -Duration 5000 -BackgroundColor '#4caf50'
+                    Show-UDToast -Message "CIEM database schema refreshed at $initializedPath" -Duration 5000 -BackgroundColor '#4caf50'
                     Invoke-UDRedirect '/ciem/config'
                 }
                 catch {
                     Show-UDToast -Message "Database initialization failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
                 }
             }
-        }
-
-        if (-not $databaseExists) {
-            return
         }
 
         # Get available providers from database
