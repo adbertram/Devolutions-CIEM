@@ -344,7 +344,10 @@ Describe 'Remove-CIEMPSUModule' {
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 1 -ParameterFilter { $Script.Name -eq 'Checks/New-CIEMScanRun' }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 1 -ParameterFilter { $Script.Name -eq 'management-port-open-to-the-internet' }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUModule -Times 1 -ParameterFilter {
-            $Name -eq 'Devolutions.CIEM' -and $Force
+            $Name -eq 'Devolutions.CIEM' -and
+            $Environment -eq 'azure' -and
+            $EnvFilePath -eq 'NO_ENV_FILE' -and
+            $Force
         }
     }
 

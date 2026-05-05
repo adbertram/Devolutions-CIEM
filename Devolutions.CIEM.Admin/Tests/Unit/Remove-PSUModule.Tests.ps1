@@ -15,6 +15,14 @@ BeforeAll {
 Describe 'Remove-PSUModule target connections' {
     BeforeEach {
         $script:capturedRestCalls = [System.Collections.Generic.List[object]]::new()
+        $script:capturedSshArgs = [System.Collections.Generic.List[object]]::new()
+        $script:localEnvFile = Join-Path $TestDrive 'local-remove.env'
+        Set-Content -Path $script:localEnvFile -Value @'
+PUBLISH_POINT_SSH=adam-server
+PUBLISH_POINT_PSU_PATH=/Users/adam/psu
+LOCAL_PSU_URL=http://192.168.86.36:5001
+LOCAL_PSU_TOKEN=local-token
+'@
 
         InModuleScope Devolutions.CIEM.Admin {
             $script:PSUConnection.Url = $null
@@ -51,6 +59,10 @@ Describe 'Remove-PSUModule target connections' {
         }
 
         Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration {}
+        Mock -ModuleName Devolutions.CIEM.Admin ssh {
+            $script:capturedSshArgs.Add(@($args))
+            $global:LASTEXITCODE = 0
+        }
         Mock -ModuleName Devolutions.CIEM.Admin az {
             '[{"publishMethod":"MSDeploy","userName":"kudu-user","userPWD":"kudu-pass"}]'
         }
@@ -119,18 +131,20 @@ Describe 'Remove-PSUModule target connections' {
         $result = Remove-PSUModule `
             -Name 'Devolutions.CIEM' `
             -Environment local `
-            -EnvFilePath 'NO_ENV_FILE' `
+            -EnvFilePath $script:localEnvFile `
             -Force `
             -WarningAction SilentlyContinue
 
         Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Connect-PSU -Times 1 -Scope It -ParameterFilter {
-            $Local -and $EnvFilePath -eq 'NO_ENV_FILE'
+            $Local -and $EnvFilePath -eq $script:localEnvFile
         }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName az -Times 0 -Scope It
 
         $deleteCall = $script:capturedRestCalls | Where-Object { $_.Method -eq 'Delete' } | Select-Object -First 1
         $deleteCall.Uri | Should -Be 'http://192.168.86.36:5001/api/v1/module/42'
-        $result.Source | Should -Be 'Database'
+        $script:capturedSshArgs[0][0] | Should -Be 'adam-server'
+        $script:capturedSshArgs[0][1] | Should -Be "rm -rf '/Users/adam/psu/Repository/Modules/Devolutions.CIEM'"
+        $result.Source | Should -Be 'Filesystem'
     }
 
     It 'requires an explicit environment when connection parameters are supplied' {
@@ -149,7 +163,7 @@ Describe 'Remove-PSUModule target connections' {
         Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Connect-PSU -Times 0 -Scope It
     }
 
-    It 'returns NotFound when the local PSU module database entry is already absent' {
+    It 'removes the local filesystem module when the PSU module database entry is already absent' {
         Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {
             InModuleScope Devolutions.CIEM.Admin {
                 $script:PSUConnection.Url = 'http://192.168.86.36:5001'
@@ -164,16 +178,18 @@ Describe 'Remove-PSUModule target connections' {
         $result = Remove-PSUModule `
             -Name 'Devolutions.CIEM' `
             -Environment local `
-            -EnvFilePath 'NO_ENV_FILE' `
+            -EnvFilePath $script:localEnvFile `
             -Force `
             -WarningAction SilentlyContinue
 
-        $result.Status | Should -Be 'NotFound'
-        $result.Source | Should -Be 'Database'
+        $result.Status | Should -Be 'Removed'
+        $result.Source | Should -Be 'Filesystem'
         Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Invoke-RestMethod -Times 0 -Scope It -ParameterFilter {
             $Method -eq 'Delete'
         }
-        Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Sync-PSUConfiguration -Times 0 -Scope It
+        $script:capturedSshArgs[0][0] | Should -Be 'adam-server'
+        $script:capturedSshArgs[0][1] | Should -Be "rm -rf '/Users/adam/psu/Repository/Modules/Devolutions.CIEM'"
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Sync-PSUConfiguration -Times 1 -Scope It
     }
 
     It 'cleans the Azure filesystem when the module database entry is already absent' {

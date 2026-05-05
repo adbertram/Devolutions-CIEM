@@ -145,6 +145,8 @@ function Remove-PSUModule {
         Write-Verbose "Database entry removed for $($mod.name) v$($mod.version)"
     }
 
+    $isLocalPublishPoint = $PSBoundParameters.ContainsKey('Environment') -and $Environment -eq 'local'
+
     if ($script:PSUConnection.IsAzure) {
         Write-Verbose "Azure hosting detected. Removing module files from filesystem..."
 
@@ -210,6 +212,42 @@ function Remove-PSUModule {
             Write-Verbose "Filesystem cleanup completed successfully."
         }
     }
+    elseif ($isLocalPublishPoint) {
+        Write-Verbose "Local publish point detected. Removing module files from filesystem..."
+
+        $envVars = ReadCIEMAdminEnvFile -EnvFilePath $EnvFilePath
+        $sshAlias = [string]$envVars['PUBLISH_POINT_SSH']
+        $remotePsuPath = [string]$envVars['PUBLISH_POINT_PSU_PATH']
+
+        if (-not $sshAlias) {
+            throw "PUBLISH_POINT_SSH is required in .env for local module filesystem cleanup."
+        }
+        if (-not $remotePsuPath) {
+            throw "PUBLISH_POINT_PSU_PATH is required in .env for local module filesystem cleanup."
+        }
+
+        $remoteModulesDir = "$($remotePsuPath.TrimEnd('/'))/Repository/Modules"
+        $deletePath = if ($Version) {
+            "$remoteModulesDir/$Name/$Version"
+        }
+        else {
+            "$remoteModulesDir/$Name"
+        }
+
+        & ssh $sshAlias "rm -rf '$deletePath'" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to remove local PSU module folder '$deletePath' on '$sshAlias'. ssh exited with code $LASTEXITCODE."
+        }
+
+        $results += [PSCustomObject]@{
+            Name    = $Name
+            Version = if ($Version) { $Version } else { 'All' }
+            Status  = 'Removed'
+            Source  = 'Filesystem'
+        }
+
+        Write-Verbose "Filesystem cleanup completed successfully."
+    }
     else {
         if ($modules.Count -eq 0) {
             $results += [PSCustomObject]@{
@@ -229,7 +267,7 @@ function Remove-PSUModule {
         }
     }
 
-    if ($modules.Count -gt 0 -or $script:PSUConnection.IsAzure) {
+    if ($modules.Count -gt 0 -or $script:PSUConnection.IsAzure -or $isLocalPublishPoint) {
         Write-Verbose "Syncing PSU configuration to clear module cache..."
         Sync-PSUConfiguration -Reset | Out-Null
         Write-Verbose "Configuration sync completed."

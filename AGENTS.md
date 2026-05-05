@@ -137,6 +137,13 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 **Verification:** Dot-source `scripts/remove-psu.ps1`, connect to Azure PSU, build `Get-CIEMPSUScriptRemovalModel -ModulePath ./psu-app`, and count `Get-PSUJob` results where `Test-CIEMOwnedPSUJob` returns true.
 **Recurrence Prevention:** Removal summaries must report module, script, schedule, active job, queued job, and retained job-history counts separately.
 
+### 7. Local PSU Module Removal Must Delete Publish-Point Files
+**Symptom:** After `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force`, local PSU can show `Devolutions.CIEM` again even though the PSU module database delete returned `Status = Removed`.
+**Cause:** Local publishing installs the module under the adam-server publish point at `/Users/adam/psu/Repository/Modules/Devolutions.CIEM`. PSU adds the repository `Modules` directory to `PSModulePath`, so deleting only the PSU database entry lets PSU rediscover the module from disk.
+**Fix:** `Remove-PSUModule -Environment local` must read `PUBLISH_POINT_SSH` and `PUBLISH_POINT_PSU_PATH` from `.env`, run `ssh <publish-point> "rm -rf '<PUBLISH_POINT_PSU_PATH>/Repository/Modules/Devolutions.CIEM'"`, and then run `Sync-PSUConfiguration -Reset`. `Remove-CIEMPSUModule` must pass `-Environment` and connection parameters through to `Remove-PSUModule`.
+**Verification:** Run `pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path Devolutions.CIEM.Admin/Tests/Unit`, then run `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` and verify local PSU reports module, script, schedule, active job, and queued job counts as `0`.
+**Recurrence Prevention:** Keep the `Remove-PSUModule.Tests.ps1` local filesystem cleanup assertions and the `CIEMDeployment.Tests.ps1` assertion that `Remove-CIEMPSUModule` passes environment and env file values into `Remove-PSUModule`.
+
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
 - CIEM feature todos: `docs/ciem-feature-todos.md` - source of truth for project purpose, expected features, product feedback, build order, and discovery/action guardrails.

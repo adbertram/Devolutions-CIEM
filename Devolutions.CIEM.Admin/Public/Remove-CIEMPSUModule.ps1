@@ -141,10 +141,13 @@ function Remove-CIEMPSUModule {
     }
 
     $removeModuleParams = @{
-        Name = $ModuleName
+        Name        = $ModuleName
+        Environment = $Environment
     }
-    if ($PSBoundParameters.ContainsKey('Version')) {
-        $removeModuleParams.Version = $Version
+    foreach ($moduleRemovalParameterName in @('EnvFilePath', 'Url', 'Token', 'ResourceGroup', 'WebAppName', 'Version')) {
+        if ($PSBoundParameters.ContainsKey($moduleRemovalParameterName)) {
+            $removeModuleParams[$moduleRemovalParameterName] = Get-Variable -Name $moduleRemovalParameterName -ValueOnly
+        }
     }
     if ($Force -and -not $WhatIfPreference) {
         $removeModuleParams.Force = $true
