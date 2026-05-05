@@ -15,10 +15,11 @@ Domain user
 AWS IAM
 PostgreSQL User
 Local User (SSH)
+MongoDB user
 See also
 Devolutions Academy - Understanding the PAM Provider
 Share your feedback
 
 ---
 
-*Downloaded on: 2026-02-18 13:09:57*
+*Downloaded on: 2026-02-18 13:09:57; refreshed against current provider list on 2026-05-05*

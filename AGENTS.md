@@ -14,12 +14,15 @@
 - CIEM solution built on PowerShell Universal (PSU).
 - PSU is owned by Devolutions.
 - CIEM is distributed as a PSU Gallery add-on, not a standalone deployment.
-- CIEM is a free PSU Gallery add-on that identifies findings and routes users to Devolutions PAM for action.
+- CIEM is a free, intentionally focused PSU Gallery add-on that creates value for Devolutions PAM by identifying entitlement risk and routing users toward PAM-supported action.
+- CIEM is not meant to become a complete CIEM, CSPM, ticketing, or PAM replacement. Avoid broad standalone feature sets that duplicate Devolutions PAM capabilities.
 - The product direction is **identity-first CIEM**, not generic CSPM. Prioritize entitlements, dormant permissions, role right-sizing, and control relationships. Prowler-ported CSPM checks are secondary.
+- User-facing features should make the next Devolutions PAM-backed outcome clear where applicable: JIT access, approval workflows, credential and session governance, evidence capture, least-privilege changes, onboarding privileged accounts or secrets, and remediation tracking. Verify current Devolutions PAM information links before adding them; do not guess product URLs.
 
 ## Product Purpose And Expected Features
 - `docs/ciem-feature-todos.md` is the source of truth for the project's purpose and expected product capabilities. Treat it as project direction, not an optional idea list.
 - CIEM should discover cloud and identity entitlement data, build the environment hierarchy, detect attack paths, detect exposure changes over time, and make findings actionable through existing security and PAM workflows.
+- CIEM features should solve narrow discovery, analysis, and prioritization problems in-app, then guide users to better outcomes with Devolutions PAM instead of owning the full remediation lifecycle.
 - Expected discovery priorities are scheduled discovery scans, exposure change detection, AWS effective access graph, least-privilege recommendation previews, privilege drift detection, sensitive resource access inventory, expanded attack path patterns, and discovery coverage reporting.
 - Expected action and connector priorities are outbound risk signal delivery, finding-to-action queue, PAM-backed JIT access requests, manual approval and evidence capture, least-privilege change packages, controlled role or policy updates, and automatic expiration or revocation.
 - Discovery remains read-only by default. Action, connector, PAM, SIEM, ticketing, IdP, or cloud write workflows require explicit re-scoping before implementation.
@@ -50,6 +53,7 @@
 - PSU version: `5.5.4`
 - Container image: `ironmansoftware/universal:5.5.4-azure`
 - Azure restarts are slow. Prefer app-level restart or configuration sync before a full webapp restart.
+- To remove CIEM from the Azure PSU target, use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force`. Do not hand-run Azure CLI deletion or ad hoc PSU cleanup commands for CIEM removal.
 
 ## Module Deployment
 - Never upload module files directly to the Azure PSU instance.
@@ -64,6 +68,7 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 
 - Use `-LocalOnly` to push to adam-server via SSH/rsync (skips PSGallery).
 - `scripts/azure_psu_file_manager.sh` and `scripts/invoke_command_in_azure_webapp.sh` are for inspection only, not deployment.
+- Use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` or `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force` to remove CIEM-owned PSU scripts, schedules, active jobs, and the `Devolutions.CIEM` module from a PSU target.
 
 ## Testing and Validation
 - Use `Invoke-TestCommand` to validate CIEM code inside PSU instead of publish-debug-publish cycles.
@@ -124,6 +129,13 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 **Fix:** Keep the Azure CIEM PSU instance on `ironmansoftware/universal:5.5.4-azure`. If Azure keeps pulling 2026.1.5 after `linuxFxVersion` is changed, recreate the Web App with 5.5.4 as the initial image. Use `az webapp delete --keep-empty-plan` to preserve the App Service Plan; if the plan was deleted, recreate `devolutions-ciem-psu-asp` as Linux S1 in West US 2.
 **Verification:** Docker logs must show `Pulling image docker.io/ironmansoftware/universal:5.5.4-azure`, `/api/v1/alive` must report `loading=false`, and `/login` must render the 5.5-era page without `?v=2026.1.5` assets.
 **Recurrence Prevention:** Do not upgrade the Azure PSU container image past 5.5.4 until first-run, local-admin token grant, and CIEM module import have been tested in a separate throwaway Web App.
+
+### 6. PSU Removal Retains CIEM Job History
+**Symptom:** After `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force`, Azure PSU can have `Devolutions.CIEM` module count `0`, CIEM-owned script count `0`, and CIEM-owned schedule count `0`, while `Get-PSUJob` still returns historical or queued `CIEMExecutor.ps1` job records.
+**Cause:** PSU exposes `Get-PSUJob` and `Stop-PSUJob`, but no supported `Remove-PSUJob` or `Set-PSUJob` cmdlet. The project PSU knowledge also confirms `DELETE /api/v1/job/{id}` returns success without removing or archiving jobs. `scripts/remove-psu.ps1` therefore stops active CIEM jobs and removes CIEM resources, but intentionally retains job history.
+**Fix:** Treat retained CIEM job history as a PSU retention limitation, not a script failure. Do not claim the instance is free from all CIEM remnants if owned job records remain. Do not modify PSU database tables directly without explicit user approval and a separate recovery plan.
+**Verification:** Dot-source `scripts/remove-psu.ps1`, connect to Azure PSU, build `Get-CIEMPSUScriptRemovalModel -ModulePath ./psu-app`, and count `Get-PSUJob` results where `Test-CIEMOwnedPSUJob` returns true.
+**Recurrence Prevention:** Removal summaries must report module, script, schedule, active job, queued job, and retained job-history counts separately.
 
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`

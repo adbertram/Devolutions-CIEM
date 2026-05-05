@@ -17,6 +17,7 @@ Entra ID user
 SSH key
 AWS
 PostgreSQL user
+MongoDB user
 Managed providers
 Unmanaged
 providers:
@@ -36,4 +37,4 @@ Share your feedback
 
 ---
 
-*Downloaded on: 2026-02-18 13:09:19*
+*Downloaded on: 2026-02-18 13:09:19; refreshed against current provider list on 2026-05-05*

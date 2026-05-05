@@ -70,6 +70,7 @@
 - [Cisco user provider](hub/providers/cisco-user-provider.md)
 - [Domain user provider](hub/providers/domain-provider.md)
 - [Local SSH user provider](hub/providers/local-ssh-provider.md)
+- [MongoDB provider](hub/providers/mongodb-provider.md)
 - [MySQL User provider](hub/providers/mysql-provider.md)
 - [Oracle user provider](hub/providers/oracle-user-provider.md)
 - [PostgreSQL user provider](hub/providers/postgresql-provider.md)
@@ -128,6 +129,7 @@
 - [Kubernetes Operator](kb/knowledge-base/kubernetes-operator.md)
 - [PAM partners integration](kb/knowledge-base/pam-partner-integration.md)
 - [Methods for using personal PAM accounts in Remote Desktop Manager](kb/knowledge-base/privileged-account-entries.md)
+- [Required package for each PAM action](kb/knowledge-base/required-package-pam-actions.md)
 - [Terraform provider](kb/knowledge-base/terraform-provider.md)
 
 ## Overview
@@ -142,6 +144,7 @@
 - [Privileged account management](rdm/privileged-account-management.md)
 - [Privileged access risk](rdm/privileged-account-management/privileged-access-risk.md)
 - [Privileged session monitoring](rdm/privileged-session-monitoring.md)
+- [External PAM integrations](rdm/external-pam-integrations.md)
 
 ## Server
 
@@ -176,6 +179,7 @@
 - [Entra ID user provider](server/providers/managed-providers/azure-ad-user-provider.md)
 - [Domain user provider](server/providers/managed-providers/domain-provider.md)
 - [Local SSH user provider](server/providers/managed-providers/local-ssh-provider.md)
+- [MongoDB provider](server/providers/managed-providers/mongodb-user-provider.md)
 - [PostgreSQL user provider](server/providers/managed-providers/postgresql-devolutions-server-provider.md)
 - [SQL Server provider](server/providers/managed-providers/sql-server-provider.md)
 - [SSH key provider](server/providers/managed-providers/ssh-key-provider.md)
@@ -212,4 +216,3 @@
 - [Securely send a file to our team](support-resources/technical-support/securely-send-file.md)
 - [Ticketing system](support-resources/technical-support/ticketing-system.md)
 - [YouTube channel](support-resources/youtube-channel.md)
-

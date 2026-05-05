@@ -1,15 +1,16 @@
 ---
 name: devolutions-pam
 description: |
-  Devolutions PAM (Privileged Access Management) domain knowledge from official documentation.
-  Use when discussing or working with PAM concepts, Devolutions PAM features, providers,
-  checkout/check-in workflows, password rotation, JIT elevation, account discovery, scan
-  configurations, vaults, propagation scripts, or any Devolutions Server/Hub PAM functionality.
-  Triggers: "PAM", "privileged access", "Devolutions PAM", "Devolutions Server PAM",
-  "Hub Business PAM", "PAM provider", "managed provider", "AnyIdentity", "identity provider",
-  "password rotation", "checkout", "check-in", "JIT elevation", "account discovery",
-  "PAM vault", "propagation", "scan configuration", "privileged account", "session recording",
-  "PAM report".
+  MANDATORY: Official Devolutions PAM domain knowledge for Devolutions Server, Hub Business/Cloud,
+  Gateway, RDM, providers, vaults, checkout/check-in, rotation, JIT, discovery,
+  password propagation, access brokering, reports, package requirements, and integrations.
+  Use for CIEM-to-PAM handoffs, PAM features, or Devolutions PAM implementation details.
+  Triggers: "PAM", "privileged access", "Devolutions PAM", "Server PAM", "Hub PAM",
+  "Devolutions Cloud PAM", "PAM provider", "managed provider", "custom PAM provider",
+  "AnyIdentity", "access brokering", "checkout", "check-in", "JIT elevation",
+  "PAM vault", "password propagation", "session recording", "PAM report", "PAM package",
+  "Kubernetes Operator", "Terraform provider", "Ansible module", "CyberArk", "BeyondTrust",
+  "Delinea".
 ---
 
 <objective>
@@ -31,16 +32,22 @@ reference files linked in each section.
 </success_criteria>
 
 <overview>
-Devolutions PAM is a privileged access management solution integrated into Devolutions Server and
-Devolutions Hub Business. It manages the full lifecycle of privileged accounts: discovery, credential
-storage, password rotation, checkout/check-in access control, JIT elevation, session recording, and
-compliance reporting.
+Devolutions PAM is a privileged access management solution across the Devolutions ecosystem:
+Devolutions Server, Devolutions Hub Business / Devolutions Cloud, Devolutions Gateway,
+Remote Desktop Manager (RDM), Devolutions Workspace, Devolutions PowerShell, and Devolutions Portal.
+It manages privileged account lifecycle and access control through secure password vaulting,
+discovery, heartbeat, password rotation, password propagation, checkout/check-in, approval workflows,
+JIT elevation/provisioning, access brokering, session recording, RBAC, built-in MFA, and reporting.
 
-PAM is also available through Remote Desktop Manager (RDM) as a client interface.
+RDM is a PAM client/admin surface for dashboards, checkout/check-in, privileged account use,
+custom-time checkout requests, privileged access risk, and privileged session monitoring. It is not
+the PAM backend by itself; backend behavior depends on the connected Devolutions Server or
+Hub/Cloud data source.
 
 Key strategic context: Devolutions PAM complements CIEM (Cloud Infrastructure Entitlement Management)
 practices. CIEM identifies excessive permissions and entitlement risks; PAM provides the enforcement
-layer to manage and control privileged access to those systems.
+and adoption layer for JIT access, credential/session governance, access brokering, evidence capture,
+and privileged-account onboarding.
 </overview>
 
 <key-concepts>
@@ -51,15 +58,18 @@ policy enforcement, and identity validation between Devolutions PAM and the iden
 
 Three provider types:
 - **Managed** — Fully integrated, built and maintained by Devolutions. Support full lifecycle: discovery, heartbeat, password rotation.
-  - Domain user, Entra ID user, AWS IAM, Local SSH user, SSH key, SQL Server user, PostgreSQL user, Windows user
+  - Server providers: AWS IAM, Domain user, Entra ID user, Local SSH user, MongoDB user, PostgreSQL user, SQL Server user, SSH key, Windows user
+  - Hub/Cloud providers: AWS IAM, Cisco user, Domain user, Entra ID user, Local SSH user, MongoDB user, MySQL user, Oracle user, PostgreSQL user
 - **Unmanaged (password reset only)** — Manual configuration, simpler/legacy systems. Password reset only.
   - MySQL user, Cisco user, Oracle user
-- **Custom (AnyIdentity)** — User-defined templates with custom action scripts for discovery, heartbeat, and rotation.
-  - Examples: Azure Key Vault secret, SQL Server login, Windows local account
+- **Custom PAM providers (formerly AnyIdentity providers)** — User-defined templates with custom action scripts for discovery, heartbeat, and rotation.
+  - Built-in examples/templates include Azure Key Vault secret, Microsoft SQL Server Login, and Windows local accounts
 
 For detailed provider setup: [references/server/providers.md](references/server/providers.md)
 For managed providers: [references/server/providers/managed-providers.md](references/server/providers/managed-providers.md)
 For custom providers: [references/server/providers/anyidentity-providers.md](references/server/providers/anyidentity-providers.md)
+For MongoDB Server provider details: [references/server/providers/managed-providers/mongodb-user-provider.md](references/server/providers/managed-providers/mongodb-user-provider.md)
+For MongoDB Hub/Cloud provider details: [references/hub/providers/mongodb-provider.md](references/hub/providers/mongodb-provider.md)
 </providers>
 
 <password-rotation>
@@ -120,13 +130,34 @@ For server vaults: [references/server/pam-vaults.md](references/server/pam-vault
 For hub vaults: [references/hub/pam-vaults.md](references/hub/pam-vaults.md)
 </vaults>
 
-<propagation-scripts>
-After password rotation, propagation scripts push the new password to dependent systems
-(services, scheduled tasks, IIS app pools, etc.) that use the rotated credential.
+<password-propagation>
+Password propagation is the broader PAM capability for updating dependent systems after a password changes.
+Propagation scripts are the Devolutions Server implementation detail that pushes the new password
+to dependent systems (services, scheduled tasks, IIS app pools, etc.) that use the rotated credential.
 
 For details: [references/server/propagation-scripts.md](references/server/propagation-scripts.md)
 For creating templates: [references/server/propagation-scripts/create-script-template.md](references/server/propagation-scripts/create-script-template.md)
-</propagation-scripts>
+</password-propagation>
+
+<account-brokering>
+Account brokering separates viewing a privileged password from using it. `View password` lets a user
+see the checked-out password. `Connect (execute)` lets RDM inject or use the credential for a session
+without exposing the password to the user.
+
+Use this distinction whenever CIEM findings recommend controlled access to privileged resources: a
+PAM-backed outcome can be "launch or execute through brokering" instead of "show the password".
+
+For details: [references/server/view-sensitive-data-account-brokering.md](references/server/view-sensitive-data-account-brokering.md)
+</account-brokering>
+
+<devolutions-gateway>
+Devolutions Gateway is the brokered remote-access component for PAM scenarios. It supports segmented
+network access, domain provider connectivity across networks, credential injection, and session
+recording/monitoring scenarios without broad VPN-style exposure.
+
+For remote PAM concepts: [references/concepts/remote-privileged-access-management.md](references/concepts/remote-privileged-access-management.md)
+For domain provider through Gateway: [references/kb/how-to-articles/configure-pam-provider-through-dgw.md](references/kb/how-to-articles/configure-pam-provider-through-dgw.md)
+</devolutions-gateway>
 
 <privileged-accounts>
 Account types managed by PAM:
@@ -147,6 +178,11 @@ For details: [references/concepts/privileged-account.md](references/concepts/pri
 
 <devolutions-server>
 Full PAM implementation with:
+- Secure password vaulting
+- Logging and reporting
+- Built-in MFA
+- Access brokering
+- Role-based access control
 - Provider management (managed, unmanaged, custom)
 - Account discovery via scan configurations
 - Password rotation and heartbeat
@@ -161,26 +197,41 @@ For getting started: [references/server/getting-started.md](references/server/ge
 </devolutions-server>
 
 <devolutions-hub-business>
-Cloud-hosted PAM with:
+Cloud-hosted PAM. Current documentation may surface this area as Devolutions Hub Business,
+Devolutions Hub, or Devolutions Cloud depending on page age and navigation. Verify current product
+naming before writing public-facing copy.
+
+Hub/Cloud PAM requires Devolutions Hub Services / Devolutions Cloud Services to communicate with
+internal resources. The service installer can enable PAM, encryption, and reporting services; multiple
+service instances can run for high availability, with standby instances used if the first service fails.
+
+Capabilities include:
 - Privileged account management
 - Request/approve access workflows
 - Password rotation policies
 - PAM vaults
+- Secure password injection
 - Privileged access reports
-- Provider support (AWS IAM, Entra ID, Cisco, Domain, SSH, MySQL, Oracle, PostgreSQL)
+- Provider support (AWS IAM, Cisco, Domain, Entra ID, Local SSH, MongoDB, MySQL, Oracle, PostgreSQL)
 - Session recording
 
 For complete hub PAM docs: [references/hub/](references/hub/)
+For services setup: [references/hub/pam-service.md](references/hub/pam-service.md)
 </devolutions-hub-business>
 
 <remote-desktop-manager>
-Client interface for PAM with:
+Client/admin interface for PAM with:
 - PAM dashboard
 - Privileged account management
+- Checkout/check-in management
+- Custom-time checkout requests from PAM vaults
 - Privileged access risk assessment
 - Privileged session monitoring
+- Recording management for previous privileged sessions
+- Personal PAM account flows through user-vault linked credentials or prompted account selection
 
 For RDM PAM docs: [references/rdm/](references/rdm/)
+For personal PAM account methods: [references/kb/knowledge-base/privileged-account-entries.md](references/kb/knowledge-base/privileged-account-entries.md)
 </remote-desktop-manager>
 
 </deployment-platforms>
@@ -191,6 +242,7 @@ For any of these topics, read the corresponding reference file:
 - Account lifecycle policy: [references/concepts/account-lifecycle-policy.md](references/concepts/account-lifecycle-policy.md)
 - Action scripts (custom providers): [references/concepts/action-script.md](references/concepts/action-script.md)
 - Agentless deployment: [references/concepts/agentless-deployment.md](references/concepts/agentless-deployment.md)
+- Application-to-application password management: [references/concepts/application-to-application-password-management.md](references/concepts/application-to-application-password-management.md)
 - AnyIdentity templates: [references/concepts/anyidentity-template.md](references/concepts/anyidentity-template.md)
 - CI/CD automation: [references/concepts/cicd-automation.md](references/concepts/cicd-automation.md)
 - CIEM: [references/concepts/cloud-infrastructure-entitlement-management.md](references/concepts/cloud-infrastructure-entitlement-management.md)
@@ -201,15 +253,18 @@ For any of these topics, read the corresponding reference file:
 - Least privilege: [references/concepts/least-privilege.md](references/concepts/least-privilege.md)
 - PAM maturity model: [references/concepts/pam-maturity.md](references/concepts/pam-maturity.md)
 - PEDM (Privilege Elevation and Delegation): [references/concepts/privilege-elevation-delegation-management.md](references/concepts/privilege-elevation-delegation-management.md)
+- Password propagation: [references/concepts/propagation.md](references/concepts/propagation.md)
 - Privileged remote access: [references/concepts/privileged-remote-access.md](references/concepts/privileged-remote-access.md)
 - Privileged sessions: [references/concepts/privileged-session.md](references/concepts/privileged-session.md)
 - Privileged task automation: [references/concepts/privileged-task-automation.md](references/concepts/privileged-task-automation.md)
 - User behavior analytics: [references/concepts/privileged-user-behavior-analytics.md](references/concepts/privileged-user-behavior-analytics.md)
+- Remote privilege access management: [references/concepts/remote-privileged-access-management.md](references/concepts/remote-privileged-access-management.md)
 - Reporting and dashboards: [references/concepts/reporting-dashboards.md](references/concepts/reporting-dashboards.md)
 - Secrets management: [references/concepts/secrets-management.md](references/concepts/secrets-management.md)
 - Session management: [references/concepts/session-management.md](references/concepts/session-management.md)
 - Session recording: [references/concepts/session-recording.md](references/concepts/session-recording.md)
 - Zero standing privileges: [references/concepts/zero-standing-privileges.md](references/concepts/zero-standing-privileges.md)
+- External PAM integrations in RDM: [references/rdm/external-pam-integrations.md](references/rdm/external-pam-integrations.md)
 </additional-concepts>
 
 <knowledge-base>
@@ -226,8 +281,11 @@ Key how-to topics include:
 - Quick AD PAM deployment
 - Importing computers from domain providers
 - Least privileges for AD providers
+- Package/license requirements by PAM action
+- PAM partner integrations for CyberArk, BeyondTrust Password Safe, and Delinea Secret Server
+- Kubernetes Operator, Terraform provider, and Ansible module integration surfaces
 </knowledge-base>
 
 <validated>
-Validated by validate-skill on 2026-02-18 12:48
+Validated by validate-skill on 2026-05-05 11:33
 </validated>
