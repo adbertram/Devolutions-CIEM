@@ -6,6 +6,7 @@ BeforeAll {
     $script:GetDatabasePathContent = Get-Content (Join-Path $repoRoot 'Public' 'Get-CIEMDatabasePath.ps1') -Raw
     $script:InvokeQueryContent = Get-Content (Join-Path $repoRoot 'Public' 'Invoke-CIEMQuery.ps1') -Raw
     $script:ConfigPageContent = Get-Content (Join-Path $repoRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
+    $script:ManifestPath = Join-Path $repoRoot 'Devolutions.CIEM.psd1'
     $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psd1'
     $script:UniversalRoot = Join-Path $repoRoot '.universal'
     $script:InitializeContent = if (Test-Path (Join-Path $script:UniversalRoot 'initialize.ps1') -PathType Leaf) {
@@ -174,6 +175,17 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             Join-Path $script:UniversalRoot 'authentication.ps1' | Should -Not -Exist
             Join-Path $script:UniversalRoot 'roles.ps1' | Should -Not -Exist
             Join-Path $script:UniversalRoot 'settings.ps1' | Should -Not -Exist
+        }
+
+        It 'Ships the bundled PSUSQLite module used by CIEM database functions' {
+            Join-Path $repoRoot 'modules/PSUSQLite/PSUSQLite.psd1' | Should -Exist
+            $script:Psm1Content | Should -Match 'modules/PSUSQLite/PSUSQLite\.psd1'
+        }
+
+        It 'Declares no external Gallery module dependencies because CIEM runtime dependencies are bundled or PSU-provided' {
+            $manifest = Import-PowerShellDataFile -Path $script:ManifestPath
+            $manifest.RequiredModules | Should -BeNullOrEmpty
+            $manifest.PrivateData.PSData.ExternalModuleDependencies | Should -BeNullOrEmpty
         }
     }
 

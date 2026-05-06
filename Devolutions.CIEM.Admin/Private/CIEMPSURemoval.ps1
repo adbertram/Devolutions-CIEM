@@ -128,19 +128,6 @@ function Get-CIEMPSUScriptRemovalModel {
         ManagedScriptNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json'
         CoreScriptNames    = $coreScriptNames
         RepositoryPaths    = $repositoryPaths
-        LegacyScriptNames  = @(
-            'CIEMExecutor.ps1'
-            'Devolutions.CIEM'
-            'Devolutions.CIEM/New-CIEMScanRun'
-            'Devolutions.CIEM/Start-CIEMAzureDiscovery'
-            'Devolutions.CIEM/Invoke-CIEMIdentityGraphBuild'
-            'Devolutions.CIEM/Invoke-CIEMAttackPathRefresh'
-        )
-        LegacyPathPatterns = @(
-            '.*/Devolutions-CIEM/psu-app/Checks/New-CIEMScanRun\.ps1$'
-            '.*/Devolutions-CIEM/psu-app/Checks/Start-CIEMAzureDiscovery\.ps1$'
-            '.*/Devolutions-CIEM/psu-app/modules/Devolutions\.CIEM\.Graph/Data/attack_path_remediation_scripts/[^/]+\.ps1$'
-        )
     }
 }
 
@@ -173,24 +160,6 @@ function Test-CIEMOwnedPSUScript {
 
     if ((Get-CIEMPSUScriptNotes -Script $Script) -eq $RemovalModel.ManagedScriptNotes) {
         return $true
-    }
-
-    if ($RemovalModel.LegacyScriptNames -contains $normalizedName) {
-        return $true
-    }
-
-    if ($normalizedName -match '^Checks/AttackPathRemediation-') {
-        return $true
-    }
-
-    if ($normalizedName -match '^Identities/AttackPaths/AttackPathRemediation-') {
-        return $true
-    }
-
-    foreach ($pathPattern in @($RemovalModel.LegacyPathPatterns)) {
-        if ($normalizedName -match $pathPattern) {
-            return $true
-        }
     }
 
     $false

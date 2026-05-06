@@ -69,6 +69,103 @@ function Initialize-CIEMPSUInstance {
         }
     }
 
+    $normalizeScriptName = {
+        param(
+            [Parameter(Mandatory)]
+            [AllowEmptyString()]
+            [string]$Name
+        )
+        $Name.Replace('\', '/').TrimStart('/')
+    }
+    $getExistingScriptPath = {
+        param(
+            [Parameter(Mandatory)]
+            [object]$Script
+        )
+
+        foreach ($propertyName in @('FullPath', 'Path')) {
+            $property = $Script.PSObject.Properties[$propertyName]
+            if ($property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+                & $normalizeScriptName -Name ([string]$property.Value)
+                return
+            }
+        }
+
+        ''
+    }
+    $getExistingScriptNotes = {
+        param(
+            [Parameter(Mandatory)]
+            [object]$Script
+        )
+
+        foreach ($propertyName in @('Notes', 'CommitNotes')) {
+            $property = $Script.PSObject.Properties[$propertyName]
+            if ($property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+                [string]$property.Value
+                return
+            }
+        }
+
+        ''
+    }
+
+    $manifestPath = Join-Path -Path $script:ModuleRoot -ChildPath 'data/psu-scripts.json'
+    if (-not (Test-Path -Path $manifestPath -PathType Leaf)) {
+        throw "CIEM PSU script manifest not found: $manifestPath"
+    }
+    $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json -Depth 10
+
+    $expectedScriptNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $expectedRepositoryPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($scriptDef in @($manifest.scripts)) {
+        $scriptName = ([string]$scriptDef.name).Replace('\', '/').TrimStart('/')
+        if ([string]::IsNullOrWhiteSpace($scriptName)) {
+            throw 'CIEM script manifest contains an empty script name.'
+        }
+        if (-not $expectedScriptNames.Add($scriptName)) {
+            throw "CIEM script manifest contains a duplicate script name: $scriptName"
+        }
+        $null = $expectedRepositoryPaths.Add("$scriptName.ps1")
+    }
+
+    $templateRootPath = [string]$manifest.remediationTemplates.path
+    if ([string]::IsNullOrWhiteSpace($templateRootPath)) {
+        throw 'CIEM script manifest remediationTemplates is missing path.'
+    }
+    $templateRoot = Join-Path -Path $script:ModuleRoot -ChildPath $templateRootPath
+    if (-not (Test-Path -Path $templateRoot -PathType Container)) {
+        throw "CIEM attack path remediation template folder not found: $templateRoot"
+    }
+    foreach ($templateFile in @(Get-ChildItem -Path $templateRoot -Filter '*.ps1' -File | Sort-Object Name)) {
+        $scriptName = [System.IO.Path]::GetFileNameWithoutExtension($templateFile.Name)
+        if (-not $expectedScriptNames.Add($scriptName)) {
+            throw "CIEM script manifest contains a duplicate script name: $scriptName"
+        }
+        $null = $expectedRepositoryPaths.Add("Identities/AttackPaths/$scriptName.ps1")
+    }
+
+    foreach ($existingScript in @(Get-PSUScript @psuConnectionParameters)) {
+        $existingName = & $normalizeScriptName -Name ([string]$existingScript.Name)
+        $existingPath = & $getExistingScriptPath -Script $existingScript
+        $isCurrentScript = $expectedScriptNames.Contains($existingName) -or
+            (-not [string]::IsNullOrWhiteSpace($existingPath) -and $expectedRepositoryPaths.Contains($existingPath)) -or
+            ((& $getExistingScriptNotes -Script $existingScript) -eq $managedScriptNotes)
+        if ($isCurrentScript) {
+            continue
+        }
+
+        $isUnsupportedCiemScript = $existingName -eq 'Devolutions.CIEM' -or
+            $existingName -match '^Devolutions\.CIEM/' -or
+            ($existingName -match '^Users/' -and $existingName -match '/Devolutions-CIEM/') -or
+            $existingName -match '^Checks/AttackPathRemediation-' -or
+            $existingName -match '^Identities/AttackPaths/AttackPathRemediation-' -or
+            ($existingPath -match '/Devolutions-CIEM/psu-app/' -and -not $expectedRepositoryPaths.Contains($existingPath))
+        if ($isUnsupportedCiemScript) {
+            throw "Initialize-CIEMPSUInstance found unsupported pre-existing CIEM PSU script '$existingName'. Remove CIEM from the PSU instance before installing the current module."
+        }
+    }
+
     $scriptRegistrationParams = @{}
     if ($Integrated) {
         $scriptRegistrationParams.Integrated = $true
@@ -87,38 +184,6 @@ function Initialize-CIEMPSUInstance {
     }
     if (-not (Test-Path -Path $databasePath -PathType Leaf)) {
         throw "CIEM database was not created at '$databasePath'."
-    }
-
-    $manifestPath = Join-Path -Path $script:ModuleRoot -ChildPath 'data/psu-scripts.json'
-    if (-not (Test-Path -Path $manifestPath -PathType Leaf)) {
-        throw "CIEM PSU script manifest not found: $manifestPath"
-    }
-    $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json -Depth 10
-
-    $expectedScriptNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($scriptDef in @($manifest.scripts)) {
-        $scriptName = ([string]$scriptDef.name).Replace('\', '/').TrimStart('/')
-        if ([string]::IsNullOrWhiteSpace($scriptName)) {
-            throw 'CIEM script manifest contains an empty script name.'
-        }
-        if (-not $expectedScriptNames.Add($scriptName)) {
-            throw "CIEM script manifest contains a duplicate script name: $scriptName"
-        }
-    }
-
-    $templateRootPath = [string]$manifest.remediationTemplates.path
-    if ([string]::IsNullOrWhiteSpace($templateRootPath)) {
-        throw 'CIEM script manifest remediationTemplates is missing path.'
-    }
-    $templateRoot = Join-Path -Path $script:ModuleRoot -ChildPath $templateRootPath
-    if (-not (Test-Path -Path $templateRoot -PathType Container)) {
-        throw "CIEM attack path remediation template folder not found: $templateRoot"
-    }
-    foreach ($templateFile in @(Get-ChildItem -Path $templateRoot -Filter '*.ps1' -File | Sort-Object Name)) {
-        $scriptName = [System.IO.Path]::GetFileNameWithoutExtension($templateFile.Name)
-        if (-not $expectedScriptNames.Add($scriptName)) {
-            throw "CIEM script manifest contains a duplicate script name: $scriptName"
-        }
     }
 
     $registeredManagedScripts = @(Get-PSUScript @psuConnectionParameters | Where-Object {

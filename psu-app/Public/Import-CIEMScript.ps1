@@ -211,7 +211,6 @@ function Import-CIEMScript {
 
     $syncedFolders = 0
 
-    $prunedScripts = 0
     $getScriptCommand = Get-Command -Name 'Get-PSUScript' -ErrorAction SilentlyContinue
 
     $coreScripts = 0
@@ -318,7 +317,6 @@ function Import-CIEMScript {
 
     [pscustomobject]@{
         ManifestPath       = $manifestPath
-        PrunedScripts      = $prunedScripts
         SyncedFolders      = $syncedFolders
         CoreScripts        = $coreScripts
         AttackPathScripts  = $attackPathScripts

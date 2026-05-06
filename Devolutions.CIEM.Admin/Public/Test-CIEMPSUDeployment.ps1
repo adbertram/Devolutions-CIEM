@@ -34,17 +34,58 @@ function Test-CIEMPSUDeployment {
             })
         $scriptCount = $registeredManagedScripts.Count
         $expectedScriptCount = 0
+        $unsupportedScriptNames = @()
         if ($moduleCount -eq 1) {
             $moduleBase = $modules[0].ModuleBase
             $manifestPath = Join-Path -Path $moduleBase -ChildPath 'data/psu-scripts.json'
             if (Test-Path -Path $manifestPath -PathType Leaf) {
                 $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json -Depth 10
-                $expectedScriptCount = @($manifest.scripts).Count
+                $expectedScriptNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                $expectedRepositoryPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+                foreach ($scriptDef in @($manifest.scripts)) {
+                    $scriptName = ([string]$scriptDef.name).Replace('\', '/').TrimStart('/')
+                    $null = $expectedScriptNames.Add($scriptName)
+                    $null = $expectedRepositoryPaths.Add("$scriptName.ps1")
+                }
                 $templatePath = [string]$manifest.remediationTemplates.path
                 if (-not [string]::IsNullOrWhiteSpace($templatePath)) {
                     $templateRoot = Join-Path -Path $moduleBase -ChildPath $templatePath
                     if (Test-Path -Path $templateRoot -PathType Container) {
-                        $expectedScriptCount += @(Get-ChildItem -Path $templateRoot -Filter '*.ps1' -File).Count
+                        foreach ($templateFile in @(Get-ChildItem -Path $templateRoot -Filter '*.ps1' -File)) {
+                            $scriptName = [System.IO.Path]::GetFileNameWithoutExtension($templateFile.Name)
+                            $null = $expectedScriptNames.Add($scriptName)
+                            $null = $expectedRepositoryPaths.Add("Identities/AttackPaths/$scriptName.ps1")
+                        }
+                    }
+                }
+                $expectedScriptCount = $expectedScriptNames.Count
+
+                foreach ($script in @(Get-PSUScript -Integrated)) {
+                    $scriptName = ([string]$script.Name).Replace('\', '/').TrimStart('/')
+                    $scriptPath = ''
+                    foreach ($propertyName in @('FullPath', 'Path')) {
+                        $property = $script.PSObject.Properties[$propertyName]
+                        if ($property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+                            $scriptPath = ([string]$property.Value).Replace('\', '/').TrimStart('/')
+                            break
+                        }
+                    }
+                    $isCurrentScript = $expectedScriptNames.Contains($scriptName) -or
+                        (-not [string]::IsNullOrWhiteSpace($scriptPath) -and $expectedRepositoryPaths.Contains($scriptPath)) -or
+                        $script.Notes -eq $managedScriptNotes -or
+                        $script.CommitNotes -eq $managedScriptNotes
+                    if ($isCurrentScript) {
+                        continue
+                    }
+
+                    $isUnsupportedCiemScript = $scriptName -eq 'Devolutions.CIEM' -or
+                        $scriptName -match '^Devolutions\.CIEM/' -or
+                        ($scriptName -match '^Users/' -and $scriptName -match '/Devolutions-CIEM/') -or
+                        $scriptName -match '^Checks/AttackPathRemediation-' -or
+                        $scriptName -match '^Identities/AttackPaths/AttackPathRemediation-' -or
+                        ($scriptPath -match '/Devolutions-CIEM/psu-app/' -and -not $expectedRepositoryPaths.Contains($scriptPath))
+                    if ($isUnsupportedCiemScript) {
+                        $unsupportedScriptNames += $scriptName
                     }
                 }
             }
@@ -61,6 +102,8 @@ function Test-CIEMPSUDeployment {
             AppCount            = $appCount
             ScriptCount         = $scriptCount
             ExpectedScriptCount = $expectedScriptCount
+            UnsupportedScriptCount = @($unsupportedScriptNames).Count
+            UnsupportedScriptNames = @($unsupportedScriptNames)
             DatabasePath        = $databasePath
             DatabaseInitialized = $databaseInitialized
         } | ConvertTo-Json -Depth 5 -Compress
@@ -101,6 +144,9 @@ function Test-CIEMPSUDeployment {
     }
     if ([int]$details.ScriptCount -ne [int]$details.ExpectedScriptCount) {
         throw "CIEM deployment validation failed: expected $($details.ExpectedScriptCount) CIEM-managed PSU scripts on $Environment, found $($details.ScriptCount)."
+    }
+    if ([int]$details.UnsupportedScriptCount -gt 0) {
+        throw "CIEM deployment validation failed: unsupported CIEM PSU scripts on ${Environment}: $($details.UnsupportedScriptNames -join ', '). Remove CIEM from the PSU instance before installing the current module."
     }
     if (-not [bool]$details.DatabaseInitialized) {
         throw "CIEM deployment validation failed: CIEM database is not initialized on $Environment. Path: $($details.DatabasePath)"

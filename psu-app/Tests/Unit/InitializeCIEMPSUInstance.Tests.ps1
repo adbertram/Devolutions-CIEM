@@ -18,6 +18,8 @@ Describe 'Initialize-CIEMPSUInstance' {
     BeforeEach {
         Remove-Item -Path $script:DatabasePath -Force -ErrorAction SilentlyContinue
 
+        $script:BootstrapSteps = [System.Collections.Generic.List[string]]::new()
+
         Mock -ModuleName Devolutions.CIEM Get-Command {
             [pscustomobject]@{ Name = $Name }
         } -ParameterFilter { $Name -in @('Get-PSUApp', 'Get-PSUScript') }
@@ -44,6 +46,7 @@ Describe 'Initialize-CIEMPSUInstance' {
         }
 
         Mock -ModuleName Devolutions.CIEM Import-CIEMScript {
+            $script:BootstrapSteps.Add('Import-CIEMScript')
             [pscustomobject]@{
                 Status       = 'Registered'
                 TotalScripts = $script:ExpectedScriptNames.Count
@@ -51,6 +54,7 @@ Describe 'Initialize-CIEMPSUInstance' {
         }
 
         Mock -ModuleName Devolutions.CIEM New-CIEMDatabase {
+            $script:BootstrapSteps.Add('New-CIEMDatabase')
             New-Item -Path (Split-Path $script:DatabasePath -Parent) -ItemType Directory -Force | Out-Null
             Set-Content -Path $script:DatabasePath -Value ''
             $script:DatabasePath
@@ -95,11 +99,16 @@ Describe 'Initialize-CIEMPSUInstance' {
         $result.ExpectedScriptCount | Should -Be $script:ExpectedScriptNames.Count
         $result.DatabaseInitialized | Should -BeTrue
         $result.DatabasePath | Should -Be $script:DatabasePath
+        $result.PSObject.Properties.Name | Should -Not -Contain 'PrunedLegacyScripts'
 
         Should -Invoke -CommandName Get-PSUApp -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Integrated.IsPresent }
         Should -Invoke -CommandName Import-CIEMScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Integrated.IsPresent }
         Should -Invoke -CommandName New-CIEMDatabase -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $PassThru.IsPresent }
-        Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Integrated.IsPresent }
+        Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { $Integrated.IsPresent }
+        $script:BootstrapSteps | Should -Be @(
+            'Import-CIEMScript'
+            'New-CIEMDatabase'
+        )
     }
 
     It 'throws before bootstrap when duplicate CIEM apps exist' {
@@ -129,6 +138,26 @@ Describe 'Initialize-CIEMPSUInstance' {
 
         { Initialize-CIEMPSUInstance -Integrated } |
             Should -Throw -ExpectedMessage '*expected*CIEM-managed PSU scripts*'
+    }
+
+    It 'throws before registration when unsupported CIEM script residue exists' {
+        Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+            @(
+                [pscustomobject]@{
+                    Name        = $script:ExpectedScriptNames[0]
+                    CommitNotes = $script:ManagedScriptNotes
+                }
+                [pscustomobject]@{
+                    Name = 'Devolutions.CIEM/Start-CIEMAzureDiscovery'
+                }
+            )
+        }
+
+        { Initialize-CIEMPSUInstance -Integrated } |
+            Should -Throw -ExpectedMessage "*unsupported pre-existing CIEM PSU script 'Devolutions.CIEM/Start-CIEMAzureDiscovery'*"
+
+        Should -Invoke -CommandName Import-CIEMScript -ModuleName Devolutions.CIEM -Times 0
+        Should -Invoke -CommandName New-CIEMDatabase -ModuleName Devolutions.CIEM -Times 0
     }
 
     It 'throws when database initialization does not create the database file' {
