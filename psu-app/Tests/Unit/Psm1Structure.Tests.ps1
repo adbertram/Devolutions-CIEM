@@ -7,7 +7,7 @@ BeforeAll {
     $script:InvokeQueryContent = Get-Content (Join-Path $repoRoot 'Public' 'Invoke-CIEMQuery.ps1') -Raw
     $script:ConfigPageContent = Get-Content (Join-Path $repoRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
     $script:ManifestPath = Join-Path $repoRoot 'Devolutions.CIEM.psd1'
-    $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psd1'
+    $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psdata'
     $script:UniversalRoot = Join-Path $repoRoot '.universal'
     $script:SetupPath = Join-Path $repoRoot 'setup.ps1'
     $script:SetupContent = if (Test-Path $script:SetupPath -PathType Leaf) {
@@ -194,6 +194,20 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:Psm1Content | Should -Match 'modules/PSUSQLite/PSUSQLite\.psd1'
         }
 
+        It 'Does not ship internal data registries as module manifests' {
+            $resolvedRepoRoot = (Resolve-Path -Path $repoRoot).Path
+            $manifestFiles = @(
+                Get-ChildItem -Path $resolvedRepoRoot -Filter '*.psd1' -File -Recurse |
+                    ForEach-Object { $_.FullName.Substring($resolvedRepoRoot.Length + 1).Replace('\', '/') } |
+                    Sort-Object
+            )
+
+            $manifestFiles | Should -Be @(
+                'Devolutions.CIEM.psd1'
+                'modules/PSUSQLite/PSUSQLite.psd1'
+            )
+        }
+
         It 'Declares no external Gallery module dependencies because CIEM runtime dependencies are bundled or PSU-provided' {
             $manifest = Import-PowerShellDataFile -Path $script:ManifestPath
             $manifest.RequiredModules | Should -BeNullOrEmpty
@@ -232,7 +246,7 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
         }
 
         It 'Loads sub-module roots from the data manifest' {
-            $script:Psm1Content | Should -Match 'Data/module_roots\.psd1'
+            $script:Psm1Content | Should -Match 'Data/module_roots\.psdata'
             $script:Psm1Content | Should -Match 'Import-PowerShellDataFile'
             $script:Psm1Content | Should -Match 'Set-Variable\s+-Name\s+\(\[string\]\$rootEntry\.Variable\)\s+-Scope\s+Script'
             $script:Psm1Content | Should -Match '\$subModuleRoots\s*=\s*@\(\$script:CIEMModuleRoots'

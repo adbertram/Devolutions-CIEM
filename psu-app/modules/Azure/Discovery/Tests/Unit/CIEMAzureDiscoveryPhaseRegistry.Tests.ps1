@@ -3,7 +3,7 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
-    $script:PhaseRegistryPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_phases.psd1'
+    $script:PhaseRegistryPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_phases.psdata'
 }
 
 Describe 'Azure Discovery Phase Registry' {

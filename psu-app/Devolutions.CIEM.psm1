@@ -21,7 +21,7 @@ function _BootLog([string]$Msg, [string]$Sev = 'INFO') {
 _BootLog "Module loading from: $PSScriptRoot"
 
 # --- Sub-module directory roots (for runtime file discovery) ---
-$script:CIEMModuleRootsConfig = Import-PowerShellDataFile -Path (Join-Path $script:ModuleRoot 'Data/module_roots.psd1')
+$script:CIEMModuleRootsConfig = Import-PowerShellDataFile -Path (Join-Path $script:ModuleRoot 'Data/module_roots.psdata')
 $script:CIEMModuleRoots = @($script:CIEMModuleRootsConfig.Modules | Sort-Object LoadOrder)
 if ($script:CIEMModuleRoots.Count -eq 0) {
     throw "CIEM module root registry contains no modules."
@@ -159,10 +159,10 @@ $script:RelationshipColors = @{}
 $script:DormantPermissionThresholdDays = 90
 $script:MediumEntitlementThreshold = 5
 $script:PrivilegedRoleNames = @((Get-Content (Join-Path $script:AzureDiscoveryRoot 'Data/privileged_roles.json') -Raw | ConvertFrom-Json).name)
-$script:CIEMGraphEntitiesConfig = Import-PowerShellDataFile -Path (Join-Path $script:GraphRoot 'Data/entities.psd1')
-$script:CIEMAttackPathRemediationTokensConfig = Import-PowerShellDataFile -Path (Join-Path $script:GraphRoot 'Data/remediation_tokens.psd1')
-$script:CIEMAzureEntitiesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/entities.psd1')
-$script:CIEMAzureDiscoveryPhasesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/discovery_phases.psd1')
+$script:CIEMGraphEntitiesConfig = Import-PowerShellDataFile -Path (Join-Path $script:GraphRoot 'Data/entities.psdata')
+$script:CIEMAttackPathRemediationTokensConfig = Import-PowerShellDataFile -Path (Join-Path $script:GraphRoot 'Data/remediation_tokens.psdata')
+$script:CIEMAzureEntitiesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/entities.psdata')
+$script:CIEMAzureDiscoveryPhasesConfig = Import-PowerShellDataFile -Path (Join-Path $script:AzureDiscoveryRoot 'Data/discovery_phases.psdata')
 # Tunables (script-scope, all defined in one place for discoverability)
 # CIEMParallelThrottleLimit*: ForEach-Object -Parallel throttle for discovery vs scan workloads.
 # CIEMSqlBatchSize: cap on rows per multi-row INSERT before InvokeCIEMBatchInsert further sub-divides

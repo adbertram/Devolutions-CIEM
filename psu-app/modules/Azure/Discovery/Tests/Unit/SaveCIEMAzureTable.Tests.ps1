@@ -3,7 +3,7 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
-    $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' '..' 'Discovery' 'Data' 'entities.psd1'
+    $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' '..' 'Discovery' 'Data' 'entities.psdata'
     $script:DiscoverySchemaPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
 
     function Get-SchemaColumns {
@@ -45,12 +45,12 @@ BeforeAll {
     }
 }
 
-Describe 'entities.psd1 + Save-CIEMAzureTable generic core' {
-    It 'entities.psd1 config file exists' {
+Describe 'entities.psdata + Save-CIEMAzureTable generic core' {
+    It 'entities.psdata config file exists' {
         $script:EntityConfigPath | Should -Exist
     }
 
-    It 'entities.psd1 is a valid PowerShell data file with entries for all four tables' {
+    It 'entities.psdata is a valid PowerShell data file with entries for all four tables' {
         $config = Import-PowerShellDataFile -Path $script:EntityConfigPath
 
         $config.Keys | Should -Contain 'ArmResource'

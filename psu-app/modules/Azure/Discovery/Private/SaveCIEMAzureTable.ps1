@@ -5,12 +5,12 @@ function SaveCIEMAzureTable {
 
     .DESCRIPTION
         Reads table + insert-column configuration from the Azure discovery entity
-        registry loaded from Discovery/Data/entities.psd1 and delegates to
+        registry loaded from Discovery/Data/entities.psdata and delegates to
         InvokeCIEMBatchInsert. Each Save-CIEMAzure* public shim calls this with the
         matching -Entity key so there's a single code path for batch inserts.
 
     .PARAMETER Entity
-        Logical entity name matching a top-level key in entities.psd1
+        Logical entity name matching a top-level key in entities.psdata
         (e.g., 'ArmResource', 'EntraResource', 'ResourceRelationship',
         'EffectiveRoleAssignment').
 

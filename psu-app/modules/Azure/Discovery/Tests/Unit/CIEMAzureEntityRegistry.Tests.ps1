@@ -3,7 +3,7 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
-    $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'entities.psd1'
+    $script:EntityConfigPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'entities.psdata'
     $script:DiscoverySchemaPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'discovery_schema.sql'
 
     New-CIEMDatabase -Path "$TestDrive/ciem.db"

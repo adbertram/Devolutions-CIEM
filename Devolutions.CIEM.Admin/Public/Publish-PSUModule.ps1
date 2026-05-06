@@ -244,12 +244,17 @@ function Publish-PSUModule {
             }
             Write-Host "  [OK] Module pushed: $moduleName v$moduleVersion -> $sshAlias" -ForegroundColor Green
 
+            Write-Host ''
+            Write-Host 'Step 4: Syncing PSU configuration...' -ForegroundColor Yellow
+            Sync-PSUConfiguration -Reset
+            Write-Host '  [OK] PSU configuration synced' -ForegroundColor Green
+
             if ($SkipAppRestart -or $ValidateDeployment) {
                 Write-Host ''
-                Write-Host 'Step 4: Skipping app restart.' -ForegroundColor Yellow
+                Write-Host 'Step 5: Skipping app restart.' -ForegroundColor Yellow
             }
             else {
-                Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 4
+                Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 5
             }
 
             Write-Host ''

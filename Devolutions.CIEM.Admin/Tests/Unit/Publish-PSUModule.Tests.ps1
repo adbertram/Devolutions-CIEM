@@ -56,6 +56,7 @@ LOCAL_PSU_TOKEN=fake-token
                 $script:rsyncArgs = @($args)
                 $global:LASTEXITCODE = 0
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration {}
             Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Mocked restart failure: PSU connection stale' }
             Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
         }
@@ -137,6 +138,7 @@ LOCAL_PSU_TOKEN=fake-token
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
             Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
             Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
+            Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration {}
             Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Stop-PSUApp should not run when -SkipAppRestart is set' }
             Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp { throw 'Start-PSUApp should not run when -SkipAppRestart is set' }
         }
@@ -147,6 +149,12 @@ LOCAL_PSU_TOKEN=fake-token
             $result.Status | Should -Be 'LocalImport'
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 0 -Scope It
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Start-PSUApp -Times 0 -Scope It
+        }
+
+        It 'syncs PSU configuration after replacing local module files' {
+            Publish-PSUModule -ModulePath $script:srcDir -LocalOnly -SkipAppRestart -EnvFilePath $script:envFile -Confirm:$false | Out-Null
+
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Sync-PSUConfiguration -Times 1 -Scope It -ParameterFilter { $Reset }
         }
     }
 }
@@ -494,6 +502,7 @@ LOCAL_PSU_TOKEN=fake-token
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
             Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
             Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
+            Mock -ModuleName Devolutions.CIEM.Admin Sync-PSUConfiguration { $script:events.Add('sync') }
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
                 $script:events.Add('register')
                 [pscustomobject]@{ Status = 'Completed' }
@@ -513,7 +522,7 @@ LOCAL_PSU_TOKEN=fake-token
             { Publish-PSUModule -ModulePath $script:localValidateSrcDir -LocalOnly -ValidateDeployment -EnvFilePath $script:localValidateEnvFile -Confirm:$false } |
                 Should -Throw -ExpectedMessage '*CIEM database is not initialized*'
 
-            $script:events | Should -Be @('validate')
+            $script:events | Should -Be @('sync', 'validate')
         }
     }
 }
