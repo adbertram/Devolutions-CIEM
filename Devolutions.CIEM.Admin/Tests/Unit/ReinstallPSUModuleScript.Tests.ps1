@@ -21,6 +21,12 @@ Describe 'scripts/reinstall-ciem-psu-module.sh' {
         $script:ScriptSource | Should -Not -Match 'Publish-PSResource'
     }
 
+    It 'does not request an app restart outside the Gallery module install process' {
+        $script:ScriptSource | Should -Match 'SkipAppRestart\s*=\s*\$true'
+        $script:ScriptSource | Should -Not -Match 'Restart-CIEMPSUApp'
+        $script:ScriptSource | Should -Not -Match 'Restart-PSUApp'
+    }
+
     It 'defaults to the local PSU target unless another environment is specified' {
         $script:ScriptSource | Should -Match 'ENVIRONMENT="local"'
         $script:ScriptSource | Should -Match 'ValidateSet\("local", "azure"\)'

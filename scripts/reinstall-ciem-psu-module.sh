@@ -179,6 +179,7 @@ Connect-PSU @connectParams | Out-Null
 $publishParams = @{
     ModulePath               = $env:CIEM_MODULE_PATH
     InstallPublishedVersion  = $true
+    SkipAppRestart           = $true
 }
 if ($env:CIEM_ENV_FILE_PATH) {
     $publishParams.EnvFilePath = $env:CIEM_ENV_FILE_PATH

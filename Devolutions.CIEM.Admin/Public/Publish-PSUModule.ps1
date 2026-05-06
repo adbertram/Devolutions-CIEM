@@ -246,7 +246,7 @@ function Publish-PSUModule {
 
             if ($SkipAppRestart -or $ValidateDeployment) {
                 Write-Host ''
-                Write-Host 'Step 4: Skipping app restart; caller will restart during validation.' -ForegroundColor Yellow
+                Write-Host 'Step 4: Skipping app restart.' -ForegroundColor Yellow
             }
             else {
                 Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 4
@@ -319,7 +319,7 @@ function Publish-PSUModule {
             Write-Host "  [OK] Installed $moduleName $($installResult.Version)" -ForegroundColor Green
 
             if ($SkipAppRestart -or $ValidateDeployment) {
-                Write-Host '  Skipping app restart; caller will restart during validation.' -ForegroundColor Yellow
+                Write-Host '  Skipping app restart.' -ForegroundColor Yellow
             }
             else {
                 Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 3
@@ -592,7 +592,7 @@ NuGet API key required. Options:
         $updatedPSU = $true
 
         if ($SkipAppRestart -or $ValidateDeployment) {
-            Write-Host '  Skipping app restart; caller will restart during validation.' -ForegroundColor Yellow
+            Write-Host '  Skipping app restart.' -ForegroundColor Yellow
         }
         else {
             Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 8

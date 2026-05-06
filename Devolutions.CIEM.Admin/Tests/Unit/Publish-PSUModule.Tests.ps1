@@ -435,7 +435,7 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             }
         }
 
-        It 'publishes, registers CIEM scripts, restarts, and validates without running post-install setup' {
+        It 'publishes and validates the PSU-registered module state without deployment-only setup or restart steps' {
             $result = Publish-PSUModule -ModulePath $script:remoteSrcDir `
                 -NuGetApiKey 'fake-key' `
                 -EnvFilePath '/tmp/custom-ciem.env' `
@@ -447,13 +447,13 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             $result.PublishResult.Status | Should -Be 'Published'
             $result.ValidationResult.Status | Should -Be 'Healthy'
             $result.PSObject.Properties.Name | Should -Not -Contain 'BootstrapResult'
-            $result.ScriptRegistration.Status | Should -Be 'Completed'
-            $script:events | Should -Be @('install', 'stop', 'start', 'register', 'validate')
+            $result.PSObject.Properties.Name | Should -Not -Contain 'ScriptRegistration'
+            $script:events | Should -Be @('install', 'validate')
             $script:testDeploymentCalls[0].Environment | Should -Be 'local'
             $script:testDeploymentCalls[0].EnvFilePath | Should -Be '/tmp/custom-ciem.env'
         }
 
-        It 'does not return bootstrap job details from validation' {
+        It 'does not return bootstrap or script registration job details from validation' {
             $result = Publish-PSUModule -ModulePath $script:remoteSrcDir `
                 -NuGetApiKey 'fake-key' `
                 -EnvFilePath 'NO_ENV_FILE' `
@@ -461,6 +461,10 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
                 -Confirm:$false
 
             $result.PSObject.Properties.Name | Should -Not -Contain 'BootstrapResult'
+            $result.PSObject.Properties.Name | Should -Not -Contain 'ScriptRegistration'
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Invoke-TestCommand -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Start-PSUApp -Times 0 -Scope It
         }
     }
 
@@ -505,11 +509,11 @@ LOCAL_PSU_TOKEN=fake-token
             }
         }
 
-        It 'throws after restarting and validating the installed module state' {
+        It 'throws after validating the installed module state without deployment-only setup or restart steps' {
             { Publish-PSUModule -ModulePath $script:localValidateSrcDir -LocalOnly -ValidateDeployment -EnvFilePath $script:localValidateEnvFile -Confirm:$false } |
                 Should -Throw -ExpectedMessage '*CIEM database is not initialized*'
 
-            $script:events | Should -Be @('stop', 'start', 'register', 'validate')
+            $script:events | Should -Be @('validate')
         }
     }
 }
