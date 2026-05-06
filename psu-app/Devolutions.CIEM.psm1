@@ -176,6 +176,19 @@ $script:CIEMSqlBatchSize = 500
 $script:CIEMGraphBatchSize = 20
 $script:CIEMGraphBatchWallClockSeconds = 300
 
+# --- Import-time setup ---
+$setupScriptPath = Join-Path $PSScriptRoot 'setup.ps1'
+if (-not (Test-Path -Path $setupScriptPath -PathType Leaf)) {
+    throw "CIEM setup script was not found: $setupScriptPath"
+}
+try {
+    . $setupScriptPath
+}
+catch {
+    Write-CIEMLog -Message "FAILED to run setup.ps1 : $_" -Severity ERROR -Component 'ModuleInit'
+    throw
+}
+
 # --- Argument completers ---
 RegisterCIEMArgumentCompleters
 

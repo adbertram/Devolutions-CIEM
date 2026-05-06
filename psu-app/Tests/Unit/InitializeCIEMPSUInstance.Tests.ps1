@@ -3,7 +3,6 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
-    $script:ManagedScriptNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json'
     $script:DatabasePath = Join-Path $TestDrive 'ciem.db'
     $script:ManifestPath = Join-Path $PSScriptRoot '..' '..' 'data' 'psu-scripts.json'
     $script:Manifest = Get-Content -Path $script:ManifestPath -Raw | ConvertFrom-Json -Depth 10
@@ -20,37 +19,22 @@ Describe 'Initialize-CIEMPSUInstance' {
 
         $script:BootstrapSteps = [System.Collections.Generic.List[string]]::new()
 
-        Mock -ModuleName Devolutions.CIEM Get-Command {
-            [pscustomobject]@{ Name = $Name }
-        } -ParameterFilter { $Name -in @('Get-PSUApp', 'Get-PSUScript') }
+        Mock -ModuleName Devolutions.CIEM Get-PSUApp { throw 'Initialize-CIEMPSUInstance must not query live PSU apps.' }
+        Mock -ModuleName Devolutions.CIEM Get-PSUScript { throw 'Initialize-CIEMPSUInstance must not query live PSU scripts.' }
+        Mock -ModuleName Devolutions.CIEM Import-CIEMScript { throw 'Initialize-CIEMPSUInstance must not register PSU scripts.' }
 
-        Mock -ModuleName Devolutions.CIEM Get-PSUApp {
-            @(
-                [pscustomobject]@{
-                    Name    = 'Devolutions CIEM'
-                    BaseUrl = '/ciem'
-                    Module  = 'Devolutions.CIEM'
-                    Command = 'New-DevolutionsCIEMApp'
-                }
-            )
-        }
-
-        Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+        Mock -ModuleName Devolutions.CIEM Get-CIEMPSUScriptDefinition {
+            $script:BootstrapSteps.Add('Get-CIEMPSUScriptDefinition')
             @($script:ExpectedScriptNames | ForEach-Object {
                     [pscustomobject]@{
-                        Name        = $_
-                        FullPath    = "$_.ps1"
-                        CommitNotes = $script:ManagedScriptNotes
+                        Name                    = $_
+                        Content                 = 'Write-Output test'
+                        Description             = $_
+                        Status                  = 'Published'
+                        Timeout                 = 30
+                        DisableManualInvocation = $false
                     }
                 })
-        }
-
-        Mock -ModuleName Devolutions.CIEM Import-CIEMScript {
-            $script:BootstrapSteps.Add('Import-CIEMScript')
-            [pscustomobject]@{
-                Status       = 'Registered'
-                TotalScripts = $script:ExpectedScriptNames.Count
-            }
         }
 
         Mock -ModuleName Devolutions.CIEM New-CIEMDatabase {
@@ -90,71 +74,31 @@ Describe 'Initialize-CIEMPSUInstance' {
         }
     }
 
-    It 'registers scripts, initializes the database, and verifies the ready state' {
+    It 'validates packaged PSU resources, initializes the database, and does not register scripts' {
         $result = Initialize-CIEMPSUInstance -Integrated
 
-        $result.Status | Should -Be 'Ready'
-        $result.AppCount | Should -Be 1
-        $result.ScriptCount | Should -Be $script:ExpectedScriptNames.Count
+        $result.Status | Should -Be 'Initialized'
         $result.ExpectedScriptCount | Should -Be $script:ExpectedScriptNames.Count
         $result.DatabaseInitialized | Should -BeTrue
         $result.DatabasePath | Should -Be $script:DatabasePath
         $result.PSObject.Properties.Name | Should -Not -Contain 'PrunedLegacyScripts'
 
-        Should -Invoke -CommandName Get-PSUApp -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Integrated.IsPresent }
-        Should -Invoke -CommandName Import-CIEMScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $Integrated.IsPresent }
+        Should -Invoke -CommandName Get-CIEMPSUScriptDefinition -ModuleName Devolutions.CIEM -Times 1
+        Should -Invoke -CommandName Get-PSUApp -ModuleName Devolutions.CIEM -Times 0
+        Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 0
+        Should -Invoke -CommandName Import-CIEMScript -ModuleName Devolutions.CIEM -Times 0
         Should -Invoke -CommandName New-CIEMDatabase -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter { $PassThru.IsPresent }
-        Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 2 -ParameterFilter { $Integrated.IsPresent }
         $script:BootstrapSteps | Should -Be @(
-            'Import-CIEMScript'
+            'Get-CIEMPSUScriptDefinition'
             'New-CIEMDatabase'
         )
     }
 
-    It 'throws before bootstrap when duplicate CIEM apps exist' {
-        Mock -ModuleName Devolutions.CIEM Get-PSUApp {
-            @(
-                [pscustomobject]@{ Name = 'Devolutions CIEM'; BaseUrl = '/ciem' }
-                [pscustomobject]@{ Name = 'Devolutions CIEM'; BaseUrl = '/ciem' }
-            )
-        }
+    It 'throws when packaged script definitions cannot be resolved' {
+        Mock -ModuleName Devolutions.CIEM Get-CIEMPSUScriptDefinition { @() }
 
         { Initialize-CIEMPSUInstance -Integrated } |
-            Should -Throw -ExpectedMessage "*expected one or zero Devolutions CIEM app registrations before configuration completes*"
-
-        Should -Invoke -CommandName Import-CIEMScript -ModuleName Devolutions.CIEM -Times 0
-        Should -Invoke -CommandName New-CIEMDatabase -ModuleName Devolutions.CIEM -Times 0
-    }
-
-    It 'throws when the script registration verification is incomplete' {
-        Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-            @(
-                [pscustomobject]@{
-                    Name        = $script:ExpectedScriptNames[0]
-                    CommitNotes = $script:ManagedScriptNotes
-                }
-            )
-        }
-
-        { Initialize-CIEMPSUInstance -Integrated } |
-            Should -Throw -ExpectedMessage '*expected*CIEM-managed PSU scripts*'
-    }
-
-    It 'throws before registration when unsupported CIEM script residue exists' {
-        Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-            @(
-                [pscustomobject]@{
-                    Name        = $script:ExpectedScriptNames[0]
-                    CommitNotes = $script:ManagedScriptNotes
-                }
-                [pscustomobject]@{
-                    Name = 'Devolutions.CIEM/Start-CIEMAzureDiscovery'
-                }
-            )
-        }
-
-        { Initialize-CIEMPSUInstance -Integrated } |
-            Should -Throw -ExpectedMessage "*unsupported pre-existing CIEM PSU script 'Devolutions.CIEM/Start-CIEMAzureDiscovery'*"
+            Should -Throw -ExpectedMessage '*script definitions could not be resolved*'
 
         Should -Invoke -CommandName Import-CIEMScript -ModuleName Devolutions.CIEM -Times 0
         Should -Invoke -CommandName New-CIEMDatabase -ModuleName Devolutions.CIEM -Times 0

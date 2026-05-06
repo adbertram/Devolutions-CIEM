@@ -6,6 +6,8 @@ BeforeAll {
     $script:UniversalScriptsPath = Join-Path $PSScriptRoot '..' '..' '.universal' 'scripts.ps1'
     $script:UniversalScriptsExists = Test-Path -Path $script:UniversalScriptsPath -PathType Leaf
     $script:UniversalScriptsContent = if ($script:UniversalScriptsExists) { Get-Content -Path $script:UniversalScriptsPath -Raw } else { '' }
+    $script:SetupScriptPath = Join-Path $PSScriptRoot '..' '..' 'setup.ps1'
+    $script:SetupScriptContent = if (Test-Path -Path $script:SetupScriptPath -PathType Leaf) { Get-Content -Path $script:SetupScriptPath -Raw } else { '' }
     $script:ImportScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Import-CIEMScript.ps1'
     $script:ImportScriptContent = Get-Content -Path $script:ImportScriptPath -Raw
     $script:InitializeScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Initialize-CIEMPSUInstance.ps1'
@@ -32,6 +34,10 @@ Describe 'Import-CIEMScript registration model' {
 
         It 'Exposes Initialize-CIEMPSUInstance as a public module command' {
             Get-Command Initialize-CIEMPSUInstance -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+
+        It 'Exposes Get-CIEMPSUScriptDefinition as the module resource definition source' {
+            Get-Command Get-CIEMPSUScriptDefinition -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
     }
 
@@ -71,9 +77,28 @@ Describe 'Import-CIEMScript registration model' {
         }
     }
 
-    Context 'PSU app startup registration' {
-        It 'Does not ship a .universal scripts.ps1 module resource that creates a read-only Devolutions.CIEM Scripts folder' {
-            $script:UniversalScriptsPath | Should -Not -Exist
+    Context 'PSU module resource registration' {
+        It 'Ships .universal scripts.ps1 with PSU module resources for core CIEM commands' {
+            $script:UniversalScriptsPath | Should -Exist
+            $script:UniversalScriptsContent | Should -Match 'Import-Module\s+Devolutions\.CIEM'
+            $script:UniversalScriptsContent | Should -Not -Match 'Initialize-CIEMPSUInstance'
+            $script:UniversalScriptsContent | Should -Match 'New-PSUScript'
+            $script:UniversalScriptsContent | Should -Match "-Module\s+'Devolutions\.CIEM'"
+            $script:UniversalScriptsContent | Should -Match "-Command\s+'New-CIEMScanRun'"
+            $script:UniversalScriptsContent | Should -Match "-Command\s+'Start-CIEMAzureDiscovery'"
+            $script:UniversalScriptsContent | Should -Match "-Command\s+'Invoke-CIEMAttackPathRemediation'"
+            $script:UniversalScriptsContent | Should -Not -Match 'ScriptBlock'
+            $script:UniversalScriptsContent | Should -Not -Match 'Get-CIEMPSUScriptDefinition'
+            $script:UniversalScriptsContent | Should -Match 'ManagedBy=Devolutions\.CIEM;Source=data/psu-scripts\.json'
+            $script:UniversalScriptsContent | Should -Not -Match 'Import-CIEMScript'
+        }
+
+        It 'Ships setup.ps1 as the single import-time CIEM setup entry point' {
+            $script:SetupScriptPath | Should -Exist
+            $script:SetupScriptContent | Should -Match 'function\s+Invoke-CIEMPSUSetup'
+            $script:SetupScriptContent | Should -Match 'Invoke-CIEMPSUSetup\s+\|\s+Out-Null'
+            $script:SetupScriptContent | Should -Match 'New-CIEMDatabase\s+-PassThru'
+            $script:SetupScriptContent | Should -Not -Match 'Import-Module\s+Devolutions\.CIEM'
         }
 
         It 'Does not run PSU management script registration from the app startup path' {
@@ -141,17 +166,33 @@ Describe 'Import-CIEMScript registration model' {
     }
 
     Context 'Initialize-CIEMPSUInstance implementation' {
-        It 'Runs script registration, database initialization, and readiness verification' {
+        It 'Delegates to the import-time setup implementation without registering scripts directly' {
             $script:InitializeScriptPath | Should -Exist
             $script:InitializeScriptContent | Should -Not -Match 'Repair-CIEMLegacyScriptRegistration'
             $script:InitializeScriptContent | Should -Not -Match 'PrunedLegacyScripts'
-            $script:InitializeScriptContent | Should -Match 'Import-CIEMScript\s+@scriptRegistrationParams'
-            $script:InitializeScriptContent | Should -Match 'New-CIEMDatabase\s+-PassThru'
-            $script:InitializeScriptContent | Should -Match 'Get-PSUApp'
-            $script:InitializeScriptContent | Should -Match 'Get-PSUScript'
-            $script:InitializeScriptContent | Should -Match 'attack_path_rules'
-            $script:InitializeScriptContent | Should -Match 'checks'
-            $script:InitializeScriptContent | Should -Match 'providers'
+            $script:InitializeScriptContent | Should -Not -Match 'Import-CIEMScript\s+@scriptRegistrationParams'
+            $script:InitializeScriptContent | Should -Not -Match 'New-PSUScript\s+@'
+            $script:InitializeScriptContent | Should -Not -Match 'New-CIEMDatabase\s+-PassThru'
+            $script:InitializeScriptContent | Should -Not -Match 'Get-PSUApp'
+            $script:InitializeScriptContent | Should -Not -Match 'Get-PSUScript'
+            $script:InitializeScriptContent | Should -Match 'Invoke-CIEMPSUSetup'
+            $script:SetupScriptContent | Should -Match 'Get-CIEMPSUScriptDefinition'
+            $script:SetupScriptContent | Should -Match 'attack_path_rules'
+            $script:SetupScriptContent | Should -Match 'checks'
+            $script:SetupScriptContent | Should -Match 'providers'
+        }
+    }
+
+    Context 'Get-CIEMPSUScriptDefinition behavior' {
+        It 'resolves every CIEM PSU script definition from the module package' {
+            $definitions = @(Get-CIEMPSUScriptDefinition)
+
+            $definitions.Count | Should -Be (@($script:Manifest.scripts).Count + @(Get-ChildItem -Path $script:RemediationTemplateRoot -Filter '*.ps1' -File).Count)
+            @($definitions.Name) | Should -Contain 'Checks/New-CIEMScanRun'
+            @($definitions.Name) | Should -Contain 'Checks/Start-CIEMAzureDiscovery'
+            @($definitions.Name) | Should -Contain 'Checks/Invoke-CIEMAttackPathRemediation'
+            @($definitions.Name) | Should -Contain 'management-port-open-to-the-internet'
+            @($definitions | Where-Object { [string]::IsNullOrWhiteSpace([string]$_.Content) }).Count | Should -Be 0
         }
     }
 

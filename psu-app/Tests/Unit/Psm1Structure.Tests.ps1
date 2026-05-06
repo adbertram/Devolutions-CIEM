@@ -9,8 +9,9 @@ BeforeAll {
     $script:ManifestPath = Join-Path $repoRoot 'Devolutions.CIEM.psd1'
     $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psd1'
     $script:UniversalRoot = Join-Path $repoRoot '.universal'
-    $script:InitializeContent = if (Test-Path (Join-Path $script:UniversalRoot 'initialize.ps1') -PathType Leaf) {
-        Get-Content (Join-Path $script:UniversalRoot 'initialize.ps1') -Raw
+    $script:SetupPath = Join-Path $repoRoot 'setup.ps1'
+    $script:SetupContent = if (Test-Path $script:SetupPath -PathType Leaf) {
+        Get-Content $script:SetupPath -Raw
     } else {
         ''
     }
@@ -51,9 +52,14 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
     }
 
     Context 'Schema application' {
-        It 'Does not initialize the database during module import' {
-            $script:Psm1Content | Should -Not -Match 'New-CIEMDatabase'
-            $script:Psm1Content | Should -Not -Match 'Initializing database'
+        It 'Runs the single setup entry point during module import' {
+            $script:SetupPath | Should -Exist
+            $script:Psm1Content | Should -Match 'Join-Path\s+\$PSScriptRoot\s+''setup\.ps1'''
+            $script:Psm1Content | Should -Match '\.\s+\$setupScriptPath'
+            $script:SetupContent | Should -Match 'function\s+Invoke-CIEMPSUSetup'
+            $script:SetupContent | Should -Match 'Invoke-CIEMPSUSetup\s+\|\s+Out-Null'
+            $script:SetupContent | Should -Match 'New-CIEMDatabase\s+-PassThru'
+            $script:SetupContent | Should -Not -Match 'Import-Module\s+Devolutions\.CIEM'
         }
 
         It 'Does not apply provider schemas during module import' {
@@ -73,12 +79,17 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:NewDatabaseContent | Should -Match 'Sync-CIEMAttackPathRuleCatalog'
         }
 
-        It 'PSU initialize hook runs the automatic CIEM bootstrap' {
-            Join-Path $script:UniversalRoot 'initialize.ps1' | Should -Exist
-            $script:InitializeContent | Should -Match 'Import-Module\s+Devolutions\.CIEM'
-            $script:InitializeContent | Should -Match 'Initialize-CIEMPSUInstance\s+-Integrated'
-            $script:InitializeContent | Should -Not -Match 'New-CIEMDatabase'
-            $script:InitializeContent | Should -Not -Match 'Import-CIEMScript'
+        It 'PSU resources rely on module import for setup' {
+            Join-Path $script:UniversalRoot 'initialize.ps1' | Should -Not -Exist
+
+            $scriptResourceContent = Get-Content (Join-Path $script:UniversalRoot 'scripts.ps1') -Raw
+            $scriptResourceContent | Should -Match 'Import-Module\s+Devolutions\.CIEM'
+            $scriptResourceContent | Should -Match "-Module\s+'Devolutions\.CIEM'"
+            $scriptResourceContent | Should -Match "-Command\s+'Start-CIEMAzureDiscovery'"
+            $scriptResourceContent | Should -Not -Match 'ScriptBlock'
+            $scriptResourceContent | Should -Not -Match 'Initialize-CIEMPSUInstance'
+            $scriptResourceContent | Should -Not -Match 'New-CIEMDatabase'
+            $scriptResourceContent | Should -Not -Match 'Import-CIEMScript'
         }
     }
 
@@ -170,8 +181,9 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
     Context 'Production PSU package resources' {
         It 'Ships only CIEM-owned PSU configuration resources' {
             Join-Path $script:UniversalRoot 'dashboards.ps1' | Should -Exist
-            Join-Path $script:UniversalRoot 'initialize.ps1' | Should -Exist
-            Join-Path $script:UniversalRoot 'scripts.ps1' | Should -Not -Exist
+            Join-Path $script:UniversalRoot 'scripts.ps1' | Should -Exist
+            Join-Path $repoRoot 'setup.ps1' | Should -Exist
+            Join-Path $script:UniversalRoot 'initialize.ps1' | Should -Not -Exist
             Join-Path $script:UniversalRoot 'authentication.ps1' | Should -Not -Exist
             Join-Path $script:UniversalRoot 'roles.ps1' | Should -Not -Exist
             Join-Path $script:UniversalRoot 'settings.ps1' | Should -Not -Exist
