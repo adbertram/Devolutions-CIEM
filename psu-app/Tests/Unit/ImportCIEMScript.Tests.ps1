@@ -275,6 +275,37 @@ Describe 'Import-CIEMScript registration model' {
             Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times 0
         }
 
+        It 'Updates existing CIEM-owned attack path scripts registered by basename without creating path duplicates' {
+            Mock -ModuleName Devolutions.CIEM Get-Command {
+                [pscustomobject]@{
+                    Name = $Name
+                }
+            } -ParameterFilter { $Name -in @('New-PSUScript', 'Get-PSUScript', 'Set-PSUScript', 'Get-PSUFolder', 'New-PSUFolder') }
+
+            Mock -ModuleName Devolutions.CIEM New-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Set-PSUScript {}
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                @(
+                    [pscustomobject]@{
+                        Name        = 'management-port-open-to-the-internet'
+                        FullPath    = 'management-port-open-to-the-internet'
+                        CommitNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json'
+                    }
+                )
+            }
+
+            $result = Import-CIEMScript
+
+            $result.Status | Should -Be 'Registered'
+            Should -Invoke -CommandName Set-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
+                $Script.Name -eq 'management-port-open-to-the-internet'
+            }
+            Should -Invoke -CommandName New-PSUScript -ModuleName Devolutions.CIEM -Times 0 -ParameterFilter {
+                $Name -eq 'management-port-open-to-the-internet' -and
+                $Path -eq 'Identities/AttackPaths/management-port-open-to-the-internet.ps1'
+            }
+        }
+
         It 'Uses integrated PSU cmdlets only when requested' {
             Mock -ModuleName Devolutions.CIEM Get-Command {
                 [pscustomobject]@{

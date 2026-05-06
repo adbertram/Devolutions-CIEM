@@ -246,7 +246,9 @@ function Import-CIEMScript {
 
                     if (-not [string]::IsNullOrWhiteSpace($expectedRepositoryPath)) {
                         $existingRepositoryPath = & $getExistingScriptPath -Script $_
-                        return $existingRepositoryPath -eq $expectedRepositoryPath
+                        $existingScriptName = & $normalizeScriptName -Name ([string]$_.Name)
+                        return $existingRepositoryPath -eq $expectedRepositoryPath -or
+                            $existingScriptName -eq [string]$scriptDef.Name
                     }
 
                     $existingScriptName = & $normalizeScriptName -Name ([string]$_.Name)
