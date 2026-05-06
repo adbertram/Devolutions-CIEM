@@ -11,9 +11,11 @@ Describe 'Invoke-TestCommand' {
         BeforeEach {
             $script:capturedScriptBlock = $null
             $script:connectEnvFilePaths = [System.Collections.Generic.List[string]]::new()
+            $script:connectAzureFlags = [System.Collections.Generic.List[bool]]::new()
 
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {
                 $script:connectEnvFilePaths.Add([string]$EnvFilePath)
+                $script:connectAzureFlags.Add([bool]$Azure)
             }
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-CIEMCommand {
                 $script:capturedScriptBlock = $ScriptBlock
@@ -35,6 +37,12 @@ Describe 'Invoke-TestCommand' {
             Invoke-TestCommand -Environment azure -EnvFilePath '/tmp/custom-ciem.env' -ScriptBlock { Get-CIEMProvider } | Out-Null
 
             $script:connectEnvFilePaths[0] | Should -Be '/tmp/custom-ciem.env'
+        }
+
+        It 'uses the explicit Azure PSU connection switch for Azure runtime commands' {
+            Invoke-TestCommand -Environment azure -ScriptBlock { Get-CIEMProvider } | Out-Null
+
+            $script:connectAzureFlags[0] | Should -BeTrue
         }
     }
 }

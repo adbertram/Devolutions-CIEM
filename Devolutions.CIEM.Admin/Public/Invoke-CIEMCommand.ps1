@@ -119,16 +119,21 @@ param([string]$ScriptContent)
 
     $scriptId = $executor.id
 
-    # --- Invoke with the command as a parameter ---
+    # --- Invoke with the command as a script parameter ---
     Write-Verbose "Invoking executor (script ID: $scriptId)..."
 
-    $encodedCommand = [System.Uri]::EscapeDataString($Command)
-    $invokeUri = "$baseUrl/api/v1/script/$scriptId`?ScriptContent=$encodedCommand"
+    $invokeParams = @{
+        Id         = $scriptId
+        Parameters = @{
+            ScriptContent = $Command
+        }
+        ErrorAction = 'Stop'
+    }
     if ($Environment) {
-        $invokeUri += "&Environment=$([System.Uri]::EscapeDataString($Environment))"
+        $invokeParams.Environment = $Environment
     }
 
-    $jobResponse = & $invokePSURestRequest -Uri $invokeUri -Method Post -Body '{}'
+    $jobResponse = Invoke-PSUScript @invokeParams
 
     $jobId = if ($jobResponse -is [int] -or $jobResponse -is [long]) {
         $jobResponse

@@ -18,9 +18,10 @@ target-specific `Publish-PSUModule` flow, then confirm the app restart.
 2. Inspect the pending change set and choose the semantic version bump (`Patch`, `Minor`, or `Major`) before publishing.
 3. Run the matching `Publish-PSUModule` command from the repository root with an explicit `-BumpVersion`.
 4. Add `-ValidateDeployment` when the request is for a full CIEM deploy, not only a publish/import.
-5. Confirm publish status, module version, and app restart output.
-6. If restart is not confirmed, run the target-specific restart command below.
-7. If Azure import, restart, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
+5. If the request is to remove CIEM and install the version already published in PowerShell Gallery, run `scripts/reinstall-ciem-psu-module.sh` instead of publishing a new Gallery version.
+6. Confirm publish status, module version, and app restart output.
+7. If restart is not confirmed, run the target-specific restart command below.
+8. If Azure import, restart, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
 </quick_start>
 
 <target_selection>
@@ -70,7 +71,7 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUMod
 For Azure publishing:
 
 ```powershell
-pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUModule -ModulePath ./psu-app -BumpVersion <Patch|Minor|Major>"
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -Azure; Publish-PSUModule -ModulePath ./psu-app -BumpVersion <Patch|Minor|Major>"
 ```
 </step_4>
 
@@ -88,36 +89,58 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUMod
 Azure:
 
 ```powershell
-pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUModule -ModulePath ./psu-app -BumpVersion <Patch|Minor|Major> -ValidateDeployment"
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -Azure; Publish-PSUModule -ModulePath ./psu-app -BumpVersion <Patch|Minor|Major> -ValidateDeployment"
 ```
 </step_5>
 
 <step_6>
+For a clean reinstall from the version already published in PowerShell Gallery,
+use the project script. This removes CIEM-owned PSU resources first, then calls
+`Publish-PSUModule -InstallPublishedVersion`, which does not bump the manifest,
+does not require `NUGET_API_KEY`, and does not call `Publish-PSResource`.
+
+Local:
+
+```bash
+scripts/reinstall-ciem-psu-module.sh --environment local
+```
+
+Azure:
+
+```bash
+scripts/reinstall-ciem-psu-module.sh --environment azure
+```
+</step_6>
+
+<step_7>
 Verify the publish output confirms a successful app restart. If the output does
 not confirm the restart, restart the app explicitly.
 
 Local:
 
 ```powershell
-pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -Local; Restart-PSUApp -Name 'Devolutions CIEM'"
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU; Restart-PSUApp -Name 'Devolutions CIEM'"
 ```
 
 Azure:
 
 ```powershell
-pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU; Restart-PSUApp -Name 'Devolutions CIEM'"
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -Azure; Restart-PSUApp -Name 'Devolutions CIEM'"
 ```
-</step_6>
+</step_7>
 </workflow>
 
 <safety>
 - Do not upload module files directly to Azure PSU.
 - Local publishing uses adam-server through `Publish-PSUModule -LocalOnly`.
 - Azure publishing goes through PowerShell Gallery before PSU import.
+- `Publish-PSUModule -InstallPublishedVersion` imports the already published
+  Gallery version into PSU without uploading a new Gallery package.
 - CIEM Gallery imports must allow PSU configuration sync. Do not use
   `Install-PSUModule -NoSync` for CIEM Gallery installs because PSU must load
-  `.universal/dashboards.ps1` and `.universal/initialize.ps1` to register the
-  app and run `Initialize-CIEMPSUInstance`.
+  `.universal/dashboards.ps1` and `.universal/scripts.ps1` to register PSU
+  resources. Initial CIEM database setup is owned by import-time
+  `setup.ps1`; do not move PSU management cmdlets into setup.
 - CIEM Gallery installs are fresh-only. Do not add legacy repair, migration, or
   cleanup paths to install/bootstrap. Existing unsupported CIEM residue must
   fail validation; remove CIEM from the PSU instance before installing the

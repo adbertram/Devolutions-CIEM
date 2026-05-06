@@ -31,6 +31,10 @@ function Publish-PSUModule {
         Skip PowerShell Gallery publishing entirely and push the module
         via SSH/rsync to the publish point PSU instance.
 
+    .PARAMETER InstallPublishedVersion
+        Skip PowerShell Gallery publishing and install the latest version already
+        available in the PowerShell Gallery into the connected PSU instance.
+
     .PARAMETER IncludeData
         Include database files (*.db, *.db-shm, *.db-wal) in the module push.
         By default (LocalOnly), DB files are excluded to preserve the PSU instance's
@@ -38,16 +42,15 @@ function Publish-PSUModule {
 
     .PARAMETER SkipAppRestart
         Skip the CIEM app restart and health check after the module is imported.
-        Use this when a higher-level deployment workflow will create or restart
-        the app after additional bootstrap steps.
+        Use this when a higher-level deployment workflow will restart or validate
+        the app separately.
 
     .PARAMETER ValidateDeployment
-        Run the CIEM PSU bootstrap, restart the app, and validate the deployment
-        after the module is published and imported.
+        Restart the app and validate the deployment after the module is
+        published and imported. Validation does not run post-install setup.
 
     .PARAMETER TimeoutSeconds
-        Timeout for CIEM bootstrap and deployment validation when ValidateDeployment
-        is specified.
+        Timeout for CIEM deployment validation when ValidateDeployment is specified.
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app
@@ -60,6 +63,9 @@ function Publish-PSUModule {
 
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app -BumpVersion Minor
+
+    .EXAMPLE
+        Publish-PSUModule -ModulePath ./psu-app -InstallPublishedVersion
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
@@ -85,6 +91,9 @@ function Publish-PSUModule {
         [switch]$LocalOnly,
 
         [Parameter()]
+        [switch]$InstallPublishedVersion,
+
+        [Parameter()]
         [switch]$IncludeData,
 
         [Parameter()]
@@ -107,6 +116,10 @@ function Publish-PSUModule {
     }
     $manifestPath = $manifestFile.FullName
     $moduleName = $manifestFile.BaseName
+
+    if ($LocalOnly -and $InstallPublishedVersion) {
+        throw '-LocalOnly and -InstallPublishedVersion cannot be used together.'
+    }
 
     # ========================================================================
     # LocalOnly Mode: Skip PSGallery entirely, import to local PSU
@@ -233,7 +246,7 @@ function Publish-PSUModule {
 
             if ($SkipAppRestart -or $ValidateDeployment) {
                 Write-Host ''
-                Write-Host 'Step 4: Skipping app restart; caller will restart after bootstrap.' -ForegroundColor Yellow
+                Write-Host 'Step 4: Skipping app restart; caller will restart during validation.' -ForegroundColor Yellow
             }
             else {
                 Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 4
@@ -282,6 +295,77 @@ function Publish-PSUModule {
         }
     }
 
+    if ($InstallPublishedVersion) {
+        Write-Host '========================================' -ForegroundColor Cyan
+        Write-Host "Installing published $moduleName from PowerShell Gallery" -ForegroundColor Cyan
+        Write-Host '========================================' -ForegroundColor Cyan
+        Write-Host "Module: $ModulePath"
+        Write-Host ''
+
+        if ($PSCmdlet.ShouldProcess($moduleName, 'Install latest published version from PowerShell Gallery into PSU')) {
+            Write-Host 'Step 1: Connecting to PSU...' -ForegroundColor Yellow
+            if (-not $script:PSUConnection.Url) {
+                $connectParams = @{ ErrorAction = 'Stop' }
+                if ($EnvFilePath) {
+                    $connectParams.EnvFilePath = $EnvFilePath
+                }
+                $null = Connect-PSU @connectParams
+            }
+            Write-Host '  [OK] Connected to PSU' -ForegroundColor Green
+
+            Write-Host ''
+            Write-Host 'Step 2: Installing latest published Gallery module into PSU...' -ForegroundColor Yellow
+            $installResult = Install-PSUModule -Name $moduleName
+            Write-Host "  [OK] Installed $moduleName $($installResult.Version)" -ForegroundColor Green
+
+            if ($SkipAppRestart -or $ValidateDeployment) {
+                Write-Host '  Skipping app restart; caller will restart during validation.' -ForegroundColor Yellow
+            }
+            else {
+                Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 3
+            }
+
+            Write-Host ''
+            Write-Host '========================================' -ForegroundColor Cyan
+            Write-Host 'Published Version Install Successful!' -ForegroundColor Green
+            Write-Host '========================================' -ForegroundColor Cyan
+
+            $publishResult = [PSCustomObject]@{
+                ModuleName = $moduleName
+                Version    = $installResult.Version
+                GalleryUrl = "https://www.powershellgallery.com/packages/$moduleName"
+                UpdatedPSU = $true
+                Status     = 'InstalledPublishedVersion'
+            }
+
+            if ($ValidateDeployment) {
+                $environment = if ($script:PSUConnection.IsAzure) { 'azure' } else { 'local' }
+                return Invoke-CIEMPSUModuleDeployment `
+                    -Environment $environment `
+                    -ModulePath $ModulePath `
+                    -BumpVersion $BumpVersion `
+                    -PublishResult $publishResult `
+                    -EnvFilePath $EnvFilePath `
+                    -TimeoutSeconds $TimeoutSeconds
+            }
+
+            return $publishResult
+        }
+
+        Write-Host ''
+        Write-Host '[DRY RUN] Would install latest published Gallery module into PSU:' -ForegroundColor Yellow
+        Write-Host "  Module: $moduleName"
+        Write-Host '  Version: latest available in PSGallery'
+
+        return [PSCustomObject]@{
+            ModuleName = $moduleName
+            Version    = $null
+            GalleryUrl = "https://www.powershellgallery.com/packages/$moduleName"
+            UpdatedPSU = $false
+            Status     = 'DryRun'
+        }
+    }
+
     Write-Host '========================================' -ForegroundColor Cyan
     Write-Host "Publishing $moduleName to PowerShell Gallery" -ForegroundColor Cyan
     Write-Host '========================================' -ForegroundColor Cyan
@@ -294,8 +378,9 @@ function Publish-PSUModule {
 
         $requiredFiles = @(
             "$moduleName.psm1"
+            'setup.ps1'
             '.universal/dashboards.ps1'
-            '.universal/initialize.ps1'
+            '.universal/scripts.ps1'
             'modules/PSUSQLite/PSUSQLite.psd1'
         )
 
@@ -507,7 +592,7 @@ NuGet API key required. Options:
         $updatedPSU = $true
 
         if ($SkipAppRestart -or $ValidateDeployment) {
-            Write-Host '  Skipping app restart; caller will restart after bootstrap.' -ForegroundColor Yellow
+            Write-Host '  Skipping app restart; caller will restart during validation.' -ForegroundColor Yellow
         }
         else {
             Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 8
@@ -527,8 +612,9 @@ NuGet API key required. Options:
         }
 
         if ($ValidateDeployment) {
+            $environment = if ($script:PSUConnection.IsAzure) { 'azure' } else { 'local' }
             return Invoke-CIEMPSUModuleDeployment `
-                -Environment azure `
+                -Environment $environment `
                 -ModulePath $ModulePath `
                 -BumpVersion $BumpVersion `
                 -PublishResult $publishResult `

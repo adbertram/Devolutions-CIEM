@@ -101,6 +101,9 @@ function Remove-PSUModule {
         if ($Environment -eq 'local') {
             $connectParams['Local'] = $true
         }
+        elseif ($Environment -eq 'azure') {
+            $connectParams['Azure'] = $true
+        }
 
         $null = Connect-PSU @connectParams
     }

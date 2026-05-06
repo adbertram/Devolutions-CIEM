@@ -6,6 +6,7 @@ function Remove-CIEMPSUModule {
     .DESCRIPTION
         Connects to local or Azure PSU, removes CIEM-owned jobs, schedules, apps,
         and scripts registered by Import-CIEMScript, then removes the CIEM module.
+        Local removal also deletes CIEM data files from the local publish point.
         PSU job history is reported but not deleted because PSU does not expose a
         supported job deletion surface.
     #>
@@ -54,6 +55,9 @@ function Remove-CIEMPSUModule {
     }
     if ($Environment -eq 'local') {
         $connectParams.Local = $true
+    }
+    elseif ($Environment -eq 'azure') {
+        $connectParams.Azure = $true
     }
 
     Connect-PSU @connectParams | Out-Null
@@ -195,12 +199,66 @@ function Remove-CIEMPSUModule {
         Remove-PSUModule @removeModuleParams
     }
 
+    $dataRemoval = [pscustomobject]@{
+        Status = 'NotApplicable'
+        Target = $null
+        Paths  = @()
+    }
+    if ($Environment -eq 'local') {
+        $envVars = ReadCIEMAdminEnvFile -EnvFilePath $EnvFilePath
+        $sshAlias = [string]$envVars['PUBLISH_POINT_SSH']
+        $remotePsuPath = [string]$envVars['PUBLISH_POINT_PSU_PATH']
+
+        if ([string]::IsNullOrWhiteSpace($sshAlias)) {
+            throw 'PUBLISH_POINT_SSH is required in .env for local CIEM data cleanup.'
+        }
+        if ([string]::IsNullOrWhiteSpace($remotePsuPath)) {
+            throw 'PUBLISH_POINT_PSU_PATH is required in .env for local CIEM data cleanup.'
+        }
+
+        $remoteDataDir = "$($remotePsuPath.TrimEnd('/'))/data"
+        $dataPaths = @(
+            "$remoteDataDir/ciem.db"
+            "$remoteDataDir/ciem.db-shm"
+            "$remoteDataDir/ciem.db-wal"
+            "$remoteDataDir/ciem.log"
+        )
+        $dataRemoval = [pscustomobject]@{
+            Status = if ($WhatIfPreference) { 'WhatIf' } else { 'Pending' }
+            Target = $sshAlias
+            Paths  = $dataPaths
+        }
+
+        $shouldRemoveData = if ($WhatIfPreference) {
+            $false
+        }
+        elseif ($Force) {
+            $true
+        }
+        else {
+            $PSCmdlet.ShouldProcess($remoteDataDir, 'Remove local CIEM database and log files')
+        }
+
+        if ($shouldRemoveData) {
+            $quotedDataPaths = @($dataPaths | ForEach-Object { "'$_'" }) -join ' '
+            & ssh $sshAlias "rm -f $quotedDataPaths" 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to remove local CIEM data files from '$remoteDataDir' on '$sshAlias'. ssh exited with code $LASTEXITCODE."
+            }
+            $dataRemoval.Status = 'Removed'
+        }
+        elseif (-not $WhatIfPreference) {
+            $dataRemoval.Status = 'Skipped'
+        }
+    }
+
     $removableResourcesRetained = (
         ($stoppedJobs -lt $activeOwnedJobs.Count) -or
         ($queuedOwnedJobs.Count -gt 0) -or
         ($removedSchedules -lt $ownedSchedules.Count) -or
         ($removedApps -lt $ownedApps.Count) -or
-        ($removedScripts -lt $ownedScripts.Count)
+        ($removedScripts -lt $ownedScripts.Count) -or
+        ($Environment -eq 'local' -and $dataRemoval.Status -eq 'Skipped')
     )
     $resourceActionCount = $stoppedJobs + $removedSchedules + $removedApps + $removedScripts
 
@@ -240,6 +298,7 @@ function Remove-CIEMPSUModule {
         AppResourcesRemoved         = $removedApps
         ScriptResourcesScanned      = $existingScripts.Count
         ScriptResourcesRemoved      = $removedScripts
+        DataRemoval                 = $dataRemoval
         ModuleRemoval               = $moduleRemoval
         Status                      = $status
     }

@@ -47,7 +47,7 @@ function Invoke-TestCommand {
 
     $connectCommands = @{
         local = { Connect-PSU -Local -EnvFilePath $EnvFilePath }
-        azure = { Connect-PSU -EnvFilePath $EnvFilePath }
+        azure = { Connect-PSU -Azure -EnvFilePath $EnvFilePath }
     }
 
     Write-Verbose "[$Environment] Connecting to PSU..."

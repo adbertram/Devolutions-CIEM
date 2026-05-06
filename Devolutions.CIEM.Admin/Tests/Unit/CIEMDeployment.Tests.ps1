@@ -153,6 +153,7 @@ Describe 'Remove-CIEMPSUModule' {
         $script:ModulePath = Join-Path $TestDrive 'psu-app'
         $script:ManifestPath = Join-Path $script:ModulePath 'data/psu-scripts.json'
         $script:RemediationRoot = Join-Path $script:ModulePath 'modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts'
+        $script:LocalEnvFile = Join-Path $TestDrive '.env'
 
         New-Item -Path (Split-Path $script:ManifestPath -Parent) -ItemType Directory -Force | Out-Null
         New-Item -Path $script:RemediationRoot -ItemType Directory -Force | Out-Null
@@ -175,6 +176,12 @@ Describe 'Remove-CIEMPSUModule' {
   }
 }
 '@
+        Set-Content -Path $script:LocalEnvFile -Value @'
+PUBLISH_POINT_SSH=adam-server
+PUBLISH_POINT_PSU_PATH=/Users/adam/psu
+LOCAL_PSU_URL=http://192.168.86.36:5001
+LOCAL_PSU_TOKEN=fake-token
+'@
 
         Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {}
         Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {
@@ -187,6 +194,15 @@ Describe 'Remove-CIEMPSUModule' {
         Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUJob {}
         Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUSchedule {}
         Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUApp {}
+        $script:sshCalls = [System.Collections.Generic.List[object]]::new()
+        Mock -ModuleName Devolutions.CIEM.Admin ssh {
+            $sshArgs = @($args)
+            $script:sshCalls.Add([pscustomobject]@{
+                    Args = $sshArgs
+                    Text = $sshArgs -join ' '
+                })
+            $global:LASTEXITCODE = 0
+        }
     }
 
     It 'removes CIEM-owned apps, scripts, schedules, active jobs, and the module from Azure' {
@@ -204,13 +220,14 @@ Describe 'Remove-CIEMPSUModule' {
             @(
                 [pscustomobject]@{ Name = 'Checks/New-CIEMScanRun' }
                 [pscustomobject]@{ Name = 'management-port-open-to-the-internet'; FullPath = 'Identities/AttackPaths/management-port-open-to-the-internet.ps1'; CommitNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json' }
+                [pscustomobject]@{ Name = 'CIEMExecutor.ps1'; FullPath = 'CIEMExecutor.ps1' }
                 [pscustomobject]@{ Name = 'Infra/RotateCertificates' }
             )
         }
         Mock -ModuleName Devolutions.CIEM.Admin Get-PSUJob {
             @(
                 [pscustomobject]@{ Id = 10; Status = 1; ScriptFullPath = 'Checks/Start-CIEMAzureDiscovery.ps1' }
-                [pscustomobject]@{ Id = 11; Status = 0; ScriptFullPath = 'CIEMExecutor.ps1' }
+                [pscustomobject]@{ Id = 11; Status = 2; ScriptFullPath = 'CIEMExecutor.ps1' }
                 [pscustomobject]@{ Id = 12; Status = 2; ScriptFullPath = 'Infra/RotateCertificates.ps1' }
                 [pscustomobject]@{ Id = 13; Status = 2; ScriptFullPath = 'Checks/New-CIEMScanRun.ps1' }
                 [pscustomobject]@{ Id = 14; Status = 2; ScriptFullPath = $null }
@@ -229,17 +246,17 @@ Describe 'Remove-CIEMPSUModule' {
         $result.Status | Should -Be 'Removed'
         $result.AppResourcesScanned | Should -Be 2
         $result.AppResourcesRemoved | Should -Be 1
-        $result.ScriptResourcesScanned | Should -Be 3
-        $result.ScriptResourcesRemoved | Should -Be 2
+        $result.ScriptResourcesScanned | Should -Be 4
+        $result.ScriptResourcesRemoved | Should -Be 3
         $result.JobResourcesScanned | Should -Be 6
-        $result.JobResourcesMatched | Should -Be 2
+        $result.JobResourcesMatched | Should -Be 3
         $result.JobResourcesStopped | Should -Be 1
         $result.QueuedJobResourcesRetained | Should -Be 0
-        $result.JobHistoryRetained | Should -Be 1
+        $result.JobHistoryRetained | Should -Be 2
         $result.ScheduleResourcesRemoved | Should -Be 1
 
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Connect-PSU -Times 1 -ParameterFilter {
-            -not $Local -and $EnvFilePath -eq 'NO_ENV_FILE'
+            $Azure -and -not $Local -and $EnvFilePath -eq 'NO_ENV_FILE'
         }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Get-PSUScript -Times 1 -ParameterFilter {
             -not $PSBoundParameters.ContainsKey('Name')
@@ -249,12 +266,50 @@ Describe 'Remove-CIEMPSUModule' {
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUSchedule -Times 1 -ParameterFilter { $Schedule.Id -eq 20 }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 1 -ParameterFilter { $Script.Name -eq 'Checks/New-CIEMScanRun' }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 1 -ParameterFilter { $Script.Name -eq 'management-port-open-to-the-internet' }
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUScript -Times 1 -ParameterFilter { $Script.Name -eq 'CIEMExecutor.ps1' }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUModule -Times 1 -ParameterFilter {
             $Name -eq 'Devolutions.CIEM' -and
             $Environment -eq 'azure' -and
             $EnvFilePath -eq 'NO_ENV_FILE' -and
             $Force
         }
+        $script:sshCalls.Count | Should -Be 0
+    }
+
+    It 'removes local CIEM database and log files from the publish point' {
+        Mock -ModuleName Devolutions.CIEM.Admin Get-PSUApp {
+            @([pscustomobject]@{ Id = 30; Name = 'Devolutions CIEM'; BaseUrl = '/ciem'; Module = 'Devolutions.CIEM'; Command = 'New-DevolutionsCIEMApp' })
+        }
+        Mock -ModuleName Devolutions.CIEM.Admin Get-PSUScript {
+            @([pscustomobject]@{ Name = 'Checks/New-CIEMScanRun' })
+        }
+        Mock -ModuleName Devolutions.CIEM.Admin Get-PSUJob { @() }
+        Mock -ModuleName Devolutions.CIEM.Admin Get-PSUSchedule { @() }
+
+        $result = Remove-CIEMPSUModule -Environment local -ModulePath $script:ModulePath -EnvFilePath $script:LocalEnvFile -Force
+
+        $result.Status | Should -Be 'Removed'
+        $result.DataRemoval.Status | Should -Be 'Removed'
+        $result.DataRemoval.Target | Should -Be 'adam-server'
+        $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.db'
+        $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.db-shm'
+        $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.db-wal'
+        $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.log'
+
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin Connect-PSU -Times 1 -ParameterFilter {
+            $Local -and -not $Azure -and $EnvFilePath -eq $script:LocalEnvFile
+        }
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUModule -Times 1 -ParameterFilter {
+            $Name -eq 'Devolutions.CIEM' -and
+            $Environment -eq 'local' -and
+            $EnvFilePath -eq $script:LocalEnvFile -and
+            $Force
+        }
+        $script:sshCalls.Count | Should -Be 1
+        $script:sshCalls[0].Args[0] | Should -Be 'adam-server'
+        $script:sshCalls[0].Text | Should -Match 'rm -f'
+        $script:sshCalls[0].Text | Should -Match '/Users/adam/psu/data/ciem\.db'
+        $script:sshCalls[0].Text | Should -Match '/Users/adam/psu/data/ciem\.log'
     }
 
     It 'reports WhatIf without removing CIEM resources or the module' {

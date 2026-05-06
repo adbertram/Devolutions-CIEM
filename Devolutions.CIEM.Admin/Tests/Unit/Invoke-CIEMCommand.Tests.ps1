@@ -51,7 +51,6 @@ Describe 'Invoke-CIEMCommand' {
                             [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
                         )
                     }
-                    '/api/v1/script/\d+\?' { return 42 }
                     '/api/v1/job/42/output' { return @('late output') }
                     '/api/v1/job/42/pipelineOutput' { return @() }
                     '/api/v1/job/42' {
@@ -64,6 +63,8 @@ Describe 'Invoke-CIEMCommand' {
                     }
                 }
             }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-PSUScript { [pscustomobject]@{ Id = 42 } }
         }
 
         It 'throws instead of returning a running result' {
@@ -78,6 +79,7 @@ Describe 'Invoke-CIEMCommand' {
             # (a) no duplicate POST was attempted and
             # (b) every request carried the ngrok skip header.
             $script:calls = [System.Collections.Generic.List[object]]::new()
+            $script:scriptInvocations = [System.Collections.Generic.List[object]]::new()
 
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod {
                 $script:calls.Add([PSCustomObject]@{
@@ -94,10 +96,6 @@ Describe 'Invoke-CIEMCommand' {
                             [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
                             [PSCustomObject]@{ id = 2; name = 'Other.ps1'; fullPath = 'Other.ps1' }
                         )
-                    }
-                    '/api/v1/script/\d+\?' {
-                        # Script invocation → return a job id
-                        return 42
                     }
                     '/api/v1/job/42/output' {
                         return @('mock output')
@@ -116,6 +114,15 @@ Describe 'Invoke-CIEMCommand' {
                 }
             }
 
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-PSUScript {
+                $script:scriptInvocations.Add([pscustomobject]@{
+                        Id          = $Id
+                        Parameters  = $Parameters
+                        Environment = $Environment
+                    })
+                [pscustomobject]@{ Id = 42 }
+            }
+
             $script:result = Invoke-CIEMCommand -Command 'Get-Date' -TimeoutSeconds 5 -Verbose
         }
 
@@ -124,9 +131,16 @@ Describe 'Invoke-CIEMCommand' {
             $postCalls | Should -BeNullOrEmpty
         }
 
-        It 'invokes the existing executor by id' {
-            $invocation = $script:calls | Where-Object { $_.Uri -match '/api/v1/script/1\?' }
-            $invocation | Should -Not -BeNullOrEmpty
+        It 'invokes the existing executor by id through Invoke-PSUScript' {
+            $script:scriptInvocations.Count | Should -Be 1
+            $script:scriptInvocations[0].Id | Should -Be 1
+        }
+
+        It 'passes ScriptContent in the Invoke-PSUScript parameters instead of the REST query string' {
+            $restInvocation = $script:calls | Where-Object { $_.Uri -match '/api/v1/script/1\\?' -or $_.Uri -match 'ScriptContent=' }
+            $restInvocation | Should -BeNullOrEmpty
+
+            $script:scriptInvocations[0].Parameters.ScriptContent | Should -Be 'Get-Date'
         }
 
         It 'returns the job output from the mocked PSU response' {
@@ -149,7 +163,6 @@ Describe 'Invoke-CIEMCommand' {
                             [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
                         )
                     }
-                    '/api/v1/script/\d+\?' { return 43 }
                     '/api/v1/job/43/output' { return @('warning output') }
                     '/api/v1/job/43/pipelineOutput' { return @('mock pipeline') }
                     '/api/v1/job/43' {
@@ -162,6 +175,8 @@ Describe 'Invoke-CIEMCommand' {
                     }
                 }
             }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-PSUScript { [pscustomobject]@{ Id = 43 } }
         }
 
         It 'returns WarningOutput instead of polling until timeout' {
@@ -187,7 +202,6 @@ Describe 'Invoke-CIEMCommand' {
                             [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
                         )
                     }
-                    '/api/v1/script/\d+\?' { return 44 }
                     '/api/v1/job/44/output' { return @('after reconnect') }
                     '/api/v1/job/44/pipelineOutput' { return @() }
                     '/api/v1/job/44$' {
@@ -209,6 +223,8 @@ Describe 'Invoke-CIEMCommand' {
                     }
                 }
             }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-PSUScript { [pscustomobject]@{ Id = 44 } }
         }
 
         It 'throws immediately without retrying the same request' {
@@ -251,7 +267,6 @@ Describe 'Invoke-CIEMCommand' {
                             [PSCustomObject]@{ id = 1; name = 'CIEMExecutor.ps1'; fullPath = 'CIEMExecutor.ps1' }
                         )
                     }
-                    '/api/v1/script/\d+\?' { return 99 }
                     '/api/v1/job/99/output' { return @() }
                     '/api/v1/job/99/pipelineOutput' { return @() }
                     '/api/v1/job/99' {
@@ -259,6 +274,8 @@ Describe 'Invoke-CIEMCommand' {
                     }
                 }
             }
+
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-PSUScript { [pscustomobject]@{ Id = 99 } }
 
             $null = Invoke-CIEMCommand -Command 'Get-Date' -TimeoutSeconds 5 -Verbose
         }

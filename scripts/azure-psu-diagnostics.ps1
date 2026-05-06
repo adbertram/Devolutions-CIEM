@@ -389,7 +389,7 @@ function Get-SectionValue {
 }
 
 try {
-    $connection = Connect-PSU -ResourceGroup $ResourceGroup -WebAppName $WebAppName
+    $connection = Connect-PSU -Azure -ResourceGroup $ResourceGroup -WebAppName $WebAppName
     $baseUrl = $connection.Url.TrimEnd('/')
     $subscriptionId = Get-AzSubscriptionId
     $armAccessToken = Get-AzAccessToken

@@ -85,6 +85,8 @@ function Get-CIEMPSUScriptRemovalModel {
     $manifest = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json -Depth 10
     $coreScriptNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     $repositoryPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $legacyScriptNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    $null = $legacyScriptNames.Add('CIEMExecutor.ps1')
 
     foreach ($scriptDef in @($manifest.scripts)) {
         $scriptName = [string]$scriptDef.name
@@ -128,6 +130,7 @@ function Get-CIEMPSUScriptRemovalModel {
         ManagedScriptNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json'
         CoreScriptNames    = $coreScriptNames
         RepositoryPaths    = $repositoryPaths
+        LegacyScriptNames  = $legacyScriptNames
     }
 }
 
@@ -152,9 +155,17 @@ function Test-CIEMOwnedPSUScript {
     if ($RemovalModel.CoreScriptNames.Contains($normalizedName)) {
         return $true
     }
+    if ($RemovalModel.PSObject.Properties['LegacyScriptNames'] -and $RemovalModel.LegacyScriptNames.Contains($normalizedName)) {
+        return $true
+    }
 
     $scriptPath = Get-CIEMPSUScriptPath -Script $Script
     if (-not [string]::IsNullOrWhiteSpace($scriptPath) -and $RemovalModel.RepositoryPaths.Contains($scriptPath)) {
+        return $true
+    }
+    if (-not [string]::IsNullOrWhiteSpace($scriptPath) -and
+        $RemovalModel.PSObject.Properties['LegacyScriptNames'] -and
+        $RemovalModel.LegacyScriptNames.Contains($scriptPath)) {
         return $true
     }
 

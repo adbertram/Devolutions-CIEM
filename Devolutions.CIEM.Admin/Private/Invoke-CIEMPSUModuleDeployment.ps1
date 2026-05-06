@@ -25,29 +25,14 @@ function Invoke-CIEMPSUModuleDeployment {
 
     $ErrorActionPreference = 'Stop'
 
-    $bootstrapScript = {
-        Import-Module Devolutions.CIEM -ErrorAction Stop
-        Initialize-CIEMPSUInstance -Integrated | Out-Null
-    }
-
-    $bootstrapResult = Invoke-TestCommand -Environment $Environment -EnvFilePath $EnvFilePath -TimeoutSeconds $TimeoutSeconds -ScriptBlock $bootstrapScript
-    if (-not $bootstrapResult.PSObject.Properties['Status']) {
-        throw 'CIEM PSU bootstrap returned no Status.'
-    }
-    $bootstrapOutput = ConvertTo-CIEMPSUCommandOutputText -Output $bootstrapResult.Output
-    if ($bootstrapResult.Status -ne 'Completed') {
-        throw "CIEM PSU bootstrap failed with status $($bootstrapResult.Status). Output: $($bootstrapOutput -join "`n")"
-    }
-    $safeBootstrapResult = [pscustomobject]@{
-        JobId     = $bootstrapResult.JobId
-        ScriptId  = $bootstrapResult.ScriptId
-        Status    = $bootstrapResult.Status
-        Output    = $bootstrapOutput
-        StartTime = $bootstrapResult.StartTime
-        EndTime   = $bootstrapResult.EndTime
-    }
-
     Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 8
+
+    $scriptRegistration = Invoke-TestCommand -Environment $Environment -EnvFilePath $EnvFilePath -TimeoutSeconds $TimeoutSeconds -ScriptBlock {
+        Import-CIEMScript -Integrated | ConvertTo-Json -Depth 5 -Compress
+    }
+    if ($scriptRegistration.PSObject.Properties['Status'] -and $scriptRegistration.Status -notin @('Completed', 'Warning', 'WarningOutput')) {
+        throw "CIEM PSU script registration failed with status $($scriptRegistration.Status)."
+    }
 
     $validationResult = Test-CIEMPSUDeployment -Environment $Environment -EnvFilePath $EnvFilePath -TimeoutSeconds $TimeoutSeconds
 
@@ -56,7 +41,7 @@ function Invoke-CIEMPSUModuleDeployment {
         ModulePath       = $ModulePath
         BumpVersion      = $BumpVersion
         PublishResult    = $PublishResult
-        BootstrapResult  = $safeBootstrapResult
+        ScriptRegistration = $scriptRegistration
         ValidationResult = $validationResult
         Status           = 'Deployed'
     }

@@ -42,7 +42,7 @@
 - "Local" means the always-on PSU instance on `adam-server`, not the MacBook.
 - Normal workflow is edit on MacBook, then `Publish-PSUModule -LocalOnly` pushes via SSH/rsync to adam-server.
 - LAN URL: `http://192.168.86.36:5001` (set as `LOCAL_PSU_URL` in `.env`)
-- `Connect-PSU -Local` reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`.
+- `Connect-PSU` defaults to local and reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`; use `Connect-PSU -Azure` only for explicit Azure work.
 - PSU Repository on adam-server: `/Users/adam/psu/Repository` (pushed via SSH, not Dropbox-synced).
 
 ### Azure PSU
@@ -58,6 +58,8 @@
 ## Module Deployment
 - Never upload module files directly to the Azure PSU instance.
 - Local publishing is automated by the `auto-publish-psu` Stop hook after `psu-app/` changes.
+- Initial CIEM setup is owned by `psu-app/setup.ps1`, which is invoked during `Devolutions.CIEM` module import. Keep this setup path limited to idempotent local module initialization such as database/schema/catalog setup.
+- PSU resource registration remains in `.universal/dashboards.ps1` and `.universal/scripts.ps1`. Do not move `New-PSUApp`, `New-PSUScript`, `Get-PSUScript`, or other PSU management cmdlets into import-time setup.
 
 ```powershell
 Import-Module ./Devolutions.CIEM.Admin
@@ -143,6 +145,20 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 **Fix:** `Remove-PSUModule -Environment local` must read `PUBLISH_POINT_SSH` and `PUBLISH_POINT_PSU_PATH` from `.env`, run `ssh <publish-point> "rm -rf '<PUBLISH_POINT_PSU_PATH>/Repository/Modules/Devolutions.CIEM'"`, and then run `Sync-PSUConfiguration -Reset`. `Remove-CIEMPSUModule` must remove CIEM-owned apps, scripts, schedules, and active jobs before invoking `Remove-PSUModule`, and must pass `-Environment` and connection parameters through to `Remove-PSUModule`.
 **Verification:** Run `pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path Devolutions.CIEM.Admin/Tests/Unit`, then run `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` and verify local PSU reports module, app, script, schedule, active job, and queued job counts as `0`.
 **Recurrence Prevention:** Keep the `Remove-PSUModule.Tests.ps1` local filesystem cleanup assertions and the `CIEMDeployment.Tests.ps1` assertions that `Remove-CIEMPSUModule` removes CIEM-owned apps and passes environment and env file values into `Remove-PSUModule`.
+
+### 8. Validated Gallery Reinstall Requires a Current Published Module
+**Symptom:** `scripts/reinstall-ciem-psu-module.sh --validate-deployment` can remove the local CIEM module and install the latest PowerShell Gallery version, then fail bootstrap with `The term 'Initialize-CIEMPSUInstance' is not recognized` when Gallery is behind the local module source. Older Gallery installs can also recreate the legacy `CIEMExecutor.ps1` script.
+**Cause:** The reinstall script runs local admin validation code against the module version that PSU installs from PowerShell Gallery. When the local source is newer than Gallery, the local validation contract can require commands that the published package does not contain. The old Gallery package can leave legacy CIEM PSU resources that current removal must still classify as CIEM-owned residue.
+**Fix:** Before removing CIEM for a validated reinstall, compare the latest Gallery version with the local module manifest version and fail before removal when Gallery is older. Treat `CIEMExecutor.ps1` as a legacy CIEM-owned PSU script during removal.
+**Verification:** Run `pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path Devolutions.CIEM.Admin/Tests/Unit`, run `scripts/reinstall-ciem-psu-module.sh --validate-deployment` while Gallery is older than the local manifest, and confirm it fails before removal with the Gallery/local version mismatch. Then run `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` and verify CIEM module, app, and script counts are `0`.
+**Recurrence Prevention:** Keep `ReinstallPSUModuleScript.Tests.ps1` asserting Gallery preflight runs before `Remove-CIEMPSUModule`, and keep `CIEMDeployment.Tests.ps1` asserting `CIEMExecutor.ps1` is removed as legacy CIEM-owned residue.
+
+### 9. Invoke-CIEMCommand Must Not Send ScriptContent In The REST Query String
+**Symptom:** `scripts/reinstall-ciem-psu-module.sh --environment local --validate-deployment` can complete install and app restart, then fail deployment validation with `Response status code does not indicate success: 414 (URI Too Long)` from `Invoke-CIEMCommand.ps1`.
+**Cause:** PSU REST script parameters are query-string parameters. Passing a full validation script through `/api/v1/script/{id}?ScriptContent=...` can exceed the local PSU server URL limit. Sending `ScriptContent` in the REST JSON body does not bind the script parameter on PSU 5.5.4.
+**Fix:** Invoke the persistent `CIEMExecutor.ps1` script with the native Universal cmdlet: `Invoke-PSUScript -Id <id> -Parameters @{ ScriptContent = $Command }`. Keep REST only for script discovery, script creation, job polling, and job output retrieval.
+**Verification:** Run `pwsh -NoProfile -File scripts/invoke-ciem-tests.ps1 -Suite Unit -Path Devolutions.CIEM.Admin/Tests/Unit/Invoke-CIEMCommand.Tests.ps1`, run an oversized local `Invoke-CIEMCommand` command, and rerun `scripts/reinstall-ciem-psu-module.sh --environment local --validate-deployment`; validation must finish with `Status = Deployed`.
+**Recurrence Prevention:** Keep the `Invoke-CIEMCommand.Tests.ps1` assertion that `ScriptContent` is passed through `Invoke-PSUScript` parameters and never appears in the REST invocation URL.
 
 ## Reference Docs
 - Architecture planning: `docs/devolutions-ciem-app-architecture.md`
