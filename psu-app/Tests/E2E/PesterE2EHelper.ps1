@@ -126,7 +126,7 @@ function script:Initialize-PesterE2E {
         Connect-PSU -Local | Out-Null
     }
     else {
-        Connect-PSU | Out-Null
+        Connect-PSU -Azure | Out-Null
     }
 }
 

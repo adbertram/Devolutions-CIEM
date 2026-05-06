@@ -12,8 +12,8 @@ Describe 'PesterE2EHelper environment routing' {
         $script:helperSource | Should -Match 'Invoke-TestCommand[\s\S]+-Environment \$script:PesterE2EEnvironment'
     }
 
-    It 'connects to Azure without the local PSU switch' {
-        $script:helperSource | Should -Match "else \{[\s\S]+Connect-PSU \| Out-Null"
+    It 'connects to Azure with the explicit Azure PSU switch' {
+        $script:helperSource | Should -Match "else \{[\s\S]+Connect-PSU -Azure \| Out-Null"
     }
 
     It 'accepts WarningOutput as a terminal successful PSU job status' {
