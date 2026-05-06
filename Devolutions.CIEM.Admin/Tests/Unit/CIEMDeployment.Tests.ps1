@@ -47,18 +47,21 @@ AfterAll {
 }
 
 Describe 'CIEM deployment cmdlet exports' {
-    It 'exports the high-level CIEM deployment commands' {
+    It 'exports one module publish/deploy command instead of a duplicate CIEM module wrapper' {
         $manifestData = Import-PowerShellDataFile -Path $script:Manifest
 
         foreach ($commandName in @(
                 'Deploy-CIEMPSUInstance'
-                'Deploy-CIEMPSUModule'
                 'Remove-CIEMPSUModule'
+                'Publish-PSUModule'
                 'Test-CIEMPSUDeployment'
             )) {
             $manifestData.FunctionsToExport | Should -Contain $commandName
             Get-Command -Module Devolutions.CIEM.Admin -Name $commandName | Should -Not -BeNullOrEmpty
         }
+
+        $manifestData.FunctionsToExport | Should -Not -Contain 'Deploy-CIEMPSUModule'
+        Get-Command -Module Devolutions.CIEM.Admin -Name 'Deploy-CIEMPSUModule' -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
     }
 }
 
@@ -145,114 +148,6 @@ Describe 'Deploy-CIEMPSUInstance' {
     }
 }
 
-Describe 'Deploy-CIEMPSUModule' {
-    BeforeEach {
-        $script:publishCalls = [System.Collections.Generic.List[object]]::new()
-        $script:runtimeScripts = [System.Collections.Generic.List[string]]::new()
-        $script:bootstrapEnvFilePaths = [System.Collections.Generic.List[string]]::new()
-        $script:testDeploymentCalls = [System.Collections.Generic.List[object]]::new()
-        $script:bootstrapStatus = 'Completed'
-
-        Mock -ModuleName Devolutions.CIEM.Admin Publish-PSUModule {
-            $script:publishCalls.Add([pscustomobject]@{
-                    ModulePath      = $ModulePath
-                    LocalOnly       = [bool]$LocalOnly
-                    Bump            = $BumpVersion
-                    SkipAppRestart  = [bool]$SkipAppRestart
-                    EnvFilePath     = $EnvFilePath
-                })
-
-            [pscustomobject]@{
-                Name    = 'Devolutions.CIEM'
-                Version = '1.2.3'
-                Status  = 'Published'
-            }
-        }
-        Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
-            $script:runtimeScripts.Add($ScriptBlock.ToString())
-            $script:bootstrapEnvFilePaths.Add([string]$EnvFilePath)
-            [pscustomobject]@{
-                Status = $script:bootstrapStatus
-                JobId  = 1137
-                Output = @(
-                    [pscustomobject]@{
-                        message = 'mock bootstrap output'
-                        job     = [pscustomobject]@{
-                            appToken = [pscustomobject]@{
-                                token = 'secret-token-value'
-                            }
-                        }
-                    }
-                )
-            }
-        }
-        Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp {}
-        Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp {}
-        Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSUDeployment {
-            $script:testDeploymentCalls.Add([pscustomobject]@{
-                    Environment = $Environment
-                    EnvFilePath = $EnvFilePath
-                })
-            [pscustomobject]@{
-                Status = 'Healthy'
-            }
-        }
-    }
-
-    It 'publishes locally, runs the shared CIEM bootstrap, and verifies the deployment' {
-        $result = Deploy-CIEMPSUModule -Environment local -ModulePath './psu-app' -BumpVersion Patch -TimeoutSeconds 180
-
-        $result.Status | Should -Be 'Deployed'
-        $script:publishCalls.Count | Should -Be 1
-        $script:publishCalls[0].LocalOnly | Should -BeTrue
-        $script:publishCalls[0].Bump | Should -Be 'Patch'
-        $script:publishCalls[0].SkipAppRestart | Should -BeTrue
-        $script:runtimeScripts.Count | Should -Be 1
-        $script:runtimeScripts[0] | Should -Match 'Initialize-CIEMPSUInstance\s+-Integrated'
-        $script:runtimeScripts[0] | Should -Not -Match 'Import-CIEMScript'
-        $script:runtimeScripts[0] | Should -Not -Match 'New-CIEMDatabase'
-        $script:testDeploymentCalls[0].Environment | Should -Be 'local'
-    }
-
-    It 'returns a sanitized bootstrap result without raw PSU job secrets' {
-        $result = Deploy-CIEMPSUModule -Environment local -ModulePath './psu-app' -BumpVersion Patch -TimeoutSeconds 180
-        $json = $result | ConvertTo-Json -Depth 10
-
-        $result.BootstrapResult.JobId | Should -Be 1137
-        $result.BootstrapResult.Output | Should -Contain 'mock bootstrap output'
-        $json | Should -Not -Match 'secret-token-value'
-        $json | Should -Not -Match 'appToken'
-    }
-
-    It 'publishes Azure through PowerShell Gallery instead of the local publish point' {
-        Deploy-CIEMPSUModule -Environment azure -ModulePath './psu-app' -BumpVersion Minor -TimeoutSeconds 300 | Out-Null
-
-        $script:publishCalls.Count | Should -Be 1
-        $script:publishCalls[0].LocalOnly | Should -BeFalse
-        $script:publishCalls[0].Bump | Should -Be 'Minor'
-        $script:publishCalls[0].SkipAppRestart | Should -BeTrue
-        $script:testDeploymentCalls[0].Environment | Should -Be 'azure'
-    }
-
-    It 'uses the same env file for publish, bootstrap, and validation' {
-        Deploy-CIEMPSUModule -Environment azure -ModulePath './psu-app' -BumpVersion Patch -EnvFilePath '/tmp/custom-ciem.env' | Out-Null
-
-        $script:publishCalls[0].EnvFilePath | Should -Be '/tmp/custom-ciem.env'
-        $script:bootstrapEnvFilePaths[0] | Should -Be '/tmp/custom-ciem.env'
-        $script:testDeploymentCalls[0].EnvFilePath | Should -Be '/tmp/custom-ciem.env'
-    }
-
-    It 'throws before restarting the app when bootstrap fails' {
-        $script:bootstrapStatus = 'Failed'
-
-        { Deploy-CIEMPSUModule -Environment local -ModulePath './psu-app' -BumpVersion Patch } |
-            Should -Throw -ExpectedMessage '*CIEM PSU bootstrap failed with status Failed*'
-
-        Should -Invoke -ModuleName Devolutions.CIEM.Admin Stop-PSUApp -Times 0 -Scope It
-        Should -Invoke -ModuleName Devolutions.CIEM.Admin Start-PSUApp -Times 0 -Scope It
-    }
-}
-
 Describe 'Remove-CIEMPSUModule' {
     BeforeEach {
         $script:ModulePath = Join-Path $TestDrive 'psu-app'
@@ -331,15 +226,15 @@ Describe 'Remove-CIEMPSUModule' {
 
         $result = Remove-CIEMPSUModule -Environment azure -ModulePath $script:ModulePath -EnvFilePath 'NO_ENV_FILE' -Force
 
-        $result.Status | Should -Be 'Partial'
+        $result.Status | Should -Be 'Removed'
         $result.AppResourcesScanned | Should -Be 2
         $result.AppResourcesRemoved | Should -Be 1
         $result.ScriptResourcesScanned | Should -Be 3
         $result.ScriptResourcesRemoved | Should -Be 2
         $result.JobResourcesScanned | Should -Be 6
-        $result.JobResourcesMatched | Should -Be 3
+        $result.JobResourcesMatched | Should -Be 2
         $result.JobResourcesStopped | Should -Be 1
-        $result.QueuedJobResourcesRetained | Should -Be 1
+        $result.QueuedJobResourcesRetained | Should -Be 0
         $result.JobHistoryRetained | Should -Be 1
         $result.ScheduleResourcesRemoved | Should -Be 1
 
@@ -396,7 +291,7 @@ Describe 'Test-CIEMPSUDeployment' {
         $script:runtimeScripts = [System.Collections.Generic.List[string]]::new()
         $script:testEnvFilePaths = [System.Collections.Generic.List[string]]::new()
         $script:ciemPageUris = [System.Collections.Generic.List[string]]::new()
-        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 13, "ExpectedScriptCount": 13, "DatabaseInitialized": true }'
+        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 13, "ExpectedScriptCount": 13, "UnsupportedScriptCount": 0, "UnsupportedScriptNames": [], "DatabaseInitialized": true }'
         Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
             $script:runtimeScripts.Add($ScriptBlock.ToString())
             $script:testEnvFilePaths.Add([string]$EnvFilePath)
@@ -440,11 +335,18 @@ Describe 'Test-CIEMPSUDeployment' {
         }
     }
 
-    It 'throws when only the CIEM executor script is registered' {
-        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 1, "ExpectedScriptCount": 13, "DatabaseInitialized": true }'
+    It 'throws when only one CIEM-managed PSU script is registered' {
+        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 1, "ExpectedScriptCount": 13, "UnsupportedScriptCount": 0, "UnsupportedScriptNames": [], "DatabaseInitialized": true }'
 
         { Test-CIEMPSUDeployment -Environment azure } |
             Should -Throw -ExpectedMessage '*expected 13 CIEM-managed PSU scripts*'
+    }
+
+    It 'throws when unsupported CIEM PSU script residue exists' {
+        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 13, "ExpectedScriptCount": 13, "UnsupportedScriptCount": 1, "UnsupportedScriptNames": ["Devolutions.CIEM/Start-CIEMAzureDiscovery"], "DatabaseInitialized": true }'
+
+        { Test-CIEMPSUDeployment -Environment azure } |
+            Should -Throw -ExpectedMessage '*unsupported CIEM PSU scripts on azure: Devolutions.CIEM/Start-CIEMAzureDiscovery*'
     }
 
     It 'throws when the CIEM page is still the PSU app-not-running placeholder' {

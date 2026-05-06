@@ -9,7 +9,6 @@
     FunctionsToExport = @(
         'Connect-PSU'
         'Deploy-CIEMPSUInstance'
-        'Deploy-CIEMPSUModule'
         'Get-ProwlerCheck'
         'Get-PSUModule'
         'Install-PSUModule'

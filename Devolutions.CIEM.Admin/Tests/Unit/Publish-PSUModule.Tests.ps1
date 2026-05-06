@@ -156,6 +156,7 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
         $script:remoteSrcDir = Join-Path $TestDrive 'remote-psu-app'
         New-Item -Path $script:remoteSrcDir -ItemType Directory -Force | Out-Null
         New-Item -Path (Join-Path $script:remoteSrcDir '.universal') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $script:remoteSrcDir 'modules/PSUSQLite') -ItemType Directory -Force | Out-Null
 
         New-ModuleManifest `
             -Path (Join-Path $script:remoteSrcDir 'Devolutions.CIEM.psd1') `
@@ -165,6 +166,14 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
         Set-Content `
             -Path (Join-Path $script:remoteSrcDir '.universal/dashboards.ps1') `
             -Value "New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem'"
+        Set-Content `
+            -Path (Join-Path $script:remoteSrcDir '.universal/initialize.ps1') `
+            -Value "Import-Module Devolutions.CIEM`nInitialize-CIEMPSUInstance -Integrated | Out-Null"
+        New-ModuleManifest `
+            -Path (Join-Path $script:remoteSrcDir 'modules/PSUSQLite/PSUSQLite.psd1') `
+            -ModuleVersion '0.0.1' `
+            -RootModule 'PSUSQLite.psm1'
+        Set-Content -Path (Join-Path $script:remoteSrcDir 'modules/PSUSQLite/PSUSQLite.psm1') -Value ''
     }
 
     Context 'when auto-connect to PSU throws because PSUConnection.Url is empty' {
@@ -286,12 +295,20 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
                 $script:PSUConnection.Token = 'fake-token'
             }
 
+            $script:installCalls = [System.Collections.Generic.List[object]]::new()
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module {
                 [PSCustomObject]@{ Version = '0.0.2' }
             }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
             Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
-            Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {}
+            Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
+                $script:installCalls.Add([pscustomobject]@{
+                        Name       = $Name
+                        Version    = $Version
+                        Repository = $Repository
+                        NoSync     = [bool]$NoSync
+                    })
+            }
             Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { throw 'Stop-PSUApp should not run when -SkipAppRestart is set' }
             Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp { throw 'Start-PSUApp should not run when -SkipAppRestart is set' }
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod { throw 'Health check should not run when -SkipAppRestart is set' }
@@ -309,6 +326,151 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Stop-PSUApp -Times 0 -Scope It
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Start-PSUApp -Times 0 -Scope It
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Invoke-RestMethod -Times 0 -Scope It
+        }
+
+        It 'imports the Gallery module with configuration sync enabled so PSU loads CIEM resources' {
+            Publish-PSUModule -ModulePath $script:remoteSrcDir `
+                -NuGetApiKey 'fake-key' `
+                -EnvFilePath 'NO_ENV_FILE' `
+                -SkipAppRestart `
+                -Confirm:$false | Out-Null
+
+            $installCall = $script:installCalls[-1]
+            $installCall.Name | Should -Be 'Devolutions.CIEM'
+            $installCall.NoSync | Should -BeFalse
+        }
+    }
+
+    Context 'when the caller wants CIEM deployment validation after remote import' {
+        BeforeAll {
+            InModuleScope Devolutions.CIEM.Admin {
+                $script:PSUConnection.Url = 'https://fake.psu'
+                $script:PSUConnection.Token = 'fake-token'
+            }
+
+            $script:events = [System.Collections.Generic.List[string]]::new()
+            $script:runtimeScripts = [System.Collections.Generic.List[string]]::new()
+            $script:bootstrapEnvFilePaths = [System.Collections.Generic.List[string]]::new()
+            $script:testDeploymentCalls = [System.Collections.Generic.List[object]]::new()
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module {
+                [PSCustomObject]@{ Version = '0.0.2' }
+            }
+            Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
+            Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
+            Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
+                $script:events.Add('install')
+            }
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
+                $script:events.Add('bootstrap')
+                $script:runtimeScripts.Add($ScriptBlock.ToString())
+                $script:bootstrapEnvFilePaths.Add([string]$EnvFilePath)
+                [pscustomobject]@{
+                    Status = 'Completed'
+                    JobId  = 1137
+                    Output = @(
+                        [pscustomobject]@{
+                            message = 'mock bootstrap output'
+                            job     = [pscustomobject]@{
+                                appToken = [pscustomobject]@{
+                                    token = 'secret-token-value'
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { $script:events.Add('stop') }
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp { $script:events.Add('start') }
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-RestMethod {
+                [pscustomobject]@{ loading = $false; hasError = $false; loadingInfo = '' }
+            }
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSUDeployment {
+                $script:events.Add('validate')
+                $script:testDeploymentCalls.Add([pscustomobject]@{
+                        Environment = $Environment
+                        EnvFilePath = $EnvFilePath
+                    })
+                [pscustomobject]@{ Status = 'Healthy' }
+            }
+        }
+
+        It 'publishes, bootstraps, restarts, and validates through Publish-PSUModule' {
+            $result = Publish-PSUModule -ModulePath $script:remoteSrcDir `
+                -NuGetApiKey 'fake-key' `
+                -EnvFilePath '/tmp/custom-ciem.env' `
+                -BumpVersion Minor `
+                -ValidateDeployment `
+                -Confirm:$false
+
+            $result.Status | Should -Be 'Deployed'
+            $result.PublishResult.Status | Should -Be 'Published'
+            $result.BootstrapResult.JobId | Should -Be 1137
+            $result.BootstrapResult.Output | Should -Contain 'mock bootstrap output'
+            $result.ValidationResult.Status | Should -Be 'Healthy'
+            $script:events | Should -Be @('install', 'bootstrap', 'stop', 'start', 'validate')
+            $script:runtimeScripts[0] | Should -Match 'Initialize-CIEMPSUInstance\s+-Integrated'
+            $script:runtimeScripts[0] | Should -Not -Match 'Import-CIEMScript'
+            $script:runtimeScripts[0] | Should -Not -Match 'New-CIEMDatabase'
+            $script:testDeploymentCalls[0].Environment | Should -Be 'azure'
+            $script:bootstrapEnvFilePaths[0] | Should -Be '/tmp/custom-ciem.env'
+            $script:testDeploymentCalls[0].EnvFilePath | Should -Be '/tmp/custom-ciem.env'
+        }
+
+        It 'returns a sanitized bootstrap result without raw PSU job secrets' {
+            $result = Publish-PSUModule -ModulePath $script:remoteSrcDir `
+                -NuGetApiKey 'fake-key' `
+                -EnvFilePath 'NO_ENV_FILE' `
+                -ValidateDeployment `
+                -Confirm:$false
+            $json = $result | ConvertTo-Json -Depth 10
+
+            $json | Should -Not -Match 'secret-token-value'
+            $json | Should -Not -Match 'appToken'
+        }
+    }
+
+    Context 'when CIEM deployment bootstrap fails after local import' {
+        BeforeAll {
+            $script:localValidateSrcDir = Join-Path $TestDrive 'local-validate-psu-app'
+            New-Item -Path $script:localValidateSrcDir -ItemType Directory -Force | Out-Null
+            New-Item -Path (Join-Path $script:localValidateSrcDir '.universal') -ItemType Directory -Force | Out-Null
+            New-ModuleManifest `
+                -Path (Join-Path $script:localValidateSrcDir 'Devolutions.CIEM.psd1') `
+                -ModuleVersion '0.0.1' `
+                -RootModule 'Devolutions.CIEM.psm1'
+            Set-Content -Path (Join-Path $script:localValidateSrcDir 'Devolutions.CIEM.psm1') -Value ''
+            Set-Content `
+                -Path (Join-Path $script:localValidateSrcDir '.universal/dashboards.ps1') `
+                -Value "New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem'"
+            $script:localValidateEnvFile = Join-Path $TestDrive '.env-local-validate'
+            Set-Content -Path $script:localValidateEnvFile -Value @'
+PUBLISH_POINT_SSH=adam-server
+PUBLISH_POINT_PSU_PATH=/Users/adam/psu
+LOCAL_PSU_URL=http://192.168.86.30:5001
+LOCAL_PSU_TOKEN=fake-token
+'@
+
+            $script:events = [System.Collections.Generic.List[string]]::new()
+            Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { [PSCustomObject]@{ Url = 'https://mocked'; Status = 'Connected' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { $null }
+            Mock -ModuleName Devolutions.CIEM.Admin ssh { '' }
+            Mock -ModuleName Devolutions.CIEM.Admin rsync { $global:LASTEXITCODE = 0 }
+            Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
+                $script:events.Add('bootstrap')
+                [pscustomobject]@{
+                    Status = 'Failed'
+                    Output = @('mock bootstrap failure')
+                }
+            }
+            Mock -ModuleName Devolutions.CIEM.Admin Stop-PSUApp { $script:events.Add('stop') }
+            Mock -ModuleName Devolutions.CIEM.Admin Start-PSUApp { $script:events.Add('start') }
+        }
+
+        It 'throws before restarting the app' {
+            { Publish-PSUModule -ModulePath $script:localValidateSrcDir -LocalOnly -ValidateDeployment -EnvFilePath $script:localValidateEnvFile -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*CIEM PSU bootstrap failed with status Failed*'
+
+            $script:events | Should -Be @('bootstrap')
         }
     }
 }

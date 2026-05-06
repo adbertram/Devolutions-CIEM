@@ -17,9 +17,10 @@ target-specific `Publish-PSUModule` flow, then confirm the app restart.
 1. Select the target from the request; use `local` when no target is specified.
 2. Inspect the pending change set and choose the semantic version bump (`Patch`, `Minor`, or `Major`) before publishing.
 3. Run the matching `Publish-PSUModule` command from the repository root with an explicit `-BumpVersion`.
-4. Confirm publish status, module version, and app restart output.
-5. If restart is not confirmed, run the target-specific restart command below.
-6. If Azure import, restart, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
+4. Add `-ValidateDeployment` when the request is for a full CIEM deploy, not only a publish/import.
+5. Confirm publish status, module version, and app restart output.
+6. If restart is not confirmed, run the target-specific restart command below.
+7. If Azure import, restart, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
 </quick_start>
 
 <target_selection>
@@ -74,6 +75,24 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUMod
 </step_4>
 
 <step_5>
+For a full CIEM deploy, use the same `Publish-PSUModule` entry point with
+`-ValidateDeployment`. Do not call or recreate `Deploy-CIEMPSUModule`; the full
+deploy path was merged into `Publish-PSUModule`.
+
+Local:
+
+```powershell
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUModule -ModulePath ./psu-app -LocalOnly -BumpVersion <Patch|Minor|Major> -ValidateDeployment"
+```
+
+Azure:
+
+```powershell
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Publish-PSUModule -ModulePath ./psu-app -BumpVersion <Patch|Minor|Major> -ValidateDeployment"
+```
+</step_5>
+
+<step_6>
 Verify the publish output confirms a successful app restart. If the output does
 not confirm the restart, restart the app explicitly.
 
@@ -88,13 +107,21 @@ Azure:
 ```powershell
 pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU; Restart-PSUApp -Name 'Devolutions CIEM'"
 ```
-</step_5>
+</step_6>
 </workflow>
 
 <safety>
 - Do not upload module files directly to Azure PSU.
 - Local publishing uses adam-server through `Publish-PSUModule -LocalOnly`.
 - Azure publishing goes through PowerShell Gallery before PSU import.
+- CIEM Gallery imports must allow PSU configuration sync. Do not use
+  `Install-PSUModule -NoSync` for CIEM Gallery installs because PSU must load
+  `.universal/dashboards.ps1` and `.universal/initialize.ps1` to register the
+  app and run `Initialize-CIEMPSUInstance`.
+- CIEM Gallery installs are fresh-only. Do not add legacy repair, migration, or
+  cleanup paths to install/bootstrap. Existing unsupported CIEM residue must
+  fail validation; remove CIEM from the PSU instance before installing the
+  current module.
 - Do not use `-Integrated` from the external terminal publish workflow.
 - Do not print or serialize raw PSU job objects from `Invoke-CIEMCommand`,
   `Invoke-TestCommand`, or deployment results. PSU job objects can contain

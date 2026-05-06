@@ -1,29 +1,20 @@
-function Deploy-CIEMPSUModule {
-    <#
-    .SYNOPSIS
-        Publishes, installs, bootstraps, and validates the CIEM PSU module.
-
-    .DESCRIPTION
-        Uses Publish-PSUModule for the selected target, registers CIEM PSU
-        automation scripts, initializes the CIEM database, restarts the CIEM app,
-        and runs the consolidated deployment validation.
-    #>
+function Invoke-CIEMPSUModuleDeployment {
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param(
-        [Parameter()]
+        [Parameter(Mandatory)]
         [ValidateSet('local', 'azure')]
-        [string]$Environment = 'local',
+        [string]$Environment,
 
-        [Parameter()]
-        [string]$ModulePath = $script:PsuAppRoot,
+        [Parameter(Mandatory)]
+        [string]$ModulePath,
 
         [Parameter(Mandatory)]
         [ValidateSet('Patch', 'Minor', 'Major')]
         [string]$BumpVersion,
 
-        [Parameter()]
-        [string]$NuGetApiKey,
+        [Parameter(Mandatory)]
+        [pscustomobject]$PublishResult,
 
         [Parameter()]
         [string]$EnvFilePath,
@@ -33,24 +24,6 @@ function Deploy-CIEMPSUModule {
     )
 
     $ErrorActionPreference = 'Stop'
-
-    $publishParams = @{
-        ModulePath      = $ModulePath
-        BumpVersion     = $BumpVersion
-        SkipAppRestart  = $true
-        ErrorAction     = 'Stop'
-    }
-    if ($PSBoundParameters.ContainsKey('NuGetApiKey')) {
-        $publishParams.NuGetApiKey = $NuGetApiKey
-    }
-    if ($PSBoundParameters.ContainsKey('EnvFilePath')) {
-        $publishParams.EnvFilePath = $EnvFilePath
-    }
-    if ($Environment -eq 'local') {
-        $publishParams.LocalOnly = $true
-    }
-
-    $publishResult = Publish-PSUModule @publishParams
 
     $bootstrapScript = {
         Import-Module Devolutions.CIEM -ErrorAction Stop
@@ -74,8 +47,7 @@ function Deploy-CIEMPSUModule {
         EndTime   = $bootstrapResult.EndTime
     }
 
-    Stop-PSUApp -Name 'Devolutions CIEM'
-    Start-PSUApp -Name 'Devolutions CIEM'
+    Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 8
 
     $validationResult = Test-CIEMPSUDeployment -Environment $Environment -EnvFilePath $EnvFilePath -TimeoutSeconds $TimeoutSeconds
 
@@ -83,7 +55,7 @@ function Deploy-CIEMPSUModule {
         Environment      = $Environment
         ModulePath       = $ModulePath
         BumpVersion      = $BumpVersion
-        PublishResult    = $publishResult
+        PublishResult    = $PublishResult
         BootstrapResult  = $safeBootstrapResult
         ValidationResult = $validationResult
         Status           = 'Deployed'

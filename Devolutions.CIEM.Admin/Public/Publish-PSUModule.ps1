@@ -41,6 +41,14 @@ function Publish-PSUModule {
         Use this when a higher-level deployment workflow will create or restart
         the app after additional bootstrap steps.
 
+    .PARAMETER ValidateDeployment
+        Run the CIEM PSU bootstrap, restart the app, and validate the deployment
+        after the module is published and imported.
+
+    .PARAMETER TimeoutSeconds
+        Timeout for CIEM bootstrap and deployment validation when ValidateDeployment
+        is specified.
+
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app
 
@@ -80,7 +88,13 @@ function Publish-PSUModule {
         [switch]$IncludeData,
 
         [Parameter()]
-        [switch]$SkipAppRestart
+        [switch]$SkipAppRestart,
+
+        [Parameter()]
+        [switch]$ValidateDeployment,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = 300
     )
 
     $ErrorActionPreference = 'Stop'
@@ -217,48 +231,12 @@ function Publish-PSUModule {
             }
             Write-Host "  [OK] Module pushed: $moduleName v$moduleVersion -> $sshAlias" -ForegroundColor Green
 
-            if ($SkipAppRestart) {
+            if ($SkipAppRestart -or $ValidateDeployment) {
                 Write-Host ''
                 Write-Host 'Step 4: Skipping app restart; caller will restart after bootstrap.' -ForegroundColor Yellow
             }
             else {
-                Write-Host ''
-                Write-Host 'Step 4: Restarting app...' -ForegroundColor Yellow
-                $appName = $script:DefaultAppName
-                $dashboardsFile = Get-ChildItem -Path $ModulePath -Filter 'dashboards.ps1' -Recurse | Where-Object { $_.Directory.Name -eq '.universal' } | Select-Object -First 1
-                if ($dashboardsFile) {
-                    $dashboardContent = Get-Content $dashboardsFile.FullName -Raw
-                    if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
-                        $appName = $matches[1]
-                    }
-                }
-                Stop-PSUApp -Name $appName
-                Start-PSUApp -Name $appName
-                Write-Host "  [OK] App '$appName' restarted" -ForegroundColor Green
-
-                Write-Host ''
-                Write-Host 'Step 5: Verifying app is healthy...' -ForegroundColor Yellow
-                $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
-                $healthy = $false
-                for ($i = 1; $i -le 10; $i++) {
-                    Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
-                    try {
-                        $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
-                        if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
-                            $healthy = $true
-                            break
-                        }
-                        Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
-                    }
-                    catch {
-                        Write-Host "  Not responding yet..." -ForegroundColor Gray
-                    }
-                    Start-Sleep -Seconds 3
-                }
-                if (-not $healthy) {
-                    throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
-                }
-                Write-Host "  [OK] App is healthy" -ForegroundColor Green
+                Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 4
             }
 
             Write-Host ''
@@ -266,13 +244,25 @@ function Publish-PSUModule {
             Write-Host 'Publish Point Import Successful!' -ForegroundColor Green
             Write-Host '========================================' -ForegroundColor Cyan
 
-            return [PSCustomObject]@{
+            $publishResult = [PSCustomObject]@{
                 ModuleName = $moduleName
                 Version    = $moduleVersion
                 GalleryUrl = $null
                 UpdatedPSU = $true
                 Status     = 'LocalImport'
             }
+
+            if ($ValidateDeployment) {
+                return Invoke-CIEMPSUModuleDeployment `
+                    -Environment local `
+                    -ModulePath $ModulePath `
+                    -BumpVersion $BumpVersion `
+                    -PublishResult $publishResult `
+                    -EnvFilePath $EnvFilePath `
+                    -TimeoutSeconds $TimeoutSeconds
+            }
+
+            return $publishResult
         }
         else {
             Write-Host ''
@@ -302,7 +292,12 @@ function Publish-PSUModule {
     if (-not $SkipValidation) {
         Write-Host 'Step 1: Validating module structure...' -ForegroundColor Yellow
 
-        $requiredFiles = @("$moduleName.psm1")
+        $requiredFiles = @(
+            "$moduleName.psm1"
+            '.universal/dashboards.ps1'
+            '.universal/initialize.ps1'
+            'modules/PSUSQLite/PSUSQLite.psd1'
+        )
 
         foreach ($file in $requiredFiles) {
             $fullPath = Join-Path $ModulePath $file
@@ -314,7 +309,7 @@ function Publish-PSUModule {
             }
         }
 
-        $psuFiles = @('.universal/dashboards.ps1', 'config.json')
+        $psuFiles = @('config.json')
         foreach ($file in $psuFiles) {
             $fullPath = Join-Path $ModulePath $file
             if (Test-Path $fullPath) {
@@ -507,50 +502,15 @@ NuGet API key required. Options:
         }
 
         Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
-        Install-PSUModule -Name $moduleName -Version $fullVersion -NoSync
+        Install-PSUModule -Name $moduleName -Version $fullVersion
         Write-Host "  [OK] Module imported" -ForegroundColor Green
         $updatedPSU = $true
 
-        if ($SkipAppRestart) {
+        if ($SkipAppRestart -or $ValidateDeployment) {
             Write-Host '  Skipping app restart; caller will restart after bootstrap.' -ForegroundColor Yellow
         }
         else {
-            $appName = $script:DefaultAppName
-            $dashboardsPath = Join-Path -Path $ModulePath -ChildPath '.universal' -AdditionalChildPath 'dashboards.ps1'
-            if (Test-Path $dashboardsPath) {
-                $dashboardContent = Get-Content $dashboardsPath -Raw
-                if ($dashboardContent -match "New-PSUApp\s+-Name\s+'([^']+)'") {
-                    $appName = $matches[1]
-                }
-            }
-            Write-Host "  Restarting app '$appName'..." -ForegroundColor Gray
-            Stop-PSUApp -Name $appName
-            Start-PSUApp -Name $appName
-            Write-Host "  [OK] App restarted" -ForegroundColor Green
-
-            Write-Host ''
-            Write-Host 'Step 8: Verifying app is healthy...' -ForegroundColor Yellow
-            $healthUrl = "$($script:PSUConnection.Url)/api/v1/alive"
-            $healthy = $false
-            for ($i = 1; $i -le 10; $i++) {
-                Write-Host "  Checking health (attempt $i/10)..." -ForegroundColor Gray
-                try {
-                    $resp = Invoke-RestMethod -Uri $healthUrl -Headers @{ 'ngrok-skip-browser-warning' = 'true' } -Method Get -TimeoutSec 5 -ErrorAction Stop
-                    if ($resp.loading -eq $false -and $resp.hasError -eq $false) {
-                        $healthy = $true
-                        break
-                    }
-                    Write-Host "  Still loading: $($resp.loadingInfo)" -ForegroundColor Gray
-                }
-                catch {
-                    Write-Host "  Not responding yet..." -ForegroundColor Gray
-                }
-                Start-Sleep -Seconds 3
-            }
-            if (-not $healthy) {
-                throw "App failed health check after restart. $healthUrl did not return healthy within 30 seconds."
-            }
-            Write-Host "  [OK] App is healthy" -ForegroundColor Green
+            Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 8
         }
 
         Write-Host ''
@@ -558,13 +518,25 @@ NuGet API key required. Options:
         Write-Host 'Publication Successful!' -ForegroundColor Green
         Write-Host '========================================' -ForegroundColor Cyan
 
-        [PSCustomObject]@{
+        $publishResult = [PSCustomObject]@{
             ModuleName  = $moduleName
             Version     = $fullVersion
             GalleryUrl  = "https://www.powershellgallery.com/packages/$moduleName"
             UpdatedPSU  = $updatedPSU
             Status      = 'Published'
         }
+
+        if ($ValidateDeployment) {
+            return Invoke-CIEMPSUModuleDeployment `
+                -Environment azure `
+                -ModulePath $ModulePath `
+                -BumpVersion $BumpVersion `
+                -PublishResult $publishResult `
+                -EnvFilePath $EnvFilePath `
+                -TimeoutSeconds $TimeoutSeconds
+        }
+
+        $publishResult
     }
     else {
         Write-Host ''
