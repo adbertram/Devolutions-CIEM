@@ -70,7 +70,7 @@ Publish-PSUModule -ModulePath ./psu-app -LocalOnly
 
 - Use `-LocalOnly` to push to adam-server via SSH/rsync (skips PSGallery).
 - `scripts/azure_psu_file_manager.sh` and `scripts/invoke_command_in_azure_webapp.sh` are for inspection only, not deployment.
-- Use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` or `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force` to remove CIEM-owned PSU scripts, schedules, active jobs, and the `Devolutions.CIEM` module from a PSU target.
+- Use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` or `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force` to remove CIEM-owned PSU apps, scripts, schedules, active jobs, configuration cache, variables, local data files, and the `Devolutions.CIEM` module from a PSU target.
 
 ## Testing and Validation
 - Use `Invoke-TestCommand` to validate CIEM code inside PSU instead of publish-debug-publish cycles.
@@ -135,7 +135,7 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 ### 6. PSU Removal Retains CIEM Job History
 **Symptom:** After `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force`, Azure PSU can have `Devolutions.CIEM` module count `0`, CIEM-owned script count `0`, and CIEM-owned schedule count `0`, while `Get-PSUJob` still returns historical or queued `CIEMExecutor.ps1` job records.
 **Cause:** PSU exposes `Get-PSUJob` and `Stop-PSUJob`, but no supported `Remove-PSUJob` or `Set-PSUJob` cmdlet. The project PSU knowledge also confirms `DELETE /api/v1/job/{id}` returns success without removing or archiving jobs. `scripts/remove-psu.ps1` therefore stops active CIEM jobs and removes CIEM resources, but intentionally retains job history.
-**Fix:** Treat retained CIEM job history as a PSU retention limitation, not a script failure. Do not claim the instance is free from all CIEM remnants if owned job records remain. Do not modify PSU database tables directly without explicit user approval and a separate recovery plan.
+**Fix:** Treat retained CIEM job history as a PSU retention limitation that is reported separately and does not block `Status = Removed`. Do not modify PSU database tables directly without explicit user approval and a separate recovery plan.
 **Verification:** Dot-source `scripts/remove-psu.ps1`, connect to Azure PSU, build `Get-CIEMPSUScriptRemovalModel -ModulePath ./psu-app`, and count `Get-PSUJob` results where `Test-CIEMOwnedPSUJob` returns true.
 **Recurrence Prevention:** Removal summaries must report module, app, script, schedule, active job, queued job, and retained job-history counts separately.
 

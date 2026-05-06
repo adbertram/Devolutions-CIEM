@@ -176,6 +176,64 @@ function Remove-CIEMPSUModule {
         }
     }
 
+    $configurationCacheKeys = @(
+        'CIEM:AuthProfiles:Azure'
+        'CIEM:AuthProfile:AWS'
+        'CIEM:Config'
+        'CIEM:ScanConfig'
+    )
+    $removedConfigurationCacheKeys = 0
+    foreach ($cacheKey in $configurationCacheKeys) {
+        $shouldRemoveCacheKey = if ($WhatIfPreference) {
+            $false
+        }
+        elseif ($Force) {
+            $true
+        }
+        else {
+            $PSCmdlet.ShouldProcess($cacheKey, 'Remove CIEM PSU cache key')
+        }
+
+        if ($shouldRemoveCacheKey) {
+            Remove-PSUCache -Key $cacheKey | Out-Null
+            $removedConfigurationCacheKeys++
+        }
+    }
+
+    $existingVariables = @(Get-PSUVariable)
+    $ownedVariables = @($existingVariables | Where-Object {
+            $variableName = [string]$_.Name
+            $variableName.StartsWith('CIEM_Azure_', [System.StringComparison]::Ordinal) -or
+            $variableName.StartsWith('CIEM_AWS_', [System.StringComparison]::Ordinal)
+        })
+    $removedConfigurationVariables = 0
+    foreach ($ownedVariable in $ownedVariables) {
+        $variableName = [string]$ownedVariable.Name
+        $shouldRemoveVariable = if ($WhatIfPreference) {
+            $false
+        }
+        elseif ($Force) {
+            $true
+        }
+        else {
+            $PSCmdlet.ShouldProcess($variableName, 'Remove CIEM PSU variable and secret')
+        }
+
+        if ($shouldRemoveVariable) {
+            Remove-PSUVariable -Name $variableName -RemoveSecret | Out-Null
+            $removedConfigurationVariables++
+        }
+    }
+
+    $configurationRemoval = [pscustomobject]@{
+        Status           = if ($WhatIfPreference) { 'WhatIf' } else { 'Removed' }
+        CacheKeys        = $configurationCacheKeys
+        CacheKeysRemoved = $removedConfigurationCacheKeys
+        VariablesScanned = $existingVariables.Count
+        VariablesMatched = $ownedVariables.Count
+        VariablesRemoved = $removedConfigurationVariables
+    }
+
     $removeModuleParams = @{
         Name        = $ModuleName
         Environment = $Environment
@@ -258,6 +316,8 @@ function Remove-CIEMPSUModule {
         ($removedSchedules -lt $ownedSchedules.Count) -or
         ($removedApps -lt $ownedApps.Count) -or
         ($removedScripts -lt $ownedScripts.Count) -or
+        ($removedConfigurationCacheKeys -lt $configurationCacheKeys.Count) -or
+        ($removedConfigurationVariables -lt $ownedVariables.Count) -or
         ($Environment -eq 'local' -and $dataRemoval.Status -eq 'Skipped')
     )
     $resourceActionCount = $stoppedJobs + $removedSchedules + $removedApps + $removedScripts
@@ -298,6 +358,7 @@ function Remove-CIEMPSUModule {
         AppResourcesRemoved         = $removedApps
         ScriptResourcesScanned      = $existingScripts.Count
         ScriptResourcesRemoved      = $removedScripts
+        ConfigurationRemoval        = $configurationRemoval
         DataRemoval                 = $dataRemoval
         ModuleRemoval               = $moduleRemoval
         Status                      = $status

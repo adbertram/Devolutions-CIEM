@@ -10,7 +10,8 @@ argument-hint: "[local|azure]"
 
 <objective>
 Publish the Devolutions.CIEM module through `Devolutions.CIEM.Admin` using the
-target-specific `Publish-PSUModule` flow, then confirm the app restart.
+target-specific `Publish-PSUModule` flow, then confirm the resulting publish or
+deployment status.
 </objective>
 
 <quick_start>
@@ -19,9 +20,8 @@ target-specific `Publish-PSUModule` flow, then confirm the app restart.
 3. Run the matching `Publish-PSUModule` command from the repository root with an explicit `-BumpVersion`.
 4. Add `-ValidateDeployment` when the request is for a full CIEM deploy, not only a publish/import.
 5. If the request is to remove CIEM and install the version already published in PowerShell Gallery, run `scripts/reinstall-ciem-psu-module.sh` instead of publishing a new Gallery version.
-6. Confirm publish status, module version, and app restart output.
-7. If restart is not confirmed, run the target-specific restart command below.
-8. If Azure import, restart, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
+6. Confirm publish status, module version, and validation status when validation was requested.
+7. If Azure import, 401, or post-publish runtime verification fails, switch to `azure-psu-instance` before repeating the publish.
 </quick_start>
 
 <target_selection>
@@ -97,7 +97,9 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -A
 For a clean reinstall from the version already published in PowerShell Gallery,
 use the project script. This removes CIEM-owned PSU resources first, then calls
 `Publish-PSUModule -InstallPublishedVersion`, which does not bump the manifest,
-does not require `NUGET_API_KEY`, and does not call `Publish-PSResource`.
+does not require `NUGET_API_KEY`, does not call `Publish-PSResource`, does not
+restart the CIEM app, and does not run `Import-CIEMScript`. Validation inspects
+the state produced by the same Gallery install path a production user runs.
 
 Local:
 
@@ -112,22 +114,6 @@ scripts/reinstall-ciem-psu-module.sh --environment azure
 ```
 </step_6>
 
-<step_7>
-Verify the publish output confirms a successful app restart. If the output does
-not confirm the restart, restart the app explicitly.
-
-Local:
-
-```powershell
-pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU; Restart-PSUApp -Name 'Devolutions CIEM'"
-```
-
-Azure:
-
-```powershell
-pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -Azure; Restart-PSUApp -Name 'Devolutions CIEM'"
-```
-</step_7>
 </workflow>
 
 <safety>
@@ -136,6 +122,15 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -A
 - Azure publishing goes through PowerShell Gallery before PSU import.
 - `Publish-PSUModule -InstallPublishedVersion` imports the already published
   Gallery version into PSU without uploading a new Gallery package.
+- `scripts/reinstall-ciem-psu-module.sh` must remain production-equivalent:
+  remove CIEM-owned resources, install the published Gallery module, and inspect
+  the resulting state only. Do not add app restart, `Import-CIEMScript`, or other
+  deployment-only bootstrap steps to the reinstall or validation flow.
+- CIEM removal status excludes PSU-retained job history. `Status = Removed`
+  means no CIEM-owned module, app, script, schedule, active or queued job,
+  configuration cache value, CIEM variable, or local CIEM data file remains in
+  the supported removal model. Report retained CIEM job history separately; PSU
+  has no supported job-history delete cmdlet or API.
 - CIEM Gallery imports must allow PSU configuration sync. Do not use
   `Install-PSUModule -NoSync` for CIEM Gallery installs because PSU must load
   `.universal/dashboards.ps1` and `.universal/scripts.ps1` to register PSU
@@ -156,6 +151,6 @@ pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Connect-PSU -A
 - The publish command completes without error.
 - The chosen `Patch`, `Minor`, or `Major` bump is reported with the diff-based rationale.
 - The module version and publish status are reported.
-- The app restart is confirmed by publish output or by the explicit restart command.
+- Deployment validation reports the installed module, app, script, and database state when requested.
 - Azure publishes report the PowerShell Gallery publication details.
 </success_criteria>
