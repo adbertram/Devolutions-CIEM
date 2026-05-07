@@ -13,6 +13,28 @@ class DashboardPageHelpers extends BasePage {
       localLastDiscoverySummary: '#lastDiscoverySummary',
       runNewScanBtn: "button:has-text('Run New Scan')",
       sectionPanelGroup: '#dashboardSectionPanels',
+      needsAttentionSection: '#dashboardNeedsAttentionSection',
+      needsAttentionItems: '[data-ciem-needs-attention-item="true"]',
+      needsAttentionEmpty: '[data-ciem-needs-attention-empty="true"]',
+      inspectIdentityButton: '[data-ciem-inspect-identity="true"] button',
+      inspectAttackPathButton: '[data-ciem-inspect-attack-path="true"] button',
+      exposureChangesSection: '#dashboardExposureChangesSection',
+      exposureChangeItems: '[data-ciem-exposure-change-item="true"]',
+      exposureChangeEmpty: '[data-ciem-exposure-change-empty="true"]',
+      reviewExposureIdentityButton: '[data-ciem-review-exposure-identity="true"] button',
+      reviewExposureAttackPathButton: '[data-ciem-review-exposure-attack-path="true"] button',
+      connectorPayloadPreviewSection: '#dashboardConnectorPayloadPreviewSection',
+      connectorPayloadPreviewItems: '[data-ciem-connector-payload-preview-item="true"]',
+      connectorPayloadPreviewEmpty: '[data-ciem-connector-payload-preview-empty="true"]',
+      pamProgressSection: '#dashboardPAMProgressSection',
+      pamProgressMetrics: '[data-ciem-pam-progress-metric="true"]',
+      pamProgressStages: '[data-ciem-pam-progress-stage="true"]',
+      pamProgressCandidates: '[data-ciem-pam-progress-candidate="true"]',
+      pamProgressEmpty: '[data-ciem-pam-progress-empty="true"]',
+      scanEfficiencySection: '#dashboardScanEfficiencySection',
+      scanEfficiencyMetrics: '[data-ciem-scan-efficiency-metric="true"]',
+      scanEfficiencyRuns: '[data-ciem-scan-efficiency-run="true"]',
+      scanEfficiencyEmpty: '[data-ciem-scan-efficiency-empty="true"]',
       scanPanel: '#dashboardScanPanel',
       identityPanel: '#dashboardIdentityPanel',
       scanSection: '#dashboardScanSection',
@@ -101,6 +123,126 @@ class DashboardPageHelpers extends BasePage {
   async getDashboardContentText() {
     await this.waitForDashboardState();
     return await this.page.locator('body').textContent();
+  }
+
+  async isNeedsAttentionVisible() {
+    return await this.isElementVisible(this.selectors.needsAttentionSection);
+  }
+
+  async getNeedsAttentionText() {
+    await this.page.locator(this.selectors.needsAttentionSection).waitFor({ state: 'visible', timeout: 15000 });
+    return (await this.page.locator(this.selectors.needsAttentionSection).textContent()).trim();
+  }
+
+  async getNeedsAttentionItemCount() {
+    await this.page.locator(this.selectors.needsAttentionSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.needsAttentionItems).count();
+  }
+
+  async hasNeedsAttentionEmptyState() {
+    return await this.isElementVisible(this.selectors.needsAttentionEmpty);
+  }
+
+  async clickInspectIdentity() {
+    await this.page.locator(this.selectors.inspectIdentityButton).first().click();
+    await this.page.waitForURL('**/ciem/identities', { timeout: 15000 });
+  }
+
+  async clickInspectAttackPath() {
+    await this.page.locator(this.selectors.inspectAttackPathButton).first().click();
+    await this.page.waitForURL('**/ciem/attack-paths', { timeout: 15000 });
+  }
+
+  async isExposureChangesVisible() {
+    return await this.isElementVisible(this.selectors.exposureChangesSection);
+  }
+
+  async getExposureChangesText() {
+    await this.page.locator(this.selectors.exposureChangesSection).waitFor({ state: 'visible', timeout: 15000 });
+    return (await this.page.locator(this.selectors.exposureChangesSection).textContent()).trim();
+  }
+
+  async getExposureChangeItemCount() {
+    await this.page.locator(this.selectors.exposureChangesSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.exposureChangeItems).count();
+  }
+
+  async hasExposureChangesEmptyState() {
+    return await this.isElementVisible(this.selectors.exposureChangeEmpty);
+  }
+
+  async clickReviewExposureIdentity() {
+    await this.page.locator(this.selectors.reviewExposureIdentityButton).first().click();
+    await this.page.waitForURL('**/ciem/identities', { timeout: 15000 });
+  }
+
+  async isConnectorPayloadPreviewVisible() {
+    return await this.isElementVisible(this.selectors.connectorPayloadPreviewSection);
+  }
+
+  async getConnectorPayloadPreviewText() {
+    await this.page.locator(this.selectors.connectorPayloadPreviewSection).waitFor({ state: 'visible', timeout: 15000 });
+    return (await this.page.locator(this.selectors.connectorPayloadPreviewSection).textContent()).trim();
+  }
+
+  async getConnectorPayloadPreviewItemCount() {
+    await this.page.locator(this.selectors.connectorPayloadPreviewSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.connectorPayloadPreviewItems).count();
+  }
+
+  async hasConnectorPayloadPreviewEmptyState() {
+    return await this.isElementVisible(this.selectors.connectorPayloadPreviewEmpty);
+  }
+
+  async isPAMProgressVisible() {
+    return await this.isElementVisible(this.selectors.pamProgressSection);
+  }
+
+  async getPAMProgressText() {
+    await this.page.locator(this.selectors.pamProgressSection).waitFor({ state: 'visible', timeout: 15000 });
+    return (await this.page.locator(this.selectors.pamProgressSection).textContent()).trim();
+  }
+
+  async getPAMProgressMetricCount() {
+    await this.page.locator(this.selectors.pamProgressSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.pamProgressMetrics).count();
+  }
+
+  async getPAMProgressStageCount() {
+    await this.page.locator(this.selectors.pamProgressSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.pamProgressStages).count();
+  }
+
+  async getPAMProgressCandidateCount() {
+    await this.page.locator(this.selectors.pamProgressSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.pamProgressCandidates).count();
+  }
+
+  async hasPAMProgressEmptyState() {
+    return await this.isElementVisible(this.selectors.pamProgressEmpty);
+  }
+
+  async isScanEfficiencyVisible() {
+    return await this.isElementVisible(this.selectors.scanEfficiencySection);
+  }
+
+  async getScanEfficiencyText() {
+    await this.page.locator(this.selectors.scanEfficiencySection).waitFor({ state: 'visible', timeout: 15000 });
+    return (await this.page.locator(this.selectors.scanEfficiencySection).textContent()).trim();
+  }
+
+  async getScanEfficiencyMetricCount() {
+    await this.page.locator(this.selectors.scanEfficiencySection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.scanEfficiencyMetrics).count();
+  }
+
+  async getScanEfficiencyRunCount() {
+    await this.page.locator(this.selectors.scanEfficiencySection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.scanEfficiencyRuns).count();
+  }
+
+  async hasScanEfficiencyEmptyState() {
+    return await this.isElementVisible(this.selectors.scanEfficiencyEmpty);
   }
 
   async clickIdentityPanelHeader() {

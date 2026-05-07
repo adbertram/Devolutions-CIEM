@@ -6,9 +6,18 @@ const {
   getScanResultCount,
   getScanHistoryCounts,
   seedIdentityViewData,
+  seedIdentitiesPageData,
+  getTestIdentitiesGraphEdgeCount,
+  seedAttackPathsPageData,
+  backupAndClearAttackPathGraphData,
+  restoreAttackPathGraphData,
+  getTestAttackPathCount,
   backupAndClearDashboardIdentityData,
   restoreDashboardIdentityData,
   getDashboardIdentityCounts,
+  seedExposureChangeData,
+  cleanupExposureChangeData,
+  getTestExposureChangeCount,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
 const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
@@ -140,6 +149,20 @@ test.describe('Dashboard Page', () => {
       expect(entitlementCount).toBe(4);
     });
 
+    test('should display scan efficiency instrumentation from scan history', async () => {
+      expect(await dashPage.isScanEfficiencyVisible()).toBe(true);
+      const text = await dashPage.getScanEfficiencyText();
+      expect(text).toContain('Scan Efficiency');
+      expect(text).toContain('Latest Duration');
+      expect(text).toContain('Average Duration');
+      expect(text).toContain('Latest Throughput');
+      expect(text).toContain('Average Throughput');
+      expect(text).toContain('Duration:');
+      expect(text).toContain('Results:');
+      expect(await dashPage.getScanEfficiencyMetricCount()).toBe(4);
+      expect(await dashPage.getScanEfficiencyRunCount()).toBeGreaterThanOrEqual(2);
+    });
+
     test('should show Total Results card with count greater than 0', async () => {
       const count = await dashPage.getTotalResultsCount();
       expect(count).toBeGreaterThan(0);
@@ -230,6 +253,137 @@ test.describe('Dashboard Page', () => {
       expect(btnVisible).toBe(true);
       await dashPage.clickRunFirstScan();
       expect(dashPage.page.url()).toContain('/ciem/scan');
+    });
+  });
+
+  test.describe('when identity and attack path risks exist', () => {
+    let graphBackup = null;
+
+    test.beforeAll(() => {
+      graphBackup = backupAndClearAttackPathGraphData();
+      seedIdentitiesPageData();
+      seedAttackPathsPageData();
+      const identityEdgeCount = getTestIdentitiesGraphEdgeCount();
+      const attackPathCount = getTestAttackPathCount();
+      if (identityEdgeCount !== 4) {
+        throw new Error(`Expected 4 seeded identity graph edges, got ${identityEdgeCount}`);
+      }
+      if (attackPathCount < 2) {
+        throw new Error(`Expected seeded attack paths, got ${attackPathCount}`);
+      }
+      console.log(`[setup:dashboard-needs-attention] Seeded ${identityEdgeCount} identity edge(s) and ${attackPathCount} attack path(s)`);
+    });
+
+    test.afterAll(() => {
+      restoreAttackPathGraphData(graphBackup);
+    });
+
+    test('should show a Needs Attention queue with identity and attack path risks', async () => {
+      expect(await dashPage.isNeedsAttentionVisible()).toBe(true);
+      const text = await dashPage.getNeedsAttentionText();
+      expect(text).toContain('Needs Attention');
+      expect(text).toContain('E2E Identities User');
+      expect(text).toContain('Critical');
+      expect(text).toContain('Holds privileged role with no sign-in activity for 120 days');
+      expect(text).toContain('Management port open to the internet');
+      expect(text).toContain('E2E Attack Path NSG');
+      expect(text).toContain('High');
+      expect(await dashPage.getNeedsAttentionItemCount()).toBeGreaterThanOrEqual(2);
+    });
+
+    test('should provide drill-in actions for identity and attack path risks', async () => {
+      await dashPage.clickInspectIdentity();
+      expect(dashPage.page.url()).toContain('/ciem/identities');
+
+      await dashPage.navigateToDashboard();
+      await dashPage.clickInspectAttackPath();
+      expect(dashPage.page.url()).toContain('/ciem/attack-paths');
+    });
+
+    test('should show PAM implementation progress and candidate mappings', async () => {
+      expect(await dashPage.isPAMProgressVisible()).toBe(true);
+      const text = await dashPage.getPAMProgressText();
+      expect(text).toContain('PAM Implementation Progress');
+      expect(text).toContain('Readiness');
+      expect(text).toContain('PAM Candidates');
+      expect(text).toContain('Outbound PAM actions');
+      expect(text).toContain('NotScoped');
+      expect(text).toContain('JIT elevation and approval workflow');
+      expect(text).toContain('Access brokering and session governance');
+      expect(await dashPage.getPAMProgressMetricCount()).toBe(4);
+      expect(await dashPage.getPAMProgressStageCount()).toBe(5);
+      expect(await dashPage.getPAMProgressCandidateCount()).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  test.describe('when exposure changes exist', () => {
+    test.beforeAll(() => {
+      seedExposureChangeData();
+      const exposureChangeCount = getTestExposureChangeCount();
+      if (exposureChangeCount !== 2) {
+        throw new Error(`Expected 2 seeded exposure changes, got ${exposureChangeCount}`);
+      }
+      console.log(`[setup:dashboard-exposure-changes] Seeded ${exposureChangeCount} exposure change(s)`);
+    });
+
+    test.afterAll(() => {
+      cleanupExposureChangeData();
+    });
+
+    test('should show local exposure change records without sending payloads', async () => {
+      expect(await dashPage.isExposureChangesVisible()).toBe(true);
+      const text = await dashPage.getExposureChangesText();
+      expect(text).toContain('Exposure Changes');
+      expect(text).toContain('Payload delivery is not enabled');
+      expect(text).toContain('E2E New Exposure User');
+      expect(text).toContain('NewRisk');
+      expect(text).toContain('E2E Increased Exposure User');
+      expect(text).toContain('RiskIncrease');
+      expect(text).toContain('Critical');
+      expect(await dashPage.getExposureChangeItemCount()).toBe(2);
+    });
+
+    test('should provide review routing for identity exposure changes', async () => {
+      await dashPage.clickReviewExposureIdentity();
+      expect(dashPage.page.url()).toContain('/ciem/identities');
+    });
+
+    test('should show preview-only connector payloads without outbound target configuration', async () => {
+      expect(await dashPage.isConnectorPayloadPreviewVisible()).toBe(true);
+      const text = await dashPage.getConnectorPayloadPreviewText();
+      expect(text).toContain('Connector Payload Previews');
+      expect(text).toContain('Preview-only');
+      expect(text).toContain('No outbound target is configured or contacted');
+      expect(text).toContain('Alert');
+      expect(text).toContain('SIEM');
+      expect(text).toContain('Webhook');
+      expect(text).toContain('PSU');
+      expect(text).toContain('deliveryEnabled');
+      expect(text).toContain('false');
+      expect(text).not.toContain('targetUrl');
+      expect(text).not.toContain('token');
+      expect(await dashPage.getConnectorPayloadPreviewItemCount()).toBe(4);
+    });
+  });
+
+  test.describe('when no identity or attack path risk data exists', () => {
+    let graphBackup = null;
+
+    test.beforeAll(() => {
+      graphBackup = backupAndClearAttackPathGraphData();
+      console.log('[setup:dashboard-needs-attention-empty] Cleared graph and attack path data');
+    });
+
+    test.afterAll(() => {
+      restoreAttackPathGraphData(graphBackup);
+    });
+
+    test('should explain that discovery data is required before risk queue items can appear', async () => {
+      expect(await dashPage.isNeedsAttentionVisible()).toBe(true);
+      expect(await dashPage.hasNeedsAttentionEmptyState()).toBe(true);
+      const text = await dashPage.getNeedsAttentionText();
+      expect(text).toContain('No discovered identity or attack path data yet');
+      expect(text).toContain('Run discovery');
     });
   });
 });

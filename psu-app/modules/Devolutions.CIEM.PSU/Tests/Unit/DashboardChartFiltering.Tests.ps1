@@ -61,3 +61,79 @@ Describe 'Dashboard section layout' {
         $script:PageSource | Should -Match 'EntraGroup'
     }
 }
+
+Describe 'Dashboard Needs Attention queue' {
+    It 'Renders the Needs Attention queue before secondary dashboard sections' {
+        $needsAttentionIndex = $script:PageSource.IndexOf("dashboardNeedsAttentionSection")
+        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+
+        $needsAttentionIndex | Should -BeGreaterThan -1
+        $sectionPanelsIndex | Should -BeGreaterThan -1
+        $needsAttentionIndex | Should -BeLessThan $sectionPanelsIndex
+        $script:PageSource | Should -Match 'Get-CIEMDashboardNeedsAttention'
+        $script:PageSource | Should -Match "'data-ciem-needs-attention-item'\s*=\s*'true'"
+        $script:PageSource | Should -Match "'data-ciem-inspect-identity'\s*=\s*'true'"
+        $script:PageSource | Should -Match "'data-ciem-inspect-attack-path'\s*=\s*'true'"
+    }
+}
+
+Describe 'Dashboard Exposure Changes queue' {
+    It 'Renders local exposure-change records before secondary dashboard sections' {
+        $exposureChangesIndex = $script:PageSource.IndexOf("dashboardExposureChangesSection")
+        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+
+        $exposureChangesIndex | Should -BeGreaterThan -1
+        $sectionPanelsIndex | Should -BeGreaterThan -1
+        $exposureChangesIndex | Should -BeLessThan $sectionPanelsIndex
+        $script:PageSource | Should -Match 'Exposure Changes'
+        $script:PageSource | Should -Match 'Get-CIEMExposureChange'
+        $script:PageSource | Should -Match "'data-ciem-exposure-change-item'\s*=\s*'true'"
+        $script:PageSource | Should -Match 'Payload delivery is not enabled'
+    }
+}
+
+Describe 'Dashboard Connector Payload Previews' {
+    It 'Renders preview-only connector payloads before secondary dashboard sections' {
+        $previewIndex = $script:PageSource.IndexOf("dashboardConnectorPayloadPreviewSection")
+        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+
+        $previewIndex | Should -BeGreaterThan -1
+        $sectionPanelsIndex | Should -BeGreaterThan -1
+        $previewIndex | Should -BeLessThan $sectionPanelsIndex
+        $script:PageSource | Should -Match 'Connector Payload Previews'
+        $script:PageSource | Should -Match 'Get-CIEMConnectorPayloadPreview'
+        $script:PageSource | Should -Match "'data-ciem-connector-payload-preview-item'\s*=\s*'true'"
+        $script:PageSource | Should -Match 'No outbound target is configured or contacted'
+    }
+}
+
+Describe 'Dashboard PAM Implementation Progress' {
+    It 'Renders read-only PAM progress before secondary dashboard sections' {
+        $progressIndex = $script:PageSource.IndexOf("dashboardPAMProgressSection")
+        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+
+        $progressIndex | Should -BeGreaterThan -1
+        $sectionPanelsIndex | Should -BeGreaterThan -1
+        $progressIndex | Should -BeLessThan $sectionPanelsIndex
+        $script:PageSource | Should -Match 'PAM Implementation Progress'
+        $script:PageSource | Should -Match 'Get-CIEMPAMProgressSummary'
+        $script:PageSource | Should -Match "'data-ciem-pam-progress-stage'\s*=\s*'true'"
+        $script:PageSource | Should -Match "'data-ciem-pam-progress-candidate'\s*=\s*'true'"
+        $script:PageSource | Should -Match 'No PAM candidates are mapped yet'
+    }
+}
+
+Describe 'Dashboard Scan Efficiency' {
+    It 'Renders scan efficiency instrumentation before secondary dashboard sections' {
+        $efficiencyIndex = $script:PageSource.IndexOf("dashboardScanEfficiencySection")
+        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+
+        $efficiencyIndex | Should -BeGreaterThan -1
+        $sectionPanelsIndex | Should -BeGreaterThan -1
+        $efficiencyIndex | Should -BeLessThan $sectionPanelsIndex
+        $script:PageSource | Should -Match 'Scan Efficiency'
+        $script:PageSource | Should -Match 'Get-CIEMScanEfficiencySummary'
+        $script:PageSource | Should -Match "'data-ciem-scan-efficiency-metric'\s*=\s*'true'"
+        $script:PageSource | Should -Match "'data-ciem-scan-efficiency-run'\s*=\s*'true'"
+    }
+}

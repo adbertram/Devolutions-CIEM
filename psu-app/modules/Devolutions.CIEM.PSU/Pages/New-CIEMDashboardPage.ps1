@@ -18,6 +18,410 @@ function New-CIEMDashboardPage {
         New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
         $scanRuns = @(Devolutions.CIEM\Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
+        $needsAttentionItems = @(Devolutions.CIEM\Get-CIEMDashboardNeedsAttention -Limit 5)
+        $exposureChanges = @(Devolutions.CIEM\Get-CIEMExposureChange -Last 5)
+        $connectorPayloadPreviews = @(Devolutions.CIEM\Get-CIEMConnectorPayloadPreview -SignalType ExposureChange -Limit 1)
+        $pamProgress = Devolutions.CIEM\Get-CIEMPAMProgressSummary -Limit 5
+        $scanEfficiency = Devolutions.CIEM\Get-CIEMScanEfficiencySummary -Last 5
+        $graphCountRows = @(Devolutions.CIEM\Invoke-CIEMQuery -Query 'SELECT COUNT(*) AS c FROM graph_nodes')
+        if ($graphCountRows.Count -ne 1) {
+            throw "Expected one graph node count row, got $($graphCountRows.Count)."
+        }
+        $hasDiscoveryGraphData = [int]$graphCountRows[0].c -gt 0
+
+        New-UDElement -Tag 'section' -Id 'dashboardNeedsAttentionSection' -Attributes @{
+            style = @{
+                marginBottom = '22px'
+            }
+        } -Content {
+            New-UDTypography -Text 'Needs Attention' -Variant 'h5' -Style @{ marginBottom = '6px' }
+            New-UDTypography -Text 'Highest-priority identity and attack path risks from the current discovery graph.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+
+            if ($needsAttentionItems.Count -eq 0) {
+                $emptyText = if ($hasDiscoveryGraphData) {
+                    'No current identity or attack path risks need attention.'
+                } else {
+                    'No discovered identity or attack path data yet. Run discovery to build the risk queue.'
+                }
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-needs-attention-empty' = 'true'
+                    style = @{
+                        padding = '14px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text $emptyText -Variant 'body2' -Style @{ color = '#666' }
+                }
+            } else {
+                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '10px' } } -Content {
+                    foreach ($item in $needsAttentionItems) {
+                        $severityColor = Devolutions.CIEM\Get-SeverityColor -Severity $item.Severity
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-needs-attention-item' = 'true'
+                            style = @{
+                                display = 'grid'
+                                gap = '8px'
+                                padding = '12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                New-UDChip -Label $item.Severity -Size 'small' -Style @{ backgroundColor = $severityColor; color = 'white' }
+                                New-UDChip -Label $item.SourceType -Size 'small' -Variant 'outlined'
+                                New-UDTypography -Text $item.Title -Variant 'subtitle1' -Style @{ fontWeight = '600' }
+                            }
+                            New-UDTypography -Text "Identity: $($item.Identity)" -Variant 'body2' -Style @{ color = '#555' }
+                            New-UDTypography -Text "Target: $($item.Target)" -Variant 'body2' -Style @{ color = '#555'; overflowWrap = 'anywhere' }
+                            New-UDTypography -Text $item.Reason -Variant 'body2'
+                            New-UDTypography -Text $item.Evidence -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                            if ($item.SourceType -eq 'Identity') {
+                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-inspect-identity' = 'true' } -Content {
+                                    New-UDButton -Text 'Inspect Identity' -Variant 'outlined' -Size 'small' -OnClick {
+                                        Invoke-UDRedirect '/ciem/identities'
+                                    }
+                                }
+                            } elseif ($item.SourceType -eq 'AttackPath') {
+                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-inspect-attack-path' = 'true' } -Content {
+                                    New-UDButton -Text 'Inspect Attack Path' -Variant 'outlined' -Size 'small' -OnClick {
+                                        Invoke-UDRedirect '/ciem/attack-paths'
+                                    }
+                                }
+                            } else {
+                                throw "Unsupported dashboard Needs Attention item source type '$($item.SourceType)'."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        New-UDElement -Tag 'section' -Id 'dashboardExposureChangesSection' -Attributes @{
+            style = @{
+                marginBottom = '22px'
+            }
+        } -Content {
+            New-UDTypography -Text 'Exposure Changes' -Variant 'h5' -Style @{ marginBottom = '6px' }
+            New-UDTypography -Text 'Local exposure changes from compared discovery snapshots. Payload delivery is not enabled.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+
+            if ($exposureChanges.Count -eq 0) {
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-exposure-change-empty' = 'true'
+                    style = @{
+                        padding = '14px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text 'No exposure changes recorded yet. Scheduled discovery will compare snapshots after the next run.' -Variant 'body2' -Style @{ color = '#666' }
+                }
+            }
+            else {
+                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '10px' } } -Content {
+                    foreach ($change in $exposureChanges) {
+                        $severityColor = Devolutions.CIEM\Get-SeverityColor -Severity $change.Severity
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-exposure-change-item' = 'true'
+                            style = @{
+                                display = 'grid'
+                                gap = '8px'
+                                padding = '12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                New-UDChip -Label $change.Severity -Size 'small' -Style @{ backgroundColor = $severityColor; color = 'white' }
+                                New-UDChip -Label $change.ChangeType -Size 'small' -Variant 'outlined'
+                                New-UDChip -Label $change.ExposureType -Size 'small' -Variant 'outlined'
+                                New-UDTypography -Text $change.ImpactedIdentityName -Variant 'subtitle1' -Style @{ fontWeight = '600' }
+                            }
+                            New-UDTypography -Text "Target: $($change.ImpactedResourceName)" -Variant 'body2' -Style @{ color = '#555'; overflowWrap = 'anywhere' }
+                            New-UDTypography -Text $change.Evidence -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                            if ($change.ExposureType -eq 'IdentityRisk') {
+                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-review-exposure-identity' = 'true' } -Content {
+                                    New-UDButton -Text 'Review Identity' -Variant 'outlined' -Size 'small' -OnClick {
+                                        Invoke-UDRedirect '/ciem/identities'
+                                    }
+                                }
+                            }
+                            elseif ($change.ExposureType -eq 'AttackPath') {
+                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-review-exposure-attack-path' = 'true' } -Content {
+                                    New-UDButton -Text 'Review Attack Path' -Variant 'outlined' -Size 'small' -OnClick {
+                                        Invoke-UDRedirect '/ciem/attack-paths'
+                                    }
+                                }
+                            }
+                            else {
+                                throw "Unsupported exposure change type '$($change.ExposureType)'."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        New-UDElement -Tag 'section' -Id 'dashboardConnectorPayloadPreviewSection' -Attributes @{
+            style = @{
+                marginBottom = '22px'
+            }
+        } -Content {
+            New-UDTypography -Text 'Connector Payload Previews' -Variant 'h5' -Style @{ marginBottom = '6px' }
+            New-UDTypography -Text 'Preview-only Alert, SIEM, Webhook, and PSU payloads for local exposure-change signals. No outbound target is configured or contacted.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+
+            if ($connectorPayloadPreviews.Count -eq 0) {
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-connector-payload-preview-empty' = 'true'
+                    style = @{
+                        padding = '14px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text 'No connector payload previews are available until exposure changes are recorded.' -Variant 'body2' -Style @{ color = '#666' }
+                }
+            }
+            else {
+                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '10px' } } -Content {
+                    foreach ($preview in $connectorPayloadPreviews) {
+                        $severityColor = Devolutions.CIEM\Get-SeverityColor -Severity $preview.Severity
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-connector-payload-preview-item' = 'true'
+                            style = @{
+                                display = 'grid'
+                                gap = '8px'
+                                padding = '12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                New-UDChip -Label $preview.ConnectorType -Size 'small' -Variant 'outlined'
+                                New-UDChip -Label $preview.SignalType -Size 'small' -Variant 'outlined'
+                                New-UDChip -Label $preview.Severity -Size 'small' -Style @{ backgroundColor = $severityColor; color = 'white' }
+                                New-UDTypography -Text $preview.EventName -Variant 'subtitle1' -Style @{ fontWeight = '600' }
+                            }
+                            New-UDTypography -Text $preview.Title -Variant 'body2' -Style @{ color = '#555' }
+                            New-UDTypography -Text $preview.Summary -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                            New-UDElement -Tag 'pre' -Attributes @{
+                                style = @{
+                                    margin = '0'
+                                    padding = '10px'
+                                    border = '1px solid #d0d7de'
+                                    borderRadius = '6px'
+                                    backgroundColor = '#f6f8fa'
+                                    color = '#24292f'
+                                    whiteSpace = 'pre-wrap'
+                                    overflowWrap = 'anywhere'
+                                    maxHeight = '140px'
+                                    overflowY = 'auto'
+                                    fontSize = '12px'
+                                }
+                            } -Content {
+                                $preview.PayloadJson
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        New-UDElement -Tag 'section' -Id 'dashboardPAMProgressSection' -Attributes @{
+            style = @{
+                marginBottom = '22px'
+            }
+        } -Content {
+            New-UDTypography -Text 'PAM Implementation Progress' -Variant 'h5' -Style @{ marginBottom = '6px' }
+            New-UDTypography -Text 'Read-only CIEM progress toward PAM adoption: exposure baseline, current exposure, candidate mapping, and scoped handoff status.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+            $riskBurndownMetric = if ($null -eq $pamProgress.RiskBurndownPercent) { 'No baseline' } else { "$($pamProgress.RiskBurndownPercent)%" }
+
+            New-UDElement -Tag 'div' -Attributes @{
+                style = @{
+                    display = 'grid'
+                    gridTemplateColumns = 'repeat(auto-fit, minmax(160px, 1fr))'
+                    gap = '10px'
+                    marginBottom = '12px'
+                }
+            } -Content {
+                foreach ($metric in @(
+                    @{ Label = 'Readiness'; Value = "$($pamProgress.ReadinessPercent)%" },
+                    @{ Label = 'Current Exposure'; Value = [string]$pamProgress.CurrentExposureCount },
+                    @{ Label = 'PAM Candidates'; Value = [string]$pamProgress.PAMCandidateCount },
+                    @{ Label = 'Risk Burndown'; Value = $riskBurndownMetric }
+                )) {
+                    New-UDElement -Tag 'div' -Attributes @{
+                        'data-ciem-pam-progress-metric' = 'true'
+                        style = @{
+                            padding = '12px'
+                            border = '1px solid #d0d7de'
+                            borderRadius = '6px'
+                            backgroundColor = '#ffffff'
+                        }
+                    } -Content {
+                        New-UDTypography -Text $metric.Label -Variant 'caption' -Style @{ color = '#666' }
+                        New-UDTypography -Text $metric.Value -Variant 'h6' -Style @{ marginTop = '4px' }
+                    }
+                }
+            }
+
+            New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '8px'; marginBottom = '12px' } } -Content {
+                foreach ($stage in @($pamProgress.Stages)) {
+                    $stageColor = switch ([string]$stage.Status) {
+                        'Complete' { '#2e7d32' }
+                        'Pending' { '#ed6c02' }
+                        'NotScoped' { '#5f6368' }
+                        default { throw "Unsupported PAM progress stage status '$($stage.Status)'." }
+                    }
+                    New-UDElement -Tag 'div' -Attributes @{
+                        'data-ciem-pam-progress-stage' = 'true'
+                        style = @{
+                            display = 'grid'
+                            gap = '6px'
+                            padding = '10px 12px'
+                            border = '1px solid #d0d7de'
+                            borderRadius = '6px'
+                            backgroundColor = '#ffffff'
+                        }
+                    } -Content {
+                        New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                            New-UDChip -Label $stage.Status -Size 'small' -Style @{ backgroundColor = $stageColor; color = 'white' }
+                            New-UDTypography -Text $stage.Name -Variant 'subtitle2' -Style @{ fontWeight = '600' }
+                        }
+                        New-UDTypography -Text $stage.Evidence -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                    }
+                }
+            }
+
+            if ($pamProgress.Candidates.Count -eq 0) {
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-pam-progress-empty' = 'true'
+                    style = @{
+                        padding = '14px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text 'No PAM candidates are mapped yet.' -Variant 'body2' -Style @{ color = '#666' }
+                }
+            }
+            else {
+                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '10px' } } -Content {
+                    foreach ($candidate in @($pamProgress.Candidates)) {
+                        $severityColor = Devolutions.CIEM\Get-SeverityColor -Severity $candidate.Severity
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-pam-progress-candidate' = 'true'
+                            style = @{
+                                display = 'grid'
+                                gap = '7px'
+                                padding = '12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                New-UDChip -Label $candidate.Severity -Size 'small' -Style @{ backgroundColor = $severityColor; color = 'white' }
+                                New-UDChip -Label $candidate.SourceType -Size 'small' -Variant 'outlined'
+                                New-UDTypography -Text $candidate.Title -Variant 'subtitle1' -Style @{ fontWeight = '600' }
+                            }
+                            New-UDTypography -Text $candidate.PAMCapability -Variant 'body2' -Style @{ color = '#555' }
+                            New-UDTypography -Text $candidate.RecommendedNextStep -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                        }
+                    }
+                }
+            }
+        }
+
+        New-UDElement -Tag 'section' -Id 'dashboardScanEfficiencySection' -Attributes @{
+            style = @{
+                marginBottom = '22px'
+            }
+        } -Content {
+            New-UDTypography -Text 'Scan Efficiency' -Variant 'h5' -Style @{ marginBottom = '6px' }
+            New-UDTypography -Text 'Duration and throughput from persisted scan runs.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+
+            if ($scanEfficiency.Status -eq 'NoScanData') {
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-scan-efficiency-empty' = 'true'
+                    style = @{
+                        padding = '14px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text 'No timed scan runs are available yet.' -Variant 'body2' -Style @{ color = '#666' }
+                }
+            }
+            elseif ($scanEfficiency.Status -eq 'Tracked') {
+                $latestDurationText = "$($scanEfficiency.LatestDurationSeconds)s"
+                $averageDurationText = "$($scanEfficiency.AverageDurationSeconds)s"
+                $latestThroughputText = if ($null -eq $scanEfficiency.LatestResultsPerSecond) { 'No throughput' } else { "$($scanEfficiency.LatestResultsPerSecond) results/s" }
+                $averageThroughputText = if ($null -eq $scanEfficiency.AverageResultsPerSecond) { 'No throughput' } else { "$($scanEfficiency.AverageResultsPerSecond) results/s" }
+
+                New-UDElement -Tag 'div' -Attributes @{
+                    style = @{
+                        display = 'grid'
+                        gridTemplateColumns = 'repeat(auto-fit, minmax(160px, 1fr))'
+                        gap = '10px'
+                        marginBottom = '12px'
+                    }
+                } -Content {
+                    foreach ($metric in @(
+                        @{ Label = 'Latest Duration'; Value = $latestDurationText },
+                        @{ Label = 'Average Duration'; Value = $averageDurationText },
+                        @{ Label = 'Latest Throughput'; Value = $latestThroughputText },
+                        @{ Label = 'Average Throughput'; Value = $averageThroughputText }
+                    )) {
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-scan-efficiency-metric' = 'true'
+                            style = @{
+                                padding = '12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDTypography -Text $metric.Label -Variant 'caption' -Style @{ color = '#666' }
+                            New-UDTypography -Text $metric.Value -Variant 'h6' -Style @{ marginTop = '4px' }
+                        }
+                    }
+                }
+
+                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '8px' } } -Content {
+                    foreach ($run in @($scanEfficiency.Runs)) {
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-scan-efficiency-run' = 'true'
+                            style = @{
+                                display = 'grid'
+                                gap = '6px'
+                                padding = '10px 12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                New-UDChip -Label $run.Status -Size 'small' -Variant 'outlined'
+                                New-UDTypography -Text $run.Id -Variant 'subtitle2' -Style @{ fontWeight = '600'; overflowWrap = 'anywhere' }
+                            }
+                            New-UDTypography -Text "Duration: $($run.DurationSeconds)s; Results: $($run.TotalResults); Failed: $($run.FailedResults); Throughput: $($run.ResultsPerSecond) results/s" -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                        }
+                    }
+                }
+            }
+            else {
+                throw "Unsupported scan efficiency status '$($scanEfficiency.Status)'."
+            }
+        }
 
         New-UDExpansionPanelGroup -Id 'dashboardSectionPanels' -Type 'Expandable' -Children {
             New-UDExpansionPanel -Id 'dashboardScanPanel' -Title 'Checks & Scans' -Icon (New-UDIcon -Icon 'Search') -Active -Children {
