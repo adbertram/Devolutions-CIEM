@@ -426,6 +426,7 @@ function InvokeCIEMScan {
 
         $workItems = foreach ($check in $selectedChecks) {
             $functionName = $check.CheckScript -replace '\.ps1$', ''
+            $scriptPath = Join-Path $checkScriptsPath $check.CheckScript
             $neededServices = @($check.Service.ToString())
             if ($check.DependsOn) {
                 $neededServices += $check.DependsOn

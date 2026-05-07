@@ -110,10 +110,12 @@ function InvokeCIEMParallelForEach {
             # ([CIEMCheck], [CIEMServiceCache], etc.) are visible at parse time.
             $moduleInstance = Get-Module Devolutions.CIEM
             $childBlock = & $moduleInstance { [scriptblock]::Create($args[0]) } $using:scriptBlockText
+            # Capture the pipeline item before try/catch — inside catch, $_ is the ErrorRecord.
+            $currentItem = $_
             try {
-                $result = @(& $moduleInstance $childBlock $_)
+                $result = @(& $moduleInstance $childBlock $currentItem)
                 [pscustomobject]@{
-                    Input   = $_
+                    Input   = $currentItem
                     Success = $true
                     Result  = $result
                     Error   = $null
@@ -121,7 +123,7 @@ function InvokeCIEMParallelForEach {
             }
             catch {
                 [pscustomobject]@{
-                    Input   = $_
+                    Input   = $currentItem
                     Success = $false
                     Result  = @()
                     Error   = $_.Exception.Message

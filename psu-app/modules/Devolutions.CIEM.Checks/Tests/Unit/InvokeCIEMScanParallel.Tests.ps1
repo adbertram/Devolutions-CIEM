@@ -62,6 +62,48 @@ Describe 'InvokeCIEMScan parallel execution' {
         }
     }
 
+    It 'Each work item ScriptPath corresponds to its own CheckScript (no stale loop variable bug)' {
+        $script:ParallelInvocation = $null
+        Mock -ModuleName Devolutions.CIEM InvokeCIEMParallelForEach {
+            param($InputObject, $ThrottleLimit, $ScriptBlock)
+
+            $script:ParallelInvocation = [pscustomobject]@{
+                Items = @($InputObject | ForEach-Object {
+                    [pscustomobject]@{
+                        CheckId = $_.Check.Id
+                        CheckScript = $_.Check.CheckScript
+                        ScriptPath = $_.ScriptPath
+                        ScriptLeaf = Split-Path -Leaf $_.ScriptPath
+                    }
+                })
+            }
+
+            @()
+        }
+
+        Update-CIEMCheck -Id 'entra_security_defaults_enabled' -Disabled $false
+        Update-CIEMCheck -Id 'entra_trusted_named_location_exist' -Disabled $false
+        Update-CIEMCheck -Id 'entra_policy_ensure_default_user_cannot_create_app' -Disabled $false
+
+        InModuleScope Devolutions.CIEM {
+            InvokeCIEMScan -Provider Azure -CheckId @(
+                'entra_security_defaults_enabled',
+                'entra_trusted_named_location_exist',
+                'entra_policy_ensure_default_user_cannot_create_app'
+            ) | Out-Null
+        }
+
+        $script:ParallelInvocation | Should -Not -BeNullOrEmpty
+        $script:ParallelInvocation.Items | Should -HaveCount 3
+
+        foreach ($item in $script:ParallelInvocation.Items) {
+            $item.ScriptLeaf | Should -Be $item.CheckScript -Because "Check '$($item.CheckId)' must dispatch its OWN script file, not a stale path from a prior loop iteration"
+        }
+
+        ($script:ParallelInvocation.Items.ScriptLeaf | Select-Object -Unique).Count |
+            Should -Be 3 -Because 'Each enabled check must contribute a distinct ScriptPath; identical paths indicate stale-variable reuse'
+    }
+
     It 'Surfaces a child failure with the failing check id' {
         Mock -ModuleName Devolutions.CIEM InvokeCIEMParallelForEach {
             @(

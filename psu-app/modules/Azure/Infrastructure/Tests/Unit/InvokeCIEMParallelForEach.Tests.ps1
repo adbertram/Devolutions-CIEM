@@ -83,4 +83,26 @@ Describe 'InvokeCIEMParallelForEach private helper' {
         $script:result[0].Success | Should -BeFalse
         $script:result[0].Error | Should -Match 'parallel-failure'
     }
+
+    It 'Failure records preserve the original work item in Input (not the catch error record)' {
+        $script:result = InModuleScope Devolutions.CIEM {
+            $items = @(
+                [pscustomobject]@{ CheckId = 'check-alpha'; ScriptPath = '/tmp/alpha.ps1' },
+                [pscustomobject]@{ CheckId = 'check-beta'; ScriptPath = '/tmp/beta.ps1' }
+            )
+            InvokeCIEMParallelForEach -InputObject $items -ThrottleLimit 1 -ScriptBlock {
+                param($workItem)
+                throw "boom-for-$($workItem.CheckId)"
+            }
+        }
+
+        @($script:result) | Should -HaveCount 2
+        foreach ($record in $script:result) {
+            $record.Success | Should -BeFalse
+            $record.Input | Should -Not -BeNullOrEmpty -Because 'failure records must carry the work item, not the ErrorRecord captured by the catch $_'
+            $record.Input.PSObject.Properties.Name | Should -Contain 'CheckId' -Because 'Input must be the original pipeline item so callers can identify which item failed'
+            $record.Input.CheckId | Should -BeIn @('check-alpha', 'check-beta')
+            $record.Error | Should -Match "boom-for-$($record.Input.CheckId)"
+        }
+    }
 }
