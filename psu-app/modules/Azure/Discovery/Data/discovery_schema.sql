@@ -88,6 +88,30 @@ CREATE INDEX IF NOT EXISTS idx_discovery_runs_status ON azure_discovery_runs(sta
 CREATE INDEX IF NOT EXISTS idx_discovery_runs_started ON azure_discovery_runs(started_at);
 
 -- =============================================================================
+-- Azure Discovery Schedules
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS azure_discovery_schedules (
+    provider_id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    cron TEXT NOT NULL,
+    enabled INTEGER NOT NULL,
+    psu_schedule_id INTEGER,
+    psu_schedule_name TEXT NOT NULL,
+    psu_script_name TEXT NOT NULL,
+    last_status TEXT,
+    last_discovery_run_id INTEGER,
+    last_psu_job_id INTEGER,
+    last_checked_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (provider_id) REFERENCES providers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_azure_discovery_schedules_enabled ON azure_discovery_schedules(enabled);
+CREATE INDEX IF NOT EXISTS idx_azure_discovery_schedules_psu_schedule ON azure_discovery_schedules(psu_schedule_id);
+
+-- =============================================================================
 -- Azure Resource Relationships
 -- =============================================================================
 

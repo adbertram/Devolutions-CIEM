@@ -462,6 +462,76 @@ function New-CIEMConfigPage {
             } -Attributes @{ style = @{ marginTop = '16px' } }
         }
 
+        New-UDCard -Title 'Scheduled Discovery' -Content {
+            $scheduleRows = @(Devolutions.CIEM\Get-CIEMAzureDiscoverySchedule)
+            $schedule = $scheduleRows | Select-Object -First 1
+            $selectedScope = if ($schedule) { [string]$schedule.Scope } else { 'All' }
+            $selectedCadence = if (-not $schedule -or $schedule.Cron -eq '0 2 * * *') {
+                'daily'
+            }
+            elseif ($schedule.Cron -eq '0 2 * * 1') {
+                'weekly'
+            }
+            else {
+                throw "Unsupported scheduled discovery cron '$($schedule.Cron)'."
+            }
+            $scheduleEnabled = if ($schedule) { [bool]$schedule.Enabled } else { $false }
+
+            New-UDGrid -Container -Spacing 2 -Content {
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 4 -Content {
+                    New-UDSelect -Id 'azureDiscoveryScheduleCadence' -Label 'Cadence' -DefaultValue $selectedCadence -FullWidth -Option {
+                        New-UDSelectOption -Name 'Daily' -Value 'daily'
+                        New-UDSelectOption -Name 'Weekly' -Value 'weekly'
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 4 -Content {
+                    New-UDSelect -Id 'azureDiscoveryScheduleScope' -Label 'Scope' -DefaultValue $selectedScope -FullWidth -Option {
+                        New-UDSelectOption -Name 'All' -Value 'All'
+                        New-UDSelectOption -Name 'ARM' -Value 'ARM'
+                        New-UDSelectOption -Name 'Entra' -Value 'Entra'
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 2 -Content {
+                    New-UDSwitch -Id 'azureDiscoveryScheduleEnabled' -Label 'Enabled' -Checked $scheduleEnabled
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 2 -Content {
+                    New-UDButton -Id 'saveAzureDiscoveryScheduleBtn' -Text 'Save' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
+                        try {
+                            $cadence = [string](Get-UDElement -Id 'azureDiscoveryScheduleCadence').value
+                            $scope = [string](Get-UDElement -Id 'azureDiscoveryScheduleScope').value
+                            $enabled = [bool](Get-UDElement -Id 'azureDiscoveryScheduleEnabled').checked
+
+                            $cron = switch ($cadence) {
+                                'daily' { '0 2 * * *' }
+                                'weekly' { '0 2 * * 1' }
+                                default { throw "Unsupported scheduled discovery cadence '$cadence'." }
+                            }
+
+                            Devolutions.CIEM\Set-CIEMAzureDiscoverySchedule -Scope $scope -Cron $cron -Enabled $enabled | Out-Null
+                            Sync-UDElement -Id 'azureDiscoveryScheduleStatus'
+                            Show-UDToast -Message 'Scheduled discovery saved.' -Duration 5000 -BackgroundColor '#4caf50'
+                        }
+                        catch {
+                            Devolutions.CIEM\Write-CIEMLog -Message "Save scheduled discovery failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                            Show-UDToast -Message "Scheduled discovery save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
+                        }
+                    }
+                }
+            }
+
+            New-UDDynamic -Id 'azureDiscoveryScheduleStatus' -Content {
+                $currentSchedule = @(Devolutions.CIEM\Get-CIEMAzureDiscoverySchedule) | Select-Object -First 1
+                if ($currentSchedule) {
+                    $state = if ($currentSchedule.Enabled) { 'Enabled' } else { 'Disabled' }
+                    $lastStatus = if ($currentSchedule.LastStatus) { $currentSchedule.LastStatus } else { 'No scheduled run recorded' }
+                    New-UDTypography -Text "$state - $($currentSchedule.Scope) - $($currentSchedule.Cron) - $lastStatus" -Variant 'caption' -Style @{ color = '#666' }
+                }
+                else {
+                    New-UDTypography -Text 'Disabled - no schedule configured' -Variant 'caption' -Style @{ color = '#666' }
+                }
+            }
+        } -Style @{ marginTop = '24px' }
+
         New-UDElement -Tag 'div' -Content {
             New-UDStack -Direction 'row' -Spacing 2 -Content {
                 New-UDButton -Id 'resetConfigBtn' -Text 'Reset to Defaults' -Variant 'outlined' -Color 'secondary' -OnClick {

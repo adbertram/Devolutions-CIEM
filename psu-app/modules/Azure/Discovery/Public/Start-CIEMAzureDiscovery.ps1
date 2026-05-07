@@ -62,6 +62,30 @@ function Start-CIEMAzureDiscovery {
     $run = New-CIEMAzureDiscoveryRun -Scope $Scope -Status 'Running' -StartedAt (Get-Date).ToString('o')
     Write-CIEMLog "Start-CIEMAzureDiscovery: run #$($run.Id) started, Scope=$Scope" -Severity INFO -Component 'Discovery'
 
+    $scheduleIdVariable = Get-Variable -Name 'UAScheduleId' -ErrorAction SilentlyContinue
+    $jobIdVariable = Get-Variable -Name 'UAJobId' -ErrorAction SilentlyContinue
+    $hasScheduleId = $scheduleIdVariable -and $null -ne $scheduleIdVariable.Value
+    $hasJobId = $jobIdVariable -and $null -ne $jobIdVariable.Value
+    if ($hasScheduleId -ne $hasJobId) {
+        throw 'Scheduled discovery context is incomplete. PSU must provide both UAScheduleId and UAJobId.'
+    }
+
+    $scheduledDiscoveryContext = if ($hasScheduleId) {
+        [PSCustomObject]@{
+            PsuScheduleId = [int]$scheduleIdVariable.Value
+            PsuJobId      = [int]$jobIdVariable.Value
+        }
+    }
+
+    try {
+    if ($scheduledDiscoveryContext) {
+        Update-CIEMAzureDiscoveryScheduleStatus `
+            -PsuScheduleId $scheduledDiscoveryContext.PsuScheduleId `
+            -LastStatus 'Running' `
+            -LastDiscoveryRunId $run.Id `
+            -LastPsuJobId $scheduledDiscoveryContext.PsuJobId | Out-Null
+    }
+
     $warningCount = 0
     $errorMessages = [System.Collections.Generic.List[string]]::new()
     $runStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
@@ -85,7 +109,6 @@ function Start-CIEMAzureDiscovery {
         $phaseById[$phase.Id] = $phase
     }
 
-    try {
         # =================================================================
         # ARM phase (collection + persistence)
         # =================================================================
@@ -418,7 +441,30 @@ function Start-CIEMAzureDiscovery {
             -ErrorMessage ($errorMessages -join '; ') `
             -PassThru
 
+        if ($finalStatus -in @('Completed', 'Partial')) {
+            $snapshotItems = @(Save-CIEMExposureSnapshot -DiscoveryRunId $run.Id)
+            $previousSnapshotRunRows = @(Invoke-CIEMQuery -Query @"
+SELECT id
+FROM azure_discovery_runs
+WHERE id <> @current_id
+  AND status IN ('Completed', 'Partial')
+ORDER BY completed_at DESC, started_at DESC
+LIMIT 1
+"@ -Parameters @{ current_id = $run.Id })
+            if ($previousSnapshotRunRows.Count -eq 1) {
+                Compare-CIEMExposureSnapshot -PreviousDiscoveryRunId ([int]$previousSnapshotRunRows[0].id) -CurrentDiscoveryRunId $run.Id | Out-Null
+            }
+            Write-CIEMLog "Exposure snapshot saved for discovery run #$($run.Id): $($snapshotItems.Count) item(s)" -Severity INFO -Component 'Discovery'
+        }
+
         Write-CIEMLog "Discovery run #$($run.Id) finished: Status=$finalStatus, ARM=$armRowCount, Entra=$entraRowCount, Relationships=$relationshipCount, Warnings=$warningCount" -Severity INFO -Component 'Discovery'
+        if ($scheduledDiscoveryContext) {
+            Update-CIEMAzureDiscoveryScheduleStatus `
+                -PsuScheduleId $scheduledDiscoveryContext.PsuScheduleId `
+                -LastStatus $finalStatus `
+                -LastDiscoveryRunId $run.Id `
+                -LastPsuJobId $scheduledDiscoveryContext.PsuJobId | Out-Null
+        }
         Write-Progress -Activity 'Azure Discovery' -Completed
         $run
     }
@@ -429,6 +475,13 @@ function Start-CIEMAzureDiscovery {
         $currentRun = Get-CIEMAzureDiscoveryRun -Id $run.Id
         if ($currentRun.Status -ne 'Cancelled') {
             Update-CIEMAzureDiscoveryRun -Id $run.Id -Status 'Failed' -CompletedAt (Get-Date).ToString('o') -ErrorMessage $errorMessage | Out-Null
+            if ($scheduledDiscoveryContext) {
+                Update-CIEMAzureDiscoveryScheduleStatus `
+                    -PsuScheduleId $scheduledDiscoveryContext.PsuScheduleId `
+                    -LastStatus 'Failed' `
+                    -LastDiscoveryRunId $run.Id `
+                    -LastPsuJobId $scheduledDiscoveryContext.PsuJobId | Out-Null
+            }
         }
         throw
     }

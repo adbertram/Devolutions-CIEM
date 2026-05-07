@@ -71,3 +71,15 @@ Describe 'Configuration page PSU-native form and certificate upload' {
         $script:PageContent | Should -Not -Match '\$Session:UploadedCertFileName'
     }
 }
+
+Describe 'Configuration page scheduled discovery controls' {
+    It 'renders scheduled discovery controls backed by the Azure discovery schedule commands' {
+        $script:PageContent | Should -Match 'Scheduled Discovery'
+        $script:PageContent | Should -Match 'Get-CIEMAzureDiscoverySchedule'
+        $script:PageContent | Should -Match 'Set-CIEMAzureDiscoverySchedule'
+        $script:PageContent | Should -Match "New-UDSelect\s+-Id\s+'azureDiscoveryScheduleCadence'"
+        $script:PageContent | Should -Match "New-UDSelect\s+-Id\s+'azureDiscoveryScheduleScope'"
+        $script:PageContent | Should -Match "New-UDSwitch\s+-Id\s+'azureDiscoveryScheduleEnabled'"
+        $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'saveAzureDiscoveryScheduleBtn'"
+    }
+}

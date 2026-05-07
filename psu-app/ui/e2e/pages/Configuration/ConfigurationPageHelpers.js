@@ -49,7 +49,15 @@ class ConfigurationPageHelpers extends BasePage {
       permissionsModalBody: '[role="dialog"] .MuiDialogContent-root',
       permissionsModalCloseBtn: ".MuiDialog-root button:has-text('Close')",
       // AWS info alert
-      awsCliAlert: ".MuiAlert-root:has-text('AWS CLI')"
+      awsCliAlert: ".MuiAlert-root:has-text('AWS CLI')",
+      // Scheduled discovery
+      scheduledDiscoveryCard: ".MuiCard-root:has-text('Scheduled Discovery')",
+      scheduledDiscoveryCadence: '#azureDiscoveryScheduleCadence',
+      scheduledDiscoveryCadenceCombobox: '[role="combobox"][aria-labelledby="azureDiscoveryScheduleCadencelabel"]',
+      scheduledDiscoveryScope: '#azureDiscoveryScheduleScope',
+      scheduledDiscoveryScopeCombobox: '[role="combobox"][aria-labelledby="azureDiscoveryScheduleScopelabel"]',
+      scheduledDiscoveryEnabled: '#azureDiscoveryScheduleEnabled',
+      saveAzureDiscoveryScheduleBtn: '#saveAzureDiscoveryScheduleBtn'
     };
   }
 
@@ -179,6 +187,34 @@ class ConfigurationPageHelpers extends BasePage {
 
   async isFieldVisible(fieldId) {
     return await this.isElementVisible(`#${fieldId}`);
+  }
+
+  async isScheduledDiscoveryCardVisible() {
+    return await this.isElementVisible(this.selectors.scheduledDiscoveryCard);
+  }
+
+  async selectScheduleCadence(value) {
+    await this.selectMUIOption('azureDiscoveryScheduleCadence', value);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'azureDiscoveryScheduleCadence', expectedValue: value }
+    );
+  }
+
+  async selectScheduleScope(value) {
+    await this.selectMUIOption('azureDiscoveryScheduleScope', value);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'azureDiscoveryScheduleScope', expectedValue: value }
+    );
+  }
+
+  async getSelectedScheduleCadence() {
+    return await this.getMUISelectValue('azureDiscoveryScheduleCadence');
+  }
+
+  async getSelectedScheduleScope() {
+    return await this.getMUISelectValue('azureDiscoveryScheduleScope');
   }
 
   async isManagedIdentityWarningVisible() {

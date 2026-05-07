@@ -44,6 +44,21 @@ test.describe('Configuration Page', () => {
       await expect(configPage.page.getByText('CIEM Database')).toHaveCount(0);
       await expect(configPage.page.getByText('Reapply Schema and Catalogs')).toHaveCount(0);
     });
+
+    test('should display scheduled discovery configuration controls', async () => {
+      expect(await configPage.isScheduledDiscoveryCardVisible()).toBe(true);
+      await configPage.waitForElement(configPage.selectors.scheduledDiscoveryCadenceCombobox);
+      await configPage.waitForElement(configPage.selectors.scheduledDiscoveryScopeCombobox);
+      await configPage.waitForElement(configPage.selectors.saveAzureDiscoveryScheduleBtn);
+    });
+
+    test('should allow selecting scheduled discovery cadence and scope without running discovery', async () => {
+      await configPage.selectScheduleCadence('weekly');
+      await configPage.selectScheduleScope('ARM');
+
+      expect(await configPage.getSelectedScheduleCadence()).toBe('weekly');
+      expect(await configPage.getSelectedScheduleScope()).toBe('ARM');
+    });
   });
 
   test.describe('when running on a local on-premises PSU instance', () => {

@@ -149,6 +149,17 @@ Describe 'Start-CIEMAzureDiscovery' {
             # at least once (ideally multiple times in a foreach loop).
             $script:StartDiscoverySource | Should -Match 'InvokeCIEMDiscoveryPhase'
         }
+        It 'Start-CIEMAzureDiscovery records PSU scheduled run status when schedule context exists' {
+            $script:StartDiscoverySource | Should -Match "Get-Variable\s+-Name\s+'UAScheduleId'"
+            $script:StartDiscoverySource | Should -Match "Get-Variable\s+-Name\s+'UAJobId'"
+            $script:StartDiscoverySource | Should -Match 'Update-CIEMAzureDiscoveryScheduleStatus'
+        }
+
+        It 'Start-CIEMAzureDiscovery saves and compares exposure snapshots after successful discovery' {
+            $script:StartDiscoverySource | Should -Match 'Save-CIEMExposureSnapshot'
+            $script:StartDiscoverySource | Should -Match 'Compare-CIEMExposureSnapshot'
+            $script:StartDiscoverySource | Should -Match "status IN \('Completed', 'Partial'\)"
+        }
     }
 
     Context 'Private collection helpers exist' {
