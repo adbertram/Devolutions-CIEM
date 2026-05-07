@@ -380,7 +380,7 @@ Describe 'Test-CIEMPSUDeployment' {
         $script:runtimeScripts = [System.Collections.Generic.List[string]]::new()
         $script:testEnvFilePaths = [System.Collections.Generic.List[string]]::new()
         $script:ciemPageUris = [System.Collections.Generic.List[string]]::new()
-        function New-TestDeploymentProbeJson {
+        function NewTestDeploymentProbeJson {
             param(
                 [Parameter()][string]$PsuVersion = '5.5.4',
                 [Parameter()][int]$ScriptCount = 3,
@@ -392,6 +392,8 @@ Describe 'Test-CIEMPSUDeployment' {
                 [Parameter()][string]$ManagedIdentityReadStatus = 'NotRequested',
                 [Parameter()][int]$ManagedIdentitySubscriptionCount = 0
             )
+
+            $ErrorActionPreference = 'Stop'
 
             [pscustomobject]@{
                 PsuVersion                       = $PsuVersion
@@ -411,7 +413,7 @@ Describe 'Test-CIEMPSUDeployment' {
                 ManagedIdentitySubscriptionCount = $ManagedIdentitySubscriptionCount
             } | ConvertTo-Json -Depth 5 -Compress
         }
-        $script:probeOutput = New-TestDeploymentProbeJson
+        $script:probeOutput = NewTestDeploymentProbeJson
         Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
             $script:runtimeScripts.Add($ScriptBlock.ToString())
             $script:testEnvFilePaths.Add([string]$EnvFilePath)
@@ -480,7 +482,7 @@ Describe 'Test-CIEMPSUDeployment' {
     }
 
     It 'enforces an expected PSU version only when the expected version is supplied' {
-        $script:probeOutput = New-TestDeploymentProbeJson -PsuVersion '2026.1.0'
+        $script:probeOutput = NewTestDeploymentProbeJson -PsuVersion '2026.1.0'
 
         $result = Test-CIEMPSUDeployment -Environment local
         $result.Details.PsuVersion | Should -Be '2026.1.0'
@@ -490,28 +492,28 @@ Describe 'Test-CIEMPSUDeployment' {
     }
 
     It 'throws when only one CIEM-managed PSU script is registered' {
-        $script:probeOutput = New-TestDeploymentProbeJson -ScriptCount 1
+        $script:probeOutput = NewTestDeploymentProbeJson -ScriptCount 1
 
         { Test-CIEMPSUDeployment -Environment azure } |
             Should -Throw -ExpectedMessage '*expected 3 CIEM-managed PSU scripts*'
     }
 
     It 'throws when unsupported CIEM PSU script residue exists' {
-        $script:probeOutput = New-TestDeploymentProbeJson -UnsupportedScriptCount 1 -UnsupportedScriptNames @('Checks/Start-CIEMAzureDiscovery')
+        $script:probeOutput = NewTestDeploymentProbeJson -UnsupportedScriptCount 1 -UnsupportedScriptNames @('Checks/Start-CIEMAzureDiscovery')
 
         { Test-CIEMPSUDeployment -Environment azure } |
             Should -Throw -ExpectedMessage '*unsupported CIEM PSU scripts on azure: Checks/Start-CIEMAzureDiscovery*'
     }
 
     It 'throws when the supported discovery script is not registered' {
-        $script:probeOutput = New-TestDeploymentProbeJson -DiscoveryCommandRegistered $false
+        $script:probeOutput = NewTestDeploymentProbeJson -DiscoveryCommandRegistered $false
 
         { Test-CIEMPSUDeployment -Environment azure } |
             Should -Throw -ExpectedMessage '*Start-CIEMAzureDiscovery is not registered*'
     }
 
     It 'throws when PSU schedule cmdlets are unavailable' {
-        $script:probeOutput = New-TestDeploymentProbeJson -ScheduleSupportAvailable $false
+        $script:probeOutput = NewTestDeploymentProbeJson -ScheduleSupportAvailable $false
 
         { Test-CIEMPSUDeployment -Environment azure } |
             Should -Throw -ExpectedMessage '*PSU schedule support is not available*'
@@ -523,7 +525,7 @@ Describe 'Test-CIEMPSUDeployment' {
     }
 
     It 'runs the managed identity read probe only when explicitly requested' {
-        $script:probeOutput = New-TestDeploymentProbeJson -ManagedIdentityReadStatus 'Validated' -ManagedIdentitySubscriptionCount 2
+        $script:probeOutput = NewTestDeploymentProbeJson -ManagedIdentityReadStatus 'Validated' -ManagedIdentitySubscriptionCount 2
 
         $result = Test-CIEMPSUDeployment -Environment azure -ValidateManagedIdentityRead
 
@@ -534,7 +536,7 @@ Describe 'Test-CIEMPSUDeployment' {
     }
 
     It 'throws when managed identity read validation is requested but not validated' {
-        $script:probeOutput = New-TestDeploymentProbeJson
+        $script:probeOutput = NewTestDeploymentProbeJson
 
         { Test-CIEMPSUDeployment -Environment azure -ValidateManagedIdentityRead } |
             Should -Throw -ExpectedMessage '*managed identity read permission was not validated*'

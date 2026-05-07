@@ -11,14 +11,14 @@ BeforeAll {
     $discoverySchema = Join-Path $PSScriptRoot '..' '..' '..' 'Azure' 'Discovery' 'Data' 'discovery_schema.sql'
     Invoke-CIEMQuery -Query (Get-Content $discoverySchema -Raw)
 
-    $graphSchema = Join-Path $PSScriptRoot '..' '..' 'Data' 'graph_schema.sql'
-    Invoke-CIEMQuery -Query (Get-Content $graphSchema -Raw)
+    $script:GraphSchemaPath = Join-Path $PSScriptRoot '..' '..' 'Data' 'graph_schema.sql'
+    Invoke-CIEMQuery -Query (Get-Content $script:GraphSchemaPath -Raw)
 
     InModuleScope Devolutions.CIEM {
         $script:DatabasePath = "$TestDrive/ciem.db"
     }
 
-    function Add-TestExposureSnapshotItem {
+    function AddTestExposureSnapshotItem {
         param(
             [Parameter(Mandatory)][int]$DiscoveryRunId,
             [Parameter(Mandatory)][string]$ExposureKey,
@@ -27,6 +27,8 @@ BeforeAll {
             [Parameter(Mandatory)][string]$IdentityName,
             [Parameter()][string]$TargetName = '/subscriptions/test-sub'
         )
+
+        $ErrorActionPreference = 'Stop'
 
         Invoke-CIEMQuery -Query @"
 INSERT INTO ciem_exposure_snapshot_items (
@@ -132,10 +134,10 @@ VALUES (
         $previousRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-06T01:00:00Z' -CompletedAt '2026-05-06T01:10:00Z'
         $currentRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-07T01:00:00Z' -CompletedAt '2026-05-07T01:10:00Z'
 
-        Add-TestExposureSnapshotItem -DiscoveryRunId $previousRun.Id -ExposureKey 'identity:stable-risk' -Severity 'Medium' -SeverityRank 3 -IdentityName 'Stable Risk User'
-        Add-TestExposureSnapshotItem -DiscoveryRunId $previousRun.Id -ExposureKey 'identity:removed-risk' -Severity 'High' -SeverityRank 2 -IdentityName 'Removed Risk User'
-        Add-TestExposureSnapshotItem -DiscoveryRunId $currentRun.Id -ExposureKey 'identity:stable-risk' -Severity 'Critical' -SeverityRank 1 -IdentityName 'Stable Risk User'
-        Add-TestExposureSnapshotItem -DiscoveryRunId $currentRun.Id -ExposureKey 'identity:new-risk' -Severity 'High' -SeverityRank 2 -IdentityName 'New Risk User'
+        AddTestExposureSnapshotItem -DiscoveryRunId $previousRun.Id -ExposureKey 'identity:stable-risk' -Severity 'Medium' -SeverityRank 3 -IdentityName 'Stable Risk User'
+        AddTestExposureSnapshotItem -DiscoveryRunId $previousRun.Id -ExposureKey 'identity:removed-risk' -Severity 'High' -SeverityRank 2 -IdentityName 'Removed Risk User'
+        AddTestExposureSnapshotItem -DiscoveryRunId $currentRun.Id -ExposureKey 'identity:stable-risk' -Severity 'Critical' -SeverityRank 1 -IdentityName 'Stable Risk User'
+        AddTestExposureSnapshotItem -DiscoveryRunId $currentRun.Id -ExposureKey 'identity:new-risk' -Severity 'High' -SeverityRank 2 -IdentityName 'New Risk User'
 
         $changes = Compare-CIEMExposureSnapshot -PreviousDiscoveryRunId $previousRun.Id -CurrentDiscoveryRunId $currentRun.Id
 
@@ -186,10 +188,81 @@ VALUES (
         $previousRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-06T01:00:00Z' -CompletedAt '2026-05-06T01:10:00Z'
         $currentRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-07T01:00:00Z' -CompletedAt '2026-05-07T01:10:00Z'
 
-        Add-TestExposureSnapshotItem -DiscoveryRunId $currentRun.Id -ExposureKey 'identity:low-risk' -Severity 'Low' -SeverityRank 4 -IdentityName 'Low Risk User'
+        AddTestExposureSnapshotItem -DiscoveryRunId $currentRun.Id -ExposureKey 'identity:low-risk' -Severity 'Low' -SeverityRank 4 -IdentityName 'Low Risk User'
 
         $changes = Compare-CIEMExposureSnapshot -PreviousDiscoveryRunId $previousRun.Id -CurrentDiscoveryRunId $currentRun.Id
 
         $changes | Should -HaveCount 0
+    }
+
+    It 'backfills pre-title attack path change records for connector previews' {
+        try {
+            Invoke-CIEMQuery -Query 'DROP TABLE ciem_exposure_changes' -AsNonQuery | Out-Null
+            Invoke-CIEMQuery -Query @"
+CREATE TABLE ciem_exposure_changes (
+    id TEXT PRIMARY KEY,
+    previous_discovery_run_id INTEGER,
+    current_discovery_run_id INTEGER NOT NULL,
+    exposure_key TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    exposure_type TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    severity_rank INTEGER NOT NULL,
+    previous_severity TEXT,
+    current_severity TEXT,
+    impacted_identity_id TEXT,
+    impacted_identity_name TEXT,
+    impacted_identity_type TEXT,
+    impacted_resource_id TEXT,
+    impacted_resource_name TEXT,
+    first_seen_at TEXT NOT NULL,
+    previous_state_json TEXT,
+    current_state_json TEXT,
+    evidence TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"@ -AsNonQuery | Out-Null
+
+            Invoke-CIEMQuery -Query @"
+INSERT INTO ciem_exposure_changes (
+    id, previous_discovery_run_id, current_discovery_run_id, exposure_key, change_type,
+    exposure_type, severity, severity_rank, previous_severity, current_severity,
+    impacted_identity_id, impacted_identity_name, impacted_identity_type,
+    impacted_resource_id, impacted_resource_name, first_seen_at,
+    previous_state_json, current_state_json, evidence, created_at
+)
+VALUES (
+    '99:NewRisk:attack-path:public-nsg', 1, 99, 'attack-path:public-nsg', 'NewRisk',
+    'AttackPath', 'High', 2, '', 'High',
+    '', '', '',
+    '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public',
+    'Public NSG', '2026-05-07T01:10:00Z',
+    NULL, @current_state_json, 'Internet -> Public NSG', '2026-05-07T01:10:00Z'
+)
+"@ -Parameters @{
+                current_state_json = @{
+                    PatternName = 'Management port open to the internet'
+                    PathChain   = 'Internet -> Public NSG'
+                } | ConvertTo-Json -Compress
+            } -AsNonQuery | Out-Null
+
+            InModuleScope Devolutions.CIEM {
+                UpdateCIEMExposureChangeStorageSchema
+            }
+
+            $stored = @(Get-CIEMExposureChange -CurrentDiscoveryRunId 99)
+            $stored | Should -HaveCount 1
+            $stored[0].Title | Should -Be 'Management port open to the internet'
+
+            $preview = @(Get-CIEMConnectorPayloadPreview -SignalType ExposureChange -ConnectorType Alert -Limit 1)[0]
+            $payload = $preview.PayloadJson | ConvertFrom-Json
+            $payload.title | Should -Be 'Management port open to the internet'
+            $payload.target.id | Should -Be '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+            $payload.target.name | Should -Be 'Public NSG'
+        }
+        finally {
+            Invoke-CIEMQuery -Query 'DROP TABLE IF EXISTS ciem_exposure_changes' -AsNonQuery | Out-Null
+            Invoke-CIEMQuery -Query (Get-Content $script:GraphSchemaPath -Raw)
+        }
     }
 }
