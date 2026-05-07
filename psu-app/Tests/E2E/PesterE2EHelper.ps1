@@ -144,7 +144,29 @@ function script:Run-OnPSU {
 `$__result = & { $Command }
 if (`$null -ne `$__result) { `$__result | ConvertTo-Json -Depth 5 -Compress } else { '___NULL___' }
 "@
-    $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -Environment $script:PesterE2EEnvironment -TimeoutSeconds $effectiveTimeoutSeconds)
+    # PSU's Universal module uses dynamic parameters on Invoke-PSUScript that call back to
+    # the server. Rapid Run-OnPSU calls can stale-cache the Connect-PSUServer auth context,
+    # producing: "Cannot retrieve the dynamic parameters for the cmdlet. Unauthenticated."
+    # When that happens, force-reconnect via Connect-PSU and retry once.
+    $maxAttempts = 3
+    $allOutput = $null
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            $allOutput = @(Invoke-TestCommand -ScriptBlock ([scriptblock]::Create($wrappedCommand)) -Environment $script:PesterE2EEnvironment -TimeoutSeconds $effectiveTimeoutSeconds)
+            break
+        } catch {
+            $msg = $_.Exception.Message
+            $isTransientAuth = ($msg -match 'Cannot retrieve the dynamic parameters' -or $msg -match 'Unauthenticated')
+            if (-not $isTransientAuth -or $attempt -eq $maxAttempts) { throw }
+            Write-Host "[pester-e2e] Transient PSU auth failure (attempt $attempt of $maxAttempts), reconnecting..."
+            Start-Sleep -Milliseconds (500 * $attempt)
+            if ($script:PesterE2EEnvironment -eq 'azure') {
+                Connect-PSU -Azure | Out-Null
+            } else {
+                Connect-PSU -Local | Out-Null
+            }
+        }
+    }
     $jobResult = $allOutput | Where-Object { $_.PSObject.Properties.Name -contains 'JobId' } | Select-Object -Last 1
 
     if (-not $jobResult) { throw "PSU command returned no job result." }

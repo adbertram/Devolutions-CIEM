@@ -33,4 +33,18 @@ Describe 'PesterE2EHelper environment routing' {
         $script:helperSource | Should -Match "\`$script:PesterE2EAzureLongRunningTimeoutSeconds = 3600"
         $script:helperSource | Should -Match 'GetPesterE2ELongRunningTimeout'
     }
+
+    It 'retries Invoke-TestCommand on transient Connect-PSUServer auth loss' {
+        # When PSU rapid-fire calls intermittently lose Connect-PSUServer auth context,
+        # Invoke-PSUScript throws "Cannot retrieve the dynamic parameters for the cmdlet.
+        # Unauthenticated." Run-OnPSU must catch this and retry with a fresh Connect-PSU.
+        $script:helperSource | Should -Match 'Cannot retrieve the dynamic parameters'
+    }
+
+    It 'reconnects PSU before retrying after a transient auth failure' {
+        # Retry must call Connect-PSU again (or equivalent) so the next Invoke-TestCommand
+        # gets a fresh Connect-PSUServer session — re-running the same call without
+        # reconnecting will hit the same stale dynamic-parameter cache.
+        $script:helperSource | Should -Match 'Connect-PSU'
+    }
 }
