@@ -130,6 +130,7 @@ VALUES (
             $item | Should -Not -BeNullOrEmpty
             $item.Severity | Should -Be 'Critical'
             $item.Identity | Should -Be 'Dormant Admin'
+            $item.TargetId | Should -Be '/subscriptions/sub-1'
             $item.Target | Should -Be '/subscriptions/sub-1'
             $item.Reason | Should -Match 'Holds privileged role with no sign-in activity for 120 days'
             $item.Evidence | Should -Match '1 privileged'
@@ -140,6 +141,7 @@ VALUES (
             $item = $script:result | Where-Object { $_.SourceType -eq 'AttackPath' -and $_.Title -eq 'Management port open to the internet' }
             $item | Should -Not -BeNullOrEmpty
             $item.Severity | Should -Be 'High'
+            $item.TargetId | Should -Be '/subscriptions/sub-1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1'
             $item.Target | Should -Be 'Public NSG'
             $item.Reason | Should -Match 'Attack path exposes Public NSG'
             $item.Evidence | Should -Match 'Internet'

@@ -85,7 +85,10 @@ function GetCIEMDashboardIdentityTarget {
     $ErrorActionPreference = 'Stop'
 
     if ($HostingResource -and [bool]$HostingResource.HasPublicIP) {
-        return [string]$HostingResource.Name
+        return [PSCustomObject]@{
+            Id   = [string]$HostingResource.Id
+            Name = [string]$HostingResource.Name
+        }
     }
 
     $assignment = @($RoleAssignments |
@@ -95,10 +98,16 @@ function GetCIEMDashboardIdentityTarget {
         Select-Object -First 1)
 
     if ($assignment.Count -eq 0) {
-        return 'No active assignment target'
+        return [PSCustomObject]@{
+            Id   = ''
+            Name = 'No active assignment target'
+        }
     }
 
-    [string]$assignment[0].Scope
+    [PSCustomObject]@{
+        Id   = [string]$assignment[0].Scope
+        Name = [string]$assignment[0].Scope
+    }
 }
 
 function GetCIEMDashboardIdentityReason {
@@ -210,11 +219,18 @@ function GetCIEMDashboardAttackPathTarget {
     }
 
     $targetNode = $pathNodes[$pathNodes.Count - 1]
-    if ($targetNode.display_name) {
-        return [string]$targetNode.display_name
+    $targetId = [string]$targetNode.id
+    $targetName = if ($targetNode.display_name) {
+        [string]$targetNode.display_name
+    }
+    else {
+        $targetId
     }
 
-    [string]$targetNode.id
+    [PSCustomObject]@{
+        Id   = $targetId
+        Name = $targetName
+    }
 }
 
 function Get-CIEMDashboardNeedsAttention {
@@ -246,7 +262,7 @@ function Get-CIEMDashboardNeedsAttention {
         $signalName = if ($selectedSignal) { [string]$selectedSignal.Signal } else { 'privileged-standing-access' }
         $target = GetCIEMDashboardIdentityTarget -RoleAssignments @($signals.RoleAssignments) -HostingResource $signals.HostingResource
         $reason = GetCIEMDashboardIdentityReason -Summary $summary -PrimarySignal $selectedSignal
-        $evidence = GetCIEMDashboardIdentityEvidence -Summary $summary -Target $target
+        $evidence = GetCIEMDashboardIdentityEvidence -Summary $summary -Target ([string]$target.Name)
 
         $items += [PSCustomObject]@{
             Id           = "identity:$($summary.Id)"
@@ -258,7 +274,8 @@ function Get-CIEMDashboardNeedsAttention {
             Identity     = [string]$summary.DisplayName
             IdentityId   = [string]$summary.Id
             IdentityType = [string]$summary.PrincipalType
-            Target       = $target
+            TargetId     = [string]$target.Id
+            Target       = [string]$target.Name
             Reason       = $reason
             Evidence     = $evidence
             DrillInUrl   = '/ciem/identities'
@@ -280,8 +297,9 @@ function Get-CIEMDashboardNeedsAttention {
             Identity     = [string]$identity.Name
             IdentityId   = [string]$identity.Id
             IdentityType = [string]$identity.Type
-            Target       = $target
-            Reason       = "Attack path exposes $target"
+            TargetId     = [string]$target.Id
+            Target       = [string]$target.Name
+            Reason       = "Attack path exposes $($target.Name)"
             Evidence     = [string]$attackPath.PathChain
             DrillInUrl   = '/ciem/attack-paths'
         }

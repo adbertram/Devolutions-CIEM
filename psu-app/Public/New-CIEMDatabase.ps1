@@ -112,6 +112,7 @@ function New-CIEMDatabase {
     }
 
     UpdateCIEMAttackPathStorageSchema
+    UpdateCIEMExposureChangeStorageSchema
     $attackPathRuleSync = Sync-CIEMAttackPathRuleCatalog
     Write-Verbose "CIEM DB: Synced $($attackPathRuleSync.RuleCount) attack path rules"
 

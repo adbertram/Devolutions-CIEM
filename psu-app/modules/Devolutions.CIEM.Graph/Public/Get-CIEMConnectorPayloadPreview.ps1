@@ -170,7 +170,7 @@ function ConvertCIEMNeedsAttentionToConnectorSignal {
         IdentityId   = [string]$Item.IdentityId
         Identity     = [string]$Item.Identity
         IdentityType = [string]$Item.IdentityType
-        TargetId     = [string]$Item.Target
+        TargetId     = [string]$Item.TargetId
         Target       = [string]$Item.Target
         Reason       = [string]$Item.Reason
         Evidence     = [string]$Item.Evidence
@@ -198,7 +198,7 @@ function ConvertCIEMExposureChangeToConnectorSignal {
         SourceType   = [string]$Change.ExposureType
         Severity     = [string]$Change.Severity
         SeverityRank = [int]$Change.SeverityRank
-        Title        = "$($Change.ChangeType): $($Change.ImpactedIdentityName)"
+        Title        = [string]$Change.Title
         IdentityId   = [string]$Change.ImpactedIdentityId
         Identity     = [string]$Change.ImpactedIdentityName
         IdentityType = [string]$Change.ImpactedIdentityType

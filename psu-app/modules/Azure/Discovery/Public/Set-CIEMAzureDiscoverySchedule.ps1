@@ -1,3 +1,30 @@
+function NewCIEMAzureDiscoveryScheduleParameterList {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$Parameters
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $setScheduleCommand = Get-Command Set-PSUSchedule -ErrorAction Stop
+    $scheduleParameterType = $setScheduleCommand.Parameters['Parameters'].ParameterType.GetGenericArguments()[0]
+    $listType = [System.Collections.Generic.List`1].MakeGenericType($scheduleParameterType)
+    $list = [Activator]::CreateInstance($listType)
+
+    foreach ($entry in $Parameters.GetEnumerator()) {
+        $scheduleParameter = [Activator]::CreateInstance($scheduleParameterType)
+        $scheduleParameter.Name = [string]$entry.Key
+        $scheduleParameter.Value = [string]$entry.Value
+        $scheduleParameter.Type = 'System.String'
+        $scheduleParameter.StringValue = [string]$entry.Value
+        $scheduleParameter.DisplayValue = [string]$entry.Value
+        $list.Add($scheduleParameter)
+    }
+
+    $list
+}
+
 function Set-CIEMAzureDiscoverySchedule {
     [CmdletBinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Creates or removes the single CIEM-owned PSU discovery schedule')]
@@ -53,24 +80,41 @@ function Set-CIEMAzureDiscoverySchedule {
             throw "Set-CIEMAzureDiscoverySchedule expected one $scriptName PSU script; found $($scripts.Count)."
         }
 
-        $schedule = New-PSUSchedule `
-            -Name $Name `
-            -Script $scripts[0] `
-            -Cron $Cron `
-            -Parameters @{ Scope = $Scope } `
-            -Description $managedDescription `
-            -Integrated `
-            -WarningAction SilentlyContinue
+        $schedule = if ($existingSchedule) {
+            Set-PSUSchedule `
+                -Id ([int64]$existingSchedule.Id) `
+                -Name $Name `
+                -Script $scripts[0] `
+                -Cron $Cron `
+                -Parameters (NewCIEMAzureDiscoveryScheduleParameterList -Parameters @{ Scope = $Scope }) `
+                -Description $managedDescription `
+                -Integrated `
+                -WarningAction SilentlyContinue | Out-Null
+
+            $updatedSchedules = @(Get-PSUSchedule -Integrated | Where-Object { [string]$_.Name -eq $Name })
+            if ($updatedSchedules.Count -ne 1) {
+                throw "Expected one PSU schedule named '$Name' after update, found $($updatedSchedules.Count)."
+            }
+            $updatedSchedules[0]
+        }
+        else {
+            $scheduleParams = @{
+                Name          = $Name
+                Script        = $scripts[0]
+                Cron          = $Cron
+                Parameters    = @{ Scope = $Scope }
+                Description   = $managedDescription
+                Integrated    = $true
+                WarningAction = 'SilentlyContinue'
+            }
+            New-PSUSchedule @scheduleParams
+        }
 
         if ($null -eq $schedule.Id) {
-            throw "New-PSUSchedule did not return an Id for '$Name'."
+            throw "PSU schedule save did not return an Id for '$Name'."
         }
 
         $psuScheduleId = [int]$schedule.Id
-
-        if ($existingSchedule) {
-            Remove-PSUSchedule -Schedule $existingSchedule -Integrated -WarningAction SilentlyContinue | Out-Null
-        }
     }
     elseif ($existingSchedule) {
         Remove-PSUSchedule -Schedule $existingSchedule -Integrated -WarningAction SilentlyContinue | Out-Null

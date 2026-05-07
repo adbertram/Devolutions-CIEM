@@ -45,6 +45,7 @@ function NewCIEMExposureChange {
         ExposureType           = [string]$source.exposure_type
         Severity               = $severity
         SeverityRank           = $severityRank
+        Title                  = $title
         PreviousSeverity       = $previousSeverity
         CurrentSeverity        = $currentSeverity
         ImpactedIdentityId     = [string]$source.impacted_identity_id
@@ -123,14 +124,14 @@ function Compare-CIEMExposureSnapshot {
         Invoke-CIEMQuery -Query @"
 INSERT INTO ciem_exposure_changes (
     id, previous_discovery_run_id, current_discovery_run_id, exposure_key,
-    change_type, exposure_type, severity, severity_rank, previous_severity,
+    change_type, exposure_type, severity, severity_rank, title, previous_severity,
     current_severity, impacted_identity_id, impacted_identity_name,
     impacted_identity_type, impacted_resource_id, impacted_resource_name,
     first_seen_at, previous_state_json, current_state_json, evidence, created_at
 )
 VALUES (
     @id, @previous_discovery_run_id, @current_discovery_run_id, @exposure_key,
-    @change_type, @exposure_type, @severity, @severity_rank, @previous_severity,
+    @change_type, @exposure_type, @severity, @severity_rank, @title, @previous_severity,
     @current_severity, @impacted_identity_id, @impacted_identity_name,
     @impacted_identity_type, @impacted_resource_id, @impacted_resource_name,
     @first_seen_at, @previous_state_json, @current_state_json, @evidence, @created_at
@@ -144,6 +145,7 @@ VALUES (
             exposure_type             = $change.ExposureType
             severity                  = $change.Severity
             severity_rank             = $change.SeverityRank
+            title                     = $change.Title
             previous_severity         = $change.PreviousSeverity
             current_severity          = $change.CurrentSeverity
             impacted_identity_id      = $change.ImpactedIdentityId

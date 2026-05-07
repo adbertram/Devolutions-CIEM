@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS ciem_exposure_changes (
     exposure_type TEXT NOT NULL,
     severity TEXT NOT NULL,
     severity_rank INTEGER NOT NULL,
+    title TEXT NOT NULL,
     previous_severity TEXT,
     current_severity TEXT,
     impacted_identity_id TEXT,

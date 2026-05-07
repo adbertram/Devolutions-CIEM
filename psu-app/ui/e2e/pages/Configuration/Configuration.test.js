@@ -379,6 +379,7 @@ test.describe('Configuration Page', () => {
       // After reset, Azure Tenant ID field should be visible
       const tenantVisible = await configPage.isFieldVisible('azTenantId');
       expect(tenantVisible).toBe(true);
+      expect(await configPage.isScheduledDiscoveryCardVisible()).toBe(true);
     });
 
     test('should reset auth method and re-render Azure fields', async () => {

@@ -75,6 +75,8 @@ Describe 'CIEM exposure change detection' {
         $tables = @(Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('ciem_exposure_snapshot_items', 'ciem_exposure_changes')")
 
         $tables | Should -HaveCount 2
+        $changeColumns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('ciem_exposure_changes')")
+        $changeColumns.name | Should -Contain 'title'
     }
 
     It 'materializes current identity and attack path exposures for a discovery run' {
@@ -144,6 +146,40 @@ VALUES (
 
         $stored = @(Get-CIEMExposureChange -CurrentDiscoveryRunId $currentRun.Id)
         $stored | Should -HaveCount 3
+    }
+
+    It 'persists attack path exposure-change titles and distinct target identifiers' {
+        $previousRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-06T01:00:00Z' -CompletedAt '2026-05-06T01:10:00Z'
+        $currentRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-07T01:00:00Z' -CompletedAt '2026-05-07T01:10:00Z'
+
+        Invoke-CIEMQuery -Query @"
+INSERT INTO ciem_exposure_snapshot_items (
+    discovery_run_id, exposure_key, exposure_type, severity, severity_rank,
+    impacted_identity_id, impacted_identity_name, impacted_identity_type,
+    impacted_resource_id, impacted_resource_name, title, state_json, evidence,
+    observed_at
+)
+VALUES (
+    @run_id, 'attack-path:public-nsg', 'AttackPath', 'High', 2,
+    '', '', '',
+    '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public',
+    'Public NSG', 'Management port open to the internet', '{}', 'Internet -> Public NSG',
+    '2026-05-07T01:10:00Z'
+)
+"@ -Parameters @{ run_id = $currentRun.Id } -AsNonQuery | Out-Null
+
+        $changes = @(Compare-CIEMExposureSnapshot -PreviousDiscoveryRunId $previousRun.Id -CurrentDiscoveryRunId $currentRun.Id)
+
+        $changes | Should -HaveCount 1
+        $changes[0].Title | Should -Be 'Management port open to the internet'
+        $changes[0].ImpactedResourceId | Should -Be '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+        $changes[0].ImpactedResourceName | Should -Be 'Public NSG'
+
+        $stored = @(Get-CIEMExposureChange -CurrentDiscoveryRunId $currentRun.Id)
+        $stored | Should -HaveCount 1
+        $stored[0].Title | Should -Be 'Management port open to the internet'
+        $stored[0].ImpactedResourceId | Should -Be '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+        $stored[0].ImpactedResourceName | Should -Be 'Public NSG'
     }
 
     It 'does not create change records for newly observed low-risk exposure' {

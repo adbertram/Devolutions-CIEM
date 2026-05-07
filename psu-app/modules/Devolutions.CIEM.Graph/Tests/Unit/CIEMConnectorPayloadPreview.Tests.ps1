@@ -17,6 +17,7 @@ Describe 'Get-CIEMConnectorPayloadPreview' {
                     Identity     = 'Dormant Admin'
                     IdentityId   = 'user-critical'
                     IdentityType = 'User'
+                    TargetId     = '/subscriptions/prod'
                     Target       = '/subscriptions/prod'
                     Reason       = 'Holds privileged role with no sign-in activity for 120 days'
                     Evidence     = '1 entitlement(s); 1 privileged; target /subscriptions/prod'
@@ -33,6 +34,7 @@ Describe 'Get-CIEMConnectorPayloadPreview' {
                     ExposureType         = 'IdentityRisk'
                     Severity             = 'Critical'
                     SeverityRank         = 1
+                    Title                = 'Dormant Admin'
                     PreviousSeverity     = ''
                     CurrentSeverity      = 'Critical'
                     ImpactedIdentityId   = 'user-critical'
@@ -96,6 +98,67 @@ Describe 'Get-CIEMConnectorPayloadPreview' {
         $payload.connectorPreview.body | Should -Be 'json'
     }
 
+    It 'keeps Needs Attention target IDs distinct from display names' {
+        Mock -ModuleName Devolutions.CIEM Get-CIEMDashboardNeedsAttention {
+            @(
+                [PSCustomObject]@{
+                    Id           = 'attack-path:public-nsg'
+                    SourceType   = 'AttackPath'
+                    Severity     = 'High'
+                    SeverityRank = 2
+                    Title        = 'Management port open to the internet'
+                    Identity     = ''
+                    IdentityId   = ''
+                    IdentityType = ''
+                    TargetId     = '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+                    Target       = 'Public NSG'
+                    Reason       = 'Attack path exposes Public NSG'
+                    Evidence     = 'Internet -> Public NSG'
+                    DrillInUrl   = '/ciem/attack-paths'
+                }
+            )
+        }
+
+        $preview = @(Get-CIEMConnectorPayloadPreview -SignalType NeedsAttention -ConnectorType Webhook -Limit 1)[0]
+        $payload = $preview.PayloadJson | ConvertFrom-Json
+
+        $payload.target.id | Should -Be '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+        $payload.target.name | Should -Be 'Public NSG'
+        $payload.review.action | Should -Be 'ReviewAttackPath'
+        $payload.review.route | Should -Be '/ciem/attack-paths'
+    }
+
+    It 'keeps exposure-change titles from the stored change record' {
+        Mock -ModuleName Devolutions.CIEM Get-CIEMExposureChange {
+            @(
+                [PSCustomObject]@{
+                    Id                   = '99:NewRisk:attack-path:public-nsg'
+                    ChangeType           = 'NewRisk'
+                    ExposureType         = 'AttackPath'
+                    Severity             = 'High'
+                    SeverityRank         = 2
+                    Title                = 'Management port open to the internet'
+                    PreviousSeverity     = ''
+                    CurrentSeverity      = 'High'
+                    ImpactedIdentityId   = ''
+                    ImpactedIdentityName = ''
+                    ImpactedIdentityType = ''
+                    ImpactedResourceId   = '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+                    ImpactedResourceName = 'Public NSG'
+                    Evidence             = 'Internet -> Public NSG'
+                }
+            )
+        }
+
+        $preview = @(Get-CIEMConnectorPayloadPreview -SignalType ExposureChange -ConnectorType Alert -Limit 1)[0]
+        $payload = $preview.PayloadJson | ConvertFrom-Json
+
+        $preview.Title | Should -Be 'Management port open to the internet'
+        $payload.title | Should -Be 'Management port open to the internet'
+        $payload.target.id | Should -Be '/subscriptions/prod/resourceGroups/rg/providers/Microsoft.Network/networkSecurityGroups/nsg-public'
+        $payload.target.name | Should -Be 'Public NSG'
+    }
+
     It 'honors source limits for every selected signal source' {
         Get-CIEMConnectorPayloadPreview -SignalType All -ConnectorType Alert -Limit 1 | Out-Null
 
@@ -116,6 +179,7 @@ Describe 'Get-CIEMConnectorPayloadPreview' {
                     ExposureType         = 'Unsupported'
                     Severity             = 'Critical'
                     SeverityRank         = 1
+                    Title                = 'Unsupported'
                     PreviousSeverity     = ''
                     CurrentSeverity      = 'Critical'
                     ImpactedIdentityId   = 'user-critical'

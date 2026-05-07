@@ -79,12 +79,12 @@ VALUES (
         Invoke-CIEMQuery -Query @"
 INSERT INTO ciem_exposure_changes (
     id, previous_discovery_run_id, current_discovery_run_id, exposure_key, change_type,
-    exposure_type, severity, severity_rank, previous_severity, current_severity,
+    exposure_type, severity, severity_rank, title, previous_severity, current_severity,
     impacted_identity_name, impacted_resource_name, first_seen_at, evidence, created_at
 )
 VALUES (
     'pam-progress-change', @previous_run_id, @current_run_id, 'attack-path:new-1', 'RiskIncrease',
-    'AttackPath', 'Critical', 1, 'High', 'Critical',
+    'AttackPath', 'Critical', 1, 'PAM progress attack path', 'High', 'Critical',
     'Dormant Admin', '/subscriptions/prod', '2026-05-07T01:10:00Z', 'Exposure increased', '2026-05-07T01:10:00Z'
 )
 "@ -Parameters @{ previous_run_id = $previousRun.Id; current_run_id = $currentRun.Id } -AsNonQuery | Out-Null

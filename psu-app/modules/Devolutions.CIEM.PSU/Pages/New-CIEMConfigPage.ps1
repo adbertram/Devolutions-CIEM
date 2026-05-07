@@ -558,6 +558,7 @@ function New-CIEMConfigPage {
                         Set-UDElement -Id 'authMethod' -Properties @{ value = 'ServicePrincipalSecret' }
                         Sync-UDElement -Id 'authMethodContainer'
                         Sync-UDElement -Id 'authFieldsContainer'
+                        Sync-UDElement -Id 'scheduledDiscoveryContainer'
                         Show-UDToast -Message 'Form reset to default values. Click Save to apply.' -Duration 5000 -BackgroundColor '#ff9800'
                     } catch {
                         Show-UDToast -Message "Failed to reset: $($_.Exception.Message)" -Duration 8000 -BackgroundColor '#f44336'

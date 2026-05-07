@@ -29,7 +29,7 @@ function Get-CIEMExposureChange {
 
     $query = @"
 SELECT id, previous_discovery_run_id, current_discovery_run_id, exposure_key,
-       change_type, exposure_type, severity, severity_rank, previous_severity,
+       change_type, exposure_type, severity, severity_rank, title, previous_severity,
        current_severity, impacted_identity_id, impacted_identity_name,
        impacted_identity_type, impacted_resource_id, impacted_resource_name,
        first_seen_at, previous_state_json, current_state_json, evidence, created_at
@@ -58,6 +58,7 @@ FROM ciem_exposure_changes
             ExposureType           = [string]$row.exposure_type
             Severity               = [string]$row.severity
             SeverityRank           = [int]$row.severity_rank
+            Title                  = [string]$row.title
             PreviousSeverity       = [string]$row.previous_severity
             CurrentSeverity        = [string]$row.current_severity
             ImpactedIdentityId     = [string]$row.impacted_identity_id

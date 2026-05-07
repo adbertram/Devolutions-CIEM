@@ -19,6 +19,9 @@ Describe 'Azure scheduled discovery configuration' {
         Mock -ModuleName Devolutions.CIEM New-PSUSchedule {
             [pscustomobject]@{ Id = 9001; Name = $Name; Description = $Description }
         }
+        Mock -ModuleName Devolutions.CIEM Set-PSUSchedule {
+            [pscustomobject]@{ Id = $Schedule.Id; Name = $Name; Description = $Description }
+        }
         Mock -ModuleName Devolutions.CIEM Remove-PSUSchedule {}
     }
 
@@ -79,7 +82,7 @@ Describe 'Azure scheduled discovery configuration' {
         Should -Invoke -CommandName Remove-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
     }
 
-    It 'preserves an existing managed schedule when replacement schedule creation fails' {
+    It 'updates an existing managed schedule without creating a duplicate PSU schedule name' {
         Mock -ModuleName Devolutions.CIEM Get-PSUSchedule {
             [pscustomobject]@{
                 Id          = 9001
@@ -87,10 +90,41 @@ Describe 'Azure scheduled discovery configuration' {
                 Description = 'ManagedBy=Devolutions.CIEM;Purpose=AzureDiscoverySchedule'
             }
         }
-        Mock -ModuleName Devolutions.CIEM New-PSUSchedule { throw 'PSU schedule create failed' }
+        Mock -ModuleName Devolutions.CIEM New-PSUSchedule {
+            throw "A schedule with the name 'CIEM Azure Discovery' already exists."
+        }
+        Mock -ModuleName Devolutions.CIEM Set-PSUSchedule {
+            [pscustomobject]@{ Id = $Schedule.Id; Name = $Name; Description = $Description }
+        }
+
+        $result = Set-CIEMAzureDiscoverySchedule -Scope 'ARM' -Cron '0 2 * * 1' -Enabled $true
+
+        $result.PsuScheduleId | Should -Be 9001
+        $result.Scope | Should -Be 'ARM'
+        $result.Cron | Should -Be '0 2 * * 1'
+
+        Should -Invoke -CommandName New-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
+        Should -Invoke -CommandName Set-PSUSchedule -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
+            $Id -eq 9001 -and
+            $Name -eq 'CIEM Azure Discovery' -and
+            $Cron -eq '0 2 * * 1' -and
+            $Integrated
+        }
+        Should -Invoke -CommandName Remove-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
+    }
+
+    It 'preserves an existing managed schedule when schedule update fails' {
+        Mock -ModuleName Devolutions.CIEM Get-PSUSchedule {
+            [pscustomobject]@{
+                Id          = 9001
+                Name        = 'CIEM Azure Discovery'
+                Description = 'ManagedBy=Devolutions.CIEM;Purpose=AzureDiscoverySchedule'
+            }
+        }
+        Mock -ModuleName Devolutions.CIEM Set-PSUSchedule { throw 'PSU schedule update failed' }
 
         { Set-CIEMAzureDiscoverySchedule -Scope 'All' -Cron '0 2 * * *' -Enabled $true } |
-            Should -Throw -ExpectedMessage '*PSU schedule create failed*'
+            Should -Throw -ExpectedMessage '*PSU schedule update failed*'
 
         Should -Invoke -CommandName Remove-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
     }
