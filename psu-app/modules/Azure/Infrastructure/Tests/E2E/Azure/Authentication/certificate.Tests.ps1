@@ -50,6 +50,22 @@ BeforeAll {
     $script:realCertSecretName = if ($realProfile.SecretName) { $realProfile.SecretName } else { 'CIEM_Azure_azure-default_CertPfx' }
     $script:realCertProfileId = $realProfile.Id  # may be null if no dedicated cert profile exists
 
+    # Validate the PFX in the vault is a real loadable certificate, not a placeholder.
+    # Tests that exercise real Azure cert auth (Connect-CIEMAzure, Invoke-AzureApi with cert)
+    # skip cleanly when the vault contains placeholder data — the user must upload a real PFX.
+    $secretName = $script:realCertSecretName
+    $script:realPfxLoadable = Run-OnPSU @"
+        `$pfxBase64 = Get-CIEMSecret '$secretName'
+        if (-not `$pfxBase64) { return `$false }
+        try {
+            `$pfxBytes = [System.Convert]::FromBase64String(`$pfxBase64)
+            `$null = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(`$pfxBytes, `$null, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+            `$true
+        } catch {
+            `$false
+        }
+"@
+
     # Save the original active profile so we can restore it
     $activeProfile = Run-OnPSU "Get-CIEMAzureAuthenticationProfile -IsActive `$true | Select-Object -First 1 | Select-Object Id"
     $script:originalActiveProfileId = if ($activeProfile) { $activeProfile.Id } else { $null }
@@ -325,6 +341,10 @@ Describe 'Azure ServicePrincipalCertificate Authentication E2E' {
 
     Context 'Connection with real certificate credentials' {
         BeforeAll {
+            if (-not $script:realPfxLoadable) {
+                $script:skipCertConnection = $true
+                return
+            }
             $certProfileId = '_E2E_TEST_cert_connect'
             $tenantId = $script:realCertTenantId
             $clientId = $script:realCertClientId
@@ -351,28 +371,37 @@ Describe 'Azure ServicePrincipalCertificate Authentication E2E' {
         }
 
         It 'Connect-CIEMAzure returns connection info' {
+            if ($script:skipCertConnection) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:connectionInfo | Should -Not -BeNullOrEmpty
         }
 
         It 'Connection has a TenantId' {
+            if ($script:skipCertConnection) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:connectionInfo.TenantId | Should -Not -BeNullOrEmpty
         }
 
         It 'Connection has SubscriptionIds' {
+            if ($script:skipCertConnection) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:connectionInfo.SubscriptionIds | Should -Not -BeNullOrEmpty
         }
 
         It 'Connection has an AccountId' {
+            if ($script:skipCertConnection) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:connectionInfo.AccountId | Should -Not -BeNullOrEmpty
         }
 
         It 'AccountType is ServicePrincipal' {
+            if ($script:skipCertConnection) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:connectionInfo.AccountType | Should -Be 'ServicePrincipal'
         }
     }
 
     Context 'Auth context state after certificate connection' {
         BeforeAll {
+            if (-not $script:realPfxLoadable) {
+                $script:skipCertCtx = $true
+                return
+            }
             $certProfileId = '_E2E_TEST_cert_ctx'
             $tenantId = $script:realCertTenantId
             $clientId = $script:realCertClientId
@@ -404,24 +433,32 @@ Describe 'Azure ServicePrincipalCertificate Authentication E2E' {
         }
 
         It 'Auth context is connected' {
+            if ($script:skipCertCtx) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:authCtx.IsConnected | Should -BeTrue
         }
 
         It 'Auth context has ARM token' {
+            if ($script:skipCertCtx) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:authCtx.HasARMToken | Should -BeTrue
         }
 
         It 'Auth context has Graph token' {
+            if ($script:skipCertCtx) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:authCtx.HasGraphToken | Should -BeTrue
         }
 
         It 'Auth method is ServicePrincipalCertificate' {
+            if ($script:skipCertCtx) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:authCtx.Method | Should -Be 'ServicePrincipalCertificate'
         }
     }
 
     Context 'Invoke-AzureApi with certificate tokens' {
         BeforeAll {
+            if (-not $script:realPfxLoadable) {
+                $script:skipCertApi = $true
+                return
+            }
             $certProfileId = '_E2E_TEST_cert_api'
             $tenantId = $script:realCertTenantId
             $clientId = $script:realCertClientId
@@ -450,11 +487,13 @@ Describe 'Azure ServicePrincipalCertificate Authentication E2E' {
         }
 
         It 'ARM API call returns data' {
+            if ($script:skipCertApi) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:armResult | Should -Not -BeNullOrEmpty
             $script:armResult.HasValue | Should -BeTrue
         }
 
         It 'ARM API returns at least one subscription' {
+            if ($script:skipCertApi) { Set-ItResult -Skipped -Because 'PSU vault contains placeholder cert PFX (not a real X509 certificate)'; return }
             $script:armResult.Count | Should -BeGreaterThan 0
         }
     }
