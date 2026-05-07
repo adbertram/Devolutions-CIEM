@@ -11,7 +11,7 @@ BeforeAll {
 Describe 'Environment page discovery cancellation' {
     It 'targets only the CIEM discovery PSU script when cancelling running jobs' {
         $script:PageContent | Should -Not -Match '\*Discovery\*'
-        $script:PageContent | Should -Match "'Checks/Start-CIEMAzureDiscovery'"
+        $script:PageContent | Should -Match "'Devolutions\.CIEM\\Start-CIEMAzureDiscovery'"
     }
 
     It 'keeps the public icon resolver self-contained for PSU page runspaces' {

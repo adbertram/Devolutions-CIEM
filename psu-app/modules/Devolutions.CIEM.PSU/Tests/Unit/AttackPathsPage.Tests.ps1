@@ -33,7 +33,7 @@ Describe 'Attack Paths page remediation execution action' {
     }
 
     It 'Starts the remediation as a PSU job and streams job stream output into the execution modal' {
-        $script:PageContent | Should -Match "Invoke-PSUScript[\s\S]*-Name\s+'Checks/Invoke-CIEMAttackPathRemediation'"
+        $script:PageContent | Should -Match "Invoke-PSUScript[\s\S]*-Name\s+'Devolutions\.CIEM\\Invoke-CIEMAttackPathRemediation'"
         $script:PageContent | Should -Match "Devolutions\.CIEM\\Get-CIEMPSUJobOutput[\s\S]*-Integrated"
         $script:PageContent | Should -Match "New-UDDynamic[\s\S]*-AutoRefresh[\s\S]*-AutoRefreshInterval\s+1"
         $script:PageContent | Should -Match "'data-ciem-attack-path-execution-dialog'\s*=\s*'true'"

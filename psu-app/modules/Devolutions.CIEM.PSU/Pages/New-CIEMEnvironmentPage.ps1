@@ -69,7 +69,7 @@ function New-CIEMEnvironmentPage {
 
                         # Progress is shown by the auto-refresh status banner above — no ProgressElementId needed
                         $run = Devolutions.CIEM\Invoke-CIEMJobWithProgress `
-                            -ScriptName 'Checks/Start-CIEMAzureDiscovery' `
+                            -ScriptName 'Devolutions.CIEM\Start-CIEMAzureDiscovery' `
                             -DisableElementIds @('startDiscoveryBtn') `
                             -MaxPollSeconds 600
 
@@ -141,7 +141,7 @@ function New-CIEMEnvironmentPage {
                             New-UDButton -Id 'cancelDiscoveryBtn' -Text 'Cancel' -Variant 'outlined' -Color 'error' -Size 'small' -OnClick {
                                 Devolutions.CIEM\Stop-CIEMAzureDiscovery
                                 # Also cancel the CIEM discovery PSU script job.
-                                $discoveryJobs = @(Get-PSUJob -Status 'Running' -Integrated | Where-Object { $_.Script -and $_.Script.Name -eq 'Checks/Start-CIEMAzureDiscovery' })
+                                $discoveryJobs = @(Get-PSUJob -Status 'Running' -Integrated | Where-Object { $_.Script -and $_.Script.Name -eq 'Devolutions.CIEM\Start-CIEMAzureDiscovery' })
                                 foreach ($job in $discoveryJobs) {
                                     Stop-PSUJob -Job $job -Integrated
                                 }

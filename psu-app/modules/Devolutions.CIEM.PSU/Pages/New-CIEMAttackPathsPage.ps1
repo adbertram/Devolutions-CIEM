@@ -163,7 +163,7 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                 'data-ciem-attack-path-remediation-script-execute' = 'true'
                                             } -Content {
                                                 New-UDButton -Text 'Execute' -Variant 'outlined' -Color 'secondary' -Size 'small' -Icon (New-UDIcon -Icon 'Play' -Size 'sm') -Style $scriptActionButtonStyle -OnClick {
-                                                $job = Invoke-PSUScript -Name 'Checks/Invoke-CIEMAttackPathRemediation' -Integrated -Parameters @{ AttackPathId = $attackPathId }
+                                                $job = Invoke-PSUScript -Name 'Devolutions.CIEM\Invoke-CIEMAttackPathRemediation' -Integrated -Parameters @{ AttackPathId = $attackPathId }
                                                 $Page:CIEMAttackPathExecution = @{
                                                     JobId        = [int64]$job.Id
                                                     Script       = $remediationScript
