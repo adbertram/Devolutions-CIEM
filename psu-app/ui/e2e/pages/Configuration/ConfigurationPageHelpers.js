@@ -190,7 +190,14 @@ class ConfigurationPageHelpers extends BasePage {
   }
 
   async isScheduledDiscoveryCardVisible() {
-    return await this.isElementVisible(this.selectors.scheduledDiscoveryCard);
+    const cards = this.page.locator(this.selectors.scheduledDiscoveryCard);
+    const count = await cards.count();
+    for (let i = 0; i < count; i++) {
+      if (await cards.nth(i).isVisible()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   async selectScheduleCadence(value) {

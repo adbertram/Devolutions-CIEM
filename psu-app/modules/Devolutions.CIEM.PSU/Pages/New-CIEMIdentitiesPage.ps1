@@ -22,7 +22,6 @@ function New-CIEMIdentitiesPage {
                 New-UDElement -Tag 'div' -Attributes @{ style = @{ minWidth = '180px' } } -Content {
                     New-UDSelect -Id 'identitiesProviderSelect' -Label 'Provider' -Option {
                         New-UDSelectOption -Name 'Azure' -Value 'Azure'
-                        New-UDSelectOption -Name 'AWS' -Value 'AWS'
                     } -DefaultValue $(if ($Page:IdentitiesProvider) { $Page:IdentitiesProvider } else { 'Azure' }) -OnChange {
                         $Page:IdentitiesProvider = $EventData
                         Sync-UDElement -Id 'identitiesGrid'

@@ -3,7 +3,7 @@ function Get-CIEMIdentityAccessSummary {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter()]
-        [ValidateSet('Azure', 'AWS')]
+        [ValidateSet('Azure')]
         [string]$Provider = 'Azure',
 
         [Parameter()]
@@ -15,10 +15,6 @@ function Get-CIEMIdentityAccessSummary {
     )
 
     $ErrorActionPreference = 'Stop'
-
-    if ($Provider -ne 'Azure') {
-        throw "Provider '$Provider' is not supported by Get-CIEMIdentityAccessSummary."
-    }
 
     $permissionSplat = @{
         Provider = $Provider

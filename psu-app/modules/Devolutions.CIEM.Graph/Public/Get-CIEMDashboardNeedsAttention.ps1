@@ -154,7 +154,7 @@ function GetCIEMDashboardIdentityEvidence {
     $parts -join '; '
 }
 
-function GetCIEMDashboardAttackPathIdentity {
+function GetCIEMDashboardAttackPathIdentityMetadata {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -166,14 +166,33 @@ function GetCIEMDashboardAttackPathIdentity {
     $identityKinds = @('EntraUser', 'EntraServicePrincipal', 'EntraManagedIdentity', 'EntraGroup')
     $identityNode = @($AttackPath.Path | Where-Object { $identityKinds -contains [string]$_.kind } | Select-Object -First 1)
     if ($identityNode.Count -eq 0) {
-        return ''
+        return [PSCustomObject]@{
+            Id   = ''
+            Name = ''
+            Type = ''
+        }
     }
 
-    if ($identityNode[0].display_name) {
-        return [string]$identityNode[0].display_name
+    $identityType = switch ([string]$identityNode[0].kind) {
+        'EntraUser' { 'User'; break }
+        'EntraServicePrincipal' { 'ServicePrincipal'; break }
+        'EntraManagedIdentity' { 'ManagedIdentity'; break }
+        'EntraGroup' { 'Group'; break }
+        default { throw "Unsupported attack path identity kind '$($identityNode[0].kind)'." }
     }
 
-    [string]$identityNode[0].id
+    $identityName = if ($identityNode[0].display_name) {
+        [string]$identityNode[0].display_name
+    }
+    else {
+        [string]$identityNode[0].id
+    }
+
+    [PSCustomObject]@{
+        Id   = [string]$identityNode[0].id
+        Name = $identityName
+        Type = $identityType
+    }
 }
 
 function GetCIEMDashboardAttackPathTarget {
@@ -249,7 +268,7 @@ function Get-CIEMDashboardNeedsAttention {
     foreach ($attackPath in @(Get-CIEMAttackPath)) {
         $severity = ConvertToCIEMDashboardSeverityLabel -Severity ([string]$attackPath.Severity)
         $target = GetCIEMDashboardAttackPathTarget -AttackPath $attackPath
-        $identity = GetCIEMDashboardAttackPathIdentity -AttackPath $attackPath
+        $identity = GetCIEMDashboardAttackPathIdentityMetadata -AttackPath $attackPath
 
         $items += [PSCustomObject]@{
             Id           = "attack-path:$($attackPath.Id)"
@@ -258,9 +277,9 @@ function Get-CIEMDashboardNeedsAttention {
             SeverityRank = GetCIEMDashboardSeverityRank -Severity $severity
             SignalRank   = GetCIEMDashboardSignalRank -Signal 'attack-path'
             Title        = [string]$attackPath.PatternName
-            Identity     = $identity
-            IdentityId   = ''
-            IdentityType = ''
+            Identity     = [string]$identity.Name
+            IdentityId   = [string]$identity.Id
+            IdentityType = [string]$identity.Type
             Target       = $target
             Reason       = "Attack path exposes $target"
             Evidence     = [string]$attackPath.PathChain

@@ -25,11 +25,15 @@ function Set-CIEMAzureDiscoverySchedule {
     if ($cronFields.Count -ne 5) {
         throw 'Cron must contain exactly 5 fields.'
     }
+    if (@('0 2 * * *', '0 2 * * 1') -notcontains $Cron) {
+        throw "Unsupported scheduled discovery cron '$Cron'. Supported values are '0 2 * * *' and '0 2 * * 1'."
+    }
 
     $providerId = 'azure'
     $scriptName = 'Devolutions.CIEM\Start-CIEMAzureDiscovery'
     $managedDescription = 'ManagedBy=Devolutions.CIEM;Purpose=AzureDiscoverySchedule'
     $psuScheduleId = $null
+    $existingSchedule = $null
 
     $existingSchedules = @(Get-PSUSchedule -Integrated | Where-Object { [string]$_.Name -eq $Name })
     if ($existingSchedules.Count -gt 1) {
@@ -41,8 +45,6 @@ function Set-CIEMAzureDiscoverySchedule {
         if ([string]$existingSchedule.Description -ne $managedDescription) {
             throw "PSU schedule '$Name' already exists and is not managed by Devolutions.CIEM."
         }
-
-        Remove-PSUSchedule -Schedule $existingSchedule -Integrated | Out-Null
     }
 
     if ($Enabled) {
@@ -65,6 +67,13 @@ function Set-CIEMAzureDiscoverySchedule {
         }
 
         $psuScheduleId = [int]$schedule.Id
+
+        if ($existingSchedule) {
+            Remove-PSUSchedule -Schedule $existingSchedule -Integrated -WarningAction SilentlyContinue | Out-Null
+        }
+    }
+    elseif ($existingSchedule) {
+        Remove-PSUSchedule -Schedule $existingSchedule -Integrated -WarningAction SilentlyContinue | Out-Null
     }
 
     $now = (Get-Date).ToString('o')

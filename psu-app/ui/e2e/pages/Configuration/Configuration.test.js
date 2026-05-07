@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const ConfigurationPageHelpers = require('./ConfigurationPageHelpers');
+const { runPSUCommand } = require('../../_utils/psu-helpers');
 
 const remediationPermissionCatalog = JSON.parse(
   fs.readFileSync(
@@ -46,6 +47,11 @@ test.describe('Configuration Page', () => {
     });
 
     test('should display scheduled discovery configuration controls', async () => {
+      const resetSchedule = await runPSUCommand("Devolutions.CIEM\\Set-CIEMAzureDiscoverySchedule -Scope 'All' -Cron '0 2 * * *' -Enabled $false | Out-Null");
+      expect(resetSchedule.status).toBe('Completed');
+      await configPage.navigateToConfigPage();
+      await configPage.selectProvider('Azure');
+
       expect(await configPage.isScheduledDiscoveryCardVisible()).toBe(true);
       await configPage.waitForElement(configPage.selectors.scheduledDiscoveryCadenceCombobox);
       await configPage.waitForElement(configPage.selectors.scheduledDiscoveryScopeCombobox);
@@ -190,6 +196,10 @@ test.describe('Configuration Page', () => {
       await configPage.selectProvider('AWS');
     });
 
+    test('should hide Azure scheduled discovery controls', async () => {
+      expect(await configPage.isScheduledDiscoveryCardVisible()).toBe(false);
+    });
+
     test.describe('when CurrentProfile is the authentication method', () => {
       test('should display AWS Profile optional text field', async () => {
         const visible = await configPage.isFieldVisible('awsProfile');
@@ -213,6 +223,22 @@ test.describe('Configuration Page', () => {
         const secretKeyVisible = await configPage.isFieldVisible('awsSecretAccessKey');
         expect(accessKeyVisible).toBe(false);
         expect(secretKeyVisible).toBe(false);
+      });
+
+      test('should persist AWS profile and region metadata when saving', async () => {
+        await configPage.fill(configPage.selectors.awsProfile, 'ciem-e2e-profile');
+        await configPage.fillAWSRegion('us-west-2');
+        await configPage.clickSave();
+
+        const toast = await configPage.waitForToastMessage('Configuration saved successfully');
+        expect(toast).toBeTruthy();
+
+        const result = await runPSUCommand("Get-PSUCache -Key 'CIEM:AuthProfile:AWS' -Integrated | ConvertTo-Json -Depth 5 -Compress");
+        expect(result.status).toBe('Completed');
+        const awsProfile = JSON.parse(result.output[0].message);
+        expect(awsProfile.Method).toBe('CurrentProfile');
+        expect(awsProfile.Profile).toBe('ciem-e2e-profile');
+        expect(awsProfile.Region).toBe('us-west-2');
       });
     });
 

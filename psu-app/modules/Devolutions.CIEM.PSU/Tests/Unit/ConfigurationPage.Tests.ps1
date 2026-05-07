@@ -39,17 +39,13 @@ Describe 'Configuration page PSU-native form and certificate upload' {
         $script:PageContent | Should -Match '\$EventData\.authMethod'
     }
 
-    It 'reads save values from EventData instead of scraping UD controls' {
+    It 'reads Azure save values from EventData instead of scraping UD controls' {
         foreach ($fieldId in @(
             'azTenantId',
             'azSpClientId',
             'azSpClientSecret',
             'azCertClientId',
-            'azCertPassword',
-            'awsRegion',
-            'awsProfile',
-            'awsAccessKeyId',
-            'awsSecretAccessKey'
+            'azCertPassword'
         )) {
             $script:PageContent | Should -Not -Match "Get-UDElement\s+-Id\s+'$fieldId'"
         }
@@ -70,6 +66,16 @@ Describe 'Configuration page PSU-native form and certificate upload' {
         $script:PageContent | Should -Not -Match '\$Session:UploadedCertBase64'
         $script:PageContent | Should -Not -Match '\$Session:UploadedCertFileName'
     }
+
+    It 'persists AWS authentication profile metadata through the AWS cache command' {
+        $script:PageContent | Should -Match 'Set-CIEMAWSAuthenticationProfile'
+        $script:PageContent | Should -Match '-Method\s+\$authMethod'
+        $script:PageContent | Should -Match '-Region\s+\$region'
+        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsProfile'"
+        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsRegion'"
+        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsAccessKeyId'"
+        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsSecretAccessKey'"
+    }
 }
 
 Describe 'Configuration page scheduled discovery controls' {
@@ -81,5 +87,11 @@ Describe 'Configuration page scheduled discovery controls' {
         $script:PageContent | Should -Match "New-UDSelect\s+-Id\s+'azureDiscoveryScheduleScope'"
         $script:PageContent | Should -Match "New-UDSwitch\s+-Id\s+'azureDiscoveryScheduleEnabled'"
         $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'saveAzureDiscoveryScheduleBtn'"
+    }
+
+    It 'syncs scheduled discovery visibility with the selected cloud provider' {
+        $script:PageContent | Should -Match "Sync-UDElement -Id 'scheduledDiscoveryContainer'"
+        $script:PageContent | Should -Match "New-UDDynamic -Id 'scheduledDiscoveryContainer'"
+        $script:PageContent | Should -Match 'if \(\$scheduleProvider -ne ''Azure''\)'
     }
 }

@@ -48,6 +48,13 @@ Describe 'Get-CIEMIdentityAccessSummary' {
         It 'Is available as a public command' {
             Get-Command -Module Devolutions.CIEM -Name Get-CIEMIdentityAccessSummary -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
+
+        It 'Advertises only providers with implemented identity summary data' {
+            $command = Get-Command -Module Devolutions.CIEM -Name Get-CIEMIdentityAccessSummary -ErrorAction Stop
+            $validateSet = $command.Parameters['Provider'].Attributes | Where-Object { $_ -is [System.Management.Automation.ValidateSetAttribute] }
+
+            $validateSet.ValidValues | Should -Be @('Azure')
+        }
     }
 
     Context 'when one principal has access to multiple targets' {

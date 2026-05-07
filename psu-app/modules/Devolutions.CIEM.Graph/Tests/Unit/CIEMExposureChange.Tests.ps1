@@ -120,7 +120,9 @@ VALUES (
 
         $attackPathExposure = @($result | Where-Object ExposureKey -eq 'attack-path:attack-snapshot')[0]
         $attackPathExposure.Severity | Should -Be 'High'
+        $attackPathExposure.ImpactedIdentityId | Should -Be 'user-snapshot'
         $attackPathExposure.ImpactedIdentityName | Should -Be 'Snapshot User'
+        $attackPathExposure.ImpactedIdentityType | Should -Be 'User'
         $attackPathExposure.ImpactedResourceName | Should -Be 'Test Subscription'
     }
 

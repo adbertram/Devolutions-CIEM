@@ -73,6 +73,15 @@ function NewCIEMAttackPathExposureSnapshotItem {
     $targetNode = $pathNodes[$pathNodes.Count - 1]
     $identityId = if ($identityNode.Count -eq 1) { [string]$identityNode[0].id } else { '' }
     $identityName = if ($identityNode.Count -eq 1 -and $identityNode[0].display_name) { [string]$identityNode[0].display_name } else { $identityId }
+    $identityType = if ($identityNode.Count -eq 1) {
+        switch ([string]$identityNode[0].kind) {
+            'EntraUser' { 'User'; break }
+            'EntraServicePrincipal' { 'ServicePrincipal'; break }
+            'EntraManagedIdentity' { 'ManagedIdentity'; break }
+            'EntraGroup' { 'Group'; break }
+            default { throw "Unsupported attack path identity kind '$($identityNode[0].kind)'." }
+        }
+    } else { '' }
     $targetId = [string]$targetNode.id
     $targetName = if ($targetNode.display_name) { [string]$targetNode.display_name } else { $targetId }
     $severity = ConvertToCIEMExposureSeverityLabel -Severity ([string]$AttackPath.Severity)
@@ -90,7 +99,7 @@ function NewCIEMAttackPathExposureSnapshotItem {
         SeverityRank          = ConvertCIEMExposureSeverityRank -Severity $severity
         ImpactedIdentityId    = $identityId
         ImpactedIdentityName  = $identityName
-        ImpactedIdentityType  = ''
+        ImpactedIdentityType  = $identityType
         ImpactedResourceId    = $targetId
         ImpactedResourceName  = $targetName
         Title                 = [string]$AttackPath.PatternName

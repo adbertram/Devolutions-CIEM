@@ -58,6 +58,7 @@ function New-CIEMConfigPage {
                 } -DefaultValue $currentProvider -FullWidth -OnChange {
                     # Only sync authMethodContainer - it will sync authFieldsContainer after rendering
                     Sync-UDElement -Id 'authMethodContainer'
+                    Sync-UDElement -Id 'scheduledDiscoveryContainer'
                 }
             } -Attributes @{ style = @{ marginBottom = '16px' } }
 
@@ -326,16 +327,18 @@ function New-CIEMConfigPage {
                         Devolutions.CIEM\Update-CIEMProvider -Name 'Azure' -Enabled $true | Out-Null
                     }
                     elseif ($provider -eq 'AWS') {
-                        $region = [string]$EventData.awsRegion
+                        $region = [string](Get-UDElement -Id 'awsRegion').value
                         $saveParams['Region'] = $region
+                        $profile = $null
 
                         switch ($authMethod) {
                             'CurrentProfile' {
-                                $saveParams['Profile'] = [string]$EventData.awsProfile
+                                $profile = [string](Get-UDElement -Id 'awsProfile').value
+                                $saveParams['Profile'] = $profile
                             }
                             'AccessKey' {
-                                $accessKeyId = [string]$EventData.awsAccessKeyId
-                                $secretAccessKey = [string]$EventData.awsSecretAccessKey
+                                $accessKeyId = [string](Get-UDElement -Id 'awsAccessKeyId').value
+                                $secretAccessKey = [string](Get-UDElement -Id 'awsSecretAccessKey').value
                                 if ($accessKeyId -and $accessKeyId -ne '********') {
                                     $saveParams['AccessKeyId'] = $accessKeyId
                                     Devolutions.CIEM\Set-CIEMSecret 'CIEM_AWS_AccessKeyId' $accessKeyId
@@ -345,6 +348,13 @@ function New-CIEMConfigPage {
                                     Devolutions.CIEM\Set-CIEMSecret 'CIEM_AWS_SecretAccessKey' $secretAccessKey
                                 }
                             }
+                        }
+
+                        if ($authMethod -eq 'CurrentProfile') {
+                            Devolutions.CIEM\Set-CIEMAWSAuthenticationProfile -Method $authMethod -Region $region -Profile $profile | Out-Null
+                        }
+                        else {
+                            Devolutions.CIEM\Set-CIEMAWSAuthenticationProfile -Method $authMethod -Region $region | Out-Null
                         }
 
                         # Enable the provider
@@ -462,7 +472,14 @@ function New-CIEMConfigPage {
             } -Attributes @{ style = @{ marginTop = '16px' } }
         }
 
-        New-UDCard -Title 'Scheduled Discovery' -Content {
+        New-UDDynamic -Id 'scheduledDiscoveryContainer' -Content {
+            $scheduleProvider = (Get-UDElement -Id 'cloudProvider').value
+            if (-not $scheduleProvider) { $scheduleProvider = $currentProvider }
+            if ($scheduleProvider -ne 'Azure') {
+                return
+            }
+
+            New-UDCard -Title 'Scheduled Discovery' -Content {
             $scheduleRows = @(Devolutions.CIEM\Get-CIEMAzureDiscoverySchedule)
             $schedule = $scheduleRows | Select-Object -First 1
             $selectedScope = if ($schedule) { [string]$schedule.Scope } else { 'All' }
@@ -530,7 +547,8 @@ function New-CIEMConfigPage {
                     New-UDTypography -Text 'Disabled - no schedule configured' -Variant 'caption' -Style @{ color = '#666' }
                 }
             }
-        } -Style @{ marginTop = '24px' }
+            } -Style @{ marginTop = '24px' }
+        }
 
         New-UDElement -Tag 'div' -Content {
             New-UDStack -Direction 'row' -Spacing 2 -Content {

@@ -63,6 +63,38 @@ Describe 'Azure scheduled discovery configuration' {
             Should -Throw -ExpectedMessage '*expected one Devolutions.CIEM\Start-CIEMAzureDiscovery PSU script*'
     }
 
+    It 'preserves an existing managed schedule when the discovery PSU script is missing' {
+        Mock -ModuleName Devolutions.CIEM Get-PSUSchedule {
+            [pscustomobject]@{
+                Id          = 9001
+                Name        = 'CIEM Azure Discovery'
+                Description = 'ManagedBy=Devolutions.CIEM;Purpose=AzureDiscoverySchedule'
+            }
+        }
+        Mock -ModuleName Devolutions.CIEM Get-PSUScript { @() }
+
+        { Set-CIEMAzureDiscoverySchedule -Scope 'All' -Cron '0 2 * * *' -Enabled $true } |
+            Should -Throw -ExpectedMessage '*expected one Devolutions.CIEM\Start-CIEMAzureDiscovery PSU script*'
+
+        Should -Invoke -CommandName Remove-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
+    }
+
+    It 'preserves an existing managed schedule when replacement schedule creation fails' {
+        Mock -ModuleName Devolutions.CIEM Get-PSUSchedule {
+            [pscustomobject]@{
+                Id          = 9001
+                Name        = 'CIEM Azure Discovery'
+                Description = 'ManagedBy=Devolutions.CIEM;Purpose=AzureDiscoverySchedule'
+            }
+        }
+        Mock -ModuleName Devolutions.CIEM New-PSUSchedule { throw 'PSU schedule create failed' }
+
+        { Set-CIEMAzureDiscoverySchedule -Scope 'All' -Cron '0 2 * * *' -Enabled $true } |
+            Should -Throw -ExpectedMessage '*PSU schedule create failed*'
+
+        Should -Invoke -CommandName Remove-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
+    }
+
     It 'removes an existing CIEM-owned schedule when disabled and persists disabled state' {
         Mock -ModuleName Devolutions.CIEM Get-PSUSchedule {
             [pscustomobject]@{
@@ -72,7 +104,7 @@ Describe 'Azure scheduled discovery configuration' {
             }
         }
 
-        $result = Set-CIEMAzureDiscoverySchedule -Scope 'ARM' -Cron '0 3 * * *' -Enabled $false
+        $result = Set-CIEMAzureDiscoverySchedule -Scope 'ARM' -Cron '0 2 * * 1' -Enabled $false
 
         $result.Enabled | Should -BeFalse
         $result.PsuScheduleId | Should -BeNullOrEmpty
@@ -101,5 +133,13 @@ Describe 'Azure scheduled discovery configuration' {
             Should -Throw -ExpectedMessage '*Cron must contain exactly 5 fields*'
 
         Should -Invoke -CommandName New-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
+    }
+
+    It 'rejects unsupported five-field cron strings before calling PSU schedule cmdlets' {
+        { Set-CIEMAzureDiscoverySchedule -Scope 'All' -Cron '30 5 * * *' -Enabled $true } |
+            Should -Throw -ExpectedMessage "*Unsupported scheduled discovery cron '30 5 * * *'.*"
+
+        Should -Invoke -CommandName New-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
+        Should -Invoke -CommandName Remove-PSUSchedule -ModuleName Devolutions.CIEM -Times 0
     }
 }

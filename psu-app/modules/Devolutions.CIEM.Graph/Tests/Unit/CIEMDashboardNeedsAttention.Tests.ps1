@@ -100,6 +100,28 @@ Describe 'Get-CIEMDashboardNeedsAttention' {
                 -Computed 1 -CollectedAt $collectedAt
 
             Update-CIEMAttackPath -PatternId 'open-management-port' | Out-Null
+
+            $rule = @(Invoke-CIEMQuery -Query "SELECT id, name, remediation, psu_script_name FROM attack_path_rules WHERE id = 'disabled-account-with-roles'")[0]
+            Invoke-CIEMQuery -Query @"
+INSERT INTO attack_paths (
+    id, rule_id, pattern_name, severity, category, remediation, psu_script_name,
+    path_json, edges_json, path_chain, evaluated_at
+)
+VALUES (
+    'identity-attack-path', @rule_id, 'Identity attack path fixture', 'high', 'Identity', @remediation, @psu_script_name,
+    @path_json, '[]', 'Dormant Admin -> Production Subscription', @evaluated_at
+)
+"@ -Parameters @{
+                rule_id         = $rule.id
+                remediation     = $rule.remediation
+                psu_script_name = $rule.psu_script_name
+                path_json       = @(
+                    @{ id = 'user-critical'; kind = 'EntraUser'; display_name = 'Dormant Admin' }
+                    @{ id = '/subscriptions/sub-1'; kind = 'AzureSubscription'; display_name = 'Production Subscription' }
+                ) | ConvertTo-Json -Compress
+                evaluated_at    = $collectedAt
+            } -AsNonQuery | Out-Null
+
             $script:result = @(Get-CIEMDashboardNeedsAttention)
         }
 
@@ -123,6 +145,14 @@ Describe 'Get-CIEMDashboardNeedsAttention' {
             $item.Evidence | Should -Match 'Internet'
             $item.Evidence | Should -Match 'Public NSG'
             $item.DrillInUrl | Should -Be '/ciem/attack-paths'
+        }
+
+        It 'Includes attack path identity metadata when the path contains an identity node' {
+            $item = $script:result | Where-Object { $_.SourceType -eq 'AttackPath' -and $_.Title -eq 'Identity attack path fixture' }
+            $item | Should -Not -BeNullOrEmpty
+            $item.Identity | Should -Be 'Dormant Admin'
+            $item.IdentityId | Should -Be 'user-critical'
+            $item.IdentityType | Should -Be 'User'
         }
 
         It 'Does not include low identity risks' {

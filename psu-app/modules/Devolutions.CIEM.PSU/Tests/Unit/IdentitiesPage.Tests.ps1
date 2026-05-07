@@ -3,6 +3,12 @@ BeforeAll {
 }
 
 Describe 'Identities page 1080p grid usability' {
+    It 'does not expose unsupported AWS identity summary selection' {
+        $script:PageContent | Should -Match "New-UDSelect\s+-Id 'identitiesProviderSelect'"
+        $script:PageContent | Should -Match "New-UDSelectOption -Name 'Azure' -Value 'Azure'"
+        $script:PageContent | Should -Not -Match "New-UDSelectOption -Name 'AWS' -Value 'AWS'"
+    }
+
     It 'keeps the top-level grid focused on identity summary columns' {
         $gridStart = $script:PageContent.IndexOf('New-UDDataGrid -LoadRows')
         $gridStart | Should -BeGreaterThan -1
