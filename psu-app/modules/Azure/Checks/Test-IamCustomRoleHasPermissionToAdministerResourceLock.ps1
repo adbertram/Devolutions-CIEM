@@ -36,7 +36,7 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
@@ -89,16 +89,19 @@ function Test-IamCustomRoleHasPermissionToAdministerResourceLock {
         $lockAdminRoles = @()
 
         foreach ($role in $customRoles) {
-            # Strict mode safe property access
-            $roleName = if ($role.properties.PSObject.Properties['roleName']) {
-                $role.properties.roleName
+            # Strict mode safe property access. $role.properties can be $null when
+            # ConvertFromCIEMStoredResource produces a role row with no Properties JSON,
+            # so guard before dereferencing PSObject.Properties.
+            $roleProperties = if ($role.PSObject.Properties['properties']) { $role.properties } else { $null }
+            $roleName = if ($roleProperties -and $roleProperties.PSObject.Properties['roleName']) {
+                $roleProperties.roleName
             }
             else {
                 'Unknown'
             }
             $roleId = $role.id
-            $permissions = if ($role.properties.PSObject.Properties['permissions']) {
-                $role.properties.permissions
+            $permissions = if ($roleProperties -and $roleProperties.PSObject.Properties['permissions']) {
+                $roleProperties.permissions
             }
             else {
                 $null

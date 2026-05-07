@@ -9,8 +9,10 @@ function ConvertFromCIEMStoredResource {
         plus a handful of indexed columns (Id, DisplayName, Name, Type, ParentId,
         SubscriptionId, ResourceGroup). At scan time we need to reverse that
         back into a single object whose top-level shape matches what the Graph
-        or Resource Graph APIs originally returned (id, displayName, name, type,
-        parentId, subscriptionId, resourceGroup plus all properties).
+        or Resource Graph APIs originally returned: indexed columns at the top
+        level (id, displayName, name, type, parentId, subscriptionId,
+        resourceGroup), and the parsed JSON exposed under `.properties` so check
+        functions can use the natural Azure-API access pattern `$obj.properties.X`.
     #>
     [CmdletBinding()]
     param(
@@ -20,12 +22,14 @@ function ConvertFromCIEMStoredResource {
 
     $ErrorActionPreference = 'Stop'
 
-    $value = if ($Resource.Properties) {
+    $properties = if ($Resource.Properties) {
         $Resource.Properties | ConvertFrom-Json -ErrorAction Stop
     }
     else {
         [pscustomobject]@{}
     }
+
+    $envelope = [pscustomobject]@{}
 
     foreach ($pair in @(
         @{ Name = 'id'; Value = $Resource.Id },
@@ -36,10 +40,12 @@ function ConvertFromCIEMStoredResource {
         @{ Name = 'subscriptionId'; Value = $Resource.SubscriptionId },
         @{ Name = 'resourceGroup'; Value = $Resource.ResourceGroup }
     )) {
-        if ($pair.Value -and -not ($value.PSObject.Properties.Name -contains $pair.Name)) {
-            $value | Add-Member -NotePropertyName $pair.Name -NotePropertyValue $pair.Value
+        if ($pair.Value) {
+            $envelope | Add-Member -NotePropertyName $pair.Name -NotePropertyValue $pair.Value
         }
     }
 
-    $value
+    $envelope | Add-Member -NotePropertyName 'properties' -NotePropertyValue $properties
+
+    $envelope
 }

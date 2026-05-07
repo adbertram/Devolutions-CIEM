@@ -82,8 +82,14 @@ function GetCIEMIAMNeeds {
             'iam:roledefinitions' {
                 foreach ($resource in @(Get-CIEMAzureArmResource -Type 'microsoft.authorization/roledefinitions')) {
                     $definition = ConvertFromCIEMStoredResource -Resource $resource
+                    $assignableScopes = if ($definition.properties -and $definition.properties.PSObject.Properties['assignableScopes']) {
+                        @($definition.properties.assignableScopes)
+                    }
+                    else {
+                        @()
+                    }
                     $targetSubscriptions = @()
-                    foreach ($scope in @($definition.assignableScopes)) {
+                    foreach ($scope in $assignableScopes) {
                         if ($scope -match '^/subscriptions/([^/]+)') {
                             $targetSubscriptions += $Matches[1]
                         }
@@ -91,13 +97,19 @@ function GetCIEMIAMNeeds {
                     if ($targetSubscriptions.Count -eq 0) {
                         $targetSubscriptions = @($SubscriptionIds)
                     }
+                    $roleType = if ($definition.properties -and $definition.properties.PSObject.Properties['type']) {
+                        $definition.properties.type
+                    }
+                    else {
+                        $null
+                    }
                     foreach ($subscriptionId in ($targetSubscriptions | Select-Object -Unique)) {
                         if (-not $subscriptionId) {
                             continue
                         }
                         & $ensureBucket $subscriptionId
                         $ServiceData['IAM'][$subscriptionId].RoleDefinitions += $definition
-                        if ($definition.PSObject.Properties.Name -contains 'type' -and $definition.type -eq 'CustomRole') {
+                        if ($roleType -eq 'CustomRole') {
                             $ServiceData['IAM'][$subscriptionId].CustomRoles += $definition
                         }
                     }
