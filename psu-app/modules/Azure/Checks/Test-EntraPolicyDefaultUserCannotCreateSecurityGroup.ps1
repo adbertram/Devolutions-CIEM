@@ -21,7 +21,7 @@ function Test-EntraPolicyDefaultUserCannotCreateSecurityGroup {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

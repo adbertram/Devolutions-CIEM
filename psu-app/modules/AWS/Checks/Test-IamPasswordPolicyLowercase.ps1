@@ -22,7 +22,7 @@ function Test-IamPasswordPolicyLowercase {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

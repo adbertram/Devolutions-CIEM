@@ -29,11 +29,16 @@ function InvokeCIEMCheck {
     [CmdletBinding()]
     [OutputType('CIEMScanResult')]
     param(
+        # Type-relaxed: PSU's long-lived runspace accumulates fresh CIEMCheck/CIEMServiceCache
+        # assemblies per Import-Module. Typing parameters with module-defined classes causes
+        # binding failures across imports ("Cannot convert CIEMCheck to type CIEMCheck").
+        # Callers in InvokeCIEMScan still build [CIEMCheck]/[CIEMServiceCache] instances; we
+        # rely on duck typing for the property accesses below.
         [Parameter(Mandatory)]
-        [CIEMCheck]$Check,
+        [object]$Check,
 
         [Parameter()]
-        [CIEMServiceCache[]]$ServiceCache,
+        [object[]]$ServiceCache,
 
         [Parameter(Mandatory)]
         [string]$FunctionName,

@@ -23,7 +23,7 @@ function Test-EntraUserCannotCreateMicrosoft365Group {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

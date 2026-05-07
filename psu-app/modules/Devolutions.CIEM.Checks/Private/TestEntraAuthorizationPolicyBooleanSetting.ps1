@@ -30,7 +30,7 @@ function TestEntraAuthorizationPolicyBooleanSetting {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache,
+        [object[]]$ServiceCache,
 
         [Parameter(Mandatory)]
         [string]$PropertyName,

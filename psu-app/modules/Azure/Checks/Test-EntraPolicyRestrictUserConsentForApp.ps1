@@ -24,7 +24,7 @@ function Test-EntraPolicyRestrictUserConsentForApp {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

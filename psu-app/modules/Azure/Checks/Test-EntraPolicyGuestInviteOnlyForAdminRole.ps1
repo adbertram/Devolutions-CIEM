@@ -27,7 +27,7 @@ function Test-EntraPolicyGuestInviteOnlyForAdminRole {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

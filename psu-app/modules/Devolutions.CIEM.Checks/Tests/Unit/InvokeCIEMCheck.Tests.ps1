@@ -3,6 +3,8 @@ BeforeAll {
     Import-Module (Join-Path $PSScriptRoot '..' '..' '..' '..' 'Devolutions.CIEM.psd1')
     Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
 
+    $script:InvokeCheckSource = Get-Content -Path (Join-Path $PSScriptRoot '..' '..' 'Private' 'InvokeCIEMCheck.ps1') -Raw
+
     InModuleScope Devolutions.CIEM {
         $script:testCheck = [CIEMCheck]::new()
         $script:testCheck.Id = 'test-check-001'
@@ -57,6 +59,22 @@ Describe 'InvokeCIEMCheck' {
                 { InvokeCIEMCheck -Check $script:testCheck -FunctionName 'Test-FailingCheck2' -ProviderName 'Azure' } |
                     Should -Throw '*Critical check failure*'
             }
+        }
+    }
+
+    Context 'parameter typing across PSU runspace boundaries' {
+        # PSU's long-lived runspace accumulates fresh class assemblies on each
+        # Import-Module of Devolutions.CIEM. Functions called from the parallel
+        # scan runspace must NOT type their parameters with module-defined
+        # classes ([CIEMCheck], [CIEMServiceCache]), or parameter binding fails
+        # with `Cannot convert the "CIEMCheck" value of type "CIEMCheck" to type
+        # "CIEMCheck"`.
+        It 'Check parameter is not typed [CIEMCheck] (avoids cross-import class-identity binding errors)' {
+            $script:InvokeCheckSource | Should -Not -Match '\[CIEMCheck\]\$Check\b'
+        }
+
+        It 'ServiceCache parameter is not typed [CIEMServiceCache[]]' {
+            $script:InvokeCheckSource | Should -Not -Match '\[CIEMServiceCache\[\]\]\$ServiceCache\b'
         }
     }
 

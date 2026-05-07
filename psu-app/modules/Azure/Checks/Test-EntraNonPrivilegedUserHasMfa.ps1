@@ -21,7 +21,7 @@ function Test-EntraNonPrivilegedUserHasMfa {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

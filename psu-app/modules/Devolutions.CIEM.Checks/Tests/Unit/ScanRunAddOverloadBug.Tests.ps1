@@ -46,4 +46,24 @@ Describe 'No module-class-typed generic collections in psu-app/modules' {
 
         $violatingFiles | Should -HaveCount 0 -Because "same root cause as List; use [Dictionary[string,object]] instead"
     }
+
+    It 'no parameter typed [CIEMCheck] or [CIEMServiceCache[]] in any check, helper, or scan file' {
+        # Same root cause as the generic-collection bug: module-class types as parameter
+        # type constraints fail across PSU's accumulated module assemblies, producing
+        # "Cannot convert the 'CIEMCheck' value of type 'CIEMCheck' to type 'CIEMCheck'"
+        # at parameter binding time. Use [object] / [object[]] for parameters that travel
+        # across runspaces or repeated Import-Module calls.
+        $psFiles = @(Get-ChildItem -Path $script:ModulesRoot -Include '*.ps1' -Recurse -ErrorAction Stop) |
+            Where-Object { $_.FullName -notmatch '[\\/]Tests[\\/]' }
+        $violatingFiles = @()
+
+        foreach ($file in $psFiles) {
+            $source = Get-Content -Path $file.FullName -Raw -ErrorAction Stop
+            if ($source -match '\[CIEMCheck\]\$\w+' -or $source -match '\[CIEMServiceCache\[\]\]\$\w+') {
+                $violatingFiles += $file.FullName
+            }
+        }
+
+        $violatingFiles | Should -HaveCount 0 -Because "module-class-typed parameters cause PSU cross-import binding failures; use [object] / [object[]] and rely on duck typing for property access"
+    }
 }

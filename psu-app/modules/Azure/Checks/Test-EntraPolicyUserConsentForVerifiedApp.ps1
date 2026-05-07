@@ -21,7 +21,7 @@ function Test-EntraPolicyUserConsentForVerifiedApp {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

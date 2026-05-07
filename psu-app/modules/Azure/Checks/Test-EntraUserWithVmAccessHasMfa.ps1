@@ -27,7 +27,7 @@ function Test-EntraUserWithVmAccessHasMfa {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

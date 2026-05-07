@@ -26,7 +26,7 @@ function Test-EntraPolicyGuestUserAccessRestriction {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'

@@ -20,7 +20,7 @@ function Test-EntraGlobalAdminCountWithinLimit {
         $Check,
 
         [Parameter(Mandatory)]
-        [CIEMServiceCache[]]$ServiceCache
+        [object[]]$ServiceCache
     )
 
     $ErrorActionPreference = 'Stop'
