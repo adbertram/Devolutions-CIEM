@@ -176,7 +176,7 @@ Describe 'Publish-PSUModule -> PSGallery + PSU update (remote path)' {
             -Value "New-PSUApp -Name 'Devolutions CIEM' -BaseUrl '/ciem'"
         Set-Content `
             -Path (Join-Path $script:remoteSrcDir 'setup.ps1') `
-            -Value "Initialize-CIEMPSUInstance | Out-Null"
+            -Value "function Invoke-CIEMPSUSetup { [pscustomobject]@{ Status = 'Initialized' } }`nInvoke-CIEMPSUSetup | Out-Null"
         Set-Content `
             -Path (Join-Path $script:remoteSrcDir '.universal/scripts.ps1') `
             -Value "Import-Module Devolutions.CIEM`nNew-PSUScript -Module 'Devolutions.CIEM' -Command 'New-CIEMScanRun'"

@@ -20,33 +20,8 @@ function New-CIEMConfigPage {
         # Get PSU environment
         $envInfo = Devolutions.CIEM\Get-PSUInstalledEnvironment
 
-        $databasePath = Devolutions.CIEM\Get-CIEMDatabasePath
-
         New-UDTypography -Text 'Configuration' -Variant 'h4' -Style @{ marginBottom = '20px'; marginTop = '10px' }
         New-UDTypography -Text 'Configure cloud provider authentication for CIEM security scans' -Variant 'subtitle1' -Style @{ marginBottom = '30px'; color = '#666' }
-
-        New-UDCard -Title 'CIEM Database' -Content {
-            New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
-                New-UDTypography -Text $databasePath -Variant 'body2' -Style @{ color = '#666' }
-            }
-
-            New-UDTypography -Text 'Reapplies CIEM database schema and refreshes provider and check catalogs for module updates.' -Variant 'body2' -Style @{
-                color = '#666'
-                marginTop = '12px'
-                marginBottom = '12px'
-            }
-
-            New-UDButton -Id 'initializeCiemDatabaseBtn' -Text 'Reapply Schema and Catalogs' -Icon (New-UDIcon -Icon 'Storage') -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
-                try {
-                    $initializedPath = Devolutions.CIEM\New-CIEMDatabase -PassThru
-                    Show-UDToast -Message "CIEM database schema refreshed at $initializedPath" -Duration 5000 -BackgroundColor '#4caf50'
-                    Invoke-UDRedirect '/ciem/config'
-                }
-                catch {
-                    Show-UDToast -Message "Database initialization failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
-                }
-            }
-        }
 
         # Get available providers from database
         $providers = @(Devolutions.CIEM\Get-CIEMProvider)
@@ -93,9 +68,12 @@ function New-CIEMConfigPage {
 
                 # Get available auth methods from database
                 $authMethods = @(Devolutions.CIEM\Get-CIEMProviderAuthMethod -Provider $selectedProvider)
+                $uiMethod = (Get-UDElement -Id 'authMethod').value
 
                 # Determine current default from active profile (Azure) or first method
-                $defaultMethod = if ($selectedProvider -eq 'Azure') {
+                $defaultMethod = if ($uiMethod -and $uiMethod -in @($authMethods.Method)) {
+                    $uiMethod
+                } elseif ($selectedProvider -eq 'Azure') {
                     $azProfile = @(Devolutions.CIEM\Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true) | Select-Object -First 1
                     if ($azProfile.Method) { $azProfile.Method } else { $authMethods[0].Method }
                 } else {

@@ -38,7 +38,7 @@ function Invoke-CIEMQuery {
 
     $databasePath = Get-CIEMDatabasePath
     if (-not (Test-Path $databasePath)) {
-        throw "CIEM database is not initialized at '$databasePath'. Open Configuration and initialize the database before running queries."
+        throw "CIEM database is not initialized at '$databasePath'. Module setup must create or migrate the database before queries run."
     }
 
     $invokeParams = @{

@@ -19,18 +19,15 @@ Describe 'Configuration page required permissions modal' {
 }
 
 Describe 'Configuration page PSU-native form and certificate upload' {
-    It 'does not render an initialized status chip in the CIEM Database card' {
-        $script:PageContent | Should -Not -Match "New-UDChip\s+-Label\s+'Initialized'"
-        $script:PageContent | Should -Not -Match 'New-UDChip\s+-Label\s+"Initialized"'
-    }
-
-    It 'explains that the database schema action creates CIEM tables and refreshes catalogs' {
-        $script:PageContent | Should -Match 'Reapplies CIEM database schema'
-        $script:PageContent | Should -Match 'refreshes provider and check catalogs'
-        $script:PageContent | Should -Match 'New-CIEMDatabase'
-        $script:PageContent | Should -Match 'Reapply Schema and Catalogs'
+    It 'does not render database schema maintenance controls' {
+        $script:PageContent | Should -Not -Match 'CIEM Database'
+        $script:PageContent | Should -Not -Match 'Reapplies CIEM database schema'
+        $script:PageContent | Should -Not -Match 'refreshes provider and check catalogs'
+        $script:PageContent | Should -Not -Match 'New-CIEMDatabase'
+        $script:PageContent | Should -Not -Match 'Reapply Schema and Catalogs'
         $script:PageContent | Should -Not -Match 'Initialize Database'
         $script:PageContent | Should -Not -Match 'Initialize the CIEM database before configuring providers or running scans'
+        $script:PageContent | Should -Not -Match 'initializeCiemDatabaseBtn'
         $script:PageContent | Should -Not -Match '\$databaseExists'
         $script:PageContent | Should -Not -Match 'if\s*\(\s*-not\s+\$databaseExists\s*\)'
     }

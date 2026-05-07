@@ -11,7 +11,6 @@ BeforeAll {
     $script:ImportScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Import-CIEMScript.ps1'
     $script:ImportScriptContent = Get-Content -Path $script:ImportScriptPath -Raw
     $script:InitializeScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Initialize-CIEMPSUInstance.ps1'
-    $script:InitializeScriptContent = if (Test-Path -Path $script:InitializeScriptPath -PathType Leaf) { Get-Content -Path $script:InitializeScriptPath -Raw } else { '' }
     $script:RepairScriptPath = Join-Path $PSScriptRoot '..' '..' 'Public' 'Repair-CIEMLegacyScriptRegistration.ps1'
     $script:AppScriptPath = Join-Path $PSScriptRoot '..' '..' 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1'
     $script:AppScriptContent = Get-Content -Path $script:AppScriptPath -Raw
@@ -32,8 +31,8 @@ Describe 'Import-CIEMScript registration model' {
             Get-Command Repair-CIEMLegacyScriptRegistration -Module Devolutions.CIEM -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
 
-        It 'Exposes Initialize-CIEMPSUInstance as a public module command' {
-            Get-Command Initialize-CIEMPSUInstance -Module Devolutions.CIEM -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        It 'Does not expose a manual PSU setup command' {
+            Get-Command Initialize-CIEMPSUInstance -Module Devolutions.CIEM -ErrorAction SilentlyContinue | Should -BeNullOrEmpty
         }
 
         It 'Exposes Get-CIEMPSUScriptDefinition as the module resource definition source' {
@@ -165,17 +164,9 @@ Describe 'Import-CIEMScript registration model' {
         }
     }
 
-    Context 'Initialize-CIEMPSUInstance implementation' {
-        It 'Delegates to the import-time setup implementation without registering scripts directly' {
-            $script:InitializeScriptPath | Should -Exist
-            $script:InitializeScriptContent | Should -Not -Match 'Repair-CIEMLegacyScriptRegistration'
-            $script:InitializeScriptContent | Should -Not -Match 'PrunedLegacyScripts'
-            $script:InitializeScriptContent | Should -Not -Match 'Import-CIEMScript\s+@scriptRegistrationParams'
-            $script:InitializeScriptContent | Should -Not -Match 'New-PSUScript\s+@'
-            $script:InitializeScriptContent | Should -Not -Match 'New-CIEMDatabase\s+-PassThru'
-            $script:InitializeScriptContent | Should -Not -Match 'Get-PSUApp'
-            $script:InitializeScriptContent | Should -Not -Match 'Get-PSUScript'
-            $script:InitializeScriptContent | Should -Match 'Invoke-CIEMPSUSetup'
+    Context 'Manual PSU setup command removal' {
+        It 'Does not ship a public Initialize-CIEMPSUInstance implementation' {
+            $script:InitializeScriptPath | Should -Not -Exist
             $script:SetupScriptContent | Should -Match 'Get-CIEMPSUScriptDefinition'
             $script:SetupScriptContent | Should -Match 'attack_path_rules'
             $script:SetupScriptContent | Should -Match 'checks'

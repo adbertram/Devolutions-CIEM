@@ -40,16 +40,9 @@ test.describe('Configuration Page', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display CIEM Database card as schema maintenance only', async () => {
-      expect(await configPage.isDatabaseCardVisible()).toBe(true);
-      expect(await configPage.isDatabaseInitializerVisible()).toBe(true);
-      expect(await configPage.isDatabaseInitializedChipVisible()).toBe(false);
-      const databaseText = await configPage.getDatabaseCardText();
-      expect(databaseText).toContain('Reapplies CIEM database schema');
-      expect(databaseText).toContain('refreshes provider and check catalogs');
-      expect(databaseText).toContain('Reapply Schema and Catalogs');
-      expect(databaseText).not.toContain('Initialize Database');
-      expect(databaseText).not.toContain('Initialize the CIEM database before configuring providers or running scans');
+    test('should not display database schema maintenance controls', async () => {
+      await expect(configPage.page.getByText('CIEM Database')).toHaveCount(0);
+      await expect(configPage.page.getByText('Reapply Schema and Catalogs')).toHaveCount(0);
     });
   });
 

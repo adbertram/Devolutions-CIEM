@@ -6,11 +6,12 @@ function InvokeCIEMTransaction {
 
     $ErrorActionPreference = 'Stop'
 
-    if (-not $script:DatabasePath) {
-        $script:DatabasePath = New-CIEMDatabase -PassThru
+    $databasePath = Get-CIEMDatabasePath
+    if (-not (Test-Path $databasePath)) {
+        throw "CIEM database is not initialized at '$databasePath'. Module setup must create or migrate the database before transactions run."
     }
 
-    $conn = Open-PSUSQLiteConnection -Database $script:DatabasePath
+    $conn = Open-PSUSQLiteConnection -Database $databasePath
     Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
     Invoke-PSUSQLiteQuery -Connection $conn -Query "BEGIN TRANSACTION" -AsNonQuery | Out-Null
 

@@ -5,6 +5,7 @@ BeforeAll {
     $script:NewDatabaseContent = Get-Content (Join-Path $repoRoot 'Public' 'New-CIEMDatabase.ps1') -Raw
     $script:GetDatabasePathContent = Get-Content (Join-Path $repoRoot 'Public' 'Get-CIEMDatabasePath.ps1') -Raw
     $script:InvokeQueryContent = Get-Content (Join-Path $repoRoot 'Public' 'Invoke-CIEMQuery.ps1') -Raw
+    $script:InvokeTransactionContent = Get-Content (Join-Path $repoRoot 'Private' 'InvokeCIEMTransaction.ps1') -Raw
     $script:ConfigPageContent = Get-Content (Join-Path $repoRoot 'modules' 'Devolutions.CIEM.PSU' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
     $script:ManifestPath = Join-Path $repoRoot 'Devolutions.CIEM.psd1'
     $script:ModuleRootsPath = Join-Path $repoRoot 'Data' 'module_roots.psdata'
@@ -167,11 +168,18 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
             $script:InvokeQueryContent | Should -Match 'CIEM database is not initialized'
         }
 
-        It 'Configuration page keeps schema refresh as maintenance instead of a first-run gate' {
-            $script:ConfigPageContent | Should -Match 'initializeCiemDatabaseBtn'
-            $script:ConfigPageContent | Should -Match 'Devolutions\.CIEM\\New-CIEMDatabase'
-            $script:ConfigPageContent | Should -Match 'Invoke-UDRedirect\s+''/ciem/config'''
-            $script:ConfigPageContent | Should -Match 'Reapply Schema and Catalogs'
+        It 'Does not lazy-create the database from InvokeCIEMTransaction' {
+            $script:InvokeTransactionContent | Should -Not -Match 'New-CIEMDatabase'
+            $script:InvokeTransactionContent | Should -Match 'Get-CIEMDatabasePath'
+            $script:InvokeTransactionContent | Should -Match 'CIEM database is not initialized'
+        }
+
+        It 'Configuration page does not expose manual database schema maintenance' {
+            $script:ConfigPageContent | Should -Not -Match 'CIEM Database'
+            $script:ConfigPageContent | Should -Not -Match 'initializeCiemDatabaseBtn'
+            $script:ConfigPageContent | Should -Not -Match 'Devolutions\.CIEM\\New-CIEMDatabase'
+            $script:ConfigPageContent | Should -Not -Match 'Invoke-UDRedirect\s+''/ciem/config'''
+            $script:ConfigPageContent | Should -Not -Match 'Reapply Schema and Catalogs'
             $script:ConfigPageContent | Should -Not -Match 'Initialize the CIEM database before configuring providers or running scans'
             $script:ConfigPageContent | Should -Not -Match '\$databaseExists'
             $script:ConfigPageContent | Should -Not -Match 'if\s*\(\s*-not\s+\$databaseExists\s*\)'
