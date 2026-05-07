@@ -4,6 +4,8 @@ const { insertFixtureRows, loadFixture } = require('./fixtures');
 const TEST_PREFIX = '_E2E_TEST_';
 const P = TEST_PREFIX; // shorthand for SQL literals
 const SCAN_HISTORY_FIXTURE = 'scan-history-summary';
+const EXPOSURE_PREVIOUS_RUN_ID = 910001;
+const EXPOSURE_CURRENT_RUN_ID = 910002;
 
 function sqlValue(value) {
   return value == null ? 'NULL' : `'${String(value).replace(/'/g, "''")}'`;
@@ -20,6 +22,10 @@ function cleanupTestData() {
     `DELETE FROM azure_arm_resources WHERE id LIKE '%${P}%'`,
     `DELETE FROM azure_entra_resources WHERE id LIKE '%${P}%'`,
     `DELETE FROM azure_effective_role_assignments WHERE principal_id LIKE '${P}%'`,
+    // Exposure-change data
+    `DELETE FROM ciem_exposure_changes WHERE id LIKE '%${P}%' OR impacted_identity_id LIKE '${P}%' OR impacted_resource_id LIKE '%${P}%' OR current_discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `DELETE FROM ciem_exposure_snapshot_items WHERE exposure_key LIKE '%${P}%' OR impacted_identity_id LIKE '${P}%' OR impacted_resource_id LIKE '%${P}%' OR discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `DELETE FROM azure_discovery_runs WHERE id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
     // Materialized attack paths
     `DELETE FROM attack_paths WHERE id LIKE '${P}%' OR path_json LIKE '%${P}%' OR edges_json LIKE '%${P}%' OR path_chain LIKE '%${P}%'`,
     // Graph data (edges first — path-style IDs need leading %)
@@ -286,14 +292,56 @@ function seedIdentitiesPageData() {
     privileged: true,
     scope: `/subscriptions/${P}sub-1`
   });
+  const duplicateReaderRoleProperties = JSON.stringify({
+    role_definition_id: `${P}roledef-duplicate-reader`,
+    role_name: 'Reader',
+    permissions_json: null,
+    privileged: false,
+    scope: `/subscriptions/${P}sub-1`
+  });
+  const duplicateOwnerRoleProperties = JSON.stringify({
+    role_definition_id: `${P}roledef-duplicate-owner`,
+    role_name: 'Owner',
+    permissions_json: null,
+    privileged: true,
+    scope: `/subscriptions/${P}sub-1`
+  });
   sshNonQuery([
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}identity-user-1','EntraUser','E2E Identities User','azure',${sqlValue(identityProperties)},'${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}identity-sp-duplicate','EntraServicePrincipal','E2E Duplicate App','azure','{}','${now}')`,
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}identity-mi-duplicate','EntraManagedIdentity','E2E Duplicate App','azure','{}','${now}')`,
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, subscription_id, resource_group, properties, collected_at) VALUES ('${P}identity-keyvault-1','AzureKeyVault','E2E Identities Key Vault','azure','${P}sub-1','e2e-rg-1','{"arm_type":"microsoft.keyvault/vaults"}','${now}')`,
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}sub-1','AzureSubscription','E2E Identities Subscription','azure','{}','${now}')`,
     `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}identity-user-1','${P}identity-keyvault-1','HasRole',${sqlValue(keyVaultRoleProperties)},0,'${now}')`,
     `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}identity-user-1','/subscriptions/${P}sub-1','HasRole',${sqlValue(ownerRoleProperties)},0,'${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}identity-sp-duplicate','/subscriptions/${P}sub-1','HasRole',${sqlValue(duplicateReaderRoleProperties)},0,'${now}')`,
+    `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}identity-mi-duplicate','/subscriptions/${P}sub-1','HasRole',${sqlValue(duplicateOwnerRoleProperties)},0,'${now}')`,
   ].join('; '));
   console.log('[seed] Seeded Identities page graph data.');
+}
+
+function seedIdentitiesPageLayoutData() {
+  const now = new Date().toISOString();
+  const roleProperties = JSON.stringify({
+    role_definition_id: `${P}roledef-layout-reader`,
+    role_name: 'Reader',
+    permissions_json: null,
+    privileged: false,
+    scope: `/subscriptions/${P}sub-1`
+  });
+  const statements = [
+    `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}sub-1','AzureSubscription','E2E Identities Subscription','azure','{}','${now}')`
+  ];
+
+  for (let i = 1; i <= 30; i++) {
+    const suffix = String(i).padStart(2, '0');
+    const identityId = `${P}identity-layout-${suffix}`;
+    statements.push(`INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${identityId}','EntraUser','E2E Layout Identity ${suffix}','azure','{}','${now}')`);
+    statements.push(`INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${identityId}','/subscriptions/${P}sub-1','HasRole',${sqlValue(roleProperties)},0,'${now}')`);
+  }
+
+  sshNonQuery(statements.join('; '));
+  console.log('[seed] Seeded Identities page layout graph data.');
 }
 
 function cleanupIdentitiesPageData() {
@@ -303,6 +351,10 @@ function cleanupIdentitiesPageData() {
 
 function getTestIdentitiesGraphEdgeCount() {
   return sshQuery(`SELECT COUNT(*) as count FROM graph_edges WHERE source_id LIKE '${P}identity-%' OR target_id LIKE '${P}identity-%' OR target_id = '/subscriptions/${P}sub-1'`)[0].count;
+}
+
+function getTestIdentitiesLayoutIdentityCount() {
+  return sshQuery(`SELECT COUNT(*) as count FROM graph_nodes WHERE id LIKE '${P}identity-layout-%'`)[0].count;
 }
 
 function seedIdentityAttackPathData() {
@@ -522,6 +574,85 @@ function getRunningDiscoveryRunCount() {
   return sshQuery("SELECT COUNT(*) as count FROM azure_discovery_runs WHERE status = 'Running'")[0].count;
 }
 
+function seedExposureChangeData() {
+  const previousAt = '2026-05-06T01:00:00.000Z';
+  const currentAt = '2026-05-07T01:00:00.000Z';
+  const rows = [
+    {
+      id: `${EXPOSURE_CURRENT_RUN_ID}:NewRisk:identity:${P}exposure-new-user`,
+      change_type: 'NewRisk',
+      exposure_type: 'IdentityRisk',
+      severity: 'High',
+      severity_rank: 2,
+      previous_severity: null,
+      current_severity: 'High',
+      identity_id: `${P}exposure-new-user`,
+      identity_name: 'E2E New Exposure User',
+      identity_type: 'User',
+      resource_id: `/subscriptions/${P}exposure-sub`,
+      resource_name: `/subscriptions/${P}exposure-sub`,
+      previous_state_json: null,
+      current_state_json: JSON.stringify({ RiskLevel: 'High', EntitlementCount: 3 }),
+      evidence: 'New High IdentityRisk exposure: E2E New Exposure User'
+    },
+    {
+      id: `${EXPOSURE_CURRENT_RUN_ID}:RiskIncrease:identity:${P}exposure-increase-user`,
+      change_type: 'RiskIncrease',
+      exposure_type: 'IdentityRisk',
+      severity: 'Critical',
+      severity_rank: 1,
+      previous_severity: 'Medium',
+      current_severity: 'Critical',
+      identity_id: `${P}exposure-increase-user`,
+      identity_name: 'E2E Increased Exposure User',
+      identity_type: 'User',
+      resource_id: `/subscriptions/${P}exposure-prod`,
+      resource_name: `/subscriptions/${P}exposure-prod`,
+      previous_state_json: JSON.stringify({ RiskLevel: 'Medium', EntitlementCount: 1 }),
+      current_state_json: JSON.stringify({ RiskLevel: 'Critical', EntitlementCount: 4 }),
+      evidence: 'IdentityRisk exposure increased from Medium to Critical: E2E Increased Exposure User'
+    }
+  ];
+
+  const stmts = [
+    `DELETE FROM ciem_exposure_changes WHERE current_discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `DELETE FROM ciem_exposure_snapshot_items WHERE discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `DELETE FROM azure_discovery_runs WHERE id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `INSERT INTO azure_discovery_runs (id, psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (${EXPOSURE_PREVIOUS_RUN_ID}, -910001, 'All', 'Completed', '${previousAt}', '${previousAt}', 1, 1, 1, 1, 0, NULL)`,
+    `INSERT INTO azure_discovery_runs (id, psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (${EXPOSURE_CURRENT_RUN_ID}, -910002, 'All', 'Completed', '${currentAt}', '${currentAt}', 1, 1, 1, 1, 0, NULL)`
+  ];
+
+  for (const row of rows) {
+    const cols = [
+      'id', 'previous_discovery_run_id', 'current_discovery_run_id', 'exposure_key',
+      'change_type', 'exposure_type', 'severity', 'severity_rank', 'previous_severity',
+      'current_severity', 'impacted_identity_id', 'impacted_identity_name',
+      'impacted_identity_type', 'impacted_resource_id', 'impacted_resource_name',
+      'first_seen_at', 'previous_state_json', 'current_state_json', 'evidence', 'created_at'
+    ];
+    const values = [
+      row.id, EXPOSURE_PREVIOUS_RUN_ID, EXPOSURE_CURRENT_RUN_ID, row.id.split(':').slice(2).join(':'),
+      row.change_type, row.exposure_type, row.severity, row.severity_rank, row.previous_severity,
+      row.current_severity, row.identity_id, row.identity_name,
+      row.identity_type, row.resource_id, row.resource_name,
+      currentAt, row.previous_state_json, row.current_state_json, row.evidence, currentAt
+    ].map(sqlValue).join(', ');
+    stmts.push(`INSERT INTO ciem_exposure_changes (${cols.join(', ')}) VALUES (${values})`);
+  }
+
+  sshNonQuery(stmts.join('; '));
+  console.log(`[seed] Seeded ${rows.length} exposure change records.`);
+}
+
+function cleanupExposureChangeData() {
+  sshNonQuery(`DELETE FROM ciem_exposure_changes WHERE current_discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID}); DELETE FROM ciem_exposure_snapshot_items WHERE discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID}); DELETE FROM azure_discovery_runs WHERE id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`);
+  console.log('[cleanup] Exposure change test data cleaned up.');
+}
+
+function getTestExposureChangeCount() {
+  return sshQuery(`SELECT COUNT(*) as count FROM ciem_exposure_changes WHERE current_discovery_run_id = ${EXPOSURE_CURRENT_RUN_ID}`)[0].count;
+}
+
 module.exports = {
   cleanupTestData, seedChecks, backupAndClearAllChecks, restoreChecks, seedTestData,
   backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount, getScanHistoryCounts, getTestCheckCounts,
@@ -532,9 +663,11 @@ module.exports = {
   backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
   seedCompletedDiscoveryRunAt,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
+  seedExposureChangeData, cleanupExposureChangeData, getTestExposureChangeCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
   backupAndClearDashboardIdentityData, restoreDashboardIdentityData, getDashboardIdentityCounts,
-  seedIdentitiesPageData, cleanupIdentitiesPageData, getTestIdentitiesGraphEdgeCount,
+  seedIdentitiesPageData, seedIdentitiesPageLayoutData, cleanupIdentitiesPageData,
+  getTestIdentitiesGraphEdgeCount, getTestIdentitiesLayoutIdentityCount,
   seedIdentityAttackPathData, cleanupIdentityAttackPathData,
   seedAttackPathsPageData, seedAttackPathsRefreshGraphData,
   backupAndClearAttackPathGraphData, restoreAttackPathGraphData,

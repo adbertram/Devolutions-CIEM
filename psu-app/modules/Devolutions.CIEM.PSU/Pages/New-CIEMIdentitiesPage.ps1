@@ -64,124 +64,137 @@ function New-CIEMIdentitiesPage {
                 $accessLevel = if ($Page:IdentitiesAccessLevel) { $Page:IdentitiesAccessLevel } else { 'All' }
                 $privilege = if ($Page:IdentitiesPrivilege) { $Page:IdentitiesPrivilege } else { 'All' }
 
-                $splat = @{ Provider = $provider; IncludeRaw = $true }
+                $splat = @{ Provider = $provider }
                 if ($accessLevel -ne 'All') { $splat.AccessLevel = $accessLevel }
                 if ($privilege -eq 'Privileged') { $splat.PrivilegedOnly = $true }
 
-                $permissions = @(Devolutions.CIEM\Get-CIEMEffectivePermission @splat)
+                $identities = @(Devolutions.CIEM\Get-CIEMIdentityAccessSummary @splat)
 
-                if ($permissions.Count -eq 0) {
+                if ($identities.Count -eq 0) {
                     New-UDTypography -Text 'No identity permission data found. Run discovery to populate the local graph data first.' -Variant 'body2' -Style @{ opacity = 0.6; fontStyle = 'italic'; padding = '16px' }
                     return
                 }
 
-                $identityRiskByPrincipalId = @{}
-                if ($provider -eq 'Azure') {
-                    foreach ($summary in @(Devolutions.CIEM\Get-CIEMIdentityRiskSummary)) {
-                        $identityRiskByPrincipalId[[string]$summary.Id] = $summary
-                    }
-                }
-
                 New-UDDataGrid -LoadRows {
-                    $rows = @($permissions | ForEach-Object {
-                        $principalId = [string]$_.Principal.Id
-                        $riskSummary = $null
-                        if ($provider -eq 'Azure') {
-                            if (-not $identityRiskByPrincipalId.ContainsKey($principalId)) {
-                                throw "Identity risk summary not found for principal '$principalId'."
-                            }
-                            $riskSummary = $identityRiskByPrincipalId[$principalId]
-                        }
-
-                        $actionLabels = @($_.Actions | ForEach-Object { $_.Description }) -join ', '
-                        $accessLevels = @($_.Actions | ForEach-Object { [string]$_.AccessLevel } | Select-Object -Unique) -join ', '
-                        $effects = @($_.Actions | ForEach-Object { [string]$_.Effect } | Select-Object -Unique) -join ', '
-                        $pathTypes = @($_.Path | ForEach-Object { [string]$_.Type } | Select-Object -Unique) -join ', '
-                        $pathText = @($_.Path | ForEach-Object { $_.Description }) -join ' | '
-                        $evidenceText = @($_.Evidence | ForEach-Object { "$($_.SourceSystem):$($_.SourceApi):$($_.SourceRecordId)" }) -join ' | '
-                        $targetType = [string]$_.Target.Type
-
+                    $rows = @($identities | ForEach-Object {
                         @{
-                            id = "$($_.Provider)-$($_.Principal.Id)-$($_.Entitlement.Type)-$($_.Target.Id)-$($_.Entitlement.Id)"
+                            id = $_.Id
                             provider = [string]$_.Provider
-                            principalId = $principalId
-                            principal = $_.Principal.DisplayName
-                            principalType = [string]$_.Principal.Type
-                            identityEntitlementCount = if ($riskSummary) { [int]$riskSummary.EntitlementCount } else { $null }
-                            identityPrivilegedCount = if ($riskSummary) { [int]$riskSummary.PrivilegedCount } else { $null }
-                            riskLevel = if ($riskSummary) { [string]$riskSummary.RiskLevel } else { 'Not available' }
-                            lastActivity = if ($riskSummary -and $riskSummary.LastSignIn) { ([datetime]$riskSummary.LastSignIn).ToString('yyyy-MM-dd HH:mm') } else { 'None' }
-                            actions = $actionLabels
-                            accessLevel = $accessLevels
-                            target = $_.Target.DisplayName
-                            targetType = $targetType
-                            targetIcon = Resolve-CIEMResourceIconDataUri -GraphKind $targetType -PropertiesJson $_.Target.PropertiesJson
-                            scope = $_.Entitlement.ScopeId
-                            entitlement = $_.Entitlement.Name
-                            entitlementType = [string]$_.Entitlement.Type
-                            pathType = $pathTypes
-                            effect = $effects
-                            privileged = if ($_.Privileged) { 'Yes' } else { 'No' }
-                            path = $pathText
-                            evidence = $evidenceText
+                            principalId = [string]$_.PrincipalId
+                            objectId = [string]$_.ObjectId
+                            principal = [string]$_.Principal
+                            principalType = [string]$_.PrincipalType
+                            identityEntitlementCount = [int]$_.EntitlementCount
+                            identityPrivilegedCount = [int]$_.PrivilegedRoleCount
+                            effectivePermissionCount = [int]$_.EffectivePermissionCount
+                            targetCount = [int]$_.TargetCount
+                            riskLevel = [string]$_.RiskLevel
+                            lastActivity = if ($_.LastActivity) { ([datetime]$_.LastActivity).ToString('yyyy-MM-dd HH:mm') } else { 'None' }
+                            accessLevel = @($_.AccessLevels) -join ', '
                         }
                     })
 
                     @($rows) | Out-UDDataGridData -Context $EventData -TotalRows @($rows).Count
                 } -Columns @(
-                    New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 110
+                    New-UDDataGridColumn -Field 'provider' -HeaderName 'Provider' -Width 80
                     New-UDDataGridColumn -Field 'principal' -HeaderName 'Principal' -Flex 1
-                    New-UDDataGridColumn -Field 'principalType' -HeaderName 'Type' -Width 150
-                    New-UDDataGridColumn -Field 'identityEntitlementCount' -HeaderName 'Entitlements' -Width 130 -Type 'number'
-                    New-UDDataGridColumn -Field 'identityPrivilegedCount' -HeaderName 'Privileged Roles' -Width 150 -Type 'number'
-                    New-UDDataGridColumn -Field 'riskLevel' -HeaderName 'Risk Level' -Width 130 -Render {
-                        if ($EventData.riskLevel -eq 'Not available') {
-                            New-UDTypography -Text 'Not available' -Variant 'body2' -Style @{ opacity = 0.6 }
-                        } else {
-                            $color = Devolutions.CIEM\Get-SeverityColor -Severity $EventData.riskLevel
-                            New-UDChip -Label $EventData.riskLevel -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                    New-UDDataGridColumn -Field 'objectId' -HeaderName 'Object ID' -Width 240 -Render {
+                        New-UDTypography -Text $EventData.objectId -Variant 'body2' -Style @{
+                            fontFamily = 'monospace'
+                            overflow = 'hidden'
+                            textOverflow = 'ellipsis'
+                            whiteSpace = 'nowrap'
                         }
                     }
-                    New-UDDataGridColumn -Field 'lastActivity' -HeaderName 'Last Activity' -Width 160
-                    New-UDDataGridColumn -Field 'actions' -HeaderName 'Can Do' -Flex 1
-                    New-UDDataGridColumn -Field 'accessLevel' -HeaderName 'Access Level' -Width 150
-                    New-UDDataGridColumn -Field 'target' -HeaderName 'Target Resource' -Flex 1 -Render {
-                        New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
-                            if ($EventData.targetIcon) {
-                                New-UDElement -Tag 'img' -Attributes @{
-                                    src = $EventData.targetIcon
-                                    alt = "$($EventData.targetType) icon"
-                                    'data-ciem-resource-icon' = 'target'
-                                    style = @{
-                                        width = '18px'
-                                        height = '18px'
-                                        flexShrink = '0'
+                    New-UDDataGridColumn -Field 'principalType' -HeaderName 'Type' -Width 95
+                    New-UDDataGridColumn -Field 'identityEntitlementCount' -HeaderName 'Entitlements' -Width 105 -Type 'number'
+                    New-UDDataGridColumn -Field 'identityPrivilegedCount' -HeaderName 'Privileged Roles' -Width 120 -Type 'number'
+                    New-UDDataGridColumn -Field 'riskLevel' -HeaderName 'Risk Level' -Width 100 -Render {
+                        $color = Devolutions.CIEM\Get-SeverityColor -Severity $EventData.riskLevel
+                        New-UDChip -Label $EventData.riskLevel -Size 'small' -Style @{ backgroundColor = $color; color = 'white' }
+                    }
+                    New-UDDataGridColumn -Field 'lastActivity' -HeaderName 'Last Activity' -Width 125
+                ) -AutoHeight $true -Pagination -PageSize 10 -ShowQuickFilter -LoadDetailContent {
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '8px 16px' } } -Content {
+                        $principalId = [string]$EventData.row.principalId
+                        $detailAccessLevel = if ($Page:IdentitiesAccessLevel) { $Page:IdentitiesAccessLevel } else { 'All' }
+                        $detailPrivilege = if ($Page:IdentitiesPrivilege) { $Page:IdentitiesPrivilege } else { 'All' }
+                        $detailSplat = @{
+                            Provider = [string]$EventData.row.provider
+                            PrincipalId = $principalId
+                            IncludeRaw = $true
+                        }
+                        if ($detailAccessLevel -ne 'All') { $detailSplat.AccessLevel = $detailAccessLevel }
+                        if ($detailPrivilege -eq 'Privileged') { $detailSplat.PrivilegedOnly = $true }
+
+                        $targetPermissions = @(Devolutions.CIEM\Get-CIEMEffectivePermission @detailSplat)
+
+                        New-UDTypography -Text "Object ID: $($EventData.row.objectId)" -Variant 'body2' -Style @{ fontFamily = 'monospace'; marginBottom = '8px'; opacity = 0.8 }
+                        New-UDTypography -Text 'Target Access' -Variant 'h6' -Style @{ marginBottom = '4px' }
+
+                        $targetAccessIndex = 0
+                        $targetAccessRows = @($targetPermissions | ForEach-Object {
+                            $targetAccessIndex++
+                            $targetType = [string]$_.Target.Type
+                            @{
+                                id = "identity_target_access_$targetAccessIndex"
+                                target = [string]$_.Target.DisplayName
+                                targetType = $targetType
+                                targetIcon = Resolve-CIEMResourceIconDataUri -GraphKind $targetType -PropertiesJson $_.Target.PropertiesJson
+                                entitlement = [string]$_.Entitlement.Name
+                                actions = @($_.Actions | ForEach-Object { $_.Description }) -join ', '
+                                accessLevel = @($_.Actions | ForEach-Object { [string]$_.AccessLevel } | Select-Object -Unique) -join ', '
+                                pathType = @($_.Path | ForEach-Object { [string]$_.Type } | Select-Object -Unique) -join ', '
+                                privileged = if ($_.Privileged) { 'Yes' } else { 'No' }
+                                evidence = @($_.Evidence | ForEach-Object { "$($_.SourceSystem):$($_.SourceApi):$($_.SourceRecordId)" }) -join ' | '
+                            }
+                        })
+
+                        if ($targetAccessRows.Count -gt 0) {
+                            New-UDDataGrid -LoadRows {
+                                $targetAccessRows | Out-UDDataGridData -Context $EventData -TotalRows @($targetAccessRows).Count
+                            } -Columns @(
+                                New-UDDataGridColumn -Field 'target' -HeaderName 'Target Resource' -Flex 1 -Render {
+                                    New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                        if ($EventData.targetIcon) {
+                                            New-UDElement -Tag 'img' -Attributes @{
+                                                src = $EventData.targetIcon
+                                                alt = "$($EventData.targetType) icon"
+                                                'data-ciem-resource-icon' = 'target'
+                                                style = @{
+                                                    width = '18px'
+                                                    height = '18px'
+                                                    flexShrink = '0'
+                                                }
+                                            }
+                                        }
+                                        New-UDTypography -Text $EventData.target -Variant 'body2' -Style @{
+                                            overflow = 'hidden'
+                                            textOverflow = 'ellipsis'
+                                            whiteSpace = 'nowrap'
+                                        }
                                     }
                                 }
-                            }
-                            New-UDTypography -Text $EventData.target -Variant 'body2' -Style @{
-                                overflow = 'hidden'
-                                textOverflow = 'ellipsis'
-                                whiteSpace = 'nowrap'
-                            }
-                        }
-                    }
-                    New-UDDataGridColumn -Field 'scope' -HeaderName 'Scope' -Flex 1
-                    New-UDDataGridColumn -Field 'entitlement' -HeaderName 'Entitlement' -Width 180
-                    New-UDDataGridColumn -Field 'pathType' -HeaderName 'Path Type' -Width 160
-                    New-UDDataGridColumn -Field 'effect' -HeaderName 'Effect' -Width 110
-                    New-UDDataGridColumn -Field 'privileged' -HeaderName 'Privileged' -Width 120 -Render {
-                        if ($EventData.privileged -eq 'Yes') {
-                            New-UDChip -Label 'Yes' -Size 'small' -Style @{ backgroundColor = '#f44336'; color = 'white' }
+                                New-UDDataGridColumn -Field 'actions' -HeaderName 'Can Do' -Flex 1
+                                New-UDDataGridColumn -Field 'accessLevel' -HeaderName 'Access Level' -Width 150
+                                New-UDDataGridColumn -Field 'entitlement' -HeaderName 'Entitlement' -Width 180
+                                New-UDDataGridColumn -Field 'pathType' -HeaderName 'Path Type' -Width 160
+                                New-UDDataGridColumn -Field 'privileged' -HeaderName 'Privileged' -Width 110 -Render {
+                                    if ($EventData.privileged -eq 'Yes') {
+                                        New-UDChip -Label 'Yes' -Size 'small' -Style @{ backgroundColor = '#f44336'; color = 'white' }
+                                    } else {
+                                        New-UDTypography -Text 'No' -Variant 'body2' -Style @{ opacity = 0.6 }
+                                    }
+                                }
+                                New-UDDataGridColumn -Field 'evidence' -HeaderName 'Evidence' -Flex 1
+                            ) -AutoHeight $true -Pagination -PageSize 10
                         } else {
-                            New-UDTypography -Text 'No' -Variant 'body2' -Style @{ opacity = 0.6 }
+                            New-UDTypography -Text 'No target access found for this identity.' -Variant 'body2' -Style @{ opacity = 0.5; padding = '4px' }
                         }
-                    }
-                ) -AutoHeight $true -Pagination -PageSize 25 -ShowQuickFilter -LoadDetailContent {
-                    New-UDElement -Tag 'div' -Attributes @{ style = @{ padding = '8px 16px' } } -Content {
+
+                        New-UDDivider
                         if ($EventData.row.provider -eq 'Azure') {
                             try {
-                                $principalId = [string]$EventData.row.principalId
                                 $details = Devolutions.CIEM\Get-CIEMIdentityRiskSignals -PrincipalId $principalId
 
                                 if ($details.HostingResource) {
@@ -305,10 +318,6 @@ function New-CIEMIdentitiesPage {
                             }
                         }
 
-                        New-UDTypography -Text 'Entitlement Path' -Variant 'h6' -Style @{ marginBottom = '4px' }
-                        New-UDTypography -Text $EventData.row.path -Variant 'body2' -Style @{ fontFamily = 'monospace'; marginBottom = '12px' }
-                        New-UDTypography -Text 'Evidence' -Variant 'h6' -Style @{ marginBottom = '4px' }
-                        New-UDTypography -Text $EventData.row.evidence -Variant 'body2' -Style @{ fontFamily = 'monospace'; opacity = 0.8 }
                     }
                 }
             }

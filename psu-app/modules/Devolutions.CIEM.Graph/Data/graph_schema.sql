@@ -88,3 +88,60 @@ CREATE TABLE IF NOT EXISTS attack_paths (
 );
 
 CREATE INDEX IF NOT EXISTS idx_attack_paths_severity ON attack_paths(severity);
+
+-- =============================================================================
+-- Exposure Snapshots And Changes (local alert-ready signal candidates)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS ciem_exposure_snapshot_items (
+    discovery_run_id INTEGER NOT NULL,
+    exposure_key TEXT NOT NULL,
+    exposure_type TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    severity_rank INTEGER NOT NULL,
+    impacted_identity_id TEXT,
+    impacted_identity_name TEXT,
+    impacted_identity_type TEXT,
+    impacted_resource_id TEXT,
+    impacted_resource_name TEXT,
+    title TEXT NOT NULL,
+    state_json TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    PRIMARY KEY (discovery_run_id, exposure_key),
+    FOREIGN KEY (discovery_run_id) REFERENCES azure_discovery_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ciem_exposure_snapshot_run ON ciem_exposure_snapshot_items(discovery_run_id);
+CREATE INDEX IF NOT EXISTS idx_ciem_exposure_snapshot_key ON ciem_exposure_snapshot_items(exposure_key);
+CREATE INDEX IF NOT EXISTS idx_ciem_exposure_snapshot_severity ON ciem_exposure_snapshot_items(severity_rank);
+
+CREATE TABLE IF NOT EXISTS ciem_exposure_changes (
+    id TEXT PRIMARY KEY,
+    previous_discovery_run_id INTEGER,
+    current_discovery_run_id INTEGER NOT NULL,
+    exposure_key TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    exposure_type TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    severity_rank INTEGER NOT NULL,
+    previous_severity TEXT,
+    current_severity TEXT,
+    impacted_identity_id TEXT,
+    impacted_identity_name TEXT,
+    impacted_identity_type TEXT,
+    impacted_resource_id TEXT,
+    impacted_resource_name TEXT,
+    first_seen_at TEXT NOT NULL,
+    previous_state_json TEXT,
+    current_state_json TEXT,
+    evidence TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (current_discovery_run_id, exposure_key, change_type),
+    FOREIGN KEY (previous_discovery_run_id) REFERENCES azure_discovery_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY (current_discovery_run_id) REFERENCES azure_discovery_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ciem_exposure_changes_current_run ON ciem_exposure_changes(current_discovery_run_id);
+CREATE INDEX IF NOT EXISTS idx_ciem_exposure_changes_type ON ciem_exposure_changes(change_type);
+CREATE INDEX IF NOT EXISTS idx_ciem_exposure_changes_severity ON ciem_exposure_changes(severity_rank);

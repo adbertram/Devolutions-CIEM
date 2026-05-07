@@ -87,6 +87,89 @@ class BasePage {
     // Read from the hidden input that holds the actual value
     return await this.page.locator(`#${selectId}`).inputValue();
   }
+
+  async getDataGridLayoutMetrics(selector, gridIndex, requiredFields) {
+    return await this.page.evaluate(({ selector, gridIndex, requiredFields }) => {
+      const grids = Array.from(document.querySelectorAll(selector));
+      if (gridIndex < 0 || gridIndex >= grids.length) {
+        throw new Error(`Expected data grid index ${gridIndex}; found ${grids.length} grid(s).`);
+      }
+
+      const root = grids[gridIndex];
+      const virtualScroller = root.querySelector('.MuiDataGrid-virtualScroller');
+      if (!virtualScroller) {
+        throw new Error('DataGrid virtual scroller was not rendered.');
+      }
+
+      const pagination = root.querySelector('.MuiTablePagination-root');
+      if (!pagination) {
+        throw new Error('DataGrid pagination was not rendered.');
+      }
+
+      const rootRect = root.getBoundingClientRect();
+      const scrollerRect = virtualScroller.getBoundingClientRect();
+      const paginationRect = pagination.getBoundingClientRect();
+      const documentElement = document.documentElement;
+
+      const fieldMetrics = requiredFields.map(field => {
+        const header = root.querySelector(`.MuiDataGrid-columnHeader[data-field="${field}"]`);
+        if (!header) {
+          throw new Error(`Required DataGrid header '${field}' was not rendered.`);
+        }
+
+        const headerRect = header.getBoundingClientRect();
+        const cell = root.querySelector(`.MuiDataGrid-cell[data-field="${field}"]`);
+        const cellRect = cell ? cell.getBoundingClientRect() : null;
+        return {
+          field,
+          headerText: header.textContent.trim(),
+          header: {
+            left: headerRect.left,
+            right: headerRect.right,
+            width: headerRect.width,
+            visibleInGrid: headerRect.left >= rootRect.left && headerRect.right <= rootRect.right
+          },
+          cell: cellRect ? {
+            left: cellRect.left,
+            right: cellRect.right,
+            width: cellRect.width,
+            visibleInGrid: cellRect.left >= rootRect.left && cellRect.right <= rootRect.right
+          } : null
+        };
+      });
+
+      return {
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        document: {
+          clientWidth: documentElement.clientWidth,
+          scrollWidth: documentElement.scrollWidth,
+          hasHorizontalOverflow: documentElement.scrollWidth > window.innerWidth + 1
+        },
+        grid: {
+          left: rootRect.left,
+          right: rootRect.right,
+          width: rootRect.width
+        },
+        virtualScroller: {
+          left: scrollerRect.left,
+          right: scrollerRect.right,
+          clientWidth: virtualScroller.clientWidth,
+          scrollWidth: virtualScroller.scrollWidth,
+          hasHorizontalOverflow: virtualScroller.scrollWidth > virtualScroller.clientWidth + 1
+        },
+        pagination: {
+          top: paginationRect.top,
+          bottom: paginationRect.bottom,
+          width: paginationRect.width,
+          visibleInViewport: paginationRect.top >= 0 && paginationRect.bottom <= window.innerHeight
+        },
+        fields: fieldMetrics
+      };
+    }, { selector, gridIndex, requiredFields });
+  }
 }
 
 module.exports = BasePage;

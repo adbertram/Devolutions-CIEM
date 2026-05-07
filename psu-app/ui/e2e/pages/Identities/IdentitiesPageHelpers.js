@@ -13,6 +13,7 @@ class IdentitiesPageHelpers extends BasePage {
       detailPanelToggle: '.MuiDataGrid-row [aria-label="Expand"], .MuiDataGrid-row [aria-label="expand row"]',
       detailPanel: '.MuiDataGrid-detailPanel',
       canDoCell: '.MuiDataGrid-cell[data-field="actions"]',
+      objectIdCell: '.MuiDataGrid-cell[data-field="objectid"]',
       quickFilter: '.MuiDataGrid-toolbarQuickFilter input',
       targetCell: '.MuiDataGrid-cell[data-field="target"]',
       targetIcon: 'img[data-ciem-resource-icon="target"]',
@@ -56,6 +57,18 @@ class IdentitiesPageHelpers extends BasePage {
     return this.page.locator(this.selectors.dataGridRows, { hasText: targetName }).first();
   }
 
+  getIdentityRows(identityName) {
+    return this.page.locator(this.selectors.dataGridRows, { hasText: identityName });
+  }
+
+  async getIdentityRowCount(identityName) {
+    return await this.getIdentityRows(identityName).count();
+  }
+
+  async rowWithTextIsVisible(text) {
+    return await this.page.locator(this.selectors.dataGridRows, { hasText: text }).count() > 0;
+  }
+
   getTargetCell(targetName) {
     return this.getTargetRow(targetName).locator(this.selectors.targetCell);
   }
@@ -72,8 +85,8 @@ class IdentitiesPageHelpers extends BasePage {
     return await row.locator(this.selectors.canDoCell, { hasText: description }).count() > 0;
   }
 
-  async expandTargetRow(targetName) {
-    const row = this.getTargetRow(targetName);
+  async expandIdentityRow(identityName) {
+    const row = this.getIdentityRows(identityName).first();
     await row.waitFor({ state: 'visible' });
     const toggle = row.locator('[aria-label="Expand"], [aria-label="expand row"]');
     const toggleCount = await toggle.count();
@@ -83,7 +96,29 @@ class IdentitiesPageHelpers extends BasePage {
       await row.click();
     }
     await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible' });
-    await this.page.locator(this.selectors.detailPanel, { hasText: 'Entitlement Path' }).waitFor({ state: 'visible' });
+    await this.page.locator(this.selectors.detailPanel, { hasText: 'Target Access' }).waitFor({ state: 'visible' });
+  }
+
+  async detailHasTargetAccess(targetName, description) {
+    const panel = this.page.locator(this.selectors.detailPanel);
+    await panel.waitFor({ state: 'visible' });
+    await panel.getByText(targetName, { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+    await panel.getByText(description, { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+    return true;
+  }
+
+  async detailTargetHasResourceIcon(targetName) {
+    const panel = this.page.locator(this.selectors.detailPanel, { hasText: targetName });
+    await panel.waitFor({ state: 'visible' });
+    return await panel.locator(this.selectors.targetIcon).count() > 0;
+  }
+
+  async objectIdIsVisible(objectId) {
+    return await this.page.getByText(objectId, { exact: true }).count() > 0;
+  }
+
+  async getPrimaryGridLayoutMetrics(requiredFields) {
+    return await this.getDataGridLayoutMetrics(this.selectors.dataGrid, 0, requiredFields);
   }
 
   async isDetailSectionVisible(sectionName) {
