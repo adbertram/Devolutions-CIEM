@@ -5,6 +5,8 @@ function ConvertCIEMExposureSeverityRank {
         [string]$Severity
     )
 
+    $ErrorActionPreference = 'Stop'
+
     switch ($Severity.ToLowerInvariant()) {
         'critical' { 1 }
         'high' { 2 }
@@ -21,6 +23,8 @@ function ConvertToCIEMExposureSeverityLabel {
         [string]$Severity
     )
 
+    $ErrorActionPreference = 'Stop'
+
     switch ($Severity.ToLowerInvariant()) {
         'critical' { 'Critical' }
         'high' { 'High' }
@@ -36,6 +40,8 @@ function TestCIEMExposureSeverityIsRisk {
         [Parameter(Mandatory)]
         [string]$Severity
     )
+
+    $ErrorActionPreference = 'Stop'
 
     (ConvertToCIEMExposureSeverityLabel -Severity $Severity) -ne 'Low'
 }

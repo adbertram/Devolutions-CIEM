@@ -11,6 +11,8 @@ function AssertCIEMConnectorSourceProperty {
         [string]$SignalType
     )
 
+    $ErrorActionPreference = 'Stop'
+
     if ($null -eq $Source.PSObject.Properties[$Name]) {
         throw "$SignalType connector preview source is missing required property '$Name'."
     }
@@ -25,6 +27,8 @@ function GetCIEMConnectorAction {
         [Parameter(Mandatory)]
         [string]$SourceType
     )
+
+    $ErrorActionPreference = 'Stop'
 
     if ($SignalType -eq 'NeedsAttention') {
         switch ($SourceType) {
@@ -59,6 +63,8 @@ function NewCIEMConnectorPayloadPreview {
         [Parameter(Mandatory)]
         [object]$Signal
     )
+
+    $ErrorActionPreference = 'Stop'
 
     foreach ($propertyName in @('SourceId', 'SourceType', 'Severity', 'SeverityRank', 'Title', 'IdentityId', 'Identity', 'IdentityType', 'TargetId', 'Target', 'Reason', 'Evidence')) {
         AssertCIEMConnectorSourceProperty -Source $Signal -Name $propertyName -SignalType $SignalType
@@ -153,6 +159,8 @@ function ConvertCIEMNeedsAttentionToConnectorSignal {
         [object]$Item
     )
 
+    $ErrorActionPreference = 'Stop'
+
     [PSCustomObject]@{
         SourceId     = [string]$Item.Id
         SourceType   = [string]$Item.SourceType
@@ -175,6 +183,8 @@ function ConvertCIEMExposureChangeToConnectorSignal {
         [Parameter(Mandatory)]
         [object]$Change
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $reason = switch ([string]$Change.ChangeType) {
         'NewRisk' { "New $($Change.CurrentSeverity) exposure detected" }

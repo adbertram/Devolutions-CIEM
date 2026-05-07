@@ -5,6 +5,8 @@ function ConvertToCIEMScanEfficiencyRun {
         [object]$Row
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $durationSeconds = [double]$Row.duration_seconds
     $totalResults = [int]$Row.total_results
     $resultsPerSecond = if ($durationSeconds -gt 0) {
@@ -50,6 +52,22 @@ function Get-CIEMScanEfficiencySummary {
 
     $ErrorActionPreference = 'Stop'
 
+    $latestDiscoveryRunRows = @(Invoke-CIEMQuery -Query @"
+SELECT discovery_run_id
+FROM azure_discovery_phase_metrics
+GROUP BY discovery_run_id
+ORDER BY discovery_run_id DESC
+LIMIT 1
+"@)
+    $latestDiscoveryRunId = $null
+    $latestDiscoveryPhaseMetrics = @()
+    $latestDiscoveryDurationSeconds = $null
+    if ($latestDiscoveryRunRows.Count -eq 1) {
+        $latestDiscoveryRunId = [int]$latestDiscoveryRunRows[0].discovery_run_id
+        $latestDiscoveryPhaseMetrics = @(Get-CIEMAzureDiscoveryPhaseMetric -DiscoveryRunId $latestDiscoveryRunId)
+        $latestDiscoveryDurationSeconds = [math]::Round((($latestDiscoveryPhaseMetrics | Measure-Object -Property ElapsedSeconds -Sum).Sum), 2)
+    }
+
     $rows = @(Invoke-CIEMQuery -Query @"
 SELECT id, status, resource_providers, started_at, completed_at, duration_seconds,
        total_results, failed_results, passed_results, skipped_results, manual_results
@@ -71,12 +89,15 @@ LIMIT @last
             SlowestDurationSeconds  = $null
             LatestResultsPerSecond  = $null
             AverageResultsPerSecond = $null
-            TotalResults            = 0
-            FailedResults           = 0
-            PassedResults           = 0
-            SkippedResults          = 0
-            ManualResults           = 0
-            Runs                    = @()
+        TotalResults            = 0
+        FailedResults           = 0
+        PassedResults           = 0
+        SkippedResults          = 0
+        ManualResults           = 0
+        LatestDiscoveryRunId          = $latestDiscoveryRunId
+        LatestDiscoveryDurationSeconds = $latestDiscoveryDurationSeconds
+        LatestDiscoveryPhaseMetrics   = $latestDiscoveryPhaseMetrics
+        Runs                    = @()
         }
     }
 
@@ -109,6 +130,9 @@ LIMIT @last
         PassedResults           = [int](($runs | Measure-Object -Property PassedResults -Sum).Sum)
         SkippedResults          = [int](($runs | Measure-Object -Property SkippedResults -Sum).Sum)
         ManualResults           = [int](($runs | Measure-Object -Property ManualResults -Sum).Sum)
+        LatestDiscoveryRunId          = $latestDiscoveryRunId
+        LatestDiscoveryDurationSeconds = $latestDiscoveryDurationSeconds
+        LatestDiscoveryPhaseMetrics   = $latestDiscoveryPhaseMetrics
         Runs                    = $runs
     }
 }

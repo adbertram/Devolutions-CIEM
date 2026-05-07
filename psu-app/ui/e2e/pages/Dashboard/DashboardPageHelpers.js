@@ -35,6 +35,8 @@ class DashboardPageHelpers extends BasePage {
       scanEfficiencyMetrics: '[data-ciem-scan-efficiency-metric="true"]',
       scanEfficiencyRuns: '[data-ciem-scan-efficiency-run="true"]',
       scanEfficiencyEmpty: '[data-ciem-scan-efficiency-empty="true"]',
+      discoveryPhaseTimingSection: '#dashboardDiscoveryPhaseTiming',
+      discoveryPhaseMetrics: '[data-ciem-discovery-phase-metric="true"]',
       scanPanel: '#dashboardScanPanel',
       identityPanel: '#dashboardIdentityPanel',
       scanSection: '#dashboardScanSection',
@@ -239,6 +241,11 @@ class DashboardPageHelpers extends BasePage {
   async getScanEfficiencyRunCount() {
     await this.page.locator(this.selectors.scanEfficiencySection).waitFor({ state: 'visible', timeout: 15000 });
     return await this.page.locator(this.selectors.scanEfficiencyRuns).count();
+  }
+
+  async getDiscoveryPhaseMetricCount() {
+    await this.page.locator(this.selectors.discoveryPhaseTimingSection).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.discoveryPhaseMetrics).count();
   }
 
   async hasScanEfficiencyEmptyState() {

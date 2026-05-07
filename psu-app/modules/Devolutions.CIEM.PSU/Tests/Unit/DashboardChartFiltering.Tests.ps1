@@ -135,5 +135,8 @@ Describe 'Dashboard Scan Efficiency' {
         $script:PageSource | Should -Match 'Get-CIEMScanEfficiencySummary'
         $script:PageSource | Should -Match "'data-ciem-scan-efficiency-metric'\s*=\s*'true'"
         $script:PageSource | Should -Match "'data-ciem-scan-efficiency-run'\s*=\s*'true'"
+        $script:PageSource | Should -Match 'Discovery Phase Timing'
+        $script:PageSource | Should -Match 'LatestDiscoveryPhaseMetrics'
+        $script:PageSource | Should -Match "'data-ciem-discovery-phase-metric'\s*=\s*'true'"
     }
 }

@@ -21,6 +21,8 @@ function NewCIEMExposureChange {
         [string]$CreatedAt
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $source = if ($Current) { $Current } else { $Previous }
     $severity = if ($ChangeType -eq 'RemovedRisk') { [string]$Previous.severity } else { [string]$Current.severity }
     $severityRank = if ($ChangeType -eq 'RemovedRisk') { [int]$Previous.severity_rank } else { [int]$Current.severity_rank }

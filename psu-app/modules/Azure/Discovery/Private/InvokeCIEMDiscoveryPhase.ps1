@@ -68,7 +68,10 @@ function InvokeCIEMDiscoveryPhase {
         [scriptblock]$OnSuccess,
 
         [Parameter()]
-        [scriptblock]$DetailBuilder
+        [scriptblock]$DetailBuilder,
+
+        [Parameter()]
+        [int]$DiscoveryRunId
     )
 
     $ErrorActionPreference = 'Stop'
@@ -77,6 +80,8 @@ function InvokeCIEMDiscoveryPhase {
     $result = $null
     $succeeded = $true
     $phaseException = $null
+    $detail = $null
+    $throwPhaseException = $false
 
     try {
         $result = & $Action
@@ -85,6 +90,7 @@ function InvokeCIEMDiscoveryPhase {
         $succeeded = $false
         $WarningCounter.Value++
         $failMessage = "${Name} failed: $($_.Exception.Message)"
+        $detail = $failMessage
         $ErrorMessages.Add($failMessage)
         Write-Warning $failMessage
         $phaseException = [System.InvalidOperationException]::new($failMessage, $_.Exception)
@@ -110,8 +116,21 @@ function InvokeCIEMDiscoveryPhase {
     else {
         Write-CIEMLog -Message "Phase ${Name} failed after ${elapsed}s" -Severity WARNING -Component 'Discovery'
         if ($FailureMode -eq 'FailRun') {
-            throw $phaseException
+            $throwPhaseException = $true
         }
+    }
+
+    if ($PSBoundParameters.ContainsKey('DiscoveryRunId')) {
+        Save-CIEMAzureDiscoveryPhaseMetric `
+            -DiscoveryRunId $DiscoveryRunId `
+            -PhaseName $Name `
+            -Succeeded $succeeded `
+            -ElapsedSeconds $elapsed `
+            -Evidence $detail | Out-Null
+    }
+
+    if ($throwPhaseException) {
+        throw $phaseException
     }
 
     [pscustomobject]@{

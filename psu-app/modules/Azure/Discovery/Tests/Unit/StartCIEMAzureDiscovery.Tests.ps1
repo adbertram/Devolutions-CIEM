@@ -160,6 +160,11 @@ Describe 'Start-CIEMAzureDiscovery' {
             $script:StartDiscoverySource | Should -Match 'Compare-CIEMExposureSnapshot'
             $script:StartDiscoverySource | Should -Match "status IN \('Completed', 'Partial'\)"
         }
+
+        It 'Start-CIEMAzureDiscovery records discovery phase metrics for the current run' {
+            $script:StartDiscoverySource | Should -Match 'InvokeCIEMDiscoveryPhase'
+            $script:StartDiscoverySource | Should -Match 'DiscoveryRunId\s+\$run\.Id'
+        }
     }
 
     Context 'Private collection helpers exist' {

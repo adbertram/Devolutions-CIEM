@@ -18,6 +18,9 @@ const {
   seedExposureChangeData,
   cleanupExposureChangeData,
   getTestExposureChangeCount,
+  seedDashboardDiscoveryPhaseMetrics,
+  cleanupDashboardDiscoveryPhaseMetrics,
+  getDashboardDiscoveryPhaseMetricCount,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
 const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
@@ -45,15 +48,21 @@ test.describe('Dashboard Page', () => {
   test.describe('when seeded scan history exists in the database', () => {
     let backup = null;
     let identityBackup = null;
+    let discoveryPhaseRunId = null;
 
     test.beforeAll(() => {
       backup = backupAndApplyFixture('scan-history-summary');
       identityBackup = backupAndClearDashboardIdentityData();
       seedIdentityViewData();
+      discoveryPhaseRunId = seedDashboardDiscoveryPhaseMetrics();
       const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
       const run2Count = getScanResultCount(`${TEST_PREFIX}scan_run_2`);
+      const discoveryPhaseMetricCount = getDashboardDiscoveryPhaseMetricCount(discoveryPhaseRunId);
       if (run1Count !== 5 || run2Count !== 3) {
         throw new Error(`Seed verification failed: scan_run_1 has ${run1Count} results (expected 5), scan_run_2 has ${run2Count} (expected 3)`);
+      }
+      if (discoveryPhaseMetricCount !== 2) {
+        throw new Error(`Seed verification failed: discovery phase timing has ${discoveryPhaseMetricCount} metrics (expected 2)`);
       }
       const identityCounts = getDashboardIdentityCounts();
       if (identityCounts.identityCount !== 3 || identityCounts.entitlementCount !== 4) {
@@ -65,6 +74,7 @@ test.describe('Dashboard Page', () => {
     test.afterAll(() => {
       restoreFixtureBackup(backup);
       restoreDashboardIdentityData(identityBackup);
+      cleanupDashboardDiscoveryPhaseMetrics();
     });
 
     test('should display scan run selector dropdown', async () => {
@@ -157,9 +167,16 @@ test.describe('Dashboard Page', () => {
       expect(text).toContain('Average Duration');
       expect(text).toContain('Latest Throughput');
       expect(text).toContain('Average Throughput');
+      expect(text).toContain('Discovery Phase Timing');
+      expect(text).toContain('Total Discovery Duration');
+      expect(text).toContain('ARM collection');
+      expect(text).toContain('Graph build');
+      expect(text).toContain('10 ARM rows');
+      expect(text).toContain('3 nodes, 2 edges');
       expect(text).toContain('Duration:');
       expect(text).toContain('Results:');
       expect(await dashPage.getScanEfficiencyMetricCount()).toBe(4);
+      expect(await dashPage.getDiscoveryPhaseMetricCount()).toBe(2);
       expect(await dashPage.getScanEfficiencyRunCount()).toBeGreaterThanOrEqual(2);
     });
 

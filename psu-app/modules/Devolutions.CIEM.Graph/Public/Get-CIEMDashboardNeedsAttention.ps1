@@ -5,6 +5,8 @@ function GetCIEMDashboardSeverityRank {
         [string]$Severity
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $normalized = $Severity.ToLowerInvariant()
     switch ($normalized) {
         'critical' { 1 }
@@ -22,6 +24,8 @@ function ConvertToCIEMDashboardSeverityLabel {
         [string]$Severity
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $normalized = $Severity.ToLowerInvariant()
     switch ($normalized) {
         'critical' { 'Critical' }
@@ -38,6 +42,8 @@ function GetCIEMDashboardSignalRank {
         [Parameter()]
         [string]$Signal
     )
+
+    $ErrorActionPreference = 'Stop'
 
     switch ($Signal) {
         'managed-identity-public-exposure' { 1 }
@@ -57,6 +63,8 @@ function GetCIEMDashboardPrimaryRiskSignal {
         [object[]]$RiskSignals
     )
 
+    $ErrorActionPreference = 'Stop'
+
     @($RiskSignals |
         Sort-Object `
             @{ Expression = { GetCIEMDashboardSeverityRank -Severity ([string]$_.Severity) } }, `
@@ -73,6 +81,8 @@ function GetCIEMDashboardIdentityTarget {
         [Parameter()]
         [object]$HostingResource
     )
+
+    $ErrorActionPreference = 'Stop'
 
     if ($HostingResource -and [bool]$HostingResource.HasPublicIP) {
         return [string]$HostingResource.Name
@@ -101,6 +111,8 @@ function GetCIEMDashboardIdentityReason {
         [object]$PrimarySignal
     )
 
+    $ErrorActionPreference = 'Stop'
+
     if ($PrimarySignal) {
         return [string]$PrimarySignal.Description
     }
@@ -126,6 +138,8 @@ function GetCIEMDashboardIdentityEvidence {
         [string]$Target
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $parts = @(
         "$($Summary.EntitlementCount) entitlement(s)"
         "$($Summary.PrivilegedCount) privileged"
@@ -147,6 +161,8 @@ function GetCIEMDashboardAttackPathIdentity {
         [object]$AttackPath
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $identityKinds = @('EntraUser', 'EntraServicePrincipal', 'EntraManagedIdentity', 'EntraGroup')
     $identityNode = @($AttackPath.Path | Where-Object { $identityKinds -contains [string]$_.kind } | Select-Object -First 1)
     if ($identityNode.Count -eq 0) {
@@ -166,6 +182,8 @@ function GetCIEMDashboardAttackPathTarget {
         [Parameter(Mandatory)]
         [object]$AttackPath
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $pathNodes = @($AttackPath.Path)
     if ($pathNodes.Count -eq 0) {

@@ -129,6 +129,7 @@ function Start-CIEMAzureDiscovery {
                     -FailureMode $phase.FailureMode `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                     -Action {
                         $results = @(InvokeCIEMResourceGraphQuery -Query $table -SubscriptionId $subscriptionIds)
                         Write-CIEMLog "ResourceGraph/${table}: $($results.Count) rows" -Component 'Discovery'
@@ -151,6 +152,7 @@ function Start-CIEMAzureDiscovery {
                 -FailureMode $builtInPhaseConfig.FailureMode `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                 -Action {
                     $builtInRoles = @(GetCIEMBuiltInRoleDefinitions)
                     Write-CIEMLog "BuiltInRoleDefinitions: $($builtInRoles.Count) rows" -Component 'Discovery'
@@ -171,6 +173,7 @@ function Start-CIEMAzureDiscovery {
                 -FailureMode 'FailRun' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                 -DetailBuilder { param($r) "$armRowCount rows" } `
                 -Action {
                     InvokeCIEMTransaction {
@@ -211,6 +214,7 @@ function Start-CIEMAzureDiscovery {
                 -FailureMode $entityPhaseConfig.FailureMode `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                 -DetailBuilder { param($r) "$(@($r).Count) rows" } `
                 -Action {
                     $entities = @(InvokeCIEMEntraEntityCollection)
@@ -235,6 +239,7 @@ function Start-CIEMAzureDiscovery {
                     -FailureMode $permissionPhaseConfig.FailureMode `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                     -DetailBuilder { param($r) "$(@($r).Count) rows" } `
                     -Action {
                         $permissions = @(InvokeCIEMEntraPermissionCollection -ServicePrincipals $collectedServicePrincipals)
@@ -257,6 +262,7 @@ function Start-CIEMAzureDiscovery {
                 -FailureMode 'FailRun' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                 -DetailBuilder { param($r) "$entraRowCount rows" } `
                 -Action {
                     InvokeCIEMTransaction {
@@ -298,6 +304,7 @@ function Start-CIEMAzureDiscovery {
                     -FailureMode $relationshipPhaseConfig.FailureMode `
                     -ErrorMessages $errorMessages `
                     -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                     -DetailBuilder { param($r) "$(@($r).Count) rows" } `
                     -Action {
                         $rels = @(InvokeCIEMEntraRelationshipCollection -Groups $collectedGroups -DirectoryRoles $collectedRoles -Users $collectedUsers)
@@ -323,6 +330,7 @@ function Start-CIEMAzureDiscovery {
                 -FailureMode 'FailRun' `
                 -ErrorMessages $errorMessages `
                 -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
                 -DetailBuilder { param($r) "$relationshipCount rows" } `
                 -Action {
                     InvokeCIEMTransaction {
@@ -346,6 +354,7 @@ function Start-CIEMAzureDiscovery {
             -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
             -DetailBuilder { param($r) "$($r.ArmCount) ARM, $($r.EntraCount) Entra, $($r.RelCount) relationships" } `
             -Action {
                 $script:discoveryLoadedArm = @(Get-CIEMAzureArmResource)
@@ -369,6 +378,7 @@ function Start-CIEMAzureDiscovery {
             -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
             -Action {
                 InvokeCIEMTransaction {
                     param($conn)
@@ -383,6 +393,7 @@ function Start-CIEMAzureDiscovery {
             -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
             -Action {
                 InvokeCIEMTransaction {
                     param($conn)
@@ -406,6 +417,7 @@ function Start-CIEMAzureDiscovery {
             -FailureMode 'FailRun' `
             -ErrorMessages $errorMessages `
             -WarningCounter $warningCounter `
+                -DiscoveryRunId $run.Id `
             -Action {
                 Sync-CIEMAttackPathRuleCatalog | Out-Null
                 $attackPathCount = @(Update-CIEMAttackPath -PassThru).Count

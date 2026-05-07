@@ -6,6 +6,7 @@ const P = TEST_PREFIX; // shorthand for SQL literals
 const SCAN_HISTORY_FIXTURE = 'scan-history-summary';
 const EXPOSURE_PREVIOUS_RUN_ID = 910001;
 const EXPOSURE_CURRENT_RUN_ID = 910002;
+const DASHBOARD_DISCOVERY_PHASE_JOB_ID = -920301;
 
 function sqlValue(value) {
   return value == null ? 'NULL' : `'${String(value).replace(/'/g, "''")}'`;
@@ -25,7 +26,9 @@ function cleanupTestData() {
     // Exposure-change data
     `DELETE FROM ciem_exposure_changes WHERE id LIKE '%${P}%' OR impacted_identity_id LIKE '${P}%' OR impacted_resource_id LIKE '%${P}%' OR current_discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
     `DELETE FROM ciem_exposure_snapshot_items WHERE exposure_key LIKE '%${P}%' OR impacted_identity_id LIKE '${P}%' OR impacted_resource_id LIKE '%${P}%' OR discovery_run_id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `DELETE FROM azure_discovery_phase_metrics WHERE evidence LIKE '%${P}%' OR discovery_run_id IN (SELECT id FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID})`,
     `DELETE FROM azure_discovery_runs WHERE id IN (${EXPOSURE_PREVIOUS_RUN_ID}, ${EXPOSURE_CURRENT_RUN_ID})`,
+    `DELETE FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID}`,
     // Materialized attack paths
     `DELETE FROM attack_paths WHERE id LIKE '${P}%' OR path_json LIKE '%${P}%' OR edges_json LIKE '%${P}%' OR path_chain LIKE '%${P}%'`,
     // Graph data (edges first — path-style IDs need leading %)
@@ -515,8 +518,9 @@ function getCompletedDiscoveryRunCount() {
 
 function backupAndClearAllDiscoveryRuns() {
   const rows = sshQuery('SELECT * FROM azure_discovery_runs');
-  sshNonQuery('DELETE FROM azure_discovery_runs');
-  console.log(`[setup] Backed up ${rows.length} discovery runs and cleared table.`);
+  rows.phaseMetrics = sshQuery('SELECT * FROM azure_discovery_phase_metrics');
+  sshNonQuery('DELETE FROM azure_discovery_phase_metrics; DELETE FROM azure_discovery_runs');
+  console.log(`[setup] Backed up ${rows.length} discovery runs and ${rows.phaseMetrics.length} phase metrics, cleared tables.`);
   return rows;
 }
 
@@ -524,13 +528,52 @@ function restoreDiscoveryRuns(rows) {
   if (!rows) return;
 
   const cols = ['id', 'psu_job_id', 'scope', 'status', 'started_at', 'completed_at', 'arm_type_count', 'arm_row_count', 'entra_type_count', 'entra_row_count', 'warning_count', 'error_message'];
-  const stmts = ['DELETE FROM azure_discovery_runs'];
+  const metricCols = ['id', 'discovery_run_id', 'phase_name', 'succeeded', 'elapsed_seconds', 'evidence', 'recorded_at'];
+  const stmts = ['DELETE FROM azure_discovery_phase_metrics', 'DELETE FROM azure_discovery_runs'];
   for (const r of rows) {
     const vals = cols.map(c => sqlValue(r[c])).join(', ');
     stmts.push(`INSERT OR REPLACE INTO azure_discovery_runs (${cols.join(', ')}) VALUES (${vals})`);
   }
+  for (const r of rows.phaseMetrics) {
+    const vals = metricCols.map(c => sqlValue(r[c])).join(', ');
+    stmts.push(`INSERT OR REPLACE INTO azure_discovery_phase_metrics (${metricCols.join(', ')}) VALUES (${vals})`);
+  }
   sshNonQuery(stmts.join('; '));
-  console.log(`[teardown] Restored ${rows.length} discovery runs.`);
+  console.log(`[teardown] Restored ${rows.length} discovery runs and ${rows.phaseMetrics.length} phase metrics.`);
+}
+
+function cleanupDashboardDiscoveryPhaseMetrics() {
+  sshNonQuery(`DELETE FROM azure_discovery_phase_metrics WHERE discovery_run_id IN (SELECT id FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID}); DELETE FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID}`);
+  console.log('[cleanup] Dashboard discovery phase timing data cleaned up.');
+}
+
+function seedDashboardDiscoveryPhaseMetrics() {
+  cleanupDashboardDiscoveryPhaseMetrics();
+  const startedAt = '2026-05-07T04:00:00.000Z';
+  const completedAt = '2026-05-07T04:00:16.000Z';
+  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (${DASHBOARD_DISCOVERY_PHASE_JOB_ID}, 'All', 'Completed', '${startedAt}', '${completedAt}', 2, 10, 2, 8, 0, NULL)`);
+  const rows = sshQuery(`SELECT id FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID} ORDER BY id DESC LIMIT 1`);
+  if (rows.length !== 1) {
+    throw new Error('Seed verification failed: dashboard discovery run was not inserted');
+  }
+
+  const runId = rows[0].id;
+  const stmts = [
+    `INSERT INTO azure_discovery_phase_metrics (discovery_run_id, phase_name, succeeded, elapsed_seconds, evidence, recorded_at) VALUES (${runId}, 'ARM collection', 1, 10.12, '${P}10 ARM rows', '${completedAt}')`,
+    `INSERT INTO azure_discovery_phase_metrics (discovery_run_id, phase_name, succeeded, elapsed_seconds, evidence, recorded_at) VALUES (${runId}, 'Graph build', 1, 5.33, '${P}3 nodes, 2 edges', '${completedAt}')`
+  ];
+  sshNonQuery(stmts.join('; '));
+
+  const count = getDashboardDiscoveryPhaseMetricCount(runId);
+  if (count !== 2) {
+    throw new Error(`Seed verification failed: dashboard discovery phase metrics count is ${count}, expected 2`);
+  }
+  console.log(`[seed] Seeded dashboard discovery phase timing for run id=${runId}`);
+  return runId;
+}
+
+function getDashboardDiscoveryPhaseMetricCount(runId) {
+  return sshQuery(`SELECT COUNT(*) as count FROM azure_discovery_phase_metrics WHERE discovery_run_id = ${runId}`)[0].count;
 }
 
 function seedCompletedDiscoveryRun() {
@@ -662,6 +705,7 @@ module.exports = {
   clearStaleDiscoveryRuns, getCompletedDiscoveryRunCount,
   backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
   seedCompletedDiscoveryRunAt,
+  seedDashboardDiscoveryPhaseMetrics, cleanupDashboardDiscoveryPhaseMetrics, getDashboardDiscoveryPhaseMetricCount,
   seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
   seedExposureChangeData, cleanupExposureChangeData, getTestExposureChangeCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,

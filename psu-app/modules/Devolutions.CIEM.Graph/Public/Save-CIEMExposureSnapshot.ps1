@@ -11,6 +11,8 @@ function NewCIEMIdentityExposureSnapshotItem {
         [string]$ObservedAt
     )
 
+    $ErrorActionPreference = 'Stop'
+
     $signals = Get-CIEMIdentityRiskSignals -PrincipalId ([string]$Summary.Id)
     $roleAssignments = @($signals.RoleAssignments)
     $targetAssignment = @($roleAssignments |
@@ -58,6 +60,8 @@ function NewCIEMAttackPathExposureSnapshotItem {
         [Parameter(Mandatory)]
         [string]$ObservedAt
     )
+
+    $ErrorActionPreference = 'Stop'
 
     $pathNodes = @($AttackPath.Path)
     if ($pathNodes.Count -eq 0) {

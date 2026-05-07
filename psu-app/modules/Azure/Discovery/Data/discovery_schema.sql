@@ -112,6 +112,25 @@ CREATE INDEX IF NOT EXISTS idx_azure_discovery_schedules_enabled ON azure_discov
 CREATE INDEX IF NOT EXISTS idx_azure_discovery_schedules_psu_schedule ON azure_discovery_schedules(psu_schedule_id);
 
 -- =============================================================================
+-- Azure Discovery Phase Metrics
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS azure_discovery_phase_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    discovery_run_id INTEGER NOT NULL,
+    phase_name TEXT NOT NULL,
+    succeeded INTEGER NOT NULL,
+    elapsed_seconds REAL NOT NULL,
+    evidence TEXT,
+    recorded_at TEXT NOT NULL,
+    UNIQUE (discovery_run_id, phase_name),
+    FOREIGN KEY (discovery_run_id) REFERENCES azure_discovery_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovery_phase_metrics_run ON azure_discovery_phase_metrics(discovery_run_id);
+CREATE INDEX IF NOT EXISTS idx_discovery_phase_metrics_phase ON azure_discovery_phase_metrics(phase_name);
+
+-- =============================================================================
 -- Azure Resource Relationships
 -- =============================================================================
 

@@ -346,7 +346,7 @@ function New-CIEMDashboardPage {
             }
         } -Content {
             New-UDTypography -Text 'Scan Efficiency' -Variant 'h5' -Style @{ marginBottom = '6px' }
-            New-UDTypography -Text 'Duration and throughput from persisted scan runs.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+            New-UDTypography -Text 'Duration and throughput from persisted scan runs and discovery phase timing.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
 
             if ($scanEfficiency.Status -eq 'NoScanData') {
                 New-UDElement -Tag 'div' -Attributes @{
@@ -420,6 +420,45 @@ function New-CIEMDashboardPage {
             }
             else {
                 throw "Unsupported scan efficiency status '$($scanEfficiency.Status)'."
+            }
+
+            $discoveryPhaseMetrics = @($scanEfficiency.LatestDiscoveryPhaseMetrics)
+            if ($discoveryPhaseMetrics.Count -gt 0) {
+                $discoveryDurationText = "$($scanEfficiency.LatestDiscoveryDurationSeconds)s"
+                New-UDElement -Tag 'div' -Id 'dashboardDiscoveryPhaseTiming' -Attributes @{
+                    style = @{
+                        display = 'grid'
+                        gap = '8px'
+                        marginTop = '12px'
+                    }
+                } -Content {
+                    New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                        New-UDTypography -Text 'Discovery Phase Timing' -Variant 'subtitle1' -Style @{ fontWeight = '600' }
+                        New-UDChip -Label "Run #$($scanEfficiency.LatestDiscoveryRunId)" -Size 'small' -Variant 'outlined'
+                        New-UDChip -Label "Total Discovery Duration: $discoveryDurationText" -Size 'small' -Variant 'outlined'
+                    }
+                    foreach ($phase in $discoveryPhaseMetrics) {
+                        $phaseStatusLabel = if ($phase.Succeeded) { 'Succeeded' } else { 'Failed' }
+                        $phaseStatusColor = if ($phase.Succeeded) { '#2e7d32' } else { '#d32f2f' }
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-discovery-phase-metric' = 'true'
+                            style = @{
+                                display = 'grid'
+                                gap = '6px'
+                                padding = '10px 12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                                New-UDChip -Label $phaseStatusLabel -Size 'small' -Style @{ backgroundColor = $phaseStatusColor; color = 'white' }
+                                New-UDTypography -Text $phase.PhaseName -Variant 'subtitle2' -Style @{ fontWeight = '600'; overflowWrap = 'anywhere' }
+                            }
+                            New-UDTypography -Text "Duration: $($phase.ElapsedSeconds)s; Evidence: $($phase.Evidence)" -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
+                        }
+                    }
+                }
             }
         }
 

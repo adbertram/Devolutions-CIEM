@@ -5,6 +5,8 @@ function ConvertCIEMPAMCandidate {
         [object]$Item
     )
 
+    $ErrorActionPreference = 'Stop'
+
     switch ([string]$Item.SourceType) {
         'Identity' {
             $capability = 'JIT elevation and approval workflow'
@@ -47,6 +49,8 @@ function NewCIEMPAMProgressStage {
         [Parameter(Mandatory)]
         [string]$Evidence
     )
+
+    $ErrorActionPreference = 'Stop'
 
     [PSCustomObject]@{
         Name     = $Name
