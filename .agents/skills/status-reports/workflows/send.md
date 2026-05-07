@@ -71,7 +71,7 @@ If — and only if — the user asked for screenshots, load the `playwright-cli`
 <details>
 <summary>Screenshot capture instructions (only when user asks)</summary>
 
-The CIEM app runs at `http://192.168.86.30:5001/ciem/ciem/` (LOCAL_PSU_URL from .env). If PSU is not running, start it via `ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'`.
+The CIEM app runs at `http://192.168.86.36:5001/ciem/ciem/` (LOCAL_PSU_URL from .env). If PSU is not running, start it via `ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'`.
 
 **Capture pattern (per page):**
 

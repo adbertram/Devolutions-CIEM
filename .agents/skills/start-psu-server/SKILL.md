@@ -49,7 +49,7 @@ for i in $(seq 1 20); do
 done
 ```
 
-Report: **adam-server PSU running at http://192.168.86.30:5001 (LOCAL_PSU_URL from .env)**
+Report: **adam-server PSU running at http://192.168.86.36:5001 (LOCAL_PSU_URL from .env)**
 </step>
 
 <step name="start-azure" condition="target is azure">
