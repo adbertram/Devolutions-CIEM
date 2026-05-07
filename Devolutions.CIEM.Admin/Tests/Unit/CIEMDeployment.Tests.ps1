@@ -380,7 +380,38 @@ Describe 'Test-CIEMPSUDeployment' {
         $script:runtimeScripts = [System.Collections.Generic.List[string]]::new()
         $script:testEnvFilePaths = [System.Collections.Generic.List[string]]::new()
         $script:ciemPageUris = [System.Collections.Generic.List[string]]::new()
-        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 13, "ExpectedScriptCount": 13, "UnsupportedScriptCount": 0, "UnsupportedScriptNames": [], "DatabaseInitialized": true }'
+        function New-TestDeploymentProbeJson {
+            param(
+                [Parameter()][string]$PsuVersion = '5.5.4',
+                [Parameter()][int]$ScriptCount = 3,
+                [Parameter()][int]$ExpectedScriptCount = 3,
+                [Parameter()][int]$UnsupportedScriptCount = 0,
+                [Parameter()][string[]]$UnsupportedScriptNames = @(),
+                [Parameter()][bool]$DiscoveryCommandRegistered = $true,
+                [Parameter()][bool]$ScheduleSupportAvailable = $true,
+                [Parameter()][string]$ManagedIdentityReadStatus = 'NotRequested',
+                [Parameter()][int]$ManagedIdentitySubscriptionCount = 0
+            )
+
+            [pscustomobject]@{
+                PsuVersion                       = $PsuVersion
+                ModuleCount                      = 1
+                ModuleVersion                    = '4.0.21'
+                ModuleBase                       = '/Users/adam/psu/Repository/Modules/Devolutions.CIEM'
+                AppCount                         = 1
+                ScriptCount                      = $ScriptCount
+                ExpectedScriptCount              = $ExpectedScriptCount
+                UnsupportedScriptCount           = $UnsupportedScriptCount
+                UnsupportedScriptNames           = @($UnsupportedScriptNames)
+                DiscoveryCommandRegistered       = $DiscoveryCommandRegistered
+                ScheduleSupportAvailable         = $ScheduleSupportAvailable
+                DatabasePath                     = '/Users/adam/psu/Repository/Modules/Devolutions.CIEM/data/ciem.db'
+                DatabaseInitialized              = $true
+                ManagedIdentityReadStatus        = $ManagedIdentityReadStatus
+                ManagedIdentitySubscriptionCount = $ManagedIdentitySubscriptionCount
+            } | ConvertTo-Json -Depth 5 -Compress
+        }
+        $script:probeOutput = New-TestDeploymentProbeJson
         Mock -ModuleName Devolutions.CIEM.Admin Invoke-TestCommand {
             $script:runtimeScripts.Add($ScriptBlock.ToString())
             $script:testEnvFilePaths.Add([string]$EnvFilePath)
@@ -415,6 +446,30 @@ Describe 'Test-CIEMPSUDeployment' {
         $script:ciemPageUris | Should -Contain 'https://mocked-ciem-psu.azurewebsites.net/ciem'
     }
 
+    It 'returns a production readiness checklist with PSU, module, app, script, schedule, database, and topology results' {
+        $result = Test-CIEMPSUDeployment -Environment azure
+
+        $result.SupportedTopology | Should -Be 'SingleInstance'
+        $result.MultiInstanceStatus | Should -Be 'NotValidated'
+        $result.SQLiteSupportStatus | Should -Be 'SupportedForSingleInstance'
+        $result.Details.PsuVersion | Should -Be '5.5.4'
+        $result.Details.ModuleVersion | Should -Be '4.0.21'
+        $result.Details.ModuleBase | Should -Be '/Users/adam/psu/Repository/Modules/Devolutions.CIEM'
+        $result.Details.DiscoveryCommandRegistered | Should -BeTrue
+        $result.Details.ScheduleSupportAvailable | Should -BeTrue
+        $result.Details.ManagedIdentityReadStatus | Should -Be 'NotRequested'
+
+        $checkNames = @($result.Checklist | Select-Object -ExpandProperty Name)
+        $checkNames | Should -Contain 'PSU version'
+        $checkNames | Should -Contain 'CIEM module import path'
+        $checkNames | Should -Contain 'CIEM app route'
+        $checkNames | Should -Contain 'CIEM automation scripts'
+        $checkNames | Should -Contain 'Scheduled discovery support'
+        $checkNames | Should -Contain 'CIEM SQLite database'
+        $checkNames | Should -Contain 'PSU topology'
+        $checkNames | Should -Contain 'Managed identity read permission'
+    }
+
     It 'passes the selected env file to the PSU runtime probe and page validation' {
         Test-CIEMPSUDeployment -Environment azure -EnvFilePath '/tmp/custom-ciem.env' | Out-Null
 
@@ -424,18 +479,65 @@ Describe 'Test-CIEMPSUDeployment' {
         }
     }
 
+    It 'enforces an expected PSU version only when the expected version is supplied' {
+        $script:probeOutput = New-TestDeploymentProbeJson -PsuVersion '2026.1.0'
+
+        $result = Test-CIEMPSUDeployment -Environment local
+        $result.Details.PsuVersion | Should -Be '2026.1.0'
+
+        { Test-CIEMPSUDeployment -Environment local -ExpectedPsuVersion '5.5.4' } |
+            Should -Throw -ExpectedMessage '*expected PSU version 5.5.4*found 2026.1.0*'
+    }
+
     It 'throws when only one CIEM-managed PSU script is registered' {
-        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 1, "ExpectedScriptCount": 13, "UnsupportedScriptCount": 0, "UnsupportedScriptNames": [], "DatabaseInitialized": true }'
+        $script:probeOutput = New-TestDeploymentProbeJson -ScriptCount 1
 
         { Test-CIEMPSUDeployment -Environment azure } |
-            Should -Throw -ExpectedMessage '*expected 13 CIEM-managed PSU scripts*'
+            Should -Throw -ExpectedMessage '*expected 3 CIEM-managed PSU scripts*'
     }
 
     It 'throws when unsupported CIEM PSU script residue exists' {
-        $script:probeOutput = '{ "ModuleCount": 1, "AppCount": 1, "ScriptCount": 13, "ExpectedScriptCount": 13, "UnsupportedScriptCount": 1, "UnsupportedScriptNames": ["Devolutions.CIEM/Start-CIEMAzureDiscovery"], "DatabaseInitialized": true }'
+        $script:probeOutput = New-TestDeploymentProbeJson -UnsupportedScriptCount 1 -UnsupportedScriptNames @('Checks/Start-CIEMAzureDiscovery')
 
         { Test-CIEMPSUDeployment -Environment azure } |
-            Should -Throw -ExpectedMessage '*unsupported CIEM PSU scripts on azure: Devolutions.CIEM/Start-CIEMAzureDiscovery*'
+            Should -Throw -ExpectedMessage '*unsupported CIEM PSU scripts on azure: Checks/Start-CIEMAzureDiscovery*'
+    }
+
+    It 'throws when the supported discovery script is not registered' {
+        $script:probeOutput = New-TestDeploymentProbeJson -DiscoveryCommandRegistered $false
+
+        { Test-CIEMPSUDeployment -Environment azure } |
+            Should -Throw -ExpectedMessage '*Start-CIEMAzureDiscovery is not registered*'
+    }
+
+    It 'throws when PSU schedule cmdlets are unavailable' {
+        $script:probeOutput = New-TestDeploymentProbeJson -ScheduleSupportAvailable $false
+
+        { Test-CIEMPSUDeployment -Environment azure } |
+            Should -Throw -ExpectedMessage '*PSU schedule support is not available*'
+    }
+
+    It 'refuses multi-instance topology because CIEM SQLite sharing has not been validated' {
+        { Test-CIEMPSUDeployment -Environment azure -Topology MultiInstance } |
+            Should -Throw -ExpectedMessage '*multi-instance PSU topology has not been validated*'
+    }
+
+    It 'runs the managed identity read probe only when explicitly requested' {
+        $script:probeOutput = New-TestDeploymentProbeJson -ManagedIdentityReadStatus 'Validated' -ManagedIdentitySubscriptionCount 2
+
+        $result = Test-CIEMPSUDeployment -Environment azure -ValidateManagedIdentityRead
+
+        $script:runtimeScripts[0] | Should -Match '\$validateManagedIdentityRead\s*=\s*\$true'
+        $script:runtimeScripts[0] | Should -Match 'Connect-CIEMAzure'
+        $result.Details.ManagedIdentityReadStatus | Should -Be 'Validated'
+        $result.Details.ManagedIdentitySubscriptionCount | Should -Be 2
+    }
+
+    It 'throws when managed identity read validation is requested but not validated' {
+        $script:probeOutput = New-TestDeploymentProbeJson
+
+        { Test-CIEMPSUDeployment -Environment azure -ValidateManagedIdentityRead } |
+            Should -Throw -ExpectedMessage '*managed identity read permission was not validated*'
     }
 
     It 'throws when the CIEM page is still the PSU app-not-running placeholder' {
