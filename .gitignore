@@ -196,3 +196,6 @@ test-results/
 !.codex/scripts/environment_setup.sh
 !.codex/environments/
 !.codex/environments/environment.toml
+
+# PSU license file (contains signed license token)
+Devolutions.CIEM.Admin/Data/psu-license.psd1
