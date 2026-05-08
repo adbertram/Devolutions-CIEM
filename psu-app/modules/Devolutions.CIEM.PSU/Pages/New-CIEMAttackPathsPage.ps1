@@ -23,6 +23,51 @@ function New-CIEMAttackPathsPage {
             Show-UDToast -Message "Attack paths refreshed: $attackPathCount findings" -Duration 5000 -BackgroundColor '#4caf50'
         } -Style @{ marginBottom = '16px' }
 
+        $focusedAttackPathId = [string]$Query['attackPathId']
+        if ($focusedAttackPathId) {
+            $focusedAttackPaths = @(Devolutions.CIEM\Get-CIEMAttackPath | Where-Object { [string]$_.Id -eq $focusedAttackPathId })
+            if ($focusedAttackPaths.Count -eq 0) {
+                New-UDElement -Tag 'section' -Id 'attackPathDeepLinkDetail' -Attributes @{
+                    style = @{
+                        marginBottom = '16px'
+                    }
+                } -Content {
+                    New-UDAlert -Severity 'warning' -Title 'Attack path not found' -Text "No attack path with ID '$focusedAttackPathId' is available in the current graph."
+                }
+            }
+            elseif ($focusedAttackPaths.Count -eq 1) {
+                $focusedAttackPath = $focusedAttackPaths[0]
+                $focusedSeverityColor = Devolutions.CIEM\Get-SeverityColor -Severity $focusedAttackPath.Severity
+                $focusedPathChain = [string]$focusedAttackPath.PathChain
+                if ([string]::IsNullOrWhiteSpace($focusedPathChain)) {
+                    throw "Expected attack path '$focusedAttackPathId' to have PathChain."
+                }
+
+                New-UDElement -Tag 'section' -Id 'attackPathDeepLinkDetail' -Attributes @{
+                    style = @{
+                        display = 'grid'
+                        gap = '10px'
+                        padding = '14px'
+                        marginBottom = '16px'
+                        border = '1px solid #8c959f'
+                        borderRadius = '6px'
+                        backgroundColor = '#f6f8fa'
+                    }
+                } -Content {
+                    New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
+                        New-UDChip -Label 'Focused' -Size 'small' -Variant 'outlined'
+                        New-UDChip -Label $focusedAttackPath.Severity -Size 'small' -Style @{ backgroundColor = $focusedSeverityColor; color = 'white' }
+                        New-UDTypography -Text $focusedAttackPath.PatternName -Variant 'h6' -Style @{ fontWeight = '600' }
+                    }
+                    New-UDTypography -Text $focusedPathChain -Variant 'body2' -Style @{ fontFamily = 'monospace'; color = '#57606a'; overflowWrap = 'anywhere' }
+                    New-UDTypography -Text $focusedAttackPath.Remediation -Variant 'body2' -Style @{ color = '#24292f'; whiteSpace = 'pre-wrap'; overflowWrap = 'anywhere' }
+                }
+            }
+            else {
+                throw "Expected one attack path for '$focusedAttackPathId', got $($focusedAttackPaths.Count)."
+            }
+        }
+
         New-UDCard -Content {
             New-UDDynamic -Id 'attackPathsPanel' -Content {
 
@@ -312,20 +357,9 @@ javascript:(()=>{const control=document.activeElement;const panel=control.closes
                                                                     throw 'Cannot close attack path remediation execution because execution state is missing.'
                                                                 }
 
-                                                                $jobId = [int64]$executionState['JobId']
-                                                                $job = Get-PSUJob -Id $jobId -Integrated
-                                                                $isRunning = @('Queued', 'Running') -contains [string]$job.Status
-                                                                $executionState['Status'] = [string]$job.Status
-                                                                $executionState['IsRunning'] = $isRunning
-
-                                                                if ($isRunning) {
-                                                                    $executionState['CloseWarning'] = $true
-                                                                    $Page:CIEMAttackPathExecution = $executionState
-                                                                    Sync-UDElement -Id $executionWarningId
-                                                                }
-                                                                else {
-                                                                    Hide-UDModal
-                                                                }
+                                                                $executionState['CloseWarning'] = $true
+                                                                $Page:CIEMAttackPathExecution = $executionState
+                                                                Sync-UDElement -Id $executionWarningId
                                                             }
                                                         }
                                                     }

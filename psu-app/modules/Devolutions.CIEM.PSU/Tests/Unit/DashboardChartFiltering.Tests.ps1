@@ -30,27 +30,54 @@ Describe 'Dashboard last discovery ownership' {
     }
 }
 
-Describe 'Dashboard section layout' {
+Describe 'Dashboard information architecture' {
 
-    It 'Renders separate checks and scans and identity stats sections without legacy scanner references' {
+    It 'Renders a compact overview, priority work, and collapsed supporting evidence layout without legacy scanner references' {
         $legacyScannerName = 'Pro' + 'wler'
-        $script:PageSource | Should -Match 'New-UDExpansionPanelGroup'
-        $script:PageSource | Should -Match "New-UDExpansionPanelGroup\s+-Id 'dashboardSectionPanels'\s+-Type 'Expandable'"
-        $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardScanPanel'"
-        $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardIdentityPanel'"
+        $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardOverviewSection'"
+        $script:PageSource | Should -Match "New-UDElement\s+-Id 'dashboardPrimaryStateGrid'"
+        $script:PageSource | Should -Match "'data-ciem-dashboard-status-metric'\s*=\s*'true'"
+        $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardPriorityWorkSection'"
+        $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardSupportingEvidenceSection'"
+        $script:PageSource | Should -Match "New-UDExpansionPanelGroup\s+-Id 'dashboardSupportingEvidencePanelGroup'.*-Type 'Accordion'"
+        $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardChecksAndScansPanel'"
+        $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardIdentityAndPAMPanel'"
         $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardScanSection'"
         $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardIdentitySection'"
-        $script:PageSource | Should -Match "'data-hideable'\s*=\s*'true'"
         $script:PageSource | Should -Match 'Checks & Scans'
         $script:PageSource | Should -Not -Match "\b$legacyScannerName\b"
         $script:PageSource | Should -Match 'Identity Stats'
     }
 
-    It 'Starts both dashboard expansion panels expanded' {
-        $scanPanelPattern = "New-UDExpansionPanel\s+-Id 'dashboardScanPanel'(?s).*?-Active"
-        $identityPanelPattern = "New-UDExpansionPanel\s+-Id 'dashboardIdentityPanel'(?s).*?-Active"
-        $script:PageSource | Should -Match $scanPanelPattern
-        $script:PageSource | Should -Match $identityPanelPattern
+    It 'Places status first, priority work next, and collapsed supporting evidence last' {
+        $overviewIndex = $script:PageSource.IndexOf("dashboardOverviewSection")
+        $priorityIndex = $script:PageSource.IndexOf("dashboardPriorityWorkSection")
+        $supportingIndex = $script:PageSource.IndexOf("dashboardSupportingEvidenceSection")
+
+        $overviewIndex | Should -BeGreaterThan -1
+        $priorityIndex | Should -BeGreaterThan -1
+        $supportingIndex | Should -BeGreaterThan -1
+        $overviewIndex | Should -BeLessThan $priorityIndex
+        $priorityIndex | Should -BeLessThan $supportingIndex
+        $script:PageSource | Should -Match 'New-UDExpansionPanelGroup'
+    }
+
+    It 'Keeps supporting detail panels collapsed by default' {
+        $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardChecksAndScansPanel'"
+        $script:PageSource | Should -Match "New-UDExpansionPanel\s+-Id 'dashboardIdentityAndPAMPanel'"
+        $script:PageSource | Should -Not -Match "dashboardChecksAndScansPanel'[\s\S]*?-Active"
+        $script:PageSource | Should -Not -Match "dashboardIdentityAndPAMPanel'[\s\S]*?-Active"
+    }
+
+    It 'Does not render removed dashboard signal references' {
+        foreach ($removedTerm in @(
+            ('ex' + 'posure'),
+            ('con' + 'nector'),
+            ('Get-CIEM' + 'Ex' + 'posure' + 'Change'),
+            ('Get-CIEM' + 'Con' + 'nector' + 'PayloadPreview')
+        )) {
+            $script:PageSource | Should -Not -Match $removedTerm
+        }
     }
 
     It 'Calculates identity stats from identity data tables' {
@@ -63,58 +90,32 @@ Describe 'Dashboard section layout' {
 }
 
 Describe 'Dashboard Needs Attention queue' {
-    It 'Renders the Needs Attention queue before secondary dashboard sections' {
+    It 'Renders the Needs Attention queue inside priority work before supporting evidence' {
         $needsAttentionIndex = $script:PageSource.IndexOf("dashboardNeedsAttentionSection")
-        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+        $priorityIndex = $script:PageSource.IndexOf("dashboardPriorityWorkSection")
+        $supportingIndex = $script:PageSource.IndexOf("dashboardSupportingEvidenceSection")
 
         $needsAttentionIndex | Should -BeGreaterThan -1
-        $sectionPanelsIndex | Should -BeGreaterThan -1
-        $needsAttentionIndex | Should -BeLessThan $sectionPanelsIndex
+        $priorityIndex | Should -BeGreaterThan -1
+        $supportingIndex | Should -BeGreaterThan -1
+        $priorityIndex | Should -BeLessThan $needsAttentionIndex
+        $needsAttentionIndex | Should -BeLessThan $supportingIndex
         $script:PageSource | Should -Match 'Get-CIEMDashboardNeedsAttention'
         $script:PageSource | Should -Match "'data-ciem-needs-attention-item'\s*=\s*'true'"
         $script:PageSource | Should -Match "'data-ciem-inspect-identity'\s*=\s*'true'"
         $script:PageSource | Should -Match "'data-ciem-inspect-attack-path'\s*=\s*'true'"
-    }
-}
-
-Describe 'Dashboard Exposure Changes queue' {
-    It 'Renders local exposure-change records before secondary dashboard sections' {
-        $exposureChangesIndex = $script:PageSource.IndexOf("dashboardExposureChangesSection")
-        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
-
-        $exposureChangesIndex | Should -BeGreaterThan -1
-        $sectionPanelsIndex | Should -BeGreaterThan -1
-        $exposureChangesIndex | Should -BeLessThan $sectionPanelsIndex
-        $script:PageSource | Should -Match 'Exposure Changes'
-        $script:PageSource | Should -Match 'Get-CIEMExposureChange'
-        $script:PageSource | Should -Match "'data-ciem-exposure-change-item'\s*=\s*'true'"
-        $script:PageSource | Should -Match 'Payload delivery is not enabled'
-    }
-}
-
-Describe 'Dashboard Connector Payload Previews' {
-    It 'Renders preview-only connector payloads before secondary dashboard sections' {
-        $previewIndex = $script:PageSource.IndexOf("dashboardConnectorPayloadPreviewSection")
-        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
-
-        $previewIndex | Should -BeGreaterThan -1
-        $sectionPanelsIndex | Should -BeGreaterThan -1
-        $previewIndex | Should -BeLessThan $sectionPanelsIndex
-        $script:PageSource | Should -Match 'Connector Payload Previews'
-        $script:PageSource | Should -Match 'Get-CIEMConnectorPayloadPreview'
-        $script:PageSource | Should -Match "'data-ciem-connector-payload-preview-item'\s*=\s*'true'"
-        $script:PageSource | Should -Match 'No outbound target is configured or contacted'
+        $script:PageSource | Should -Match 'DrillInUrl'
     }
 }
 
 Describe 'Dashboard PAM Implementation Progress' {
-    It 'Renders read-only PAM progress before secondary dashboard sections' {
+    It 'Renders read-only PAM progress in supporting evidence' {
         $progressIndex = $script:PageSource.IndexOf("dashboardPAMProgressSection")
-        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+        $supportingIndex = $script:PageSource.IndexOf("dashboardSupportingEvidenceSection")
 
         $progressIndex | Should -BeGreaterThan -1
-        $sectionPanelsIndex | Should -BeGreaterThan -1
-        $progressIndex | Should -BeLessThan $sectionPanelsIndex
+        $supportingIndex | Should -BeGreaterThan -1
+        $supportingIndex | Should -BeLessThan $progressIndex
         $script:PageSource | Should -Match 'PAM Implementation Progress'
         $script:PageSource | Should -Match 'Get-CIEMPAMProgressSummary'
         $script:PageSource | Should -Match "'data-ciem-pam-progress-stage'\s*=\s*'true'"
@@ -124,13 +125,13 @@ Describe 'Dashboard PAM Implementation Progress' {
 }
 
 Describe 'Dashboard Scan Efficiency' {
-    It 'Renders scan efficiency instrumentation before secondary dashboard sections' {
+    It 'Renders scan efficiency instrumentation in supporting evidence' {
         $efficiencyIndex = $script:PageSource.IndexOf("dashboardScanEfficiencySection")
-        $sectionPanelsIndex = $script:PageSource.IndexOf("dashboardSectionPanels")
+        $supportingIndex = $script:PageSource.IndexOf("dashboardSupportingEvidenceSection")
 
         $efficiencyIndex | Should -BeGreaterThan -1
-        $sectionPanelsIndex | Should -BeGreaterThan -1
-        $efficiencyIndex | Should -BeLessThan $sectionPanelsIndex
+        $supportingIndex | Should -BeGreaterThan -1
+        $supportingIndex | Should -BeLessThan $efficiencyIndex
         $script:PageSource | Should -Match 'Scan Efficiency'
         $script:PageSource | Should -Match 'Get-CIEMScanEfficiencySummary'
         $script:PageSource | Should -Match "'data-ciem-scan-efficiency-metric'\s*=\s*'true'"

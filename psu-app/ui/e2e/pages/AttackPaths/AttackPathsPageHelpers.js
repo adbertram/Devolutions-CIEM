@@ -10,6 +10,7 @@ class AttackPathsPageHelpers extends BasePage {
       dataGrid: '.MuiDataGrid-root',
       dataGridRows: '.MuiDataGrid-row',
       dataGridColumnHeaders: '.MuiDataGrid-columnHeader',
+      focusedDetail: '#attackPathDeepLinkDetail',
       detailPanelToggle: '.MuiDataGrid-row [aria-label="Expand"], .MuiDataGrid-row [aria-label="expand row"]',
       detailPanel: '.MuiDataGrid-detailPanel',
       remediationBlock: '.MuiDataGrid-detailPanel [data-ciem-attack-path-remediation="true"]',
@@ -38,6 +39,11 @@ class AttackPathsPageHelpers extends BasePage {
 
   async navigateToAttackPathsPage() {
     await this.goto(testConfig.pages.attackPaths);
+    await this.page.waitForTimeout(3000);
+  }
+
+  async navigateToAttackPathDetail(attackPathId) {
+    await this.goto(`${testConfig.pages.attackPaths}?attackPathId=${encodeURIComponent(attackPathId)}`);
     await this.page.waitForTimeout(3000);
   }
 
@@ -128,6 +134,18 @@ class AttackPathsPageHelpers extends BasePage {
 
   async getDetailPanelText() {
     return (await this.page.locator(this.selectors.detailPanel).textContent()).trim();
+  }
+
+  async waitForAttackPathDetail(patternName) {
+    await this.page.locator(this.selectors.detailPanel).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.detailPanel).getByText(patternName).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.remediationBlock).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.remediationScriptBlock).waitFor({ state: 'visible', timeout: 15000 });
+  }
+
+  async waitForFocusedAttackPathDetail(patternName) {
+    await this.page.locator(this.selectors.focusedDetail).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.focusedDetail).getByText(patternName).waitFor({ state: 'visible', timeout: 15000 });
   }
 
   async isRemediationBlockVisible() {

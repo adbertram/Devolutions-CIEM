@@ -286,6 +286,7 @@ function Get-CIEMDashboardNeedsAttention {
         $severity = ConvertToCIEMDashboardSeverityLabel -Severity ([string]$attackPath.Severity)
         $target = GetCIEMDashboardAttackPathTarget -AttackPath $attackPath
         $identity = GetCIEMDashboardAttackPathIdentityMetadata -AttackPath $attackPath
+        $drillInUrl = "/ciem/attack-paths?attackPathId=$([uri]::EscapeDataString([string]$attackPath.Id))"
 
         $items += [PSCustomObject]@{
             Id           = "attack-path:$($attackPath.Id)"
@@ -301,7 +302,7 @@ function Get-CIEMDashboardNeedsAttention {
             Target       = [string]$target.Name
             Reason       = "Attack path exposes $($target.Name)"
             Evidence     = [string]$attackPath.PathChain
-            DrillInUrl   = '/ciem/attack-paths'
+            DrillInUrl   = $drillInUrl
         }
     }
 

@@ -1,4 +1,10 @@
-const { sshQuery, sshNonQuery, LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME } = require('./psu-helpers');
+const {
+  sshQuery,
+  sshNonQuery,
+  LONG_RUNNING_ATTACK_PATH_RULE_ID,
+  LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME,
+  LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH
+} = require('./psu-helpers');
 const { insertFixtureRows, loadFixture } = require('./fixtures');
 
 const TEST_PREFIX = '_E2E_TEST_';
@@ -31,6 +37,7 @@ function cleanupTestData() {
     `DELETE FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID}`,
     // Materialized attack paths
     `DELETE FROM attack_paths WHERE id LIKE '${P}%' OR path_json LIKE '%${P}%' OR edges_json LIKE '%${P}%' OR path_chain LIKE '%${P}%'`,
+    `DELETE FROM attack_path_rules WHERE id = '${LONG_RUNNING_ATTACK_PATH_RULE_ID}'`,
     // Graph data (edges first — path-style IDs need leading %)
     `DELETE FROM graph_edges WHERE source_id LIKE '%${P}%' OR target_id LIKE '%${P}%'`,
     `DELETE FROM graph_nodes WHERE id LIKE '%${P}%'`,
@@ -425,7 +432,13 @@ function seedAttackPathsPageData() {
       _type: 'edge'
     }
   ]);
+  const longRunningStepsJson = JSON.stringify([
+    { kind: 'EntraUser' },
+    { edge: 'HasRole', direction: 'outbound' },
+    { kind: 'AzureSubscription' }
+  ]);
   sshNonQuery([
+    `DELETE FROM attack_path_rules WHERE id = '${LONG_RUNNING_ATTACK_PATH_RULE_ID}'`,
     `DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'`,
     // Pattern 1: open-management-port
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('__internet__','Internet','Internet','global',null,'${now}')`,
@@ -439,9 +452,10 @@ function seedAttackPathsPageData() {
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('${P}ap-long-running-user','EntraUser','E2E Long Running User','azure','{"accountEnabled":false}','${now}')`,
     `INSERT OR REPLACE INTO graph_nodes (id, kind, display_name, provider, properties, collected_at) VALUES ('/subscriptions/${P}ap-long-running-sub','AzureSubscription','E2E Long Running Subscription','azure',null,'${now}')`,
     `INSERT OR REPLACE INTO graph_edges (source_id, target_id, kind, properties, computed, collected_at) VALUES ('${P}ap-long-running-user','/subscriptions/${P}ap-long-running-sub','HasRole','{"role_name":"Reader","role_definition_id":"/subscriptions/${P}ap-long-running-sub/providers/Microsoft.Authorization/roleDefinitions/reader-role","role_assignment_id":"/subscriptions/${P}ap-long-running-sub/providers/Microsoft.Authorization/roleAssignments/e2e-long-running-role","privileged":false}',0,'${now}')`,
+    `INSERT INTO attack_path_rules (id, name, severity, category, description, remediation, remediation_script_path, psu_script_name, steps_json, disabled, updated_at) VALUES ('${LONG_RUNNING_ATTACK_PATH_RULE_ID}','ZZZ Long running remediation fixture','low','identity-hygiene','E2E fixture used to verify the remediation close-warning dialog while a script is still running.','1. Keep the test remediation running long enough to exercise the close-warning branch.\n2. Terminate the PSU job from the warning dialog.','${LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH}','${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}',${sqlValue(longRunningStepsJson)},0,'${now}')`,
     `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-open-management-port','open-management-port','Management port open to the internet','high','network-exposure','1. Restrict or remove the inbound management rule that allows internet access to SSH, RDP, or WinRM.\n2. Replace public management access with Azure Bastion, VPN, private endpoint access, or Just-in-Time VM access.\n3. If a management rule must remain, limit the source to approved administrative IP ranges and document the exception owner.\n4. Confirm attached resources no longer have public management exposure.\n5. rerun Azure discovery and confirm this attack path no longer appears.','management-port-open-to-the-internet',${sqlValue(openManagementPathJson)},${sqlValue(openManagementEdgesJson)},'Internet (Internet) -> E2E Attack Path NSG (AzureNSG)','${now}')`,
     `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-disabled-account','disabled-account-with-roles','Disabled account still holding active role assignments','high','identity-hygiene','1. Open the disabled identity in Microsoft Entra ID and confirm it should remain disabled.\n2. In Azure RBAC, find every active role assignment for this identity at the listed scope.\n3. Remove active role assignments from the disabled identity.\n4. If access is still required, assign it to an active owner-approved identity instead of re-enabling the disabled account.\n5. rerun Azure discovery and confirm this attack path no longer appears.','disabled-account-still-holding-active-role-assignments',${sqlValue(disabledAccountPathJson)},${sqlValue(disabledAccountEdgesJson)},'E2E Disabled User (EntraUser) -> E2E Subscription (AzureSubscription)','${now}')`,
-    `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-long-running-remediation','disabled-account-with-roles','ZZZ Long running remediation fixture','low','identity-hygiene','1. Keep the test remediation running long enough to exercise the close-warning branch.\n2. Terminate the PSU job from the warning dialog.','${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}',${sqlValue(longRunningPathJson)},${sqlValue(longRunningEdgesJson)},'E2E Long Running User (EntraUser) -> E2E Long Running Subscription (AzureSubscription)','${now}')`,
+    `INSERT OR REPLACE INTO attack_paths (id, rule_id, pattern_name, severity, category, remediation, psu_script_name, path_json, edges_json, path_chain, evaluated_at) VALUES ('${P}ap-long-running-remediation','${LONG_RUNNING_ATTACK_PATH_RULE_ID}','ZZZ Long running remediation fixture','low','identity-hygiene','1. Keep the test remediation running long enough to exercise the close-warning branch.\n2. Terminate the PSU job from the warning dialog.','${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}',${sqlValue(longRunningPathJson)},${sqlValue(longRunningEdgesJson)},'E2E Long Running User (EntraUser) -> E2E Long Running Subscription (AzureSubscription)','${now}')`,
   ].join('; '));
   console.log('[seed] Seeded graph and materialized attack path data for Attack Paths page tests (3 patterns).');
 }
@@ -500,7 +514,7 @@ function restoreAttackPathGraphData(state) {
 }
 
 function cleanupAttackPathsPageData() {
-  sshNonQuery(`DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'; DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%' OR target_id = '/subscriptions/${P}ap-sub-1'; DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id = '/subscriptions/${P}ap-sub-1'`);
+  sshNonQuery(`DELETE FROM attack_paths WHERE id LIKE '${P}ap-%' OR path_json LIKE '%${P}ap-%' OR edges_json LIKE '%${P}ap-%' OR path_chain LIKE '%${P}ap-%'; DELETE FROM attack_path_rules WHERE id = '${LONG_RUNNING_ATTACK_PATH_RULE_ID}'; DELETE FROM graph_edges WHERE source_id LIKE '${P}ap-%' OR target_id LIKE '${P}ap-%' OR target_id IN ('/subscriptions/${P}ap-sub-1','/subscriptions/${P}ap-long-running-sub'); DELETE FROM graph_nodes WHERE id LIKE '${P}ap-%' OR id IN ('/subscriptions/${P}ap-sub-1','/subscriptions/${P}ap-long-running-sub')`);
   console.log('[cleanup] Attack Paths page graph data cleaned up.');
 }
 

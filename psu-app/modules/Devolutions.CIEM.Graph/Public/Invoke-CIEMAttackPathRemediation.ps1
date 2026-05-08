@@ -2,47 +2,42 @@ function Invoke-CIEMAttackPathRemediation {
     [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'High')]
     [OutputType([pscustomobject])]
     param(
-        [Parameter(Mandatory, ValueFromPipeline)]
-        [object[]]$AttackPath
+        [Parameter(Mandatory)]
+        [string]$AttackPathId
     )
 
-    process {
-        $ErrorActionPreference = 'Stop'
+    $ErrorActionPreference = 'Stop'
 
-        foreach ($item in $AttackPath) {
-            if (-not $item) {
-                throw 'Cannot remediate attack path because input object is null.'
-            }
+    if ([string]::IsNullOrWhiteSpace($AttackPathId)) {
+        throw 'Cannot remediate attack path because AttackPathId is empty.'
+    }
 
-            if ([string]::IsNullOrWhiteSpace($item.PatternId)) {
-                throw 'Cannot remediate attack path because PatternId is empty.'
-            }
+    $attackPaths = @(Get-CIEMAttackPath | Where-Object { [string]$_.Id -eq $AttackPathId })
+    if ($attackPaths.Count -ne 1) {
+        throw "Cannot remediate attack path because attack path '$AttackPathId' was not found."
+    }
 
-            if ([string]::IsNullOrWhiteSpace($item.RemediationScript)) {
-                throw "Cannot remediate attack path '$($item.PatternId)' because RemediationScript is empty."
-            }
+    $attackPath = $attackPaths[0]
+    $scriptText = Get-CIEMAttackPathRemediationScript -Id $AttackPathId
+    if ([string]::IsNullOrWhiteSpace($scriptText)) {
+        throw "Cannot remediate attack path '$AttackPathId' because rendered remediation script is empty."
+    }
 
-            $target = if ([string]::IsNullOrWhiteSpace($item.PatternName)) {
-                $item.PatternId
-            } else {
-                "$($item.PatternName) [$($item.PatternId)]"
-            }
+    $target = "$($attackPath.PatternName) [$($attackPath.PatternId)]"
+    if ($PSCmdlet.ShouldProcess($target, 'Execute attack path remediation script')) {
+        $startedAt = Get-Date
+        & ([scriptblock]::Create($scriptText))
+        $completedAt = Get-Date
 
-            if ($PSCmdlet.ShouldProcess($target, 'Execute attack path remediation script')) {
-                $startedAt = Get-Date
-                & ([scriptblock]::Create($item.RemediationScript))
-                $completedAt = Get-Date
-
-                [pscustomobject]@{
-                    PatternId             = $item.PatternId
-                    PatternName           = $item.PatternName
-                    RemediationScriptPath = $item.RemediationScriptPath
-                    StartedAt             = $startedAt
-                    CompletedAt           = $completedAt
-                    DurationSeconds       = [Math]::Round(($completedAt - $startedAt).TotalSeconds, 3)
-                    Status                = 'Completed'
-                }
-            }
+        [pscustomobject]@{
+            AttackPathId          = $AttackPathId
+            PatternId             = $attackPath.PatternId
+            PatternName           = $attackPath.PatternName
+            RemediationScriptPath = $attackPath.RemediationScriptPath
+            StartedAt             = $startedAt
+            CompletedAt           = $completedAt
+            DurationSeconds       = [Math]::Round(($completedAt - $startedAt).TotalSeconds, 3)
+            Status                = 'Completed'
         }
     }
 }

@@ -18,9 +18,7 @@ function New-CIEMDashboardPage {
         New-UDTypography -Text 'Cloud Infrastructure Entitlement Management - Scan Results Overview' -Variant 'subtitle1' -Style @{ marginBottom = '20px'; color = '#666' }
 
         $scanRuns = @(Devolutions.CIEM\Get-CIEMScanRun | Where-Object { $_.TotalResults -gt 0 })
-        $needsAttentionItems = @(Devolutions.CIEM\Get-CIEMDashboardNeedsAttention -Limit 5)
-        $exposureChanges = @(Devolutions.CIEM\Get-CIEMExposureChange -Last 5)
-        $connectorPayloadPreviews = @(Devolutions.CIEM\Get-CIEMConnectorPayloadPreview -SignalType ExposureChange -Limit 1)
+        $needsAttentionItems = @(Devolutions.CIEM\Get-CIEMDashboardNeedsAttention -Limit 3)
         $pamProgress = Devolutions.CIEM\Get-CIEMPAMProgressSummary -Limit 5
         $scanEfficiency = Devolutions.CIEM\Get-CIEMScanEfficiencySummary -Last 5
         $graphCountRows = @(Devolutions.CIEM\Invoke-CIEMQuery -Query 'SELECT COUNT(*) AS c FROM graph_nodes')
@@ -28,6 +26,58 @@ function New-CIEMDashboardPage {
             throw "Expected one graph node count row, got $($graphCountRows.Count)."
         }
         $hasDiscoveryGraphData = [int]$graphCountRows[0].c -gt 0
+
+        $latestScanState = if ($scanRuns.Count -gt 0) { [string]$scanRuns[0].Status } else { 'No scan data' }
+        $identityDataState = if ($hasDiscoveryGraphData) { 'Present' } else { 'None' }
+        $pamReadiness = "$($pamProgress.ReadinessPercent)%"
+        New-UDElement -Tag 'section' -Id 'dashboardOverviewSection' -Attributes @{
+            style = @{
+                display = 'grid'
+                gap = '12px'
+                marginBottom = '16px'
+            }
+        } -Content {
+            New-UDElement -Id 'dashboardPrimaryStateGrid' -Tag 'div' -Attributes @{
+                style = @{
+                    display = 'grid'
+                    gridTemplateColumns = 'repeat(4, minmax(0, 1fr))'
+                    gap = '10px'
+                }
+            } -Content {
+                foreach ($metric in @(
+                    @{ Label = 'Needs Attention'; Value = [string]$needsAttentionItems.Count; Detail = 'Priority risk items' },
+                    @{ Label = 'Identity Data'; Value = $identityDataState; Detail = 'Discovery graph state' },
+                    @{ Label = 'Latest Scan'; Value = $latestScanState; Detail = 'Checks and scan state' },
+                    @{ Label = 'PAM Readiness'; Value = $pamReadiness; Detail = 'Implementation progress' }
+                )) {
+                    New-UDElement -Tag 'div' -Attributes @{
+                        'data-ciem-dashboard-status-metric' = 'true'
+                        style = @{
+                            display = 'grid'
+                            gap = '3px'
+                            minHeight = '82px'
+                            padding = '12px'
+                            border = '1px solid #d0d7de'
+                            borderRadius = '6px'
+                            backgroundColor = '#ffffff'
+                        }
+                    } -Content {
+                        New-UDTypography -Text $metric.Label -Variant 'caption' -Style @{ color = '#57606a'; fontWeight = '600' }
+                        New-UDTypography -Text $metric.Value -Variant 'h5' -Style @{ color = '#24292f'; fontWeight = '700'; lineHeight = '1.1' }
+                        New-UDTypography -Text $metric.Detail -Variant 'caption' -Style @{ color = '#57606a' }
+                    }
+                }
+            }
+        }
+
+        New-UDElement -Tag 'section' -Id 'dashboardPriorityWorkSection' -Attributes @{
+            style = @{
+                display = 'grid'
+                gap = '14px'
+                alignItems = 'start'
+                marginBottom = '18px'
+            }
+        } -Content {
 
         New-UDElement -Tag 'section' -Id 'dashboardNeedsAttentionSection' -Attributes @{
             style = @{
@@ -86,8 +136,12 @@ function New-CIEMDashboardPage {
                                 }
                             } elseif ($item.SourceType -eq 'AttackPath') {
                                 New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-inspect-attack-path' = 'true' } -Content {
+                                    $drillInUrl = [string]$item.DrillInUrl
+                                    if ([string]::IsNullOrWhiteSpace($drillInUrl)) {
+                                        throw "Expected dashboard Needs Attention attack path '$($item.Id)' to include DrillInUrl."
+                                    }
                                     New-UDButton -Text 'Inspect Attack Path' -Variant 'outlined' -Size 'small' -OnClick {
-                                        Invoke-UDRedirect '/ciem/attack-paths'
+                                        Invoke-UDRedirect $drillInUrl
                                     }
                                 }
                             } else {
@@ -99,139 +153,67 @@ function New-CIEMDashboardPage {
             }
         }
 
-        New-UDElement -Tag 'section' -Id 'dashboardExposureChangesSection' -Attributes @{
-            style = @{
-                marginBottom = '22px'
-            }
-        } -Content {
-            New-UDTypography -Text 'Exposure Changes' -Variant 'h5' -Style @{ marginBottom = '6px' }
-            New-UDTypography -Text 'Local exposure changes from compared discovery snapshots. Payload delivery is not enabled.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
-
-            if ($exposureChanges.Count -eq 0) {
-                New-UDElement -Tag 'div' -Attributes @{
-                    'data-ciem-exposure-change-empty' = 'true'
+            if ($scanRuns.Count -eq 0) {
+                New-UDElement -Tag 'div' -Id 'dashboardNoScanDataState' -Attributes @{
                     style = @{
-                        padding = '14px'
+                        marginTop = '4px'
+                        textAlign = 'center'
+                        padding = '28px'
                         border = '1px solid #d0d7de'
                         borderRadius = '6px'
                         backgroundColor = '#ffffff'
                     }
                 } -Content {
-                    New-UDTypography -Text 'No exposure changes recorded yet. Scheduled discovery will compare snapshots after the next run.' -Variant 'body2' -Style @{ color = '#666' }
-                }
-            }
-            else {
-                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '10px' } } -Content {
-                    foreach ($change in $exposureChanges) {
-                        $severityColor = Devolutions.CIEM\Get-SeverityColor -Severity $change.Severity
-                        New-UDElement -Tag 'div' -Attributes @{
-                            'data-ciem-exposure-change-item' = 'true'
-                            style = @{
-                                display = 'grid'
-                                gap = '8px'
-                                padding = '12px'
-                                border = '1px solid #d0d7de'
-                                borderRadius = '6px'
-                                backgroundColor = '#ffffff'
-                            }
-                        } -Content {
-                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
-                                New-UDChip -Label $change.Severity -Size 'small' -Style @{ backgroundColor = $severityColor; color = 'white' }
-                                New-UDChip -Label $change.ChangeType -Size 'small' -Variant 'outlined'
-                                New-UDChip -Label $change.ExposureType -Size 'small' -Variant 'outlined'
-                                New-UDTypography -Text $change.ImpactedIdentityName -Variant 'subtitle1' -Style @{ fontWeight = '600' }
-                            }
-                            New-UDTypography -Text "Target: $($change.ImpactedResourceName)" -Variant 'body2' -Style @{ color = '#555'; overflowWrap = 'anywhere' }
-                            New-UDTypography -Text $change.Evidence -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
-                            if ($change.ExposureType -eq 'IdentityRisk') {
-                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-review-exposure-identity' = 'true' } -Content {
-                                    New-UDButton -Text 'Review Identity' -Variant 'outlined' -Size 'small' -OnClick {
-                                        Invoke-UDRedirect '/ciem/identities'
-                                    }
-                                }
-                            }
-                            elseif ($change.ExposureType -eq 'AttackPath') {
-                                New-UDElement -Tag 'div' -Attributes @{ 'data-ciem-review-exposure-attack-path' = 'true' } -Content {
-                                    New-UDButton -Text 'Review Attack Path' -Variant 'outlined' -Size 'small' -OnClick {
-                                        Invoke-UDRedirect '/ciem/attack-paths'
-                                    }
-                                }
-                            }
-                            else {
-                                throw "Unsupported exposure change type '$($change.ExposureType)'."
-                            }
+                    New-UDStack -Direction 'column' -AlignItems 'center' -Spacing 2 -Content {
+                        New-UDIcon -Icon 'Search' -Size '3x' -Style @{ color = '#1976d2'; marginBottom = '8px' }
+                        New-UDTypography -Text 'No Scan Data Available' -Variant 'h5' -Style @{ marginBottom = '4px' }
+                        New-UDTypography -Text 'Run a security scan to populate the dashboard.' -Variant 'body1' -Style @{ color = '#666'; marginBottom = '12px' }
+                        New-UDButton -Text 'Run Your First Scan' -Variant 'contained' -Color 'primary' -Size 'medium' -OnClick {
+                            Invoke-UDRedirect '/ciem/scan'
                         }
                     }
                 }
             }
         }
 
-        New-UDElement -Tag 'section' -Id 'dashboardConnectorPayloadPreviewSection' -Attributes @{
+        New-UDElement -Tag 'section' -Id 'dashboardSupportingEvidenceSection' -Attributes @{
             style = @{
-                marginBottom = '22px'
+                display = 'grid'
+                gap = '18px'
             }
         } -Content {
-            New-UDTypography -Text 'Connector Payload Previews' -Variant 'h5' -Style @{ marginBottom = '6px' }
-            New-UDTypography -Text 'Preview-only Alert, SIEM, Webhook, and PSU payloads for local exposure-change signals. No outbound target is configured or contacted.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+            New-UDExpansionPanelGroup -Id 'dashboardSupportingEvidencePanelGroup' -Type 'Accordion' -Children {
+                New-UDExpansionPanel -Id 'dashboardIdentityAndPAMPanel' -Title 'Identity & PAM' -Children {
+                    New-UDElement -Tag 'section' -Id 'dashboardIdentitySection' -Attributes @{ style = @{ marginBottom = '20px' } } -Content {
+                        New-UDTypography -Text 'Identity Stats' -Variant 'h5' -Style @{ marginBottom = '6px' }
+                        New-UDTypography -Text 'Identity inventory and effective entitlement coverage.' -Variant 'body2' -Style @{ marginBottom = '16px'; color = '#666' }
 
-            if ($connectorPayloadPreviews.Count -eq 0) {
-                New-UDElement -Tag 'div' -Attributes @{
-                    'data-ciem-connector-payload-preview-empty' = 'true'
-                    style = @{
-                        padding = '14px'
-                        border = '1px solid #d0d7de'
-                        borderRadius = '6px'
-                        backgroundColor = '#ffffff'
-                    }
-                } -Content {
-                    New-UDTypography -Text 'No connector payload previews are available until exposure changes are recorded.' -Variant 'body2' -Style @{ color = '#666' }
-                }
-            }
-            else {
-                New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'grid'; gap = '10px' } } -Content {
-                    foreach ($preview in $connectorPayloadPreviews) {
-                        $severityColor = Devolutions.CIEM\Get-SeverityColor -Severity $preview.Severity
-                        New-UDElement -Tag 'div' -Attributes @{
-                            'data-ciem-connector-payload-preview-item' = 'true'
-                            style = @{
-                                display = 'grid'
-                                gap = '8px'
-                                padding = '12px'
-                                border = '1px solid #d0d7de'
-                                borderRadius = '6px'
-                                backgroundColor = '#ffffff'
+                        $identityStatsRows = @(Devolutions.CIEM\Invoke-CIEMQuery -Query @"
+SELECT
+    (SELECT COUNT(*) FROM graph_nodes WHERE kind IN ('EntraUser', 'EntraServicePrincipal', 'EntraGroup')) AS identity_count,
+    (SELECT COUNT(*) FROM azure_effective_role_assignments) AS entitlement_count
+"@)
+                        if ($identityStatsRows.Count -ne 1) {
+                            throw "Expected one dashboard identity stats row, got $($identityStatsRows.Count)."
+                        }
+
+                        $identityStats = $identityStatsRows[0]
+                        $identityCount = [int]$identityStats.identity_count
+                        $entitlementCount = [int]$identityStats.entitlement_count
+
+                        New-UDGrid -Container -Content {
+                            New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
+                                New-UDCard -Title 'Identities' -Content {
+                                    New-UDTypography -Text $identityCount -Variant 'h3' -Style @{ color = '#1976d2'; textAlign = 'center' }
+                                } -Style @{ textAlign = 'center' }
                             }
-                        } -Content {
-                            New-UDStack -Direction 'row' -Spacing 1 -AlignItems 'center' -Content {
-                                New-UDChip -Label $preview.ConnectorType -Size 'small' -Variant 'outlined'
-                                New-UDChip -Label $preview.SignalType -Size 'small' -Variant 'outlined'
-                                New-UDChip -Label $preview.Severity -Size 'small' -Style @{ backgroundColor = $severityColor; color = 'white' }
-                                New-UDTypography -Text $preview.EventName -Variant 'subtitle1' -Style @{ fontWeight = '600' }
-                            }
-                            New-UDTypography -Text $preview.Title -Variant 'body2' -Style @{ color = '#555' }
-                            New-UDTypography -Text $preview.Summary -Variant 'caption' -Style @{ color = '#666'; overflowWrap = 'anywhere' }
-                            New-UDElement -Tag 'pre' -Attributes @{
-                                style = @{
-                                    margin = '0'
-                                    padding = '10px'
-                                    border = '1px solid #d0d7de'
-                                    borderRadius = '6px'
-                                    backgroundColor = '#f6f8fa'
-                                    color = '#24292f'
-                                    whiteSpace = 'pre-wrap'
-                                    overflowWrap = 'anywhere'
-                                    maxHeight = '140px'
-                                    overflowY = 'auto'
-                                    fontSize = '12px'
-                                }
-                            } -Content {
-                                $preview.PayloadJson
+                            New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
+                                New-UDCard -Title 'Entitlements' -Content {
+                                    New-UDTypography -Text $entitlementCount -Variant 'h3' -Style @{ color = '#7b1fa2'; textAlign = 'center' }
+                                } -Style @{ textAlign = 'center' }
                             }
                         }
                     }
-                }
-            }
-        }
 
         New-UDElement -Tag 'section' -Id 'dashboardPAMProgressSection' -Attributes @{
             style = @{
@@ -239,7 +221,7 @@ function New-CIEMDashboardPage {
             }
         } -Content {
             New-UDTypography -Text 'PAM Implementation Progress' -Variant 'h5' -Style @{ marginBottom = '6px' }
-            New-UDTypography -Text 'Read-only CIEM progress toward PAM adoption: exposure baseline, current exposure, candidate mapping, and scoped handoff status.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
+            New-UDTypography -Text 'Read-only CIEM progress toward PAM adoption: readiness, candidate mapping, and scoped handoff status.' -Variant 'body2' -Style @{ marginBottom = '12px'; color = '#666' }
             $riskBurndownMetric = if ($null -eq $pamProgress.RiskBurndownPercent) { 'No baseline' } else { "$($pamProgress.RiskBurndownPercent)%" }
 
             New-UDElement -Tag 'div' -Attributes @{
@@ -252,7 +234,6 @@ function New-CIEMDashboardPage {
             } -Content {
                 foreach ($metric in @(
                     @{ Label = 'Readiness'; Value = "$($pamProgress.ReadinessPercent)%" },
-                    @{ Label = 'Current Exposure'; Value = [string]$pamProgress.CurrentExposureCount },
                     @{ Label = 'PAM Candidates'; Value = [string]$pamProgress.PAMCandidateCount },
                     @{ Label = 'Risk Burndown'; Value = $riskBurndownMetric }
                 )) {
@@ -340,6 +321,9 @@ function New-CIEMDashboardPage {
             }
         }
 
+                }
+
+                New-UDExpansionPanel -Id 'dashboardChecksAndScansPanel' -Title 'Checks & Scans' -Children {
         New-UDElement -Tag 'section' -Id 'dashboardScanEfficiencySection' -Attributes @{
             style = @{
                 marginBottom = '22px'
@@ -462,10 +446,9 @@ function New-CIEMDashboardPage {
             }
         }
 
-        New-UDExpansionPanelGroup -Id 'dashboardSectionPanels' -Type 'Expandable' -Children {
-            New-UDExpansionPanel -Id 'dashboardScanPanel' -Title 'Checks & Scans' -Icon (New-UDIcon -Icon 'Search') -Active -Children {
-                New-UDElement -Tag 'section' -Id 'dashboardScanSection' -Attributes @{ 'data-hideable' = 'true'; style = @{ marginBottom = '28px' } } -Content {
-                    New-UDTypography -Text 'Cloud checks, scan results, and finding evidence.' -Variant 'body2' -Style @{ marginBottom = '16px'; color = '#666' }
+        New-UDElement -Tag 'section' -Id 'dashboardScanSection' -Attributes @{ style = @{ marginBottom = '28px' } } -Content {
+            New-UDTypography -Text 'Checks & Scans' -Variant 'h5' -Style @{ marginBottom = '6px' }
+            New-UDTypography -Text 'Cloud checks, scan results, and finding evidence.' -Variant 'body2' -Style @{ marginBottom = '16px'; color = '#666' }
 
             if ($scanRuns -and $scanRuns.Count -gt 0) {
                 # Initialize selected scan run to most recent if not already set
@@ -643,38 +626,8 @@ function New-CIEMDashboardPage {
                     }
                 }
             }
-                }
-            }
+        }
 
-            New-UDExpansionPanel -Id 'dashboardIdentityPanel' -Title 'Identity Stats' -Icon (New-UDIcon -Icon 'Users') -Active -Children {
-                New-UDElement -Tag 'section' -Id 'dashboardIdentitySection' -Attributes @{ 'data-hideable' = 'true'; style = @{ marginBottom = '20px' } } -Content {
-                    New-UDTypography -Text 'Identity inventory and effective entitlement coverage.' -Variant 'body2' -Style @{ marginBottom = '16px'; color = '#666' }
-
-            $identityStatsRows = @(Devolutions.CIEM\Invoke-CIEMQuery -Query @"
-SELECT
-    (SELECT COUNT(*) FROM graph_nodes WHERE kind IN ('EntraUser', 'EntraServicePrincipal', 'EntraGroup')) AS identity_count,
-    (SELECT COUNT(*) FROM azure_effective_role_assignments) AS entitlement_count
-"@)
-            if ($identityStatsRows.Count -ne 1) {
-                throw "Expected one dashboard identity stats row, got $($identityStatsRows.Count)."
-            }
-
-            $identityStats = $identityStatsRows[0]
-            $identityCount = [int]$identityStats.identity_count
-            $entitlementCount = [int]$identityStats.entitlement_count
-
-            New-UDGrid -Container -Content {
-                New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
-                    New-UDCard -Title 'Identities' -Content {
-                        New-UDTypography -Text $identityCount -Variant 'h3' -Style @{ color = '#1976d2'; textAlign = 'center' }
-                    } -Style @{ textAlign = 'center' }
-                }
-                New-UDGrid -Item -ExtraSmallSize 12 -SmallSize 6 -MediumSize 3 -Content {
-                    New-UDCard -Title 'Entitlements' -Content {
-                        New-UDTypography -Text $entitlementCount -Variant 'h3' -Style @{ color = '#7b1fa2'; textAlign = 'center' }
-                    } -Style @{ textAlign = 'center' }
-                }
-            }
                 }
             }
         }

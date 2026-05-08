@@ -1,5 +1,6 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const DashboardPageHelpers = require('./DashboardPageHelpers');
+const AttackPathsPageHelpers = require('../AttackPaths/AttackPathsPageHelpers');
 const {
   backupAndClearAllScanHistory,
   restoreScanHistory,
@@ -15,9 +16,6 @@ const {
   backupAndClearDashboardIdentityData,
   restoreDashboardIdentityData,
   getDashboardIdentityCounts,
-  seedExposureChangeData,
-  cleanupExposureChangeData,
-  getTestExposureChangeCount,
   seedDashboardDiscoveryPhaseMetrics,
   cleanupDashboardDiscoveryPhaseMetrics,
   getDashboardDiscoveryPhaseMetricCount,
@@ -29,6 +27,7 @@ test.describe('Dashboard Page', () => {
   let dashPage;
 
   test.beforeEach(async ({ ciemPage }) => {
+    await ciemPage.setViewportSize({ width: 1440, height: 900 });
     dashPage = new DashboardPageHelpers(ciemPage);
     await dashPage.navigateToDashboard();
   });
@@ -77,12 +76,14 @@ test.describe('Dashboard Page', () => {
       cleanupDashboardDiscoveryPhaseMetrics();
     });
 
-    test('should display scan run selector dropdown', async () => {
+    test('should reveal scan run selector inside Checks & Scans details', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const visible = await dashPage.isScanRunSelectorVisible();
       expect(visible).toBe(true);
     });
 
-    test('should display Run New Scan button', async () => {
+    test('should reveal Run New Scan button inside Checks & Scans details', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const visible = await dashPage.isRunNewScanButtonVisible();
       expect(visible).toBe(true);
     });
@@ -94,7 +95,8 @@ test.describe('Dashboard Page', () => {
       expect(localSummaryCount).toBe(0);
     });
 
-    test('should display summary cards container', async () => {
+    test('should reveal summary cards inside Checks & Scans details', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const totalVisible = await dashPage.isElementVisible(dashPage.selectors.totalResultsCard);
       const failedVisible = await dashPage.isElementVisible(dashPage.selectors.failedChecksCard);
       const passedVisible = await dashPage.isElementVisible(dashPage.selectors.passedChecksCard);
@@ -105,54 +107,57 @@ test.describe('Dashboard Page', () => {
       expect(criticalVisible).toBe(true);
     });
 
-    test('should separate checks and scans from identity stats without legacy scanner references', async () => {
+    test('should present at-a-glance operating state before secondary details', async () => {
+      const metrics = await dashPage.getAtAGlanceLayoutMetrics();
+      expect(metrics.hasHorizontalOverflow).toBe(false);
+      expect(metrics.metricCount).toBe(4);
+      expect(metrics.metricRows).toBe(1);
+      expect(metrics.overview.top).toBeLessThan(260);
+      expect(metrics.overview.bottom).toBeLessThanOrEqual(520);
+      expect(metrics.priorityWork.top).toBeLessThan(metrics.supportingEvidence.top);
+      expect(metrics.priorityWork.top).toBeLessThan(metrics.viewportHeight);
+    });
+
+    test('should hide secondary detail sections by default', async () => {
+      expect(await dashPage.isScanSectionVisible()).toBe(false);
+      expect(await dashPage.isIdentitySectionVisible()).toBe(false);
+      expect(await dashPage.isScanRunSelectorVisible()).toBe(false);
+      expect(await dashPage.isRunNewScanButtonVisible()).toBe(false);
+      expect(await dashPage.isScanEfficiencyVisible()).toBe(false);
+      expect(await dashPage.isSeverityChartVisible()).toBe(false);
+      expect(await dashPage.isServiceChartVisible()).toBe(false);
+      expect(await dashPage.isCritHighCardVisible()).toBe(false);
+    });
+
+    test('should render only the remaining supporting panels', async () => {
+      expect(await dashPage.getSupportingPanelIds()).toEqual([
+        'dashboardIdentityAndPAMPanel',
+        'dashboardChecksAndScansPanel'
+      ]);
+    });
+
+    test('should separate checks and scans from identity stats without legacy scanner references after details are opened', async () => {
       const legacyScannerName = ['Pro', 'wler'].join('');
-      expect(await dashPage.isElementVisible(dashPage.selectors.sectionPanelGroup)).toBe(true);
-      expect(await dashPage.isElementVisible(dashPage.selectors.scanPanel)).toBe(true);
-      expect(await dashPage.isElementVisible(dashPage.selectors.identityPanel)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.dashboardOverviewSection)).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.dashboardPrimaryStateGrid)).toBe(true);
+      await dashPage.expandChecksAndScansDetails();
       expect(await dashPage.isScanSectionVisible()).toBe(true);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
-      expect(await dashPage.isScanSectionHideable()).toBe(true);
-      expect(await dashPage.isIdentitySectionHideable()).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.scanSectionHeading)).toBe(true);
-      expect(await dashPage.isElementVisible(dashPage.selectors.identitySectionHeading)).toBe(true);
       expect(await dashPage.isScanRunSelectorInsideScanSection()).toBe(true);
       expect(await dashPage.isRunNewScanButtonInsideScanSection()).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.scanSectionTotalResultsCard)).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.scanSectionFailedChecksCard)).toBe(true);
+      await dashPage.expandIdentityAndPAMDetails();
+      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
+      expect(await dashPage.isElementVisible(dashPage.selectors.identitySectionHeading)).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.identityCountCard)).toBe(true);
       expect(await dashPage.isElementVisible(dashPage.selectors.entitlementsCard)).toBe(true);
       expect(await dashPage.isScanRunSelectorInsideIdentitySection()).toBe(false);
       expect(await dashPage.getDashboardContentText()).not.toContain(legacyScannerName);
     });
 
-    test('should collapse and expand the checks and scans panel', async () => {
-      expect(await dashPage.isScanSectionVisible()).toBe(true);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
-
-      await dashPage.clickScanPanelHeader();
-      expect(await dashPage.isScanSectionVisible()).toBe(false);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
-
-      await dashPage.clickScanPanelHeader();
-      expect(await dashPage.isScanSectionVisible()).toBe(true);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
-    });
-
-    test('should collapse and expand the identity stats panel', async () => {
-      expect(await dashPage.isScanSectionVisible()).toBe(true);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
-
-      await dashPage.clickIdentityPanelHeader();
-      expect(await dashPage.isScanSectionVisible()).toBe(true);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(false);
-
-      await dashPage.clickIdentityPanelHeader();
-      expect(await dashPage.isScanSectionVisible()).toBe(true);
-      expect(await dashPage.isIdentitySectionVisible()).toBe(true);
-    });
-
     test('should display identity stats from identity data', async () => {
+      await dashPage.expandIdentityAndPAMDetails();
       const identityCount = await dashPage.getIdentityCount();
       const entitlementCount = await dashPage.getEntitlementsCount();
       expect(identityCount).toBe(3);
@@ -160,6 +165,7 @@ test.describe('Dashboard Page', () => {
     });
 
     test('should display scan efficiency instrumentation from scan history', async () => {
+      await dashPage.expandChecksAndScansDetails();
       expect(await dashPage.isScanEfficiencyVisible()).toBe(true);
       const text = await dashPage.getScanEfficiencyText();
       expect(text).toContain('Scan Efficiency');
@@ -181,32 +187,38 @@ test.describe('Dashboard Page', () => {
     });
 
     test('should show Total Results card with count greater than 0', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const count = await dashPage.getTotalResultsCount();
       expect(count).toBeGreaterThan(0);
     });
 
     test('should show Failed Checks card with a numeric count', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const count = await dashPage.getFailedChecksCount();
       expect(count).toBeGreaterThanOrEqual(0);
     });
 
     test('should show Passed Checks card with a numeric count', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const count = await dashPage.getPassedChecksCount();
       expect(count).toBeGreaterThanOrEqual(0);
     });
 
     test('should show Critical Issues card with a number', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const count = await dashPage.getCriticalIssuesCount();
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThanOrEqual(0);
     });
 
     test('should default to most recent scan run selection', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const selectorVisible = await dashPage.isScanRunSelectorVisible();
       expect(selectorVisible).toBe(true);
     });
 
     test('should refresh dashboard content when selector changes without error', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const changed = await dashPage.changeScanRunSelector();
       expect(changed).toBe(true);
       const totalVisible = await dashPage.isElementVisible(dashPage.selectors.totalResultsCard);
@@ -214,31 +226,37 @@ test.describe('Dashboard Page', () => {
     });
 
     test('should redirect to scan page when Run New Scan is clicked', async () => {
+      await dashPage.expandChecksAndScansDetails();
       await dashPage.clickRunNewScan();
       expect(dashPage.page.url()).toContain('/ciem/scan');
     });
 
     test('should display severity chart section', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const chartVisible = await dashPage.isSeverityChartVisible();
       expect(chartVisible).toBe(true);
     });
 
     test('should display service chart section', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const chartVisible = await dashPage.isServiceChartVisible();
       expect(chartVisible).toBe(true);
     });
 
     test('should display Critical & High Results card', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const visible = await dashPage.isCritHighCardVisible();
       expect(visible).toBe(true);
     });
 
     test('should display Critical & High Results table', async () => {
+      await dashPage.expandChecksAndScansDetails();
       const hasTable = await dashPage.hasCritHighTable();
       expect(hasTable).toBe(true);
     });
 
     test('should redirect to history page when View All Results is clicked', async () => {
+      await dashPage.expandChecksAndScansDetails();
       await dashPage.clickViewAllResults();
       expect(dashPage.page.url()).toContain('/ciem/history');
     });
@@ -302,22 +320,28 @@ test.describe('Dashboard Page', () => {
       expect(text).toContain('E2E Identities User');
       expect(text).toContain('Critical');
       expect(text).toContain('Holds privileged role with no sign-in activity for 120 days');
-      expect(text).toContain('Management port open to the internet');
-      expect(text).toContain('E2E Attack Path NSG');
+      expect(text).toContain('Disabled account still holding active role assignments');
+      expect(text).toContain('E2E Disabled User');
       expect(text).toContain('High');
       expect(await dashPage.getNeedsAttentionItemCount()).toBeGreaterThanOrEqual(2);
     });
 
-    test('should provide drill-in actions for identity and attack path risks', async () => {
+    test('should provide drill-in actions for identity and targeted attack path risks', async () => {
       await dashPage.clickInspectIdentity();
       expect(dashPage.page.url()).toContain('/ciem/identities');
 
       await dashPage.navigateToDashboard();
       await dashPage.clickInspectAttackPath();
-      expect(dashPage.page.url()).toContain('/ciem/attack-paths');
+      expect(dashPage.page.url()).toContain('/ciem/attack-paths?attackPathId=');
+      const attackPage = new AttackPathsPageHelpers(dashPage.page);
+      await attackPage.waitForFocusedAttackPathDetail('Disabled account still holding active role assignments');
+      const detailText = await attackPage.page.locator(attackPage.selectors.focusedDetail).textContent();
+      expect(detailText).toContain('Disabled account still holding active role assignments');
+      expect(detailText).toContain('E2E Disabled User');
     });
 
     test('should show PAM implementation progress and candidate mappings', async () => {
+      await dashPage.expandIdentityAndPAMDetails();
       expect(await dashPage.isPAMProgressVisible()).toBe(true);
       const text = await dashPage.getPAMProgressText();
       expect(text).toContain('PAM Implementation Progress');
@@ -327,59 +351,9 @@ test.describe('Dashboard Page', () => {
       expect(text).toContain('NotScoped');
       expect(text).toContain('JIT elevation and approval workflow');
       expect(text).toContain('Access brokering and session governance');
-      expect(await dashPage.getPAMProgressMetricCount()).toBe(4);
+      expect(await dashPage.getPAMProgressMetricCount()).toBe(3);
       expect(await dashPage.getPAMProgressStageCount()).toBe(5);
       expect(await dashPage.getPAMProgressCandidateCount()).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  test.describe('when exposure changes exist', () => {
-    test.beforeAll(() => {
-      seedExposureChangeData();
-      const exposureChangeCount = getTestExposureChangeCount();
-      if (exposureChangeCount !== 2) {
-        throw new Error(`Expected 2 seeded exposure changes, got ${exposureChangeCount}`);
-      }
-      console.log(`[setup:dashboard-exposure-changes] Seeded ${exposureChangeCount} exposure change(s)`);
-    });
-
-    test.afterAll(() => {
-      cleanupExposureChangeData();
-    });
-
-    test('should show local exposure change records without sending payloads', async () => {
-      expect(await dashPage.isExposureChangesVisible()).toBe(true);
-      const text = await dashPage.getExposureChangesText();
-      expect(text).toContain('Exposure Changes');
-      expect(text).toContain('Payload delivery is not enabled');
-      expect(text).toContain('E2E New Exposure User');
-      expect(text).toContain('NewRisk');
-      expect(text).toContain('E2E Increased Exposure User');
-      expect(text).toContain('RiskIncrease');
-      expect(text).toContain('Critical');
-      expect(await dashPage.getExposureChangeItemCount()).toBe(2);
-    });
-
-    test('should provide review routing for identity exposure changes', async () => {
-      await dashPage.clickReviewExposureIdentity();
-      expect(dashPage.page.url()).toContain('/ciem/identities');
-    });
-
-    test('should show preview-only connector payloads without outbound target configuration', async () => {
-      expect(await dashPage.isConnectorPayloadPreviewVisible()).toBe(true);
-      const text = await dashPage.getConnectorPayloadPreviewText();
-      expect(text).toContain('Connector Payload Previews');
-      expect(text).toContain('Preview-only');
-      expect(text).toContain('No outbound target is configured or contacted');
-      expect(text).toContain('Alert');
-      expect(text).toContain('SIEM');
-      expect(text).toContain('Webhook');
-      expect(text).toContain('PSU');
-      expect(text).toContain('deliveryEnabled');
-      expect(text).toContain('false');
-      expect(text).not.toContain('targetUrl');
-      expect(text).not.toContain('token');
-      expect(await dashPage.getConnectorPayloadPreviewItemCount()).toBe(4);
     });
   });
 

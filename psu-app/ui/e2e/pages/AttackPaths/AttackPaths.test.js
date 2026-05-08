@@ -178,6 +178,14 @@ test.describe('Attack Paths Page', () => {
       expect(script).not.toContain('{{');
     });
 
+    test('should expand the requested attack path from an attackPathId deep link', async () => {
+      await attackPage.navigateToAttackPathDetail('_E2E_TEST_ap-open-management-port');
+      await attackPage.waitForFocusedAttackPathDetail('Management port open to the internet');
+      const detailText = await attackPage.page.locator(attackPage.selectors.focusedDetail).textContent();
+      expect(detailText).toContain('Management port open to the internet');
+      expect(detailText).toContain('E2E Attack Path NSG');
+    });
+
     test('should display remediation guidance when an attack path row is expanded', async () => {
       const hasData = await attackPage.hasAttackPathData();
       expect(hasData).toBe(true);

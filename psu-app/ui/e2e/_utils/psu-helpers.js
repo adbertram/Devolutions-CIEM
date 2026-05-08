@@ -4,7 +4,9 @@ const { testConfig } = require('./test-config');
 const PSU_STATUS = { Queued: 0, Running: 1, Completed: 2, Failed: 3, Canceled: 5, TimedOut: 9, Warning: 10, WarningOutput: 11 };
 const PSU_STATUS_NAMES = Object.fromEntries(Object.entries(PSU_STATUS).map(([k, v]) => [v, k]));
 const PSU_TERMINAL_STATUSES = [PSU_STATUS.Completed, PSU_STATUS.Failed, PSU_STATUS.Canceled, PSU_STATUS.TimedOut, PSU_STATUS.Warning, PSU_STATUS.WarningOutput];
-const LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME = 'E2EAttackPathLongRunningRemediation';
+const LONG_RUNNING_ATTACK_PATH_RULE_ID = 'e2e-long-running-remediation';
+const LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME = 'e2e-long-running-remediation';
+const LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH = `modules/Devolutions.CIEM.Graph/Data/attack_path_remediation_scripts/${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}.ps1`;
 
 async function isPSUReady() {
   try {
@@ -239,56 +241,62 @@ function runPSUCommandSync(command, timeoutMs = 30000) {
 
 function registerLongRunningAttackPathRemediationScript() {
   const command = `
-    $scriptName = '${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}'
-    $scriptPath = 'Identities/AttackPaths/${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}.ps1'
+    $relativeScriptPath = '${LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH}'
+    $module = Get-Module -ListAvailable -Name Devolutions.CIEM | Sort-Object Version -Descending | Select-Object -First 1
+    if ($null -eq $module) {
+      throw 'Cannot register E2E long-running attack path remediation script because Devolutions.CIEM is not installed.'
+    }
+
+    $moduleRoot = Split-Path -Path $module.Path -Parent
+    $scriptPath = Join-Path $moduleRoot $relativeScriptPath
+    New-Item -Path (Split-Path -Path $scriptPath -Parent) -ItemType Directory -Force | Out-Null
     $content = @'
-$ErrorActionPreference = 'Stop'
+<#
+.SYNOPSIS
+Remediates the attack path finding "{{PATTERN_NAME}}".
+
+.DESCRIPTION
+This E2E remediation fixture keeps the remediation job running long enough to verify
+the close-warning dialog for an active attack path remediation execution.
+#>
+
 Write-Information 'E2E long-running attack path remediation started.' -InformationAction Continue
 Start-Sleep -Seconds 60
 Write-Information 'E2E long-running attack path remediation completed.' -InformationAction Continue
 '@
-    $matches = @(Get-PSUScript -Integrated | Where-Object {
-      [string]$_.Name -eq $scriptName -or [string]$_.FullPath -eq $scriptPath -or [string]$_.Path -eq $scriptPath
-    })
-    if ($matches.Count -gt 1) {
-      throw "Expected one PSU script named '$scriptName', found $($matches.Count)."
-    }
+    Set-Content -LiteralPath $scriptPath -Value $content -NoNewline -Encoding UTF8
 
-    if ($matches.Count -eq 1) {
-      Set-PSUScript -Script $matches[0] -Content $content -Description 'Long-running E2E attack path remediation script' -Status 'Published' -TimeOut 90 -DisableManualInvocation:$true -Notes 'ManagedBy=Devolutions.CIEM.E2E' -Integrated | Out-Null
-    } else {
-      New-PSUScript -Name $scriptName -Path $scriptPath -ScriptBlock ([scriptblock]::Create($content)) -Description 'Long-running E2E attack path remediation script' -Status 'Published' -TimeOut 90 -DisableManualInvocation:$true -Notes 'ManagedBy=Devolutions.CIEM.E2E' -Integrated | Out-Null
-    }
-
-    [pscustomobject]@{ Status = 'Registered'; Name = $scriptName }
+    [pscustomobject]@{ Status = 'Registered'; Path = $scriptPath; RelativePath = $relativeScriptPath }
   `;
   const result = runPSUCommandSync(command, 30000);
   if (result.status !== 'Completed') {
-    throw new Error(`Failed to register long-running attack path remediation script: ${JSON.stringify(result)}`);
+    throw new Error(`Failed to register E2E long-running attack path remediation script: ${JSON.stringify(result)}`);
   }
   return result;
 }
 
 function removeLongRunningAttackPathRemediationScript() {
   const command = `
-    $scriptName = '${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}'
-    $scriptPath = 'Identities/AttackPaths/${LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME}.ps1'
-    $matches = @(Get-PSUScript -Integrated | Where-Object {
-      [string]$_.Name -eq $scriptName -or [string]$_.FullPath -eq $scriptPath -or [string]$_.Path -eq $scriptPath
-    })
-    if ($matches.Count -gt 1) {
-      throw "Expected one PSU script named '$scriptName', found $($matches.Count)."
+    $relativeScriptPath = '${LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH}'
+    $module = Get-Module -ListAvailable -Name Devolutions.CIEM | Sort-Object Version -Descending | Select-Object -First 1
+    if ($null -eq $module) {
+      [pscustomobject]@{ Status = 'Removed'; Removed = 0; RelativePath = $relativeScriptPath }
+      return
     }
 
-    if ($matches.Count -eq 1) {
-      Remove-PSUScript -Script $matches[0] -Integrated | Out-Null
+    $moduleRoot = Split-Path -Path $module.Path -Parent
+    $scriptPath = Join-Path $moduleRoot $relativeScriptPath
+    $removed = 0
+    if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
+      Remove-Item -LiteralPath $scriptPath -Force
+      $removed = 1
     }
 
-    [pscustomobject]@{ Status = 'Removed'; Name = $scriptName; Removed = $matches.Count }
+    [pscustomobject]@{ Status = 'Removed'; Path = $scriptPath; RelativePath = $relativeScriptPath; Removed = $removed }
   `;
   const result = runPSUCommandSync(command, 30000);
   if (result.status !== 'Completed') {
-    throw new Error(`Failed to remove long-running attack path remediation script: ${JSON.stringify(result)}`);
+    throw new Error(`Failed to remove E2E long-running attack path remediation script: ${JSON.stringify(result)}`);
   }
   return result;
 }
@@ -489,7 +497,9 @@ function sshNonQuery(sql) {
 }
 
 module.exports = {
+  LONG_RUNNING_ATTACK_PATH_RULE_ID,
   LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME,
+  LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH,
   isPSUReady, startPSU, waitForPSU,
   runPSUCommand, runPSUQuery, runPSUNonQuery,
   sshQuery, sshNonQuery,

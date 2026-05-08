@@ -16,6 +16,15 @@ Describe 'Attack Paths page refresh action' {
     }
 }
 
+Describe 'Attack Paths page deep links' {
+    It 'Reads attackPathId from the URL and renders a focused attack path detail panel' {
+        $script:PageContent | Should -Match 'attackPathId'
+        $script:PageContent | Should -Match 'Query'
+        $script:PageContent | Should -Match 'attackPathDeepLinkDetail'
+        $script:PageContent | Should -Match 'Get-CIEMAttackPath'
+    }
+}
+
 Describe 'Attack Paths page remediation execution action' {
     It 'Displays an execute button alongside the remediation script copy button' {
         $script:PageContent | Should -Match "'data-ciem-attack-path-remediation-script-copy'\s*=\s*'true'"

@@ -706,13 +706,6 @@ Describe 'Attack Path Engine' {
         }
 
         It 'renders a direct Azure RBAC role assignment REST delete command from the finding path' {
-            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-                [pscustomobject]@{
-                    Name    = 'disabled-account-still-holding-active-role-assignments'
-                    Content = '{{ROLE_ASSIGNMENT_DELETE_COMMANDS}}'
-                }
-            }
-
             Save-CIEMGraphNode -Id 'disabled-user-1' -Kind 'EntraUser' -DisplayName 'Disabled User' -Provider 'azure' -Properties '{"accountEnabled":false}'
             Save-CIEMGraphNode -Id '/subscriptions/sub-disabled-1' -Kind 'AzureSubscription' -DisplayName 'Disabled Test Subscription' -Provider 'azure'
             Save-CIEMGraphEdge -SourceId 'disabled-user-1' -TargetId '/subscriptions/sub-disabled-1' -Kind 'HasRole' `
@@ -732,13 +725,6 @@ Describe 'Attack Path Engine' {
         }
 
         It 'renders a group membership REST delete command from the finding path' {
-            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-                [pscustomobject]@{
-                    Name    = 'guest-user-is-a-member-of-a-group-that-holds-a-privileged-role'
-                    Content = '{{GROUP_MEMBER_REMOVE_COMMANDS}}'
-                }
-            }
-
             Save-CIEMGraphNode -Id 'guest-user-1' -Kind 'EntraUser' -DisplayName 'Guest User' -Provider 'azure' -Properties '{"userType":"Guest"}'
             Save-CIEMGraphNode -Id 'privileged-group-1' -Kind 'EntraGroup' -DisplayName 'Privileged Group' -Provider 'azure'
             Save-CIEMGraphNode -Id '/subscriptions/sub-guest-1' -Kind 'AzureSubscription' -DisplayName 'Guest Test Subscription' -Provider 'azure'

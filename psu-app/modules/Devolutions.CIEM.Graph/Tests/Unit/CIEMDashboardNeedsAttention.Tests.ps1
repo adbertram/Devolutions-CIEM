@@ -146,7 +146,7 @@ VALUES (
             $item.Reason | Should -Match 'Attack path exposes Public NSG'
             $item.Evidence | Should -Match 'Internet'
             $item.Evidence | Should -Match 'Public NSG'
-            $item.DrillInUrl | Should -Be '/ciem/attack-paths'
+            $item.DrillInUrl | Should -Match '^/ciem/attack-paths\?attackPathId='
         }
 
         It 'Includes attack path identity metadata when the path contains an identity node' {

@@ -14,35 +14,11 @@ function Get-CIEMAttackPathRemediationScript {
     }
     $attackPath = $attackPaths[0]
 
-    if ([string]::IsNullOrWhiteSpace($attackPath.PsuScriptName)) {
-        throw "Cannot render attack path remediation script because attack path '$Id' has no PSU script reference."
-    }
-
     $patterns = @(GetCIEMAttackPatternDefinition | Where-Object { $_.id -eq $attackPath.PatternId })
     if ($patterns.Count -ne 1) {
         throw "Cannot render attack path remediation script because rule '$($attackPath.PatternId)' was not found."
     }
 
-    $scripts = @(Get-PSUScript -Integrated | Where-Object { $null -ne $_ })
-    $matchingScripts = @($scripts | Where-Object {
-        $names = @(
-            [string]$_.Name
-            [string]$_.FullPath
-            [string]$_.Path
-        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-
-        $names | Where-Object {
-            ($_ -replace '\.ps1$', '') -eq $attackPath.PsuScriptName
-        }
-    })
-    if ($matchingScripts.Count -ne 1) {
-        throw "Cannot render attack path remediation script because PSU script '$($attackPath.PsuScriptName)' was not found."
-    }
-
-    $content = [string]$matchingScripts[0].Content
-    if ([string]::IsNullOrWhiteSpace($content)) {
-        throw "Cannot render attack path remediation script because PSU script '$($attackPath.PsuScriptName)' has empty content."
-    }
-
-    ResolveCIEMAttackPathScriptContent -Pattern $patterns[0] -AttackPath $attackPath -ScriptContent $content
+    $renderedScript = ResolveCIEMAttackPathRemediationScript -Pattern $patterns[0] -AttackPath $attackPath
+    [string]$renderedScript.Content
 }

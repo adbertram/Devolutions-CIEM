@@ -168,118 +168,41 @@ INSERT INTO attack_paths (
             $script:StoredAttackPath = @(Update-CIEMAttackPath -PatternId 'open-management-port' -PassThru)[0]
         }
 
-        It 'reads the PSU script by rule reference and replaces attack path, auth profile, and PSU environment placeholders' {
-            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-                @(
-                    [pscustomobject]@{
-                        Name    = 'unrelated-script'
-                        Content = 'Write-Output "unused"'
-                    }
-                    [pscustomobject]@{
-                        Name     = 'management-port-open-to-the-internet'
-                        FullPath = 'Remediation/management-port-open-to-the-internet.ps1'
-                        Content  = @'
-# {{PATTERN_NAME}}
-# {{PATH_CHAIN}}
-# {{AUTH_PROFILE_ID}}
-# {{AUTH_PROFILE_NAME}}
-# {{AUTH_PROFILE_METHOD}}
-# {{TENANT_ID}}
-# {{CLIENT_ID}}
-# {{MANAGED_IDENTITY_CLIENT_ID}}
-# {{PSU_ENVIRONMENT}}
-# {{PSU_WEBSITE_NAME}}
-{{NSG_RULE_DELETE_COMMANDS}}
-'@
-                    }
-                )
-            }
-            Mock -ModuleName Devolutions.CIEM Get-CIEMAzureAuthenticationProfile {
-                [pscustomobject]@{
-                    Id                      = 'profile-1'
-                    Name                    = 'Production'
-                    Method                  = 'ServicePrincipalSecret'
-                    TenantId                = 'tenant-1'
-                    ClientId                = 'client-1'
-                    ManagedIdentityClientId = 'mi-client-1'
-                }
-            }
-            Mock -ModuleName Devolutions.CIEM Get-PSUInstalledEnvironment {
-                [pscustomobject]@{
-                    Environment             = 'AzureWebApp'
-                    SupportsManagedIdentity = $true
-                    WebsiteName             = 'ciem-prod'
-                }
-            }
-
+        It 'reads the packaged remediation script by rule reference and replaces attack path placeholders' {
             $scriptText = Get-CIEMAttackPathRemediationScript -Id $script:StoredAttackPath.Id
 
-            $scriptText | Should -Match '# Management port open to the internet'
+            $scriptText | Should -Match '^<#'
+            $scriptText | Should -Match 'Remediates the attack path finding "Management port open to the internet"'
             $scriptText | Should -Match 'Internet \(Internet\)'
-            $scriptText | Should -Match '# profile-1'
-            $scriptText | Should -Match '# Production'
-            $scriptText | Should -Match '# ServicePrincipalSecret'
-            $scriptText | Should -Match '# tenant-1'
-            $scriptText | Should -Match '# client-1'
-            $scriptText | Should -Match '# mi-client-1'
-            $scriptText | Should -Match '# AzureWebApp'
-            $scriptText | Should -Match '# ciem-prod'
+            $scriptText | Should -Match 'nsg1'
             $expectedUri = [regex]::Escape('https://management.azure.com/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.Network/networkSecurityGroups/nsg1/securityRules/AllowRDP?api-version=2023-09-01')
             $scriptText | Should -Match 'Devolutions\.CIEM\\Invoke-AzureApi'
             $scriptText | Should -Match '-Api ARM'
             $scriptText | Should -Match '-Method DELETE'
             $scriptText | Should -Match $expectedUri
+            $scriptText | Should -Match 'Devolutions\.CIEM\\Connect-CIEMAzure'
             $scriptText | Should -Not -Match '\baz\b'
             $scriptText | Should -Not -Match '{{'
-            Should -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM -Times 1 -ParameterFilter {
-                -not $Name -and $Integrated
-            }
         }
 
         It 'preserves leading template comment help when rendering attack path placeholders' {
-            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
-                [pscustomobject]@{
-                    Name    = 'management-port-open-to-the-internet'
-                    Content = @'
-<#
-.SYNOPSIS
-Remediates the attack path finding "{{PATTERN_NAME}}".
-
-.DESCRIPTION
-This generated remediation script targets the specific attack path chain below:
-{{PATH_CHAIN}}
-
-It runs Azure REST API commands with the selected CIEM authentication profile context.
-#>
-
-{{NSG_RULE_DELETE_COMMANDS}}
-'@
-                }
-            }
-            Mock -ModuleName Devolutions.CIEM Get-CIEMAzureAuthenticationProfile {
-                [pscustomobject]@{
-                    Id                      = 'profile-1'
-                    Name                    = 'Production'
-                    Method                  = 'ServicePrincipalSecret'
-                    TenantId                = 'tenant-1'
-                    ClientId                = 'client-1'
-                    ManagedIdentityClientId = 'mi-client-1'
-                }
-            }
-            Mock -ModuleName Devolutions.CIEM Get-PSUInstalledEnvironment {
-                [pscustomobject]@{
-                    Environment             = 'AzureWebApp'
-                    SupportsManagedIdentity = $true
-                    WebsiteName             = 'ciem-prod'
-                }
-            }
-
             $scriptText = Get-CIEMAttackPathRemediationScript -Id $script:StoredAttackPath.Id
 
             $scriptText | Should -Match '^<#'
             $scriptText | Should -Match 'Remediates the attack path finding "Management port open to the internet"'
             $scriptText | Should -Match 'Internet \(Internet\)'
             $scriptText | Should -Not -Match '{{'
+        }
+
+        It 'does not require PSU remediation template scripts to be registered' {
+            Mock -ModuleName Devolutions.CIEM Get-PSUScript {
+                throw 'Get-PSUScript should not be called when rendering packaged attack path remediation scripts.'
+            }
+
+            $scriptText = Get-CIEMAttackPathRemediationScript -Id $script:StoredAttackPath.Id
+
+            $scriptText | Should -Match 'Management port open to the internet'
+            Should -Not -Invoke -CommandName Get-PSUScript -ModuleName Devolutions.CIEM
         }
 
         It 'renders remediation content from CIEMAttackPath instances created from a different PowerShell class assembly' {

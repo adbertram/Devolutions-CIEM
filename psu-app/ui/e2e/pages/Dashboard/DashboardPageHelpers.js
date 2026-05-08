@@ -12,20 +12,20 @@ class DashboardPageHelpers extends BasePage {
       lastDiscoveryHeader: '#ciemLastDiscoveryHeader',
       localLastDiscoverySummary: '#lastDiscoverySummary',
       runNewScanBtn: "button:has-text('Run New Scan')",
-      sectionPanelGroup: '#dashboardSectionPanels',
+      dashboardOverviewSection: '#dashboardOverviewSection',
+      dashboardPrimaryStateGrid: '#dashboardPrimaryStateGrid',
+      dashboardStatusMetrics: '[data-ciem-dashboard-status-metric="true"]',
+      dashboardPriorityWorkSection: '#dashboardPriorityWorkSection',
+      dashboardSupportingEvidenceSection: '#dashboardSupportingEvidenceSection',
+      dashboardSupportingEvidencePanelGroup: '#dashboardSupportingEvidencePanelGroup',
+      dashboardSupportingPanels: '#dashboardSupportingEvidencePanelGroup [id^="dashboard"][id$="Panel"]',
+      checksAndScansPanel: '#dashboardChecksAndScansPanel',
+      identityAndPAMPanel: '#dashboardIdentityAndPAMPanel',
       needsAttentionSection: '#dashboardNeedsAttentionSection',
       needsAttentionItems: '[data-ciem-needs-attention-item="true"]',
       needsAttentionEmpty: '[data-ciem-needs-attention-empty="true"]',
       inspectIdentityButton: '[data-ciem-inspect-identity="true"] button',
       inspectAttackPathButton: '[data-ciem-inspect-attack-path="true"] button',
-      exposureChangesSection: '#dashboardExposureChangesSection',
-      exposureChangeItems: '[data-ciem-exposure-change-item="true"]',
-      exposureChangeEmpty: '[data-ciem-exposure-change-empty="true"]',
-      reviewExposureIdentityButton: '[data-ciem-review-exposure-identity="true"] button',
-      reviewExposureAttackPathButton: '[data-ciem-review-exposure-attack-path="true"] button',
-      connectorPayloadPreviewSection: '#dashboardConnectorPayloadPreviewSection',
-      connectorPayloadPreviewItems: '[data-ciem-connector-payload-preview-item="true"]',
-      connectorPayloadPreviewEmpty: '[data-ciem-connector-payload-preview-empty="true"]',
       pamProgressSection: '#dashboardPAMProgressSection',
       pamProgressMetrics: '[data-ciem-pam-progress-metric="true"]',
       pamProgressStages: '[data-ciem-pam-progress-stage="true"]',
@@ -37,12 +37,10 @@ class DashboardPageHelpers extends BasePage {
       scanEfficiencyEmpty: '[data-ciem-scan-efficiency-empty="true"]',
       discoveryPhaseTimingSection: '#dashboardDiscoveryPhaseTiming',
       discoveryPhaseMetrics: '[data-ciem-discovery-phase-metric="true"]',
-      scanPanel: '#dashboardScanPanel',
-      identityPanel: '#dashboardIdentityPanel',
       scanSection: '#dashboardScanSection',
       identitySection: '#dashboardIdentitySection',
-      scanSectionHeading: "#dashboardScanPanel:has-text('Checks & Scans')",
-      identitySectionHeading: "#dashboardIdentityPanel:has-text('Identity Stats')",
+      scanSectionHeading: "#dashboardScanSection:has-text('Checks & Scans')",
+      identitySectionHeading: "#dashboardIdentitySection:has-text('Identity Stats')",
       // Summary cards
       summaryCards: '.MuiGrid-container .MuiCard-root',
       totalResultsCard: ".MuiCard-root:has-text('Total Results')",
@@ -62,9 +60,9 @@ class DashboardPageHelpers extends BasePage {
       critHighTable: ".MuiCard-root:has-text('Critical & High Results') table",
       noCritHighMessage: "text=No critical or high severity results",
       // Empty state
-      emptyStateCard: ".MuiCard-root:has-text('No Scan Data Available')",
+      emptyStateCard: '#dashboardNoScanDataState',
       emptyStateIcon: '.MuiCard-root svg',
-      runFirstScanBtn: "button:has-text('Run Your First Scan')",
+      runFirstScanBtn: "#dashboardNoScanDataState button:has-text('Run Your First Scan')",
       // Dynamic content
       dashboardContent: '#dashboardContent'
     };
@@ -76,9 +74,9 @@ class DashboardPageHelpers extends BasePage {
   }
 
   async waitForDashboardState() {
-    await this.page.locator(this.selectors.sectionPanelGroup).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.dashboardOverviewSection).waitFor({ state: 'visible', timeout: 15000 });
     await this.page
-      .locator(`${this.selectors.totalResultsCard}, ${this.selectors.emptyStateCard}`)
+      .locator(`${this.selectors.needsAttentionSection}, ${this.selectors.emptyStateCard}`)
       .first()
       .waitFor({ state: 'visible', timeout: 15000 });
   }
@@ -116,15 +114,77 @@ class DashboardPageHelpers extends BasePage {
   }
 
   async clickScanPanelHeader() {
-    const section = this.page.locator(this.selectors.scanSection);
-    const visibleBeforeClick = await section.isVisible();
-    await this.page.locator(this.selectors.scanPanel).getByText('Checks & Scans').first().click();
-    await section.waitFor({ state: visibleBeforeClick ? 'hidden' : 'visible', timeout: 15000 });
+    await this.expandChecksAndScansDetails();
+  }
+
+  async expandChecksAndScansDetails() {
+    await this.expandSupportingPanel(this.selectors.checksAndScansPanel, this.selectors.scanSection, 'Checks & Scans');
+  }
+
+  async expandIdentityAndPAMDetails() {
+    await this.expandSupportingPanel(this.selectors.identityAndPAMPanel, this.selectors.identitySection, 'Identity & PAM');
+  }
+
+  async expandSupportingPanel(panelSelector, visibleContentSelector, title) {
+    if (await this.page.locator(visibleContentSelector).isVisible()) {
+      return;
+    }
+    await this.page.locator(panelSelector).getByText(title).first().click();
+    await this.page.locator(visibleContentSelector).waitFor({ state: 'visible', timeout: 15000 });
   }
 
   async getDashboardContentText() {
     await this.waitForDashboardState();
     return await this.page.locator('body').textContent();
+  }
+
+  async getAtAGlanceLayoutMetrics() {
+    await this.page.locator(this.selectors.dashboardOverviewSection).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.dashboardPriorityWorkSection).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.dashboardSupportingEvidenceSection).waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.locator(this.selectors.dashboardSupportingEvidencePanelGroup).waitFor({ state: 'visible', timeout: 15000 });
+
+    return await this.page.evaluate((selectors) => {
+      const rectFor = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) {
+          throw new Error(`Expected selector to be rendered: ${selector}`);
+        }
+        const rect = element.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          height: rect.height
+        };
+      };
+
+      const metricRects = Array.from(document.querySelectorAll(selectors.dashboardStatusMetrics)).map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          top: Math.round(rect.top),
+          bottom: Math.round(rect.bottom),
+          height: Math.round(rect.height)
+        };
+      });
+
+      return {
+        viewportHeight: window.innerHeight,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        windowInnerWidth: window.innerWidth,
+        hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        overview: rectFor(selectors.dashboardOverviewSection),
+        priorityWork: rectFor(selectors.dashboardPriorityWorkSection),
+        supportingEvidence: rectFor(selectors.dashboardSupportingEvidenceSection),
+        metricCount: metricRects.length,
+        metricRows: new Set(metricRects.map((rect) => rect.top)).size,
+        metricRects
+      };
+    }, this.selectors);
+  }
+
+  async getSupportingPanelIds() {
+    await this.page.locator(this.selectors.dashboardSupportingEvidencePanelGroup).waitFor({ state: 'visible', timeout: 15000 });
+    return await this.page.locator(this.selectors.dashboardSupportingPanels).evaluateAll((nodes) => nodes.map((node) => node.id));
   }
 
   async isNeedsAttentionVisible() {
@@ -152,48 +212,7 @@ class DashboardPageHelpers extends BasePage {
 
   async clickInspectAttackPath() {
     await this.page.locator(this.selectors.inspectAttackPathButton).first().click();
-    await this.page.waitForURL('**/ciem/attack-paths', { timeout: 15000 });
-  }
-
-  async isExposureChangesVisible() {
-    return await this.isElementVisible(this.selectors.exposureChangesSection);
-  }
-
-  async getExposureChangesText() {
-    await this.page.locator(this.selectors.exposureChangesSection).waitFor({ state: 'visible', timeout: 15000 });
-    return (await this.page.locator(this.selectors.exposureChangesSection).textContent()).trim();
-  }
-
-  async getExposureChangeItemCount() {
-    await this.page.locator(this.selectors.exposureChangesSection).waitFor({ state: 'visible', timeout: 15000 });
-    return await this.page.locator(this.selectors.exposureChangeItems).count();
-  }
-
-  async hasExposureChangesEmptyState() {
-    return await this.isElementVisible(this.selectors.exposureChangeEmpty);
-  }
-
-  async clickReviewExposureIdentity() {
-    await this.page.locator(this.selectors.reviewExposureIdentityButton).first().click();
-    await this.page.waitForURL('**/ciem/identities', { timeout: 15000 });
-  }
-
-  async isConnectorPayloadPreviewVisible() {
-    return await this.isElementVisible(this.selectors.connectorPayloadPreviewSection);
-  }
-
-  async getConnectorPayloadPreviewText() {
-    await this.page.locator(this.selectors.connectorPayloadPreviewSection).waitFor({ state: 'visible', timeout: 15000 });
-    return (await this.page.locator(this.selectors.connectorPayloadPreviewSection).textContent()).trim();
-  }
-
-  async getConnectorPayloadPreviewItemCount() {
-    await this.page.locator(this.selectors.connectorPayloadPreviewSection).waitFor({ state: 'visible', timeout: 15000 });
-    return await this.page.locator(this.selectors.connectorPayloadPreviewItems).count();
-  }
-
-  async hasConnectorPayloadPreviewEmptyState() {
-    return await this.isElementVisible(this.selectors.connectorPayloadPreviewEmpty);
+    await this.page.waitForURL(/\/ciem\/attack-paths\?attackPathId=.+/, { timeout: 15000 });
   }
 
   async isPAMProgressVisible() {
@@ -253,10 +272,7 @@ class DashboardPageHelpers extends BasePage {
   }
 
   async clickIdentityPanelHeader() {
-    const section = this.page.locator(this.selectors.identitySection);
-    const visibleBeforeClick = await section.isVisible();
-    await this.page.locator(this.selectors.identityPanel).getByText('Identity Stats').first().click();
-    await section.waitFor({ state: visibleBeforeClick ? 'hidden' : 'visible', timeout: 15000 });
+    await this.expandIdentityAndPAMDetails();
   }
 
   async isScanRunSelectorInsideScanSection() {
