@@ -11,6 +11,7 @@
         'Deploy-CIEMPSUInstance'
         'Get-ProwlerCheck'
         'Get-PSUModule'
+        'Initialize-CIEMPSUManagedIdentity'
         'Install-PSUModule'
         'Invoke-CIEMCommand'
         'Invoke-CIEMTest'
