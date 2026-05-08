@@ -87,21 +87,6 @@ done
 az webapp restart --name "$SITE" --resource-group "$RG"
 ```
 
-### Provisioning steps (Devolutions.CIEM.Admin helper)
-
-The `Devolutions.CIEM.Admin` companion module bundles `Initialize-CIEMPSUManagedIdentity`, which performs all of the above in one call:
-
-```powershell
-Import-Module ./Devolutions.CIEM.Admin
-Initialize-CIEMPSUManagedIdentity `
-  -ResourceGroup devolutions-ciem-rg `
-  -SiteName      devolutions-ciem-psu `
-  -SubscriptionId (Get-AzContext).Subscription.Id `
-  -Restart
-```
-
-Pass `-GraphPermission @()` to skip Graph permission setup if you only need ARM (Azure resource) coverage.
-
 ### Configure CIEM to use the managed identity
 
 After the identity is provisioned and the app restarts, open the CIEM **Configuration** page in PSU and create an Azure authentication profile with:
@@ -138,12 +123,7 @@ In the UI:
 
 ## Uninstall
 
-```powershell
-Import-Module ./Devolutions.CIEM.Admin
-Remove-CIEMPSUModule       # removes CIEM apps, scripts, schedules, and the module itself
-```
-
-Or manually: remove the `Devolutions CIEM` PSU app, delete the three CIEM-registered scripts, then `Uninstall-Module Devolutions.CIEM`.
+Remove the `Devolutions CIEM` PSU app, delete the CIEM-registered scripts, then `Uninstall-Module Devolutions.CIEM`.
 
 ## Project
 
