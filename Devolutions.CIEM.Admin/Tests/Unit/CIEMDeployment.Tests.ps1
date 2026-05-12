@@ -61,6 +61,7 @@ Describe 'CIEM deployment cmdlet exports' {
 
         foreach ($commandName in @(
                 'Deploy-CIEMPSUInstance'
+                'Deploy-PSUModule'
                 'Remove-CIEMPSUModule'
                 'Publish-PSUModule'
                 'Test-CIEMPSUDeployment'

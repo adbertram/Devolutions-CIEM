@@ -1,5 +1,3 @@
-$script:DefaultAppName = 'Devolutions CIEM'
-
 function Publish-PSUModule {
     <#
     .SYNOPSIS
@@ -9,7 +7,8 @@ function Publish-PSUModule {
         Automatically bumps the version and publishes a module to PowerShell Gallery.
         Modules with the 'PowerShellUniversal' tag appear in the PSU Gallery.
 
-        Optionally imports the published module to a connected PSU instance.
+        This cmdlet does NOT install the module into any PSU instance. Use
+        Deploy-PSUModule for that.
 
     .PARAMETER ModulePath
         Path to the module directory. Required.
@@ -27,45 +26,11 @@ function Publish-PSUModule {
     .PARAMETER EnvFilePath
         Path to .env file for loading NuGetApiKey.
 
-    .PARAMETER LocalOnly
-        Skip PowerShell Gallery publishing entirely and push the module
-        via SSH/rsync to the publish point PSU instance.
-
-    .PARAMETER InstallPublishedVersion
-        Skip PowerShell Gallery publishing and install the latest version already
-        available in the PowerShell Gallery into the connected PSU instance.
-
-    .PARAMETER IncludeData
-        Include database files (*.db, *.db-shm, *.db-wal) in the module push.
-        By default (LocalOnly), DB files are excluded to preserve the PSU instance's
-        runtime data. Azure/PSGallery publishes always exclude data files too.
-
-    .PARAMETER SkipAppRestart
-        Skip the CIEM app restart and health check after the module is imported.
-        Use this when a higher-level deployment workflow will restart or validate
-        the app separately.
-
-    .PARAMETER ValidateDeployment
-        Restart the app and validate the deployment after the module is
-        published and imported. Validation does not run post-install setup.
-
-    .PARAMETER TimeoutSeconds
-        Timeout for CIEM deployment validation when ValidateDeployment is specified.
-
     .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app
 
     .EXAMPLE
-        Publish-PSUModule -ModulePath ./psu-app -LocalOnly
-
-    .EXAMPLE
-        Publish-PSUModule -ModulePath ./psu-app -LocalOnly -IncludeData
-
-    .EXAMPLE
         Publish-PSUModule -ModulePath ./psu-app -BumpVersion Minor
-
-    .EXAMPLE
-        Publish-PSUModule -ModulePath ./psu-app -InstallPublishedVersion
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
@@ -85,25 +50,7 @@ function Publish-PSUModule {
         [switch]$SkipValidation,
 
         [Parameter()]
-        [string]$EnvFilePath,
-
-        [Parameter()]
-        [switch]$LocalOnly,
-
-        [Parameter()]
-        [switch]$InstallPublishedVersion,
-
-        [Parameter()]
-        [switch]$IncludeData,
-
-        [Parameter()]
-        [switch]$SkipAppRestart,
-
-        [Parameter()]
-        [switch]$ValidateDeployment,
-
-        [Parameter()]
-        [int]$TimeoutSeconds = 300
+        [string]$EnvFilePath
     )
 
     $ErrorActionPreference = 'Stop'
@@ -116,260 +63,7 @@ function Publish-PSUModule {
     }
     $manifestPath = $manifestFile.FullName
     $moduleName = $manifestFile.BaseName
-
-    if ($LocalOnly -and $InstallPublishedVersion) {
-        throw '-LocalOnly and -InstallPublishedVersion cannot be used together.'
-    }
-
-    # ========================================================================
-    # LocalOnly Mode: Skip PSGallery entirely, import to local PSU
-    # ========================================================================
-    if ($LocalOnly) {
-        Write-Host '========================================' -ForegroundColor Cyan
-        Write-Host "Publishing $moduleName to Publish Point PSU" -ForegroundColor Cyan
-        Write-Host '========================================' -ForegroundColor Cyan
-        Write-Host "Module: $ModulePath"
-        Write-Host ''
-
-        # Read publish point config from .env
-        $projectRoot = Split-Path $ModulePath -Parent
-        $envPath = if ($EnvFilePath) { $EnvFilePath } else { Join-Path $projectRoot '.env' }
-        $sshAlias = $null
-        $remotePsuPath = $null
-        if (Test-Path $envPath) {
-            foreach ($line in (Get-Content $envPath -ErrorAction Stop)) {
-                if ($line -match '^\s*#' -or $line -match '^\s*$') { continue }
-                if ($line -match '^([^=]+)=(.*)$') {
-                    switch ($matches[1].Trim()) {
-                        'PUBLISH_POINT_SSH' { $sshAlias = $matches[2].Trim() }
-                        'PUBLISH_POINT_PSU_PATH' { $remotePsuPath = $matches[2].Trim() }
-                    }
-                }
-            }
-        }
-        if (-not $sshAlias) { throw "PUBLISH_POINT_SSH is required in .env (e.g., adam-server)." }
-        if (-not $remotePsuPath) { throw "PUBLISH_POINT_PSU_PATH is required in .env (e.g., /Users/adam/psu)." }
-        $remoteModulesDir = "$remotePsuPath/Repository/Modules"
-
-        Write-Host 'Step 1: Connecting to local PSU...' -ForegroundColor Yellow
-        $null = Connect-PSU -Local -ErrorAction Stop
-        Write-Host '  [OK] Connected to local PSU' -ForegroundColor Green
-
-        Write-Host ''
-        Write-Host 'Step 2: Bumping version...' -ForegroundColor Yellow
-
-        $manifest = Import-PowerShellDataFile -Path $manifestPath
-        $localVersion = [version]$manifest.ModuleVersion
-
-        # Check currently installed version on publish point via SSH
-        $installedVersion = $null
-        $remoteVersionOutput = & ssh $sshAlias "ls '$remoteModulesDir/$moduleName/' 2>/dev/null" 2>$null
-        if ($LASTEXITCODE -eq 0 -and $remoteVersionOutput) {
-            $versionStrings = @($remoteVersionOutput | Where-Object { $_ -match '^\d+\.\d+\.\d+' })
-            if ($versionStrings) {
-                $installedVersion = $versionStrings | ForEach-Object { [version]$_ } | Sort-Object -Descending | Select-Object -First 1
-            }
-        }
-
-        # Check PowerShell Gallery version
-        $galleryVersion = $null
-        try {
-            $existing = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction Stop 3>$null
-            if ($existing) {
-                $galleryVersion = [version]($existing.Version -replace '-.*$', '')
-            }
-        }
-        catch {
-            throw "Failed to query PowerShell Gallery for module '$moduleName'. Error: $_"
-        }
-
-        # Use the highest of manifest, installed, and gallery versions
-        $baseVersion = $localVersion
-        if ($installedVersion -and $installedVersion -gt $baseVersion) { $baseVersion = $installedVersion }
-        if ($galleryVersion -and $galleryVersion -gt $baseVersion) { $baseVersion = $galleryVersion }
-
-        Write-Host "  Manifest version:  $localVersion" -ForegroundColor Gray
-        if ($installedVersion) {
-            Write-Host "  Installed version: $installedVersion" -ForegroundColor Cyan
-        }
-        if ($galleryVersion) {
-            Write-Host "  Gallery version:   $galleryVersion" -ForegroundColor Cyan
-        }
-
-        $newVersion = GetBumpedVersion -Base $baseVersion -Component $BumpVersion
-
-        Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
-
-        # Update manifest file
-        $manifestContent = Get-Content -Path $manifestPath -Raw
-        $updatedContent = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
-        Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
-        Write-Host "  [OK] Updated $manifestPath" -ForegroundColor Green
-
-        $moduleVersion = $newVersion.ToString()
-
-        Write-Host ''
-        Write-Host 'Step 3: Pushing module to publish point via SSH...' -ForegroundColor Yellow
-
-        if ($PSCmdlet.ShouldProcess($moduleName, "Push v$moduleVersion to $sshAlias")) {
-
-            # Remove existing module on publish point
-            & ssh $sshAlias "rm -rf '$remoteModulesDir/$moduleName'" 2>$null
-
-            # Build rsync exclude list
-            $rsyncArgs = @('-az', '--delete')
-            if (-not $IncludeData) {
-                $rsyncArgs += '--exclude=*.db'
-                $rsyncArgs += '--exclude=*.db-shm'
-                $rsyncArgs += '--exclude=*.db-wal'
-            }
-            $rsyncArgs += '--exclude=*.log'
-            $rsyncArgs += '--exclude=modules/Devolutions.CIEM.PSU/Data/icons/source-packs/'
-            $rsyncArgs += '--exclude=Tests/'
-            $rsyncArgs += '--exclude=node_modules/'
-            $rsyncArgs += '--exclude=playwright-report/'
-            $rsyncArgs += '--exclude=test-results/'
-            $rsyncArgs += '--exclude=ui/e2e/'
-            $rsyncArgs += "$ModulePath/"
-            $rsyncArgs += "${sshAlias}:${remoteModulesDir}/${moduleName}/${moduleVersion}/"
-
-            Write-Verbose "rsync $($rsyncArgs -join ' ')"
-            & rsync @rsyncArgs
-            if ($LASTEXITCODE -ne 0) {
-                throw "rsync to $sshAlias failed with exit code $LASTEXITCODE"
-            }
-
-            if (-not $IncludeData) {
-                Write-Host "  [OK] Excluded *.db files (use -IncludeData to override)" -ForegroundColor Green
-            }
-            Write-Host "  [OK] Module pushed: $moduleName v$moduleVersion -> $sshAlias" -ForegroundColor Green
-
-            Write-Host ''
-            Write-Host 'Step 4: Syncing PSU configuration...' -ForegroundColor Yellow
-            Sync-PSUConfiguration -Reset
-            Write-Host '  [OK] PSU configuration synced' -ForegroundColor Green
-
-            if ($SkipAppRestart -or $ValidateDeployment) {
-                Write-Host ''
-                Write-Host 'Step 5: Skipping app restart.' -ForegroundColor Yellow
-            }
-            else {
-                Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 5
-            }
-
-            Write-Host ''
-            Write-Host '========================================' -ForegroundColor Cyan
-            Write-Host 'Publish Point Import Successful!' -ForegroundColor Green
-            Write-Host '========================================' -ForegroundColor Cyan
-
-            $publishResult = [PSCustomObject]@{
-                ModuleName = $moduleName
-                Version    = $moduleVersion
-                GalleryUrl = $null
-                UpdatedPSU = $true
-                Status     = 'LocalImport'
-            }
-
-            if ($ValidateDeployment) {
-                return Invoke-CIEMPSUModuleDeployment `
-                    -Environment local `
-                    -ModulePath $ModulePath `
-                    -BumpVersion $BumpVersion `
-                    -PublishResult $publishResult `
-                    -EnvFilePath $EnvFilePath `
-                    -TimeoutSeconds $TimeoutSeconds
-            }
-
-            return $publishResult
-        }
-        else {
-            Write-Host ''
-            $manifest = Import-PowerShellDataFile -Path $manifestPath
-            Write-Host '[DRY RUN] Would push to publish point:' -ForegroundColor Yellow
-            Write-Host "  Module: $moduleName"
-            Write-Host "  Version: $($manifest.ModuleVersion)"
-            Write-Host "  Target: ${sshAlias}:${remoteModulesDir}/${moduleName}/$($manifest.ModuleVersion)/"
-
-            return [PSCustomObject]@{
-                ModuleName = $moduleName
-                Version    = $manifest.ModuleVersion
-                GalleryUrl = $null
-                UpdatedPSU = $false
-                Status     = 'DryRun'
-            }
-        }
-    }
-
-    if ($InstallPublishedVersion) {
-        Write-Host '========================================' -ForegroundColor Cyan
-        Write-Host "Installing published $moduleName from PowerShell Gallery" -ForegroundColor Cyan
-        Write-Host '========================================' -ForegroundColor Cyan
-        Write-Host "Module: $ModulePath"
-        Write-Host ''
-
-        if ($PSCmdlet.ShouldProcess($moduleName, 'Install latest published version from PowerShell Gallery into PSU')) {
-            Write-Host 'Step 1: Connecting to PSU...' -ForegroundColor Yellow
-            if (-not $script:PSUConnection.Url) {
-                $connectParams = @{ ErrorAction = 'Stop' }
-                if ($EnvFilePath) {
-                    $connectParams.EnvFilePath = $EnvFilePath
-                }
-                $null = Connect-PSU @connectParams
-            }
-            Write-Host '  [OK] Connected to PSU' -ForegroundColor Green
-
-            Write-Host ''
-            Write-Host 'Step 2: Installing latest published Gallery module into PSU...' -ForegroundColor Yellow
-            $installResult = Install-PSUModule -Name $moduleName
-            Write-Host "  [OK] Installed $moduleName $($installResult.Version)" -ForegroundColor Green
-
-            if ($SkipAppRestart -or $ValidateDeployment) {
-                Write-Host '  Skipping app restart.' -ForegroundColor Yellow
-            }
-            else {
-                Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 3
-            }
-
-            Write-Host ''
-            Write-Host '========================================' -ForegroundColor Cyan
-            Write-Host 'Published Version Install Successful!' -ForegroundColor Green
-            Write-Host '========================================' -ForegroundColor Cyan
-
-            $publishResult = [PSCustomObject]@{
-                ModuleName = $moduleName
-                Version    = $installResult.Version
-                GalleryUrl = "https://www.powershellgallery.com/packages/$moduleName"
-                UpdatedPSU = $true
-                Status     = 'InstalledPublishedVersion'
-            }
-
-            if ($ValidateDeployment) {
-                $environment = if ($script:PSUConnection.IsAzure) { 'azure' } else { 'local' }
-                return Invoke-CIEMPSUModuleDeployment `
-                    -Environment $environment `
-                    -ModulePath $ModulePath `
-                    -BumpVersion $BumpVersion `
-                    -PublishResult $publishResult `
-                    -EnvFilePath $EnvFilePath `
-                    -TimeoutSeconds $TimeoutSeconds
-            }
-
-            return $publishResult
-        }
-
-        Write-Host ''
-        Write-Host '[DRY RUN] Would install latest published Gallery module into PSU:' -ForegroundColor Yellow
-        Write-Host "  Module: $moduleName"
-        Write-Host '  Version: latest available in PSGallery'
-
-        return [PSCustomObject]@{
-            ModuleName = $moduleName
-            Version    = $null
-            GalleryUrl = "https://www.powershellgallery.com/packages/$moduleName"
-            UpdatedPSU = $false
-            Status     = 'DryRun'
-        }
-    }
+    $galleryUrl = "https://www.powershellgallery.com/packages/$moduleName"
 
     Write-Host '========================================' -ForegroundColor Cyan
     Write-Host "Publishing $moduleName to PowerShell Gallery" -ForegroundColor Cyan
@@ -377,7 +71,6 @@ function Publish-PSUModule {
     Write-Host "Module: $ModulePath"
     Write-Host ''
 
-    # Step 1: Validate
     if (-not $SkipValidation) {
         Write-Host 'Step 1: Validating module structure...' -ForegroundColor Yellow
 
@@ -411,7 +104,6 @@ function Publish-PSUModule {
         Write-Host 'Step 1: Skipping validation...' -ForegroundColor Yellow
     }
 
-    # Step 2: Version bump
     Write-Host ''
     Write-Host 'Step 2: Querying PowerShell Gallery for current version...' -ForegroundColor Yellow
 
@@ -452,21 +144,6 @@ function Publish-PSUModule {
 
     Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
 
-    $manifestContent = Get-Content -Path $manifestPath -Raw
-    $updatedContent = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
-
-    if ($PSCmdlet.ShouldProcess($manifestPath, "Update ModuleVersion to $newVersion")) {
-        Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
-        Write-Host "  [OK] Updated $manifestPath" -ForegroundColor Green
-    }
-
-    $manifest = Import-PowerShellDataFile -Path $manifestPath
-    $tags = $manifest.PrivateData.PSData.Tags
-    if ($tags) {
-        Write-Host "  [OK] Tags: $($tags -join ', ')" -ForegroundColor Green
-    }
-
-    # Step 3: API key
     Write-Host ''
     Write-Host 'Step 3: Checking API key...' -ForegroundColor Yellow
 
@@ -481,7 +158,7 @@ function Publish-PSUModule {
         }
 
         if (Test-Path $EnvFilePath) {
-            Write-Host "  Loading from .env file..." -ForegroundColor Gray
+            Write-Host '  Loading from .env file...' -ForegroundColor Gray
             $envContent = Get-Content $EnvFilePath -ErrorAction SilentlyContinue
             foreach ($line in $envContent) {
                 if ($line -match '^NUGET_API_KEY=(.+)$') {
@@ -504,9 +181,8 @@ NuGet API key required. Options:
 
     Write-Host '  [OK] API key provided' -ForegroundColor Green
 
-    # Step 4: Publish
-    Write-Host ''
-    Write-Host 'Step 4: Preparing to publish...' -ForegroundColor Yellow
+    $manifestContent = Get-Content -Path $manifestPath -Raw
+    $updatedContent = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '$newVersion'"
 
     $moduleVersion = $newVersion.ToString()
     if ($manifest.PrivateData.PSData.Prerelease) {
@@ -516,132 +192,99 @@ NuGet API key required. Options:
         $fullVersion = $moduleVersion
     }
 
-    Write-Host "  [OK] Will publish version: $fullVersion" -ForegroundColor Green
-
-    Write-Host ''
-    Write-Host 'Step 5: Publishing to PowerShell Gallery...' -ForegroundColor Yellow
-
-    if ($PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerShell Gallery")) {
-        # Stage a clean copy excluding database files to avoid shipping runtime data
-        $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) "PSUPublish_$moduleName"
-        if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
-        Copy-Item -Path $ModulePath -Destination $stagingDir -Recurse -Force
-        Get-ChildItem -Path $stagingDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal', '*.log' -File | Remove-Item -Force
-        $stagingExcludeDirectories = @(
-            Get-ChildItem -Path $stagingDir -Recurse -Directory -Force |
-                Where-Object { $_.Name -in @('Tests', 'node_modules', 'playwright-report', 'test-results', 'source-packs') -or $_.FullName -like '*/ui/e2e' }
-        )
-        foreach ($directory in $stagingExcludeDirectories) {
-            if (Test-Path -LiteralPath $directory.FullName) {
-                Remove-Item -LiteralPath $directory.FullName -Recurse -Force
-            }
-        }
-        Write-Host "  [OK] Staged clean copy (excluded *.db files)" -ForegroundColor Green
-
-        $publishParams = @{
-            Path        = $stagingDir
-            ApiKey      = $NuGetApiKey
-            Repository  = 'PSGallery'
-            ErrorAction = 'Stop'
-        }
-
-        try {
-            Publish-PSResource @publishParams
-        } finally {
-            Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
-
-        # Step 6: Verify
-        Write-Host ''
-        Write-Host 'Step 6: Verifying publication...' -ForegroundColor Yellow
-
-        $maxRetries = 6
-        $retryDelay = 10
-        $verified = $false
-
-        for ($i = 1; $i -le $maxRetries; $i++) {
-            Write-Host "  Checking PowerShell Gallery (attempt $i/$maxRetries)..." -ForegroundColor Gray
-            $published = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
-            if ($published -and $published.Version -eq $fullVersion) {
-                $verified = $true
-                break
-            }
-            if ($i -lt $maxRetries) {
-                Write-Host "  Not found yet, waiting ${retryDelay}s..." -ForegroundColor Gray
-                Start-Sleep -Seconds $retryDelay
-            }
-        }
-
-        if ($verified) {
-            Write-Host "  [OK] Verified: $moduleName $fullVersion is available" -ForegroundColor Green
-        }
-        else {
-            Write-Host "  [WARN] Could not verify within $($maxRetries * $retryDelay)s" -ForegroundColor Yellow
-            Write-Host "  The module may still be propagating." -ForegroundColor Yellow
-        }
-
-        # Step 7: Update PSU
-        $updatedPSU = $false
-        Write-Host ''
-        Write-Host 'Step 7: Updating PSU server...' -ForegroundColor Yellow
-
-        if (-not $script:PSUConnection.Url) {
-            Write-Host '  Not connected to PSU. Attempting auto-connect...' -ForegroundColor Gray
-            $null = Connect-PSU -ErrorAction Stop
-            Write-Host '  [OK] Connected to PSU' -ForegroundColor Green
-        }
-
-        Write-Host "  Importing $moduleName $fullVersion to PSU..." -ForegroundColor Gray
-        Install-PSUModule -Name $moduleName -Version $fullVersion
-        Write-Host "  [OK] Module imported" -ForegroundColor Green
-        $updatedPSU = $true
-
-        if ($SkipAppRestart -or $ValidateDeployment) {
-            Write-Host '  Skipping app restart.' -ForegroundColor Yellow
-        }
-        else {
-            Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 8
-        }
-
-        Write-Host ''
-        Write-Host '========================================' -ForegroundColor Cyan
-        Write-Host 'Publication Successful!' -ForegroundColor Green
-        Write-Host '========================================' -ForegroundColor Cyan
-
-        $publishResult = [PSCustomObject]@{
-            ModuleName  = $moduleName
-            Version     = $fullVersion
-            GalleryUrl  = "https://www.powershellgallery.com/packages/$moduleName"
-            UpdatedPSU  = $updatedPSU
-            Status      = 'Published'
-        }
-
-        if ($ValidateDeployment) {
-            $environment = if ($script:PSUConnection.IsAzure) { 'azure' } else { 'local' }
-            return Invoke-CIEMPSUModuleDeployment `
-                -Environment $environment `
-                -ModulePath $ModulePath `
-                -BumpVersion $BumpVersion `
-                -PublishResult $publishResult `
-                -EnvFilePath $EnvFilePath `
-                -TimeoutSeconds $TimeoutSeconds
-        }
-
-        $publishResult
-    }
-    else {
+    if (-not $PSCmdlet.ShouldProcess($moduleName, "Publish version $fullVersion to PowerShell Gallery")) {
         Write-Host ''
         Write-Host '[DRY RUN] Would publish:' -ForegroundColor Yellow
         Write-Host "  Module: $moduleName"
         Write-Host "  New version: $fullVersion"
         Write-Host "  Path: $ModulePath"
 
-        [PSCustomObject]@{
-            ModuleName  = $moduleName
-            Version     = $fullVersion
-            GalleryUrl  = "https://www.powershellgallery.com/packages/$moduleName"
-            UpdatedPSU  = $false
-            Status      = 'DryRun'
+        return [PSCustomObject]@{
+            ModuleName = $moduleName
+            Version    = $fullVersion
+            GalleryUrl = $galleryUrl
+            Status     = 'DryRun'
         }
+    }
+
+    Set-Content -Path $manifestPath -Value $updatedContent -NoNewline
+    Write-Host "  [OK] Updated $manifestPath" -ForegroundColor Green
+
+    $tags = (Import-PowerShellDataFile -Path $manifestPath).PrivateData.PSData.Tags
+    if ($tags) {
+        Write-Host "  [OK] Tags: $($tags -join ', ')" -ForegroundColor Green
+    }
+
+    Write-Host ''
+    Write-Host "Step 4: Publishing version $fullVersion to PowerShell Gallery..." -ForegroundColor Yellow
+
+    # Stage a clean copy excluding database files to avoid shipping runtime data
+    $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) "PSUPublish_$moduleName"
+    if (Test-Path $stagingDir) { Remove-Item $stagingDir -Recurse -Force }
+    Copy-Item -Path $ModulePath -Destination $stagingDir -Recurse -Force
+    Get-ChildItem -Path $stagingDir -Recurse -Include '*.db', '*.db-shm', '*.db-wal', '*.log' -File | Remove-Item -Force
+    $stagingExcludeDirectories = @(
+        Get-ChildItem -Path $stagingDir -Recurse -Directory -Force |
+            Where-Object { $_.Name -in @('Tests', 'node_modules', 'playwright-report', 'test-results', 'source-packs') -or $_.FullName -like '*/ui/e2e' }
+    )
+    foreach ($directory in $stagingExcludeDirectories) {
+        if (Test-Path -LiteralPath $directory.FullName) {
+            Remove-Item -LiteralPath $directory.FullName -Recurse -Force
+        }
+    }
+    Write-Host '  [OK] Staged clean copy (excluded *.db files, Tests/, ui/e2e/, node_modules/)' -ForegroundColor Green
+
+    $publishParams = @{
+        Path        = $stagingDir
+        ApiKey      = $NuGetApiKey
+        Repository  = 'PSGallery'
+        ErrorAction = 'Stop'
+    }
+
+    try {
+        Publish-PSResource @publishParams
+    }
+    finally {
+        Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Host ''
+    Write-Host 'Step 5: Verifying publication...' -ForegroundColor Yellow
+
+    $maxRetries = 6
+    $retryDelay = 10
+    $verified = $false
+
+    for ($i = 1; $i -le $maxRetries; $i++) {
+        Write-Host "  Checking PowerShell Gallery (attempt $i/$maxRetries)..." -ForegroundColor Gray
+        $published = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
+        if ($published -and $published.Version -eq $fullVersion) {
+            $verified = $true
+            break
+        }
+        if ($i -lt $maxRetries) {
+            Write-Host "  Not found yet, waiting ${retryDelay}s..." -ForegroundColor Gray
+            Start-Sleep -Seconds $retryDelay
+        }
+    }
+
+    if ($verified) {
+        Write-Host "  [OK] Verified: $moduleName $fullVersion is available" -ForegroundColor Green
+    }
+    else {
+        Write-Host "  [WARN] Could not verify within $($maxRetries * $retryDelay)s" -ForegroundColor Yellow
+        Write-Host '  The module may still be propagating.' -ForegroundColor Yellow
+    }
+
+    Write-Host ''
+    Write-Host '========================================' -ForegroundColor Cyan
+    Write-Host "Publication Successful! ($moduleName $fullVersion)" -ForegroundColor Green
+    Write-Host '========================================' -ForegroundColor Cyan
+
+    [PSCustomObject]@{
+        ModuleName = $moduleName
+        Version    = $fullVersion
+        GalleryUrl = $galleryUrl
+        Status     = 'Published'
     }
 }

@@ -9,16 +9,21 @@ Describe 'scripts/reinstall-ciem-psu-module.sh' {
         $script:ScriptPath | Should -Exist
     }
 
-    It 'removes CIEM before installing the existing Gallery module' {
+    It 'removes CIEM before deploying the existing Gallery module' {
         $removeIndex = $script:ScriptSource.IndexOf('Remove-CIEMPSUModule @removeParams')
-        $publishIndex = $script:ScriptSource.IndexOf('Publish-PSUModule @publishParams')
+        $deployIndex = $script:ScriptSource.IndexOf('Deploy-PSUModule @deployParams')
 
         $removeIndex | Should -BeGreaterOrEqual 0
-        $publishIndex | Should -BeGreaterThan $removeIndex
+        $deployIndex | Should -BeGreaterThan $removeIndex
         $script:ScriptSource | Should -Match 'scripts/lib/log\.sh'
-        $script:ScriptSource | Should -Match 'InstallPublishedVersion\s*=\s*\$true'
+        $script:ScriptSource | Should -Not -Match 'InstallPublishedVersion'
+        $script:ScriptSource | Should -Not -Match 'Publish-PSUModule'
         $script:ScriptSource | Should -Not -Match 'NuGetApiKey'
         $script:ScriptSource | Should -Not -Match 'Publish-PSResource'
+    }
+
+    It 'passes the target environment through to Deploy-PSUModule' {
+        $script:ScriptSource | Should -Match '\$deployParams\.Environment\s*=\s*\$Environment|Environment\s*=\s*\$Environment'
     }
 
     It 'does not request an app restart outside the Gallery module install process' {

@@ -149,7 +149,7 @@ Remove-CIEMPSUModule @removeParams
 '
 log_info "pwsh Remove-CIEMPSUModule completed"
 
-log_info "pwsh Publish-PSUModule InstallPublishedVersion (environment=$ENVIRONMENT)"
+log_info "pwsh Deploy-PSUModule (environment=$ENVIRONMENT)"
 # shellcheck disable=SC2016
 CIEM_REPO_ROOT="$REPO_ROOT" \
 CIEM_TARGET_ENVIRONMENT="$ENVIRONMENT" \
@@ -164,35 +164,23 @@ Import-Module (Join-Path $env:CIEM_REPO_ROOT "Devolutions.CIEM.Admin/Devolutions
 [ValidateSet("local", "azure")]
 [string]$Environment = $env:CIEM_TARGET_ENVIRONMENT
 
-$connectParams = @{}
-if ($env:CIEM_ENV_FILE_PATH) {
-    $connectParams.EnvFilePath = $env:CIEM_ENV_FILE_PATH
-}
-if ($Environment -eq "local") {
-    $connectParams.Local = $true
-}
-elseif ($Environment -eq "azure") {
-    $connectParams.Azure = $true
-}
-Connect-PSU @connectParams | Out-Null
-
-$publishParams = @{
-    ModulePath               = $env:CIEM_MODULE_PATH
-    InstallPublishedVersion  = $true
-    SkipAppRestart           = $true
+$deployParams = @{
+    Environment    = $Environment
+    ModulePath     = $env:CIEM_MODULE_PATH
+    SkipAppRestart = $true
 }
 if ($env:CIEM_ENV_FILE_PATH) {
-    $publishParams.EnvFilePath = $env:CIEM_ENV_FILE_PATH
+    $deployParams.EnvFilePath = $env:CIEM_ENV_FILE_PATH
 }
 if ($env:CIEM_VALIDATE_DEPLOYMENT -eq "1") {
-    $publishParams.ValidateDeployment = $true
+    $deployParams.ValidateDeployment = $true
 }
 if ($env:CIEM_WHAT_IF -eq "1") {
-    $publishParams.WhatIf = $true
+    $deployParams.WhatIf = $true
 }
 
-Publish-PSUModule @publishParams
+Deploy-PSUModule @deployParams
 '
-log_info "pwsh Publish-PSUModule InstallPublishedVersion completed"
+log_info "pwsh Deploy-PSUModule completed"
 
 log_info "done"
