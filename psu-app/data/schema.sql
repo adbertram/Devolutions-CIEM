@@ -75,6 +75,74 @@ CREATE INDEX IF NOT EXISTS idx_scan_results_resource ON scan_results(resource_id
 CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
 
 -- =============================================================================
+-- Notification Tables
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS notification_authentication_profiles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    method TEXT NOT NULL,
+    settings_json TEXT NOT NULL,
+    secret_refs_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notification_channels (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    authentication_profile_id TEXT NOT NULL,
+    from_address TEXT NOT NULL,
+    to_recipients_json TEXT NOT NULL,
+    cc_recipients_json TEXT NOT NULL,
+    bcc_recipients_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (authentication_profile_id) REFERENCES notification_authentication_profiles(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_channels_enabled ON notification_channels(enabled);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    auto_send_scope TEXT NOT NULL,
+    change_types_json TEXT NOT NULL,
+    minimum_severity TEXT NOT NULL,
+    subject_template TEXT NOT NULL,
+    text_body_template TEXT NOT NULL,
+    html_body_template TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_enabled ON notifications(enabled);
+
+CREATE TABLE IF NOT EXISTS notification_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    notification_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    source_signal_id TEXT NOT NULL,
+    source_signal_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    attempted_at TEXT NOT NULL,
+    completed_at TEXT,
+    message_id TEXT,
+    recipient_summary TEXT,
+    error_message TEXT,
+    FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+    FOREIGN KEY (channel_id) REFERENCES notification_channels(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_history_attempted ON notification_history(attempted_at);
+CREATE INDEX IF NOT EXISTS idx_notification_history_source ON notification_history(source_signal_id, source_signal_type);
+
+-- =============================================================================
 -- Provider Authentication Methods
 -- =============================================================================
 

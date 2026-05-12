@@ -51,13 +51,35 @@ class ConfigurationPageHelpers extends BasePage {
       // AWS info alert
       awsCliAlert: ".MuiAlert-root:has-text('AWS CLI')",
       // Scheduled discovery
-      scheduledDiscoveryCard: ".MuiCard-root:has-text('Scheduled Discovery')",
+      scheduledDiscoveryCard: "#scheduledDiscoveryWrapper .MuiCard-root",
       scheduledDiscoveryCadence: '#azureDiscoveryScheduleCadence',
       scheduledDiscoveryCadenceCombobox: '[role="combobox"][aria-labelledby="azureDiscoveryScheduleCadencelabel"]',
       scheduledDiscoveryScope: '#azureDiscoveryScheduleScope',
       scheduledDiscoveryScopeCombobox: '[role="combobox"][aria-labelledby="azureDiscoveryScheduleScopelabel"]',
       scheduledDiscoveryEnabled: '#azureDiscoveryScheduleEnabled',
-      saveAzureDiscoveryScheduleBtn: '#saveAzureDiscoveryScheduleBtn'
+      saveAzureDiscoveryScheduleBtn: '#saveAzureDiscoveryScheduleBtn',
+      // Notifications
+      notificationCard: ".MuiCard-root:has-text('Notification Channels')",
+      notificationAuthMethod: '#notificationAuthMethod',
+      notificationAuthMethodCombobox: '[role="combobox"][aria-labelledby="notificationAuthMethodlabel"]',
+      notificationSmtpHost: '#notificationSmtpHost',
+      notificationSmtpPort: '#notificationSmtpPort',
+      notificationSmtpTlsMode: '#notificationSmtpTlsMode',
+      notificationSmtpTlsModeCombobox: '[role="combobox"][aria-labelledby="notificationSmtpTlsModelabel"]',
+      notificationSmtpUsername: '#notificationSmtpUsername',
+      notificationSmtpPassword: '#notificationSmtpPassword',
+      notificationFromAddress: '#notificationFromAddress',
+      notificationToRecipients: '#notificationToRecipients',
+      notificationSubjectTemplate: '#notificationSubjectTemplate',
+      notificationTextBodyTemplate: '#notificationTextBodyTemplate',
+      notificationHtmlBodyTemplate: '#notificationHtmlBodyTemplate',
+      notificationAutoSendScope: '#notificationAutoSendScope',
+      notificationAutoSendScopeCombobox: '[role="combobox"][aria-labelledby="notificationAutoSendScopelabel"]',
+      notificationMinimumSeverity: '#notificationMinimumSeverity',
+      notificationMinimumSeverityCombobox: '[role="combobox"][aria-labelledby="notificationMinimumSeveritylabel"]',
+      saveNotificationsBtn: '#saveNotificationsBtn',
+      testNotificationEmailBtn: '#testNotificationEmailBtn',
+      notificationHistoryEmpty: "text=No notification history"
     };
   }
 
@@ -222,6 +244,69 @@ class ConfigurationPageHelpers extends BasePage {
 
   async getSelectedScheduleScope() {
     return await this.getMUISelectValue('azureDiscoveryScheduleScope');
+  }
+
+  async isNotificationCardVisible() {
+    return await this.isElementVisible(this.selectors.notificationCard);
+  }
+
+  async selectNotificationAuthMethod(value) {
+    await this.selectMUIOption('notificationAuthMethod', value);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'notificationAuthMethod', expectedValue: value }
+    );
+
+    if (value === 'SmtpBasic') {
+      await this.waitForElement(this.selectors.notificationSmtpUsername);
+      await this.waitForElement(this.selectors.notificationSmtpPassword);
+    }
+  }
+
+  async selectNotificationTlsMode(value) {
+    await this.selectMUIOption('notificationSmtpTlsMode', value);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'notificationSmtpTlsMode', expectedValue: value }
+    );
+  }
+
+  async selectNotificationAutoSendScope(value) {
+    await this.selectMUIOption('notificationAutoSendScope', value);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'notificationAutoSendScope', expectedValue: value }
+    );
+  }
+
+  async selectNotificationMinimumSeverity(value) {
+    await this.selectMUIOption('notificationMinimumSeverity', value);
+    await this.page.waitForFunction(
+      ({ selectId, expectedValue }) => document.querySelector(`#${selectId}`)?.value === expectedValue,
+      { selectId: 'notificationMinimumSeverity', expectedValue: value }
+    );
+  }
+
+  async fillAnonymousNotificationConfig() {
+    await this.selectNotificationAuthMethod('SmtpAnonymous');
+    await this.fill(this.selectors.notificationSmtpHost, 'smtp-relay.example.com');
+    await this.fill(this.selectors.notificationSmtpPort, '25');
+    await this.selectNotificationTlsMode('None');
+    await this.fill(this.selectors.notificationFromAddress, 'ciem@example.com');
+    await this.fill(this.selectors.notificationToRecipients, 'security@example.com, it@example.com');
+    await this.selectNotificationAutoSendScope('ScheduledDiscovery');
+    await this.selectNotificationMinimumSeverity('Critical');
+    await this.fill(this.selectors.notificationSubjectTemplate, '[CIEM] {{Severity}} {{Title}}');
+    await this.fill(this.selectors.notificationTextBodyTemplate, 'Text {{Title}} {{Evidence}}');
+    await this.fill(this.selectors.notificationHtmlBodyTemplate, '<p>{{Title}} {{Evidence}}</p>');
+  }
+
+  async clickSaveNotifications() {
+    await this.click(this.selectors.saveNotificationsBtn);
+  }
+
+  async clickTestNotificationEmail() {
+    await this.click(this.selectors.testNotificationEmailBtn);
   }
 
   async isManagedIdentityWarningVisible() {

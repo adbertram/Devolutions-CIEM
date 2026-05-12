@@ -58,6 +58,16 @@ test.describe('Configuration Page', () => {
       await configPage.waitForElement(configPage.selectors.saveAzureDiscoveryScheduleBtn);
     });
 
+    test('should display notification channel configuration controls', async () => {
+      expect(await configPage.isNotificationCardVisible()).toBe(true);
+      await configPage.waitForElement(configPage.selectors.notificationAuthMethodCombobox);
+      await configPage.waitForElement(configPage.selectors.notificationSmtpHost);
+      await configPage.waitForElement(configPage.selectors.notificationFromAddress);
+      await configPage.waitForElement(configPage.selectors.notificationToRecipients);
+      await configPage.waitForElement(configPage.selectors.saveNotificationsBtn);
+      await configPage.waitForElement(configPage.selectors.testNotificationEmailBtn);
+    });
+
     test('should allow selecting scheduled discovery cadence and scope without running discovery', async () => {
       await configPage.selectScheduleCadence('weekly');
       await configPage.selectScheduleScope('ARM');
@@ -266,6 +276,54 @@ test.describe('Configuration Page', () => {
         const profileVisible = await configPage.isFieldVisible('awsProfile');
         expect(profileVisible).toBe(false);
       });
+    });
+  });
+
+  test.describe('when configuring notification channels', () => {
+    test('should show SMTP Basic fields only when SMTP Basic is selected', async () => {
+      await configPage.selectNotificationAuthMethod('SmtpBasic');
+      expect(await configPage.isElementVisible(configPage.selectors.notificationSmtpUsername)).toBe(true);
+      expect(await configPage.isElementVisible(configPage.selectors.notificationSmtpPassword)).toBe(true);
+
+      await configPage.selectNotificationAuthMethod('SmtpAnonymous');
+      expect(await configPage.isElementVisible(configPage.selectors.notificationSmtpUsername)).toBe(false);
+    });
+
+    test('should save anonymous SMTP channel routing and notification template', async () => {
+      await configPage.fillAnonymousNotificationConfig();
+      await configPage.clickSaveNotifications();
+
+      const toast = await configPage.waitForToastMessage('Notifications saved');
+      expect(toast).toBeTruthy();
+
+      const result = await runPSUCommand(`
+$profile = Devolutions.CIEM\\Get-CIEMNotificationAuthenticationProfile -Id 'email-smtp'
+$channel = Devolutions.CIEM\\Get-CIEMNotificationChannel -Id 'email-default'
+$notification = Devolutions.CIEM\\Get-CIEMNotification -Id 'exposure-change-default'
+[pscustomobject]@{
+  Method = $profile.Method
+  Host = $profile.Settings.Host
+  FromAddress = $channel.FromAddress
+  ToRecipients = $channel.ToRecipients
+  AutoSendScope = $notification.AutoSendScope
+  MinimumSeverity = $notification.MinimumSeverity
+} | ConvertTo-Json -Depth 5 -Compress
+`);
+      expect(result.status).toBe('Completed');
+      const saved = JSON.parse(result.output[0].message);
+      expect(saved.Method).toBe('SmtpAnonymous');
+      expect(saved.Host).toBe('smtp-relay.example.com');
+      expect(saved.FromAddress).toBe('ciem@example.com');
+      expect(saved.ToRecipients).toContain('security@example.com');
+      expect(saved.AutoSendScope).toBe('ScheduledDiscovery');
+      expect(saved.MinimumSeverity).toBe('Critical');
+    });
+
+    test('should run the test email action and refresh the history area', async () => {
+      await configPage.clickTestNotificationEmail();
+      const toast = await configPage.waitForToastMessage('Test email');
+      expect(toast).toBeTruthy();
+      await configPage.waitForElement(configPage.selectors.notificationHistoryEmpty);
     });
   });
 

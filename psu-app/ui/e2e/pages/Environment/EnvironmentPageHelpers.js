@@ -100,6 +100,21 @@ class EnvironmentPageHelpers extends BasePage {
     await this.click(this.selectors.startDiscoveryBtn);
   }
 
+  async assertNoImmediateDiscoveryFailure(windowMs = 5000) {
+    // Catches regressions like "Discovery failed: Unknown script: Devolutions.CIEM\\Start-CIEMAzureDiscovery"
+    // (Known Issue #10) that surface within 1-2s of click when PSU has stale script registrations.
+    // Waits a short window for any failure/error iziToast to appear, then asserts none exists.
+    await this.page.waitForTimeout(windowMs);
+    const failureToast = this.page.locator('.iziToast').filter({
+      hasText: /Discovery failed|Unknown script|Cannot retrieve the dynamic parameters/
+    });
+    const count = await failureToast.count();
+    if (count > 0) {
+      const text = (await failureToast.first().textContent()) ?? '';
+      throw new Error(`Immediate discovery failure toast appeared within ${windowMs}ms: ${text.trim()}`);
+    }
+  }
+
   async isStartDiscoveryButtonLoading() {
     // PSU -ShowLoading adds MuiCircularProgress inside the button while processing
     const btn = this.page.locator(this.selectors.startDiscoveryBtn);

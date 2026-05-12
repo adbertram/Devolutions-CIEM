@@ -66,8 +66,8 @@ function Start-CIEMAzureDiscovery {
     $jobIdVariable = Get-Variable -Name 'UAJobId' -ErrorAction SilentlyContinue
     $hasScheduleId = $scheduleIdVariable -and $null -ne $scheduleIdVariable.Value
     $hasJobId = $jobIdVariable -and $null -ne $jobIdVariable.Value
-    if ($hasScheduleId -ne $hasJobId) {
-        throw 'Scheduled discovery context is incomplete. PSU must provide both UAScheduleId and UAJobId.'
+    if ($hasScheduleId -and -not $hasJobId) {
+        throw 'Scheduled discovery context is incomplete. PSU set UAScheduleId without UAJobId.'
     }
 
     $scheduledDiscoveryContext = if ($hasScheduleId) {
@@ -76,6 +76,7 @@ function Start-CIEMAzureDiscovery {
             PsuJobId      = [int]$jobIdVariable.Value
         }
     }
+    $notificationInvocationSource = if ($scheduledDiscoveryContext) { 'ScheduledDiscovery' } else { 'Manual' }
 
     try {
     if ($scheduledDiscoveryContext) {
@@ -465,6 +466,7 @@ LIMIT 1
 "@ -Parameters @{ current_id = $run.Id })
             if ($previousSnapshotRunRows.Count -eq 1) {
                 Compare-CIEMExposureSnapshot -PreviousDiscoveryRunId ([int]$previousSnapshotRunRows[0].id) -CurrentDiscoveryRunId $run.Id | Out-Null
+                Send-CIEMNotification -CurrentDiscoveryRunId $run.Id -InvocationSource $notificationInvocationSource | Out-Null
             }
             Write-CIEMLog "Exposure snapshot saved for discovery run #$($run.Id): $($snapshotItems.Count) item(s)" -Severity INFO -Component 'Discovery'
         }

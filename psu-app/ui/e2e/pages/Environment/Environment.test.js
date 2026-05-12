@@ -204,6 +204,11 @@ test.describe('Environment Page', () => {
       const startingToast = envPage.page.locator('.iziToast:has-text("Starting Azure discovery")');
       await expect(startingToast).toBeVisible({ timeout: 10000 });
 
+      // Regression guard for Known Issue #10: PSU "Unknown script" / dynamic-parameter
+      // failures surface as a "Discovery failed" toast within ~1-2s of click. Catch it now
+      // instead of waiting through the 9-minute completion poll below.
+      await envPage.assertNoImmediateDiscoveryFailure();
+
       // Poll for discovery to complete — button re-enables when OnClick handler finishes
       const startBtn = envPage.page.locator(envPage.selectors.startDiscoveryBtn);
       for (let i = 0; i < 180; i++) { // 180 × 3s = 9 minutes max
@@ -240,6 +245,11 @@ test.describe('Environment Page', () => {
       // 1. Starting toast must appear
       const startingToast = envPage.page.locator('.iziToast:has-text("Starting Azure discovery")');
       await expect(startingToast).toBeVisible({ timeout: 10000 });
+
+      // 1a. Regression guard for Known Issue #10: a "Discovery failed: Unknown script"
+      // toast within ~5s of click means PSU lost its `Devolutions.CIEM\*` script registrations.
+      // Fail fast here so we don't wait 10 minutes for a terminal toast that's already wrong.
+      await envPage.assertNoImmediateDiscoveryFailure();
 
       // 2. Wait for a terminal discovery toast (success or failure) up to 10 minutes.
       // Watching the toast directly avoids a race between button re-enable polling

@@ -236,6 +236,7 @@ Describe 'Devolutions.CIEM.psm1 Structure' {
                 'ChecksRoot'
                 'EffectivePermissionsRoot'
                 'ReportsRoot'
+                'NotificationsRoot'
                 'PSURoot'
             )
         }

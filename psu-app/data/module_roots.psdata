@@ -50,6 +50,13 @@
             LoadClasses = $true
         }
         @{
+            Name        = 'Notifications'
+            Variable    = 'NotificationsRoot'
+            Path        = 'modules/Devolutions.CIEM.Notifications'
+            LoadOrder   = 75
+            LoadClasses = $true
+        }
+        @{
             Name        = 'PSU'
             Variable    = 'PSURoot'
             Path        = 'modules/Devolutions.CIEM.PSU'

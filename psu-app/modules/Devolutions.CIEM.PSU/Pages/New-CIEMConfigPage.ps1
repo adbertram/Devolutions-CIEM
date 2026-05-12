@@ -28,6 +28,13 @@ function New-CIEMConfigPage {
         $currentProvider = ($providers | Where-Object Enabled | Select-Object -First 1).Name
         if (-not $currentProvider) { $currentProvider = 'Azure' }
 
+        New-UDElement -Tag 'style' -Content {
+@'
+body:has(#cloudProvider[value="Azure"]) #scheduledDiscoveryWrapper { display: block !important; }
+body:has(#cloudProvider[value="AWS"]) #scheduledDiscoveryWrapper { display: none !important; }
+'@
+        }
+
         New-UDCard -Title 'Cloud Provider Authentication' -Content {
             # Environment detection indicator (integrated into auth card)
             New-UDElement -Tag 'div' -Attributes @{ style = @{ marginBottom = '16px' } } -Content {
@@ -475,11 +482,11 @@ function New-CIEMConfigPage {
         New-UDDynamic -Id 'scheduledDiscoveryContainer' -Content {
             $scheduleProvider = (Get-UDElement -Id 'cloudProvider').value
             if (-not $scheduleProvider) { $scheduleProvider = $currentProvider }
-            if ($scheduleProvider -ne 'Azure') {
-                return
-            }
+            $scheduleDisplay = if ($scheduleProvider -eq 'Azure') { 'block' } else { 'none' }
 
-            New-UDCard -Title 'Scheduled Discovery' -Content {
+            New-UDElement -Tag 'div' -Id 'scheduledDiscoveryWrapper' -Attributes @{ style = @{ display = $scheduleDisplay } } -Content {
+                if ($scheduleProvider -eq 'Azure') {
+                    New-UDCard -Title 'Scheduled Discovery' -Content {
             $scheduleRows = @(Devolutions.CIEM\Get-CIEMAzureDiscoverySchedule)
             $schedule = $scheduleRows | Select-Object -First 1
             $selectedScope = if ($schedule) { [string]$schedule.Scope } else { 'All' }
@@ -548,7 +555,260 @@ function New-CIEMConfigPage {
                 }
             }
             } -Style @{ marginTop = '24px' }
+                }
+            }
         }
+
+        New-UDCard -Title 'Notification Channels' -Content {
+            $notificationProfile = @(Devolutions.CIEM\Get-CIEMNotificationAuthenticationProfile -Id 'email-smtp') | Select-Object -First 1
+            $notificationChannel = @(Devolutions.CIEM\Get-CIEMNotificationChannel -Id 'email-default') | Select-Object -First 1
+            $notification = @(Devolutions.CIEM\Get-CIEMNotification -Id 'exposure-change-default') | Select-Object -First 1
+            $passwordSecretName = 'CIEM_Notification_Email_Password'
+            $passwordExists = Test-Path "Secret:$passwordSecretName"
+
+            $selectedNotificationAuthMethod = if ($notificationProfile) { [string]$notificationProfile.Method } else { 'SmtpAnonymous' }
+            $selectedTlsMode = if ($notificationProfile) { [string]$notificationProfile.Settings.TlsMode } else { 'None' }
+            $selectedAutoSendScope = if ($notification) { [string]$notification.AutoSendScope } else { 'AnyDiscovery' }
+            $selectedMinimumSeverity = if ($notification) { [string]$notification.MinimumSeverity } else { 'High' }
+            $selectedChangeTypes = if ($notification) { @($notification.ChangeTypes) } else { @('NewRisk', 'RiskIncrease') }
+            if (-not $Page:NotificationAuthMethod) {
+                $Page:NotificationAuthMethod = $selectedNotificationAuthMethod
+            }
+
+            New-UDElement -Tag 'style' -Content {
+@'
+#notificationSmtpBasicFieldsWrapper { display: none !important; }
+body:has(#notificationAuthMethod[value="SmtpBasic"]) #notificationSmtpBasicFieldsWrapper { display: block !important; }
+body:has(#notificationAuthMethod[value="SmtpAnonymous"]) #notificationSmtpBasicFieldsWrapper { display: none !important; }
+'@
+            }
+
+            New-UDGrid -Container -Spacing 2 -Content {
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 4 -Content {
+                    New-UDSelect -Id 'notificationAuthMethod' -Label 'SMTP Auth Method' -DefaultValue $selectedNotificationAuthMethod -FullWidth -Option {
+                        New-UDSelectOption -Name 'Anonymous SMTP Relay' -Value 'SmtpAnonymous'
+                        New-UDSelectOption -Name 'SMTP Basic' -Value 'SmtpBasic'
+                    } -OnChange {
+                        $Page:NotificationAuthMethod = $EventData
+                        Sync-UDElement -Id 'notificationAuthFieldsContainer'
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 5 -Content {
+                    New-UDTextbox -Id 'notificationSmtpHost' -Label 'SMTP Host' -Value $notificationProfile.Settings.Host -FullWidth -Placeholder 'smtp.example.com'
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 3 -Content {
+                    $smtpPort = if ($notificationProfile) { [string]$notificationProfile.Settings.Port } else { '25' }
+                    New-UDTextbox -Id 'notificationSmtpPort' -Label 'Port' -Value $smtpPort -FullWidth -Placeholder '25'
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 4 -Content {
+                    New-UDSelect -Id 'notificationSmtpTlsMode' -Label 'TLS Mode' -DefaultValue $selectedTlsMode -FullWidth -Option {
+                        New-UDSelectOption -Name 'None' -Value 'None'
+                        New-UDSelectOption -Name 'STARTTLS' -Value 'StartTls'
+                        New-UDSelectOption -Name 'SSL/TLS' -Value 'Ssl'
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                    New-UDDynamic -Id 'notificationAuthFieldsContainer' -Content {
+                        $smtpAuthMethod = $Page:NotificationAuthMethod
+                        if (-not $smtpAuthMethod) { $smtpAuthMethod = $selectedNotificationAuthMethod }
+                        $smtpBasicDisplay = if ($smtpAuthMethod -eq 'SmtpBasic') { 'block' } else { 'none' }
+
+                        New-UDElement -Tag 'div' -Id 'notificationSmtpBasicFieldsWrapper' -Attributes @{ style = @{ display = $smtpBasicDisplay } } -Content {
+                            New-UDGrid -Container -Spacing 2 -Content {
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    New-UDTextbox -Id 'notificationSmtpUsername' -Label 'SMTP Username' -Value $notificationProfile.Settings.Username -FullWidth -Placeholder 'alerts@example.com'
+                                }
+                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                                    $smtpPasswordValue = if ($passwordExists) { '********' } else { '' }
+                                    $smtpPasswordPlaceholder = if ($passwordExists) { 'Password is stored. Leave empty to keep existing.' } else { 'SMTP password' }
+                                    New-UDTextbox -Id 'notificationSmtpPassword' -Label 'SMTP Password' -Type 'password' -Value $smtpPasswordValue -FullWidth -Placeholder $smtpPasswordPlaceholder
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px'; marginBottom = '16px' } } -Content {
+                New-UDDivider
+            }
+
+            New-UDGrid -Container -Spacing 2 -Content {
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 3 -Content {
+                    $channelEnabled = if ($notificationChannel) { [bool]$notificationChannel.Enabled } else { $false }
+                    New-UDSwitch -Id 'notificationChannelEnabled' -Label 'Email Channel Enabled' -Checked $channelEnabled
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 9 -Content {
+                    New-UDTextbox -Id 'notificationFromAddress' -Label 'From Address' -Value $notificationChannel.FromAddress -FullWidth -Placeholder 'ciem@example.com'
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                    New-UDTextbox -Id 'notificationToRecipients' -Label 'To Recipients' -Value (@($notificationChannel.ToRecipients) -join ', ') -FullWidth -Placeholder 'security@example.com, it@example.com'
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    New-UDTextbox -Id 'notificationCcRecipients' -Label 'Cc Recipients' -Value (@($notificationChannel.CcRecipients) -join ', ') -FullWidth
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    New-UDTextbox -Id 'notificationBccRecipients' -Label 'Bcc Recipients' -Value (@($notificationChannel.BccRecipients) -join ', ') -FullWidth
+                }
+            }
+
+            New-UDElement -Tag 'div' -Attributes @{ style = @{ marginTop = '16px'; marginBottom = '16px' } } -Content {
+                New-UDDivider
+            }
+
+            New-UDGrid -Container -Spacing 2 -Content {
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 3 -Content {
+                    $notificationEnabled = if ($notification) { [bool]$notification.Enabled } else { $false }
+                    New-UDSwitch -Id 'notificationEnabled' -Label 'Exposure Change Notification Enabled' -Checked $notificationEnabled
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 3 -Content {
+                    New-UDSelect -Id 'notificationAutoSendScope' -Label 'Auto-send Scope' -DefaultValue $selectedAutoSendScope -FullWidth -Option {
+                        New-UDSelectOption -Name 'Any Discovery' -Value 'AnyDiscovery'
+                        New-UDSelectOption -Name 'Scheduled Discovery' -Value 'ScheduledDiscovery'
+                        New-UDSelectOption -Name 'Manual Only' -Value 'ManualOnly'
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 3 -Content {
+                    New-UDSelect -Id 'notificationMinimumSeverity' -Label 'Minimum Severity' -DefaultValue $selectedMinimumSeverity -FullWidth -Option {
+                        New-UDSelectOption -Name 'Critical' -Value 'Critical'
+                        New-UDSelectOption -Name 'High' -Value 'High'
+                        New-UDSelectOption -Name 'Medium' -Value 'Medium'
+                        New-UDSelectOption -Name 'Low' -Value 'Low'
+                        New-UDSelectOption -Name 'Info' -Value 'Info'
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 3 -Content {
+                    New-UDStack -Direction 'row' -Spacing 1 -Content {
+                        New-UDSwitch -Id 'notificationChangeTypeNewRisk' -Label 'New' -Checked ($selectedChangeTypes -contains 'NewRisk')
+                        New-UDSwitch -Id 'notificationChangeTypeRiskIncrease' -Label 'Increased' -Checked ($selectedChangeTypes -contains 'RiskIncrease')
+                        New-UDSwitch -Id 'notificationChangeTypeRemovedRisk' -Label 'Removed' -Checked ($selectedChangeTypes -contains 'RemovedRisk')
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                    $subjectTemplate = if ($notification) { $notification.SubjectTemplate } else { '[CIEM] {{Severity}} exposure: {{Title}}' }
+                    New-UDTextbox -Id 'notificationSubjectTemplate' -Label 'Subject Template' -Value $subjectTemplate -FullWidth
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    $textTemplate = if ($notification) { $notification.TextBodyTemplate } else { "Exposure change: {{Title}}`nSeverity: {{Severity}}`nEvidence: {{Evidence}}" }
+                    New-UDTextbox -Id 'notificationTextBodyTemplate' -Label 'Plain Text Body Template' -Value $textTemplate -Multiline -Rows 5 -FullWidth
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    $htmlTemplate = if ($notification) { $notification.HtmlBodyTemplate } else { '<p><strong>{{Severity}}</strong>: {{Title}}</p><p>{{Evidence}}</p>' }
+                    New-UDTextbox -Id 'notificationHtmlBodyTemplate' -Label 'HTML Body Template' -Value $htmlTemplate -Multiline -Rows 5 -FullWidth
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                    New-UDStack -Direction 'row' -Spacing 2 -Content {
+                        New-UDButton -Id 'saveNotificationsBtn' -Text 'Save Notifications' -Variant 'contained' -Color 'primary' -ShowLoading -OnClick {
+                            try {
+                                $parseRecipients = {
+                                    param([string]$RecipientText)
+
+                                    if ([string]::IsNullOrWhiteSpace($RecipientText)) {
+                                        return
+                                    }
+
+                                    foreach ($recipient in ($RecipientText -split ',')) {
+                                        $trimmedRecipient = $recipient.Trim()
+                                        if (-not [string]::IsNullOrWhiteSpace($trimmedRecipient)) {
+                                            $trimmedRecipient
+                                        }
+                                    }
+                                }
+
+                                $smtpAuthMethod = [string]$Page:NotificationAuthMethod
+                                if (-not $smtpAuthMethod) { $smtpAuthMethod = [string](Get-UDElement -Id 'notificationAuthMethod').value }
+                                $smtpHost = [string](Get-UDElement -Id 'notificationSmtpHost').value
+                                $smtpPort = [int](Get-UDElement -Id 'notificationSmtpPort').value
+                                $smtpTlsMode = [string](Get-UDElement -Id 'notificationSmtpTlsMode').value
+                                $smtpUsername = [string](Get-UDElement -Id 'notificationSmtpUsername').value
+                                $smtpPassword = [string](Get-UDElement -Id 'notificationSmtpPassword').value
+
+                                if ($smtpAuthMethod -eq 'SmtpBasic' -and $smtpPassword -and $smtpPassword -ne '********') {
+                                    Devolutions.CIEM\Set-CIEMSecret $passwordSecretName $smtpPassword
+                                }
+                                if ($smtpAuthMethod -eq 'SmtpBasic' -and -not (Test-Path "Secret:$passwordSecretName") -and -not $smtpPassword) {
+                                    throw 'SMTP Basic requires a password.'
+                                }
+
+                                $profileParams = @{
+                                    Name = 'Default SMTP'
+                                    Method = $smtpAuthMethod
+                                    Host = $smtpHost
+                                    Port = $smtpPort
+                                    TlsMode = $smtpTlsMode
+                                }
+                                if ($smtpAuthMethod -eq 'SmtpBasic') {
+                                    $profileParams.Username = $smtpUsername
+                                    $profileParams.PasswordSecretName = $passwordSecretName
+                                }
+                                $savedProfile = Devolutions.CIEM\Set-CIEMNotificationAuthenticationProfile @profileParams
+
+                                $toRecipients = [string[]]@(& $parseRecipients ([string](Get-UDElement -Id 'notificationToRecipients').value))
+                                $ccRecipients = [string[]]@(& $parseRecipients ([string](Get-UDElement -Id 'notificationCcRecipients').value))
+                                $bccRecipients = [string[]]@(& $parseRecipients ([string](Get-UDElement -Id 'notificationBccRecipients').value))
+
+                                Devolutions.CIEM\Set-CIEMNotificationChannel `
+                                    -Enabled ([bool](Get-UDElement -Id 'notificationChannelEnabled').checked) `
+                                    -AuthenticationProfileId $savedProfile.Id `
+                                    -FromAddress ([string](Get-UDElement -Id 'notificationFromAddress').value) `
+                                    -ToRecipients $toRecipients `
+                                    -CcRecipients $ccRecipients `
+                                    -BccRecipients $bccRecipients | Out-Null
+
+                                $changeTypes = @()
+                                if ([bool](Get-UDElement -Id 'notificationChangeTypeNewRisk').checked) { $changeTypes += 'NewRisk' }
+                                if ([bool](Get-UDElement -Id 'notificationChangeTypeRiskIncrease').checked) { $changeTypes += 'RiskIncrease' }
+                                if ([bool](Get-UDElement -Id 'notificationChangeTypeRemovedRisk').checked) { $changeTypes += 'RemovedRisk' }
+
+                                Devolutions.CIEM\Set-CIEMNotification `
+                                    -Enabled ([bool](Get-UDElement -Id 'notificationEnabled').checked) `
+                                    -AutoSendScope ([string](Get-UDElement -Id 'notificationAutoSendScope').value) `
+                                    -ChangeTypes $changeTypes `
+                                    -MinimumSeverity ([string](Get-UDElement -Id 'notificationMinimumSeverity').value) `
+                                    -SubjectTemplate ([string](Get-UDElement -Id 'notificationSubjectTemplate').value) `
+                                    -TextBodyTemplate ([string](Get-UDElement -Id 'notificationTextBodyTemplate').value) `
+                                    -HtmlBodyTemplate ([string](Get-UDElement -Id 'notificationHtmlBodyTemplate').value) | Out-Null
+
+                                Sync-UDElement -Id 'notificationHistoryTable'
+                                Show-UDToast -Message 'Notifications saved.' -Duration 5000 -BackgroundColor '#4caf50'
+                            }
+                            catch {
+                                Devolutions.CIEM\Write-CIEMLog -Message "Save notifications failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                                Show-UDToast -Message "Notification save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
+                            }
+                        }
+                        New-UDButton -Id 'testNotificationEmailBtn' -Text 'Test Email' -Variant 'outlined' -Color 'secondary' -ShowLoading -OnClick {
+                            try {
+                                $sendResult = Devolutions.CIEM\Send-CIEMNotification -InvocationSource 'Manual' -Test
+                                Sync-UDElement -Id 'notificationHistoryTable'
+                                Show-UDToast -Message "Test email completed: $($sendResult.SentCount) sent." -Duration 5000 -BackgroundColor '#4caf50'
+                            }
+                            catch {
+                                Devolutions.CIEM\Write-CIEMLog -Message "Test notification failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-ConfigPage'
+                                Sync-UDElement -Id 'notificationHistoryTable'
+                                Show-UDToast -Message "Test email failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
+                            }
+                        }
+                    }
+                }
+            }
+
+            New-UDDynamic -Id 'notificationHistoryTable' -Content {
+                $historyRows = @(Devolutions.CIEM\Get-CIEMNotificationHistory -Last 10)
+                if ($historyRows.Count -eq 0) {
+                    New-UDTypography -Text 'No notification history.' -Variant 'caption' -Style @{ color = '#666'; marginTop = '16px' }
+                }
+                else {
+                    New-UDTable -Data $historyRows -Columns @(
+                        New-UDTableColumn -Property 'AttemptedAt' -Title 'Attempted'
+                        New-UDTableColumn -Property 'Status' -Title 'Status'
+                        New-UDTableColumn -Property 'SourceSignalId' -Title 'Source'
+                        New-UDTableColumn -Property 'RecipientSummary' -Title 'Recipients'
+                        New-UDTableColumn -Property 'ErrorMessage' -Title 'Error'
+                    ) -Dense
+                }
+            }
+        } -Style @{ marginTop = '24px' }
 
         New-UDElement -Tag 'div' -Content {
             New-UDStack -Direction 'row' -Spacing 2 -Content {

@@ -155,6 +155,16 @@ Describe 'Start-CIEMAzureDiscovery' {
             $script:StartDiscoverySource | Should -Match 'Update-CIEMAzureDiscoveryScheduleStatus'
         }
 
+        It 'Start-CIEMAzureDiscovery only treats scheduled context as incomplete when UAScheduleId is set without UAJobId' {
+            # PSU sets $UAJobId on every job execution. $UAScheduleId is only set by schedule
+            # triggers. The previous XOR check ($hasScheduleId -ne $hasJobId) threw on every
+            # UI button click because UAJobId-set-alone evaluated true XOR false → throw.
+            # Corrected check only flags the genuine integrity violation: schedule context
+            # claimed but PSU did not provide a job id.
+            $script:StartDiscoverySource | Should -Not -Match '\$hasScheduleId\s+-ne\s+\$hasJobId'
+            $script:StartDiscoverySource | Should -Match '\$hasScheduleId\s+-and\s+-not\s+\$hasJobId'
+        }
+
         It 'Start-CIEMAzureDiscovery saves and compares exposure snapshots after successful discovery' {
             $script:StartDiscoverySource | Should -Match 'Save-CIEMExposureSnapshot'
             $script:StartDiscoverySource | Should -Match 'Compare-CIEMExposureSnapshot'

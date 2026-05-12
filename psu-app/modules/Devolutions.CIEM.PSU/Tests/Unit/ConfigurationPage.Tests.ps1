@@ -92,6 +92,30 @@ Describe 'Configuration page scheduled discovery controls' {
     It 'syncs scheduled discovery visibility with the selected cloud provider' {
         $script:PageContent | Should -Match "Sync-UDElement -Id 'scheduledDiscoveryContainer'"
         $script:PageContent | Should -Match "New-UDDynamic -Id 'scheduledDiscoveryContainer'"
-        $script:PageContent | Should -Match 'if \(\$scheduleProvider -ne ''Azure''\)'
+        $script:PageContent | Should -Match "New-UDElement -Tag 'div' -Id 'scheduledDiscoveryWrapper'"
+        $script:PageContent | Should -Match '\$scheduleDisplay = if \(\$scheduleProvider -eq ''Azure''\)'
+    }
+}
+
+Describe 'Configuration page notification controls' {
+    It 'renders notification channel controls backed by notification commands' {
+        $script:PageContent | Should -Match 'Notification Channels'
+        $script:PageContent | Should -Match 'Get-CIEMNotificationAuthenticationProfile'
+        $script:PageContent | Should -Match 'Set-CIEMNotificationAuthenticationProfile'
+        $script:PageContent | Should -Match 'Get-CIEMNotificationChannel'
+        $script:PageContent | Should -Match 'Set-CIEMNotificationChannel'
+        $script:PageContent | Should -Match 'Get-CIEMNotificationHistory'
+        $script:PageContent | Should -Match 'Send-CIEMNotification'
+        $script:PageContent | Should -Match "New-UDSelect\s+-Id\s+'notificationAuthMethod'"
+        $script:PageContent | Should -Match "New-UDTextbox\s+-Id\s+'notificationSmtpHost'"
+        $script:PageContent | Should -Match "New-UDTextbox\s+-Id\s+'notificationToRecipients'"
+        $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'saveNotificationsBtn'"
+        $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'testNotificationEmailBtn'"
+    }
+
+    It 'stores notification SMTP passwords through the CIEM secret wrapper' {
+        $script:PageContent | Should -Match 'CIEM_Notification_Email_Password'
+        $script:PageContent | Should -Match 'Set-CIEMSecret\s+\$passwordSecretName\s+\$smtpPassword'
+        $script:PageContent | Should -Match 'PasswordSecretName\s+=\s+\$passwordSecretName'
     }
 }
