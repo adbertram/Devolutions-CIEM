@@ -189,10 +189,11 @@ test-results/
 .agents/skills/status-reports/reports/
 .agents/skills/status-reports/scripts/*.log
 
-# Claude Code, Codex, and Gemini local config (skills, commands, agents, hooks)
+# Claude Code, Codex, Gemini, and Codex .agents local config (skills, commands, agents, hooks)
 .claude/
 .codex/
 .gemini/
+.agents/
 
 # PSU license file (contains signed license token)
 Devolutions.CIEM.Admin/Data/psu-license.psd1
