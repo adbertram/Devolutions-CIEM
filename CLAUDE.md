@@ -24,10 +24,10 @@ cd psu-app/ui/e2e && npx playwright test                              # Playwrig
 
 ## Default PSU Instance (CRITICAL)
 
-**"Local" PSU = the always-on adam-server instance (Mac Mini).** There is NO MacBook PSU. Code is pushed to adam-server via SSH/rsync. Default to "local" unless the user explicitly says "Azure" or "production".
+**"Local" PSU = the always-on adam-server instance (Mac Mini).** There is NO MacBook PSU. Default to "local" unless the user explicitly says "Azure" or "production".
 
 - `Connect-PSU` defaults local; reads `LOCAL_PSU_URL` / `LOCAL_PSU_TOKEN` from `.env`. Use `Connect-PSU -Azure` for production.
-- `Publish-PSUModule -LocalOnly` pushes to adam-server and restarts the app
+- `Deploy-PSUModule -Environment local` installs the current PSGallery version into adam-server PSU and restarts the app
 - `Invoke-TestCommand -Environment local` (default) runs commands inside PSU
 
 Server config, .env keys, recovery escalation, log access: `.claude/rules/psu-instances.md` (auto-loaded for PSU paths).
@@ -38,13 +38,22 @@ Server config, .env keys, recovery escalation, log access: `.claude/rules/psu-in
 
 ## Module Deployment (CRITICAL)
 
-**Never upload module files directly to Azure PSU.** Use `Publish-PSUModule` from the `Devolutions.CIEM.Admin` module — it auto-bumps version, publishes to PSGallery, and imports to PSU.
+**Never upload module files directly to Azure PSU.** Publishing and deploying are now two distinct steps:
+
+1. `Publish-PSUModule` (from `Devolutions.CIEM.Admin`) bumps the manifest and publishes to PowerShell Gallery. PSGallery-only — does not touch PSU. Use the `publish-psu-module` skill.
+2. `Deploy-PSUModule` installs the current (or pinned) Gallery version into a PSU instance via `Install-PSUModule`, restarts the CIEM app, and optionally validates. Use the `deploy-psu-module` skill.
 
 ```powershell
 Import-Module ./Devolutions.CIEM.Admin
-Publish-PSUModule -ModulePath ./psu-app -WhatIf   # Dry run
-Publish-PSUModule -ModulePath ./psu-app           # Publish + import to production PSU
-Publish-PSUModule -ModulePath ./psu-app -LocalOnly # Skip PSGallery; SSH/rsync to adam-server
+
+# Step 1: publish to PSGallery
+Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch -WhatIf  # Dry run
+Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch          # Publish to Gallery
+
+# Step 2: deploy the current PSGallery version to PSU
+Deploy-PSUModule -Environment local                                  # adam-server
+Deploy-PSUModule -Environment azure                                  # production
+Deploy-PSUModule -Environment local -ValidateDeployment              # with end-to-end validation
 ```
 
 Setup boundaries:

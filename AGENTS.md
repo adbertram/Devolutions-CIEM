@@ -40,7 +40,7 @@
 ## PSU Instances
 ### Local PSU
 - "Local" means the always-on PSU instance on `adam-server`, not the MacBook.
-- Normal workflow is edit on MacBook, then `Publish-PSUModule -LocalOnly` pushes via SSH/rsync to adam-server.
+- Normal workflow is edit on MacBook, then `Publish-PSUModule` (Gallery) followed by `Deploy-PSUModule -Environment local` to install the new Gallery version into adam-server PSU.
 - LAN URL: `http://192.168.86.36:5001` (set as `LOCAL_PSU_URL` in `.env`)
 - `Connect-PSU` defaults to local and reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`; use `Connect-PSU -Azure` only for explicit Azure work.
 - PSU Repository on adam-server: `/Users/adam/psu/Repository` (pushed via SSH, not Dropbox-synced).
@@ -57,18 +57,24 @@
 
 ## Module Deployment
 - Never upload module files directly to the Azure PSU instance.
-- Local publishing is automated by the `auto-publish-psu` Stop hook after `psu-app/` changes.
+- Publishing and deploying are two distinct steps. `Publish-PSUModule` is PSGallery-only; `Deploy-PSUModule` installs the current Gallery version into a PSU instance.
 - Initial CIEM setup is owned by `psu-app/setup.ps1`, which is invoked during `Devolutions.CIEM` module import. Keep this setup path limited to idempotent local module initialization such as database/schema/catalog setup.
 - PSU resource registration remains in `.universal/dashboards.ps1` and `.universal/scripts.ps1`. Do not move `New-PSUApp`, `New-PSUScript`, `Get-PSUScript`, or other PSU management cmdlets into import-time setup.
 
 ```powershell
 Import-Module ./Devolutions.CIEM.Admin
-Publish-PSUModule -ModulePath ./psu-app -WhatIf
-Publish-PSUModule -ModulePath ./psu-app
-Publish-PSUModule -ModulePath ./psu-app -LocalOnly
+
+# Publish (PSGallery only — does not touch PSU)
+Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch -WhatIf
+Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch
+
+# Deploy the current Gallery version into a PSU instance
+Deploy-PSUModule -Environment local
+Deploy-PSUModule -Environment azure
+Deploy-PSUModule -Environment local -ValidateDeployment
 ```
 
-- Use `-LocalOnly` to push to adam-server via SSH/rsync (skips PSGallery).
+- Both local and Azure deploys install from PSGallery via `Install-PSUModule`. The previous `-LocalOnly` SSH/rsync path has been retired.
 - `scripts/azure_psu_file_manager.sh` and `scripts/invoke_command_in_azure_webapp.sh` are for inspection only, not deployment.
 - Use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` or `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force` to remove CIEM-owned PSU apps, scripts, schedules, active jobs, configuration cache, variables, local data files, and the `Devolutions.CIEM` module from a PSU target.
 
@@ -164,14 +170,14 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 **Symptom:** Clicking Start Discovery on the Environment page (or Run Scan, or Execute on Attack Paths) toasts `Discovery failed: Cannot retrieve the dynamic parameters for the cmdlet. Unknown script: Checks/Start-CIEMAzureDiscovery`. PSU server log contains `[ERR] Discovery from Environment page failed: ... Unknown script: Checks/...`. The script names registered on PSU are `Devolutions.CIEM\Start-CIEMAzureDiscovery`, `Devolutions.CIEM\New-CIEMScanRun`, and `Devolutions.CIEM\Invoke-CIEMAttackPathRemediation`.
 **Cause:** `psu-app/.universal/scripts.ps1` registers automation scripts via `New-PSUScript -Module 'Devolutions.CIEM' -Command '<verb-noun>'`, which produces PSU script names of the form `Devolutions.CIEM\<verb-noun>`. PSU pages that call `Invoke-PSUScript -Name 'Checks/<verb-noun>'` or `Invoke-CIEMJobWithProgress -ScriptName 'Checks/<verb-noun>'` reference a script name that no longer exists and get an `Unknown script` error from `Invoke-PSUScript`'s dynamic parameter binder.
 **Fix:** PSU page references must match the `.universal/scripts.ps1` registration. Use `'Devolutions.CIEM\Start-CIEMAzureDiscovery'`, `'Devolutions.CIEM\New-CIEMScanRun'`, and `'Devolutions.CIEM\Invoke-CIEMAttackPathRemediation'` in `New-CIEMEnvironmentPage.ps1`, `New-CIEMScanPage.ps1`, and `New-CIEMAttackPathsPage.ps1`. Keep `EnvironmentPage.Tests.ps1` and `AttackPathsPage.Tests.ps1` asserting the `Devolutions\.CIEM\\<command>` form so the names cannot drift back to `Checks/` without breaking unit tests. The legacy `Checks/` names live in `data/psu-scripts.json` and `Import-CIEMScript`, which are only used by the older manifest path and not by the active `.universal/scripts.ps1` registration.
-**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester -Path psu-app/modules/Devolutions.CIEM.PSU/Tests/Unit -Output Detailed"` and confirm `EnvironmentPage` discovery cancellation and `AttackPathsPage` remediation execution tests pass. Then publish via `Publish-PSUModule -LocalOnly`, navigate to `/ciem/ciem/environment` (note the double `/ciem` segment for the local PSU app), and click Start Discovery. The status banner must show `Discovery in progress (Run #N, Scope: All)` instead of the red `Cannot retrieve the dynamic parameters ... Unknown script` toast.
+**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester -Path psu-app/modules/Devolutions.CIEM.PSU/Tests/Unit -Output Detailed"` and confirm `EnvironmentPage` discovery cancellation and `AttackPathsPage` remediation execution tests pass. Then publish via `Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch` followed by `Deploy-PSUModule -Environment local`, navigate to `/ciem/ciem/environment` (note the double `/ciem` segment for the local PSU app), and click Start Discovery. The status banner must show `Discovery in progress (Run #N, Scope: All)` instead of the red `Cannot retrieve the dynamic parameters ... Unknown script` toast.
 **Recurrence Prevention:** Keep the `EnvironmentPage.Tests.ps1` `'Devolutions\.CIEM\\Start-CIEMAzureDiscovery'` assertion and the `AttackPathsPage.Tests.ps1` `Invoke-PSUScript ... -Name 'Devolutions\.CIEM\\Invoke-CIEMAttackPathRemediation'` assertion. When adding any new PSU page that launches a script via `Invoke-PSUScript -Name` or `Invoke-CIEMJobWithProgress -ScriptName`, the name must be `Devolutions.CIEM\<command>` matching the entry in `.universal/scripts.ps1`. Do not reintroduce `Checks/<command>` naming in PSU page code.
 
 ### 11. InvokeCIEMScan Workitem ScriptPath Must Be Computed Per Check
 **Symptom:** Clicking Start Scan on the Scan page toasts `Scan failed: [Azure] Check 'unknown-check' failed: The term '<some-Test-Entra*-name>' is not recognized as a name of a cmdlet, function, script file, or executable program.` The function name varies between scan runs, but the file referenced by that name exists on disk under `psu-app/modules/Azure/Checks/` and is correctly defined.
 **Cause:** `psu-app/modules/Devolutions.CIEM.Checks/Private/InvokeCIEMScan.ps1` set `$scriptPath = Join-Path $checkScriptsPath $dbCheck.CheckScript` inside the validation `foreach ($dbCheck in $dbChecks)` loop that built `$selectedChecks`, then later used `ScriptPath = $scriptPath` inside the `$workItems = foreach ($check in $selectedChecks)` builder. After the validation loop finishes, `$scriptPath` retains only the LAST iteration's value, so every parallel work item is dispatched with the same stale path. `InvokeCIEMParallelForEach` reuses runspaces and dot-sources `$workItem.ScriptPath` per item — meaning only the function inside that one stale file is ever loaded into module session state. When `InvokeCIEMCheck` calls `& $FunctionName` for any other check, the lookup fails with the "not recognized" error, surfaced as `unknown-check` because `parallelResult.Input.Check` was the failing item.
 **Fix:** Inside the workItems builder, recompute the per-check path: `$scriptPath = Join-Path $checkScriptsPath $check.CheckScript` (using the current loop variable `$check`, not the stale value left by the validation loop). The change is in `psu-app/modules/Devolutions.CIEM.Checks/Private/InvokeCIEMScan.ps1` immediately above the `[pscustomobject]@{ ... ScriptPath = $scriptPath ... }` literal that builds each work item.
-**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester -Path psu-app/modules/Devolutions.CIEM.Checks/Tests/Unit/InvokeCIEMScanParallel.Tests.ps1 -Output Detailed"` and confirm the `Each work item ScriptPath corresponds to its own CheckScript (no stale loop variable bug)` test passes. Then publish via `Publish-PSUModule -LocalOnly`, navigate to the Scan page, click Start Scan, and confirm the scan progresses past the parallel dispatch phase without the `not recognized as a name of a cmdlet` toast.
+**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester -Path psu-app/modules/Devolutions.CIEM.Checks/Tests/Unit/InvokeCIEMScanParallel.Tests.ps1 -Output Detailed"` and confirm the `Each work item ScriptPath corresponds to its own CheckScript (no stale loop variable bug)` test passes. Then publish via `Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch` followed by `Deploy-PSUModule -Environment local`, navigate to the Scan page, click Start Scan, and confirm the scan progresses past the parallel dispatch phase without the `not recognized as a name of a cmdlet` toast.
 **Recurrence Prevention:** Keep the `Each work item ScriptPath corresponds to its own CheckScript` Pester assertion in `InvokeCIEMScanParallel.Tests.ps1`. The test enables three distinct checks and asserts each work item's `ScriptPath` leaf equals its own `CheckScript`, plus that all three leaves are unique. Do not reintroduce reliance on `$scriptPath` carried from any outer foreach loop into the work item builder.
 
 **General rule:** When a PowerShell `foreach` block sets a loop-local variable (`$scriptPath`, `$item`, `$current`) and a *later* block references that variable, the later block sees only the last iteration's value. Either recompute per-iteration in the consuming block, or emit the value as a property on the items the outer loop produces.
@@ -180,7 +186,7 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 **Symptom:** During a scan, a check fails with `[Azure] Check '<id>' failed: Cannot index into a null array.` — varying check id between scan runs (e.g. `iam_custom_role_has_permission_to_administer_resource_lock`, `iam_role_user_access_admin_restricted`). Stack trace points to a check function line that reads `$obj.properties.PSObject.Properties['<key>']` or `$obj.properties.<key>`.
 **Cause:** `ConvertFromCIEMStoredResource` was flattening the stored Properties JSON onto the top-level envelope, so consumers got `{id, type, roleName, permissions, ...}` instead of the API-shape `{id, type, ..., properties: {roleName, permissions, ...}}`. Check functions were written against the original Azure API shape and dereference `.properties.X`, which is null on the flattened envelope. Per-consumer null-guards stopped the crash but didn't fix the contract — the checks couldn't actually inspect role permissions because they were looking at the wrong path.
 **Fix:** `psu-app/modules/Devolutions.CIEM.Checks/Private/ConvertFromCIEMStoredResource.ps1` now returns `{id, displayName, name, type, parentId, subscriptionId, resourceGroup, properties: <parsed JSON>}` — indexed columns at the top level, JSON content nested under `.properties`. `.properties` is always present (an empty `[pscustomobject]@{}` when the row has no Properties JSON) so consumers can dereference without null-guards. Updated `psu-app/modules/Devolutions.CIEM.Checks/Private/GetCIEMIAMNeeds.ps1` to read `$definition.properties.assignableScopes` and `$definition.properties.type` (the JSON's `type` field, e.g. `CustomRole`) instead of the previously-flat `$definition.assignableScopes` / `$definition.type` (which now refers to the indexed-column resource type, e.g. `Microsoft.Authorization/roleDefinitions`).
-**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester -Path psu-app/modules/Devolutions.CIEM.Checks/Tests/Unit/ConvertFromCIEMStoredResource.Tests.ps1, psu-app/modules/Azure/Checks/Tests/Unit/Test-IamCustomRoleHasPermissionToAdministerResourceLock.Tests.ps1 -Output Detailed"` — both files must pass. Then run `Publish-PSUModule -LocalOnly` and trigger a scan; previously-failing IAM checks must complete without `Cannot index into a null array`.
+**Verification:** Run `pwsh -NoProfile -Command "Invoke-Pester -Path psu-app/modules/Devolutions.CIEM.Checks/Tests/Unit/ConvertFromCIEMStoredResource.Tests.ps1, psu-app/modules/Azure/Checks/Tests/Unit/Test-IamCustomRoleHasPermissionToAdministerResourceLock.Tests.ps1 -Output Detailed"` — both files must pass. Then run `Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch` followed by `Deploy-PSUModule -Environment local` and trigger a scan; previously-failing IAM checks must complete without `Cannot index into a null array`.
 **Recurrence Prevention:** Keep `ConvertFromCIEMStoredResource.Tests.ps1` asserting `.properties` is always present and contains the parsed JSON. Any future caller of `ConvertFromCIEMStoredResource` must access JSON content via `.properties.X`, not flat top-level (the flat path now only carries indexed column values).
 
 **General rule:** When a bug surfaces in many consumers, fix at the producer (single source of truth). Per-consumer guards stop the crash but leave consumers reading the wrong shape. Source fixes preserve the contract every consumer was written against.
@@ -190,3 +196,5 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 - CIEM feature todos: `docs/ciem-feature-todos.md` - source of truth for project purpose, expected features, product feedback, build order, and discovery/action guardrails.
 - Resource icons: `psu-app/modules/Devolutions.CIEM.PSU/Data/icons/` contains official Azure, Entra, and AWS icon source packs, curated SVGs in `resources/`, and `resource-icon-map.json` for CIEM resource type mappings.
 - PSU Azure hosting docs: `docs/psu-docs/config/hosting/azure.md`
+
+
