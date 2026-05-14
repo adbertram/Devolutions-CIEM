@@ -90,6 +90,7 @@ Describe 'Publish-PSUModule -> PSGallery' {
                     })
             }
             Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { throw 'Connect-PSU must not be called from Publish-PSUModule (deploy responsibility moved to Deploy-PSUModule)' }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule { throw 'Install-PSUModule must not be called from Publish-PSUModule' }
         }
@@ -141,6 +142,16 @@ Describe 'Publish-PSUModule -> PSGallery' {
             $result.Version | Should -Be '0.0.6'
         }
 
+        It 'skips Gallery versions that exist even when the baseline lookup is stale' {
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion {
+                $Version.ToString() -in @('0.0.3', '0.0.4')
+            }
+
+            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Patch -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
+
+            $result.Version | Should -Be '0.0.5'
+        }
+
         It 'supports Minor and Major bumps' {
             $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Minor -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
             $result.Version | Should -Be '0.1.0'
@@ -167,6 +178,7 @@ Describe 'Publish-PSUModule -> PSGallery' {
     Context 'when NUGET_API_KEY is not provided' {
         BeforeAll {
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.0.2' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
         }
 
@@ -180,6 +192,7 @@ Describe 'Publish-PSUModule -> PSGallery' {
     Context 'when running in -WhatIf mode' {
         BeforeAll {
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.0.2' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource { throw 'Publish-PSResource should not run in WhatIf mode' }
         }
 

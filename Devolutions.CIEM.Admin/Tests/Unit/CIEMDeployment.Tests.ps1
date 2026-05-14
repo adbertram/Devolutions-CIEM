@@ -209,6 +209,7 @@ LOCAL_PSU_TOKEN=fake-token
             @(
                 [pscustomobject]@{ Name = 'CIEM_Azure_sp-clientsecret_ClientSecret' }
                 [pscustomobject]@{ Name = 'CIEM_Azure_sp-clientsecret_CertPfx' }
+                [pscustomobject]@{ Name = 'CIEM_AuthProfile_email-default_Password' }
                 [pscustomobject]@{ Name = 'Other_Module_Secret' }
             )
         }
@@ -314,8 +315,8 @@ LOCAL_PSU_TOKEN=fake-token
         $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.db-shm'
         $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.db-wal'
         $result.DataRemoval.Paths | Should -Contain '/Users/adam/psu/data/ciem.log'
-        $result.ConfigurationRemoval.CacheKeysRemoved | Should -Be 4
-        $result.ConfigurationRemoval.VariablesRemoved | Should -Be 2
+        $result.ConfigurationRemoval.CacheKeysRemoved | Should -Be 2
+        $result.ConfigurationRemoval.VariablesRemoved | Should -Be 3
 
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Connect-PSU -Times 1 -ParameterFilter {
             $Local -and -not $Azure -and $EnvFilePath -eq $script:LocalEnvFile
@@ -331,8 +332,13 @@ LOCAL_PSU_TOKEN=fake-token
         $script:sshCalls[0].Text | Should -Match 'rm -f'
         $script:sshCalls[0].Text | Should -Match '/Users/adam/psu/data/ciem\.db'
         $script:sshCalls[0].Text | Should -Match '/Users/adam/psu/data/ciem\.log'
-        foreach ($cacheKey in @('CIEM:AuthProfiles:Azure', 'CIEM:AuthProfile:AWS', 'CIEM:Config', 'CIEM:ScanConfig')) {
+        foreach ($cacheKey in @('CIEM:Config', 'CIEM:ScanConfig')) {
             Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUCache -Times 1 -ParameterFilter {
+                $Key -eq $cacheKey
+            }
+        }
+        foreach ($cacheKey in @('CIEM:AuthProfiles:Azure', 'CIEM:AuthProfile:AWS')) {
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUCache -Times 0 -ParameterFilter {
                 $Key -eq $cacheKey
             }
         }
@@ -341,6 +347,9 @@ LOCAL_PSU_TOKEN=fake-token
         }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUVariable -Times 1 -ParameterFilter {
             $Name -eq 'CIEM_Azure_sp-clientsecret_CertPfx' -and $RemoveSecret
+        }
+        Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUVariable -Times 1 -ParameterFilter {
+            $Name -eq 'CIEM_AuthProfile_email-default_Password' -and $RemoveSecret
         }
         Should -Invoke -ModuleName Devolutions.CIEM.Admin Remove-PSUVariable -Times 0 -ParameterFilter {
             $Name -eq 'Other_Module_Secret'
@@ -531,7 +540,10 @@ Describe 'Test-CIEMPSUDeployment' {
         $result = Test-CIEMPSUDeployment -Environment azure -ValidateManagedIdentityRead
 
         $script:runtimeScripts[0] | Should -Match '\$validateManagedIdentityRead\s*=\s*\$true'
+        $script:runtimeScripts[0] | Should -Match 'Get-CIEMAuthenticationProfileAssignment'
+        $script:runtimeScripts[0] | Should -Match 'Get-CIEMAuthenticationProfile'
         $script:runtimeScripts[0] | Should -Match 'Connect-CIEMAzure'
+        $script:runtimeScripts[0] | Should -Not -Match 'Get-CIEMAzureAuthenticationProfile'
         $result.Details.ManagedIdentityReadStatus | Should -Be 'Validated'
         $result.Details.ManagedIdentitySubscriptionCount | Should -Be 2
     }

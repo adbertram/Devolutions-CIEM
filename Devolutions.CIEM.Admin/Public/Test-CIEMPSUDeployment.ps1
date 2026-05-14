@@ -114,9 +114,16 @@ if (Test-Path -Path $databasePath -PathType Leaf) {
 $managedIdentityReadStatus = 'NotRequested'
 $managedIdentitySubscriptionCount = 0
 if ($validateManagedIdentityRead) {
-    $managedIdentityProfiles = @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true -Method 'ManagedIdentity')
+    $assignment = Get-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure'
+    if ($null -eq $assignment) {
+        throw "Managed identity read validation requires ProviderDiscovery/Azure to have an assigned authentication profile."
+    }
+
+    $managedIdentityProfiles = @(Get-CIEMAuthenticationProfile -Id $assignment.AuthenticationProfileId | Where-Object {
+        $_.Provider -eq 'Azure' -and $_.Method -eq 'ManagedIdentity'
+    })
     if ($managedIdentityProfiles.Count -ne 1) {
-        throw "Managed identity read validation requires exactly one active Azure ManagedIdentity profile, found $($managedIdentityProfiles.Count)."
+        throw "Managed identity read validation requires the ProviderDiscovery/Azure assigned authentication profile to use Azure ManagedIdentity, found $($managedIdentityProfiles.Count)."
     }
 
     $managedIdentityContext = Connect-CIEMAzure -AuthenticationProfile $managedIdentityProfiles[0]

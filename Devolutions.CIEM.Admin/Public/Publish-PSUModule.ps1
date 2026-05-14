@@ -136,10 +136,10 @@ function Publish-PSUModule {
         Write-Host "  Base version for bump: $baseVersion (local)" -ForegroundColor Gray
     }
 
-    $newVersion = switch ($BumpVersion) {
-        'Major' { [version]::new($baseVersion.Major + 1, 0, 0) }
-        'Minor' { [version]::new($baseVersion.Major, $baseVersion.Minor + 1, 0) }
-        'Patch' { [version]::new($baseVersion.Major, $baseVersion.Minor, $baseVersion.Build + 1) }
+    $newVersion = GetBumpedVersion -Base $baseVersion -Component $BumpVersion
+    while (Test-CIEMPSGalleryPackageVersion -Name $moduleName -Version $newVersion) {
+        Write-Host "  Gallery already contains version $newVersion; checking next $BumpVersion version..." -ForegroundColor Yellow
+        $newVersion = GetBumpedVersion -Base $newVersion -Component $BumpVersion
     }
 
     Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green

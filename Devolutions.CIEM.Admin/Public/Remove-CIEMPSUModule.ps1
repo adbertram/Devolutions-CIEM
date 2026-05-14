@@ -177,8 +177,6 @@ function Remove-CIEMPSUModule {
     }
 
     $configurationCacheKeys = @(
-        'CIEM:AuthProfiles:Azure'
-        'CIEM:AuthProfile:AWS'
         'CIEM:Config'
         'CIEM:ScanConfig'
     )
@@ -204,7 +202,8 @@ function Remove-CIEMPSUModule {
     $ownedVariables = @($existingVariables | Where-Object {
             $variableName = [string]$_.Name
             $variableName.StartsWith('CIEM_Azure_', [System.StringComparison]::Ordinal) -or
-            $variableName.StartsWith('CIEM_AWS_', [System.StringComparison]::Ordinal)
+            $variableName.StartsWith('CIEM_AWS_', [System.StringComparison]::Ordinal) -or
+            $variableName.StartsWith('CIEM_AuthProfile_', [System.StringComparison]::Ordinal)
         })
     $removedConfigurationVariables = 0
     foreach ($ownedVariable in $ownedVariables) {
