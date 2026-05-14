@@ -136,10 +136,20 @@ Describe 'Discovery Run CRUD' {
             $results | Should -HaveCount 2
         }
 
-        It '-Last returns newest first (ORDER BY started_at DESC)' {
+        It '-Last returns newest first by normalized started_at timestamp' {
             $results = Get-CIEMAzureDiscoveryRun -Last 3
             $results[0].StartedAt | Should -Be '2026-01-03T00:00:00Z'
             $results[2].StartedAt | Should -Be '2026-01-01T00:00:00Z'
+        }
+
+        It '-Last orders mixed UTC and offset timestamps by actual instant' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-14T17:44:58.106Z' | Out-Null
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-14T12:59:51.1161110-05:00' | Out-Null
+
+            $result = Get-CIEMAzureDiscoveryRun -Last 1
+
+            $result.StartedAt | Should -Be '2026-05-14T12:59:51.1161110-05:00'
         }
 
         It 'Applies -Status before -Last so running runs do not replace the latest completed run' {

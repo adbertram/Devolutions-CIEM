@@ -24,7 +24,7 @@ function GetCIEMAzureDiscoveryCoverageReportData {
         }
     }
     else {
-        $runRows = @(Invoke-CIEMQuery -Query "SELECT * FROM azure_discovery_runs WHERE completed_at IS NOT NULL AND completed_at <> '' ORDER BY started_at DESC LIMIT 1")
+        $runRows = @(Invoke-CIEMQuery -Query "SELECT * FROM azure_discovery_runs WHERE completed_at IS NOT NULL AND completed_at <> '' ORDER BY julianday(started_at) DESC, id DESC LIMIT 1")
         if ($runRows.Count -eq 0) {
             throw "No completed discovery run was found."
         }

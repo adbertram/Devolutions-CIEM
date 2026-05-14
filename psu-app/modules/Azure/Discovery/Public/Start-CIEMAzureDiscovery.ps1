@@ -461,7 +461,7 @@ SELECT id
 FROM azure_discovery_runs
 WHERE id <> @current_id
   AND status IN ('Completed', 'Partial')
-ORDER BY completed_at DESC, started_at DESC
+ORDER BY julianday(completed_at) DESC, julianday(started_at) DESC, id DESC
 LIMIT 1
 "@ -Parameters @{ current_id = $run.Id })
             if ($previousSnapshotRunRows.Count -eq 1) {

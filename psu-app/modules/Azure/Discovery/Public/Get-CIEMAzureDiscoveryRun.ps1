@@ -31,7 +31,7 @@ function Get-CIEMAzureDiscoveryRun {
         $query += "`nWHERE " + ($conditions -join ' AND ')
     }
     if ($PSBoundParameters.ContainsKey('Last')) {
-        $query += "`nORDER BY started_at DESC LIMIT @last"
+        $query += "`nORDER BY julianday(started_at) DESC, id DESC LIMIT @last"
         $parameters.last = $Last
     }
 
