@@ -21,7 +21,7 @@ test.describe('Navigation', () => {
       expect(visible).toBe(true);
     });
 
-    test('should display all 10 navigation items', async () => {
+    test('should display all registry navigation items', async () => {
       const labels = await navPage.getNavItemLabels();
       const expectedLabels = navPage.expectedNavItems.map((item) => item.label);
 
@@ -39,6 +39,7 @@ test.describe('Navigation', () => {
       'Scan History',
       'Identities',
       'Reports',
+      'Authentication Profiles',
       'Configuration',
       'About'
     ]) {

@@ -18,6 +18,39 @@ function sqlValue(value) {
   return value == null ? 'NULL' : `'${String(value).replace(/'/g, "''")}'`;
 }
 
+function backupAuthenticationProfileState() {
+  const profiles = sshQuery('SELECT id, name, provider, method, settings_json, secret_refs_json, created_at, updated_at FROM authentication_profiles');
+  const assignments = sshQuery('SELECT usage_type, usage_id, authentication_profile_id, created_at, updated_at FROM authentication_profile_assignments');
+  console.log(`[setup] Backed up ${profiles.length} auth profile(s) and ${assignments.length} assignment(s).`);
+  return { profiles, assignments };
+}
+
+function restoreAuthenticationProfileState(state) {
+  if (!state) {
+    throw new Error('Authentication profile backup state is required.');
+  }
+
+  const statements = [
+    'DELETE FROM authentication_profile_assignments',
+    'DELETE FROM authentication_profiles'
+  ];
+
+  for (const row of state.profiles) {
+    const cols = ['id', 'name', 'provider', 'method', 'settings_json', 'secret_refs_json', 'created_at', 'updated_at'];
+    const values = cols.map(col => sqlValue(row[col])).join(', ');
+    statements.push(`INSERT INTO authentication_profiles (${cols.join(', ')}) VALUES (${values})`);
+  }
+
+  for (const row of state.assignments) {
+    const cols = ['usage_type', 'usage_id', 'authentication_profile_id', 'created_at', 'updated_at'];
+    const values = cols.map(col => sqlValue(row[col])).join(', ');
+    statements.push(`INSERT INTO authentication_profile_assignments (${cols.join(', ')}) VALUES (${values})`);
+  }
+
+  sshNonQuery(statements.join('; '));
+  console.log(`[teardown] Restored ${state.profiles.length} auth profile(s) and ${state.assignments.length} assignment(s).`);
+}
+
 function cleanupTestData() {
   // Use '%_E2E_TEST_%' for tables with path-style IDs (e.g. /subscriptions/_E2E_TEST_sub-1)
   sshNonQuery([
@@ -712,6 +745,7 @@ function getTestExposureChangeCount() {
 
 module.exports = {
   cleanupTestData, seedChecks, backupAndClearAllChecks, restoreChecks, seedTestData,
+  backupAuthenticationProfileState, restoreAuthenticationProfileState,
   backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount, getScanHistoryCounts, getTestCheckCounts,
   seedEnvironmentData, cleanupEnvironmentData,
   getArmResourceCount, getTestArmResourceCount,

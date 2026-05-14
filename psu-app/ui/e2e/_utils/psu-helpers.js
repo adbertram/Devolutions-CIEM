@@ -120,16 +120,12 @@ async function runPSUCommand(command, timeoutMs = 30000) {
     executor = await createRes.json();
   }
 
-  // Invoke the command
-  const encoded = encodeURIComponent(command);
-  const invokeRes = await fetch(`${baseUrl}/api/v1/script/${executor.id}?ScriptContent=${encoded}`, {
-    method: 'POST', headers, body: '{}'
-  });
-  if (!invokeRes.ok) {
-    return { jobId: null, status: 'InvocationFailed', statusCode: -1, httpStatus: invokeRes.status, error: invokeRes.statusText };
+  let jobId = null;
+  try {
+    jobId = invokePSUExecutorScript(executor.id, command, timeoutMs);
+  } catch (error) {
+    return { jobId: null, status: 'InvocationFailed', statusCode: -1, error: error.message };
   }
-  const jobResponse = await invokeRes.json();
-  const jobId = typeof jobResponse === 'number' ? jobResponse : jobResponse.id;
 
   // Poll for terminal status
   const start = Date.now();
@@ -178,6 +174,46 @@ function curlJson(args, timeoutMs = 30000) {
   return JSON.parse(output);
 }
 
+function invokePSUExecutorScript(executorId, command, timeoutMs = 30000) {
+  const scriptContentB64 = Buffer.from(command, 'utf8').toString('base64');
+  const psCommand = `
+$ErrorActionPreference = 'Stop'
+if (-not (Get-Command Invoke-PSUScript -ErrorAction SilentlyContinue)) {
+    Import-Module Universal -ErrorAction Stop
+}
+$scriptContent = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:CIEM_E2E_SCRIPT_CONTENT_B64))
+$job = Invoke-PSUScript -Id ([int64]$env:CIEM_E2E_SCRIPT_ID) -ComputerName $env:CIEM_E2E_PSU_URL -AppToken $env:CIEM_E2E_PSU_TOKEN -Parameters @{ ScriptContent = $scriptContent }
+if ($job -is [int] -or $job -is [long]) {
+    $job
+}
+elseif ($null -ne $job.Id) {
+    $job.Id
+}
+else {
+    throw 'Invoke-PSUScript did not return a job id.'
+}
+`.trim();
+
+  const output = execFileSync('pwsh', ['-NoProfile', '-Command', psCommand], {
+    encoding: 'utf8',
+    timeout: timeoutMs,
+    maxBuffer: 256 * 1024 * 1024,
+    env: {
+      ...process.env,
+      CIEM_E2E_PSU_URL: testConfig.urls.psu,
+      CIEM_E2E_PSU_TOKEN: getPSUToken(),
+      CIEM_E2E_SCRIPT_ID: String(executorId),
+      CIEM_E2E_SCRIPT_CONTENT_B64: scriptContentB64
+    }
+  }).trim();
+  const lines = output.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+  const jobId = Number.parseInt(lines[lines.length - 1], 10);
+  if (!Number.isInteger(jobId)) {
+    throw new Error(`Invoke-PSUScript returned an invalid job id: ${output}`);
+  }
+  return jobId;
+}
+
 function runPSUCommandSync(command, timeoutMs = 30000) {
   const baseUrl = testConfig.urls.psu;
   const headers = getPSUHeaders();
@@ -201,13 +237,7 @@ function runPSUCommandSync(command, timeoutMs = 30000) {
     ], timeoutMs);
   }
 
-  const jobResponse = curlJson([
-    ...headerArgs,
-    '-X', 'POST',
-    '--data', '{}',
-    `${baseUrl}/api/v1/script/${executor.id}?ScriptContent=${encodeURIComponent(command)}`
-  ], timeoutMs);
-  const jobId = typeof jobResponse === 'number' ? jobResponse : jobResponse.id;
+  const jobId = invokePSUExecutorScript(executor.id, command, timeoutMs);
 
   const start = Date.now();
   let job = null;
@@ -301,21 +331,12 @@ function removeLongRunningAttackPathRemediationScript() {
   return result;
 }
 
-/**
- * Deactivate any active Azure auth profile. Returns the previously active profile ID (or null).
- * Caller should assert the result in the test.
- */
-async function deactivateAzureAuthProfile() {
+async function clearAzureDiscoveryAuthAssignment() {
   const result = await runPSUCommand(`
-    $profiles = @(Get-CIEMAzureAuthenticationProfile)
-    $activeProfile = $profiles | Where-Object { [bool]$_.IsActive } | Select-Object -First 1
-    if ($activeProfile) {
-      $activeId = $activeProfile.Id
-      $now = (Get-Date).ToString('o')
-      $cacheProfiles = @(Get-PSUCache -Key 'CIEM:AuthProfiles:Azure' -ErrorAction SilentlyContinue)
-      foreach ($p in $cacheProfiles) { $p.IsActive = $false; $p.UpdatedAt = $now }
-      Set-PSUCache -Key 'CIEM:AuthProfiles:Azure' -Value $cacheProfiles -Persist
-      $activeId
+    $assignment = Get-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure'
+    if ($assignment) {
+      Invoke-CIEMQuery -Query "DELETE FROM authentication_profile_assignments WHERE usage_type = @usage_type AND usage_id = @usage_id" -Parameters @{ usage_type = 'ProviderDiscovery'; usage_id = 'Azure' } -AsNonQuery | Out-Null
+      $assignment.AuthenticationProfileId
     } else {
       'none'
     }
@@ -323,30 +344,23 @@ async function deactivateAzureAuthProfile() {
   const data = result.pipelineOutput;
   if (data && data.length > 0) {
     const val = data[0].value;
-    return { previousActiveId: val === 'none' ? null : val, result };
+    return { previousAssignmentProfileId: val === 'none' ? null : val, result };
   }
-  return { previousActiveId: null, result };
+  return { previousAssignmentProfileId: null, result };
 }
 
-/**
- * Reactivate an Azure auth profile by ID.
- */
-async function activateAzureAuthProfile(profileId) {
-  return await runPSUCommand(`Set-CIEMAzureAuthenticationProfileActive -Id '${profileId}'`);
+async function setAzureDiscoveryAuthAssignment(profileId) {
+  return await runPSUCommand(`Set-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure' -AuthenticationProfileId '${profileId}'`);
 }
 
-/**
- * Returns the count of active Azure auth profiles (0 or 1+).
- */
-async function getActiveAzureAuthProfileCount() {
+async function getAzureDiscoveryAuthAssignmentCount() {
   const result = await runPSUCommand(`
-    $profiles = @(Get-PSUCache -Key 'CIEM:AuthProfiles:Azure' -ErrorAction SilentlyContinue)
-    @($profiles | Where-Object { [bool]$_.IsActive }).Count
+    @(Get-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure').Count
   `);
   if (result.statusCode === -1) return { count: -1, result };
   const data = result.pipelineOutput;
   if (data && data.length > 0) {
-    return { count: parseInt(data[0].value) || 0, result };
+    return { count: parseInt(data[0].value, 10), result };
   }
   return { count: 0, result };
 }
@@ -506,6 +520,6 @@ module.exports = {
   registerLongRunningAttackPathRemediationScript,
   removeLongRunningAttackPathRemediationScript,
   cancelRunningPSUJobs, PSU_STATUS, PSU_STATUS_NAMES,
-  deactivateAzureAuthProfile, activateAzureAuthProfile,
-  getActiveAzureAuthProfileCount
+  clearAzureDiscoveryAuthAssignment, setAzureDiscoveryAuthAssignment,
+  getAzureDiscoveryAuthAssignmentCount
 };

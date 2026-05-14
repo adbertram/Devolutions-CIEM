@@ -30,6 +30,10 @@ class ReportsPageHelpers extends BasePage {
 
   async getReportContextText() {
     await this.waitForSelector(this.selectors.reportContext);
+    await this.page.waitForFunction(selector => {
+      const text = document.querySelector(selector)?.textContent ?? '';
+      return /Run #\d+/.test(text) && text.includes('Scope ') && text.includes('Status ');
+    }, this.selectors.reportContext);
     return (await this.page.locator(this.selectors.reportContext).textContent()).trim();
   }
 

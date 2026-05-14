@@ -46,27 +46,46 @@ module.exports = async function globalSetup() {
   // 4. Back up auth profiles so tests can't corrupt real credentials
   try {
     const backupResult = await runPSUCommand(`
-      $profiles = @(Get-PSUCache -Key 'CIEM:AuthProfiles:Azure' -ErrorAction SilentlyContinue)
-      if ($profiles.Count -gt 0) {
-        $profiles | ConvertTo-Json -Depth 10 -Compress
-      } else {
-        '[]'
-      }
+      $profiles = @(Invoke-CIEMQuery -Query "SELECT id, name, provider, method, settings_json, secret_refs_json, created_at, updated_at FROM authentication_profiles")
+      $assignments = @(Invoke-CIEMQuery -Query "SELECT usage_type, usage_id, authentication_profile_id, created_at, updated_at FROM authentication_profile_assignments")
+      [pscustomobject]@{
+        Profiles = @($profiles | ForEach-Object {
+          [pscustomobject]@{
+            Id = [string]$_.id
+            Name = [string]$_.name
+            Provider = [string]$_.provider
+            Method = [string]$_.method
+            SettingsJson = [string]$_.settings_json
+            SecretRefsJson = [string]$_.secret_refs_json
+            CreatedAt = [string]$_.created_at
+            UpdatedAt = [string]$_.updated_at
+          }
+        })
+        Assignments = @($assignments | ForEach-Object {
+          [pscustomobject]@{
+            UsageType = [string]$_.usage_type
+            UsageId = [string]$_.usage_id
+            AuthenticationProfileId = [string]$_.authentication_profile_id
+            CreatedAt = [string]$_.created_at
+            UpdatedAt = [string]$_.updated_at
+          }
+        })
+      } | ConvertTo-Json -Depth 10 -Compress
     `);
     if (backupResult.statusCode === 2 || backupResult.statusCode === 11) {
       const raw = backupResult.pipelineOutput && backupResult.pipelineOutput.length > 0
         ? backupResult.pipelineOutput[backupResult.pipelineOutput.length - 1].value
-        : '[]';
+        : '{"Profiles":[],"Assignments":[]}';
       process.env._E2E_AUTH_PROFILES_BACKUP = raw;
-      const count = JSON.parse(raw).length;
-      console.log(`[setup] Backed up ${count} auth profile(s).`);
+      const backup = JSON.parse(raw);
+      console.log(`[setup] Backed up ${backup.Profiles.length} auth profile(s) and ${backup.Assignments.length} assignment(s).`);
     } else {
       console.log(`[setup] Could not back up auth profiles (status: ${backupResult.status}).`);
-      process.env._E2E_AUTH_PROFILES_BACKUP = '[]';
+      process.env._E2E_AUTH_PROFILES_BACKUP = '{"Profiles":[],"Assignments":[]}';
     }
   } catch (err) {
     console.log(`[setup] Auth profile backup failed: ${err.message}`);
-    process.env._E2E_AUTH_PROFILES_BACKUP = '[]';
+    process.env._E2E_AUTH_PROFILES_BACKUP = '{"Profiles":[],"Assignments":[]}';
   }
 
   // 5. Clean stale test data and seed fresh data in the selected PSU target

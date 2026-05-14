@@ -10,8 +10,8 @@ const {
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount
 } = require('../../_utils/cleanup');
 const {
-  deactivateAzureAuthProfile, activateAzureAuthProfile,
-  getActiveAzureAuthProfileCount, cancelRunningPSUJobs
+  clearAzureDiscoveryAuthAssignment, setAzureDiscoveryAuthAssignment,
+  getAzureDiscoveryAuthAssignmentCount, cancelRunningPSUJobs
 } = require('../../_utils/psu-helpers');
 
 test.describe('Environment Page', () => {
@@ -146,10 +146,10 @@ test.describe('Environment Page', () => {
     });
   });
 
-  // --- Auth profile state: no active profile ---
+  // --- Auth profile state: no assigned profile ---
 
-  test.describe('when no active authentication profile exists', () => {
-    let previousActiveProfileId = null;
+  test.describe('when no Azure discovery authentication profile is assigned', () => {
+    let previousAssignmentProfileId = null;
 
     test.beforeAll(async () => {
       try {
@@ -161,27 +161,25 @@ test.describe('Environment Page', () => {
           console.log(`[setup:auth] Cancelled ${cancelled} PSU jobs (${running} running, ${queued} queued).`);
         }
 
-        // Deactivate any active profile
-        const { previousActiveId, result: deactivateResult } = await deactivateAzureAuthProfile();
-        console.log(`[setup:auth] Deactivation result: status=${deactivateResult.status}, previousActiveId=${previousActiveId}`);
+        const { previousAssignmentProfileId: clearedProfileId, result: deactivateResult } = await clearAzureDiscoveryAuthAssignment();
+        console.log(`[setup:auth] Assignment clear result: status=${deactivateResult.status}, previousAssignmentProfileId=${clearedProfileId}`);
         if (deactivateResult.statusCode === -1) {
-          test.skip(true, `Could not deactivate auth profile: PSU command ${deactivateResult.status} (jobId: ${deactivateResult.jobId})`);
+          test.skip(true, `Could not clear auth assignment: PSU command ${deactivateResult.status} (jobId: ${deactivateResult.jobId})`);
           return;
         }
-        previousActiveProfileId = previousActiveId;
+        previousAssignmentProfileId = clearedProfileId;
 
-        // Assert: verify no active profile remains
-        const { count, result: countResult } = await getActiveAzureAuthProfileCount();
-        console.log(`[setup:auth] Active profile count: ${count} (PSU status: ${countResult.status})`);
+        const { count, result: countResult } = await getAzureDiscoveryAuthAssignmentCount();
+        console.log(`[setup:auth] Assignment count: ${count} (PSU status: ${countResult.status})`);
         if (countResult.statusCode === -1) {
           test.skip(true, `Could not verify auth state: PSU command ${countResult.status}`);
           return;
         }
         if (count !== 0) {
-          test.skip(true, `Could not deactivate auth profile (${count} still active)`);
+          test.skip(true, `Could not clear auth assignment (${count} still assigned)`);
           return;
         }
-        console.log(`[setup:auth] State established: 0 active auth profiles.`);
+        console.log(`[setup:auth] State established: 0 Azure discovery auth assignments.`);
       } catch (err) {
         console.log(`[setup:auth] ERROR: ${err.message}`);
         test.skip(true, `Auth setup failed: ${err.message}`);
@@ -189,14 +187,13 @@ test.describe('Environment Page', () => {
     });
 
     test.afterAll(async () => {
-      if (previousActiveProfileId) {
-        const restoreResult = await activateAzureAuthProfile(previousActiveProfileId);
-        console.log(`[teardown] Restored auth profile '${previousActiveProfileId}' (status: ${restoreResult.status}).`);
+      if (previousAssignmentProfileId) {
+        const restoreResult = await setAzureDiscoveryAuthAssignment(previousAssignmentProfileId);
+        console.log(`[teardown] Restored Azure discovery auth assignment '${previousAssignmentProfileId}' (status: ${restoreResult.status}).`);
       }
     });
 
-    test('should complete discovery without crashing when clicking Start Discovery', async ({}, testInfo) => {
-      testInfo.setTimeout(600000); // Discovery may run with stale auth from PSU runspace pool
+    test('should show profile assignment guidance without crashing when Start Discovery is clicked', async () => {
       await cancelRunningPSUJobs();
       clearStaleDiscoveryRuns();
       await envPage.clickStartDiscovery();
@@ -204,28 +201,17 @@ test.describe('Environment Page', () => {
       const startingToast = envPage.page.locator('.iziToast:has-text("Starting Azure discovery")');
       await expect(startingToast).toBeVisible({ timeout: 10000 });
 
-      // Regression guard for Known Issue #10: PSU "Unknown script" / dynamic-parameter
-      // failures surface as a "Discovery failed" toast within ~1-2s of click. Catch it now
-      // instead of waiting through the 9-minute completion poll below.
-      await envPage.assertNoImmediateDiscoveryFailure();
+      const failureToast = envPage.page.locator('.iziToast:has-text("Discovery failed: No authentication profile assignment found for ProviderDiscovery")');
+      await expect(failureToast).toBeVisible({ timeout: 15000 });
+      await expect(failureToast).toContainText('Configure one on the Authentication Profiles page.');
 
-      // Poll for discovery to complete — button re-enables when OnClick handler finishes
       const startBtn = envPage.page.locator(envPage.selectors.startDiscoveryBtn);
-      for (let i = 0; i < 180; i++) { // 180 × 3s = 9 minutes max
-        await envPage.page.waitForTimeout(3000);
-        const isDisabled = await startBtn.getAttribute('disabled');
-        if (isDisabled === null) break;
-      }
+      await expect(startBtn).toBeEnabled({ timeout: 15000 });
 
-      // After discovery completes, tree auto-reloads via Sync-UDElement.
-      // Page should be in a valid state (tree loaded or no-resources shown).
       const chartArea = envPage.page.locator(envPage.selectors.chartArea);
       const chartText = (await chartArea.textContent()).trim();
-      // Must NEVER see crash indicators
       expect(chartText).not.toContain('unexpected status');
-      expect(chartText).not.toContain('Error');
-      // Chart area must have some content (either tree or no-resources state)
-      expect(chartText.length).toBeGreaterThan(0);
+      expect(chartText).not.toContain('Unknown script');
     });
   });
 
@@ -235,6 +221,14 @@ test.describe('Environment Page', () => {
     test.beforeAll(async () => {
       await cancelRunningPSUJobs();
       clearStaleDiscoveryRuns();
+
+      const { count, result } = await getAzureDiscoveryAuthAssignmentCount();
+      if (result.statusCode === -1) {
+        throw new Error(`Could not verify Azure discovery auth assignment: ${result.status}`);
+      }
+      if (count !== 1) {
+        throw new Error(`Expected exactly one Azure discovery auth assignment before discovery, got ${count}. Configure ProviderDiscovery/Azure in Authentication Profiles.`);
+      }
     });
 
     test('should complete discovery and auto-load infrastructure and identity trees', async ({}, testInfo) => {
