@@ -15,32 +15,37 @@ SELECT name
 FROM sqlite_master
 WHERE type = 'table'
   AND name IN (
-    'notification_authentication_profiles',
     'notification_channels',
     'notifications',
     'notification_history'
   )
 "@)
 
-        $tables | Should -HaveCount 4
-        $tables.name | Should -Contain 'notification_authentication_profiles'
+        $tables | Should -HaveCount 3
         $tables.name | Should -Contain 'notification_channels'
         $tables.name | Should -Contain 'notifications'
         $tables.name | Should -Contain 'notification_history'
     }
 
-    It 'creates notification authentication profile columns for data-driven SMTP settings and secret references' {
-        $columns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('notification_authentication_profiles')")
+    It 'does not store authentication profile ownership on notification channels' {
+        $columns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('notification_channels')")
 
-        $columns.name | Should -Contain 'settings_json'
-        $columns.name | Should -Contain 'secret_refs_json'
-        $columns.name | Should -Contain 'method'
+        $columns.name | Should -Contain 'from_address'
+        $columns.name | Should -Contain 'to_recipients_json'
+        $columns.name | Should -Not -Contain 'authentication_profile_id'
+    }
+
+    It 'contains no legacy notification authentication migration path' {
+        $moduleRoot = Resolve-Path (Join-Path $PSScriptRoot '..' '..' '..' '..')
+        $newDatabaseSource = Get-Content -Path (Join-Path $moduleRoot 'Public/New-CIEMDatabase.ps1') -Raw
+        $legacyMigrationPath = Join-Path $moduleRoot 'modules/Devolutions.CIEM.Notifications/Private/UpdateCIEMNotificationStorageSchema.ps1'
+
+        $legacyMigrationPath | Should -Not -Exist
+        $newDatabaseSource | Should -Not -Match 'UpdateCIEMNotificationStorageSchema'
     }
 
     It 'exports notification commands without exposing class types in public parameters' {
         $commands = @(
-            'Get-CIEMNotificationAuthenticationProfile',
-            'Set-CIEMNotificationAuthenticationProfile',
             'Get-CIEMNotificationChannel',
             'Set-CIEMNotificationChannel',
             'Get-CIEMNotification',
@@ -60,20 +65,17 @@ WHERE type = 'table'
 
     It 'loads notification classes inside the module scope' {
         $classProperties = InModuleScope Devolutions.CIEM {
-            $authProfile = [CIEMNotificationAuthenticationProfile]::new()
             $channel = [CIEMNotificationChannel]::new()
             $notification = [CIEMNotification]::new()
 
             [PSCustomObject]@{
-                AuthProfileProperties = @($authProfile.PSObject.Properties.Name)
                 ChannelProperties     = @($channel.PSObject.Properties.Name)
                 NotificationProperties = @($notification.PSObject.Properties.Name)
             }
         }
 
-        $classProperties.AuthProfileProperties | Should -Contain 'SettingsJson'
-        $classProperties.AuthProfileProperties | Should -Contain 'SecretRefsJson'
-        $classProperties.ChannelProperties | Should -Contain 'AuthenticationProfileId'
+        $classProperties.ChannelProperties | Should -Contain 'FromAddress'
+        $classProperties.ChannelProperties | Should -Not -Contain 'AuthenticationProfileId'
         $classProperties.NotificationProperties | Should -Contain 'HtmlBodyTemplate'
     }
 }

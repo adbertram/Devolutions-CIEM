@@ -9,16 +9,19 @@ BeforeAll {
         throw "Local PSU not reachable or CIEM module not loaded. Start PSU on adam-server: ssh adam-server 'sudo launchctl kickstart -k system/com.psu.server'"
     }
 
-    # Verify real Azure auth profile exists and is active, then connect
+    # Verify a real Azure discovery authentication profile is assigned, then connect
     $script:authReady = Run-OnPSU @'
-        $profile = Get-CIEMAzureAuthenticationProfile -IsActive $true | Select-Object -First 1
-        if (-not $profile) { throw 'No active Azure auth profile found. Configure one in PSU before running E2E tests.' }
+        $assignment = Get-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure'
+        if (-not $assignment) { throw 'No Azure discovery authentication profile assignment found. Configure one in PSU before running E2E tests.' }
+        $profile = Get-CIEMAuthenticationProfile -Id $assignment.AuthenticationProfileId
+        if (-not $profile) { throw "Assigned Azure discovery authentication profile '$($assignment.AuthenticationProfileId)' was not found." }
+        if ($profile.Provider -ne 'Azure') { throw "Assigned Azure discovery authentication profile '$($profile.Id)' has provider '$($profile.Provider)'." }
         Connect-CIEMAzure | Out-Null
         'connected'
 '@ -TimeoutSeconds 120
 
     if ($script:authReady -ne 'connected') {
-        throw "Failed to connect to Azure. Ensure an active auth profile with valid credentials exists."
+        throw "Failed to connect to Azure. Ensure the Azure discovery authentication profile assignment has valid credentials."
     }
 
     $script:testRunIds = @()

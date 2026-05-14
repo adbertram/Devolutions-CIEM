@@ -58,10 +58,7 @@ function Send-CIEMNotification {
     }
     $channel = $enabledChannels[0]
 
-    $profile = @(Get-CIEMNotificationAuthenticationProfile -Id $channel.AuthenticationProfileId)
-    if ($profile.Count -ne 1) {
-        throw "Notification channel '$($channel.Id)' references missing authentication profile '$($channel.AuthenticationProfileId)'."
-    }
+    $profile = GetCIEMAssignedAuthenticationProfile -UsageType 'NotificationChannel' -UsageId 'email-default'
 
     $changes = if ($Test) {
         @([PSCustomObject]@{
@@ -113,7 +110,7 @@ function Send-CIEMNotification {
         $attemptedAt = (Get-Date).ToString('o')
 
         try {
-            $sendResult = SendCIEMEmailMessage -AuthenticationProfile $profile[0] -Channel $channel -Subject $subject -TextBody $textBody -HtmlBody $htmlBody
+            $sendResult = SendCIEMEmailMessage -AuthenticationProfile $profile -Channel $channel -Subject $subject -TextBody $textBody -HtmlBody $htmlBody
             SaveCIEMNotificationHistory `
                 -NotificationId $notification.Id `
                 -ChannelId $channel.Id `

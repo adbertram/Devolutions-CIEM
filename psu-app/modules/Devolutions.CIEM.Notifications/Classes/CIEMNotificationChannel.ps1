@@ -3,7 +3,6 @@ class CIEMNotificationChannel {
     [string]$Name
     [string]$Type
     [bool]$Enabled
-    [string]$AuthenticationProfileId
     [string]$FromAddress
     [string]$ToRecipientsJson
     [string]$CcRecipientsJson

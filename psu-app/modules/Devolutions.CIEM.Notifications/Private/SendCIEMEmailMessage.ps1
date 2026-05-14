@@ -19,8 +19,8 @@ function SendCIEMEmailMessage {
 
     $ErrorActionPreference = 'Stop'
 
-    if ($AuthenticationProfile.Type -ne 'Email') {
-        throw "Notification authentication profile '$($AuthenticationProfile.Id)' must be type Email."
+    if ($AuthenticationProfile.Provider -ne 'Email') {
+        throw "Authentication profile '$($AuthenticationProfile.Id)' must have provider Email."
     }
     if ($Channel.Type -ne 'Email') {
         throw "Notification channel '$($Channel.Id)' must be type Email."
@@ -59,7 +59,7 @@ function SendCIEMEmailMessage {
                 $smtpClient.Credentials = $null
             }
             'SmtpBasic' {
-                $password = Get-CIEMSecret -Name $AuthenticationProfile.SecretRefs.Password
+                $password = $AuthenticationProfile.Secrets.Password
                 if ([string]::IsNullOrEmpty($password)) {
                     throw "Secret '$($AuthenticationProfile.SecretRefs.Password)' did not return a password."
                 }

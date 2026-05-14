@@ -382,18 +382,37 @@ function ConvertToCIEMAttackPathId {
     "$PatternId-$($hash.Substring(0, 16))"
 }
 
-function GetCIEMActiveAzureAuthenticationProfileForAttackPathScript {
+function GetCIEMAssignedAzureAuthenticationProfileForAttackPathScript {
     [CmdletBinding()]
     param()
 
     $ErrorActionPreference = 'Stop'
 
-    $profiles = @(Get-CIEMAzureAuthenticationProfile -ProviderId 'azure' -IsActive $true)
-    if ($profiles.Count -ne 1) {
-        throw "Cannot render attack path remediation script because exactly one active Azure authentication profile is required; found $($profiles.Count)."
+    $profile = GetCIEMAssignedAuthenticationProfile -UsageType 'ProviderDiscovery' -UsageId 'Azure'
+    if ($null -eq $profile) {
+        throw "Cannot render attack path remediation script because ProviderDiscovery/Azure has no assigned authentication profile."
     }
 
-    $profiles[0]
+    $profile
+}
+
+function GetCIEMAttackPathAuthProfileSettingValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$AuthenticationProfile,
+
+        [Parameter(Mandatory)]
+        [string]$PropertyName
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    if (-not $AuthenticationProfile.PSObject.Properties['Settings']) {
+        throw "Cannot render attack path remediation script because assigned authentication profile is missing Settings."
+    }
+
+    GetCIEMRequiredTokenObjectValue -Object $AuthenticationProfile.Settings -PropertyName $PropertyName -Context 'assigned authentication profile settings'
 }
 
 function GetCIEMRequiredTokenObjectValue {
@@ -666,7 +685,7 @@ function GetCIEMAttackPathTokenAuthProfile {
     $ErrorActionPreference = 'Stop'
 
     if (-not $Context.ContainsKey('AuthProfile') -or $null -eq $Context['AuthProfile']) {
-        $Context['AuthProfile'] = GetCIEMActiveAzureAuthenticationProfileForAttackPathScript
+        $Context['AuthProfile'] = GetCIEMAssignedAzureAuthenticationProfileForAttackPathScript
     }
 
     $Context['AuthProfile']
@@ -688,7 +707,7 @@ function ResolveCIEMAttackPathAuthProfileIdToken {
     $ErrorActionPreference = 'Stop'
 
     $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
-    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Id' -Context 'active Azure authentication profile'
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Id' -Context 'assigned authentication profile'
 }
 
 function ResolveCIEMAttackPathAuthProfileNameToken {
@@ -707,7 +726,7 @@ function ResolveCIEMAttackPathAuthProfileNameToken {
     $ErrorActionPreference = 'Stop'
 
     $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
-    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Name' -Context 'active Azure authentication profile'
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Name' -Context 'assigned authentication profile'
 }
 
 function ResolveCIEMAttackPathAuthProfileMethodToken {
@@ -726,7 +745,7 @@ function ResolveCIEMAttackPathAuthProfileMethodToken {
     $ErrorActionPreference = 'Stop'
 
     $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
-    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Method' -Context 'active Azure authentication profile'
+    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'Method' -Context 'assigned authentication profile'
 }
 
 function ResolveCIEMAttackPathTenantIdToken {
@@ -745,7 +764,7 @@ function ResolveCIEMAttackPathTenantIdToken {
     $ErrorActionPreference = 'Stop'
 
     $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
-    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'TenantId' -Context 'active Azure authentication profile'
+    GetCIEMAttackPathAuthProfileSettingValue -AuthenticationProfile $authProfile -PropertyName 'TenantId'
 }
 
 function ResolveCIEMAttackPathClientIdToken {
@@ -764,7 +783,7 @@ function ResolveCIEMAttackPathClientIdToken {
     $ErrorActionPreference = 'Stop'
 
     $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
-    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'ClientId' -Context 'active Azure authentication profile'
+    GetCIEMAttackPathAuthProfileSettingValue -AuthenticationProfile $authProfile -PropertyName 'ClientId'
 }
 
 function ResolveCIEMAttackPathManagedIdentityClientIdToken {
@@ -783,7 +802,7 @@ function ResolveCIEMAttackPathManagedIdentityClientIdToken {
     $ErrorActionPreference = 'Stop'
 
     $authProfile = GetCIEMAttackPathTokenAuthProfile -Context $Context
-    GetCIEMRequiredTokenObjectValue -Object $authProfile -PropertyName 'ManagedIdentityClientId' -Context 'active Azure authentication profile'
+    GetCIEMAttackPathAuthProfileSettingValue -AuthenticationProfile $authProfile -PropertyName 'ManagedIdentityClientId'
 }
 
 function GetCIEMAttackPathTokenPsuEnvironment {

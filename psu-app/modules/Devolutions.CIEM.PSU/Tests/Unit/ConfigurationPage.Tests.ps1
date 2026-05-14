@@ -2,23 +2,7 @@ BeforeAll {
     $script:PageContent = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Pages' 'New-CIEMConfigPage.ps1') -Raw
 }
 
-Describe 'Configuration page required permissions modal' {
-    It 'reads the Azure permission model from Get-CIEMRequiredPermission instead of inline SQL' {
-        $script:PageContent | Should -Match 'Get-CIEMRequiredPermission\s+-Provider\s+''Azure'''
-        $script:PageContent | Should -Not -Match 'SELECT permissions FROM azure_provider_apis'
-    }
-
-    It 'renders separate discovery and remediation sections' {
-        $script:PageContent | Should -Match 'Discovery Permissions'
-        $script:PageContent | Should -Match 'Remediation Permissions'
-    }
-
-    It 'does not pass unsupported Style parameters to New-UDDivider in the permissions modal' {
-        $script:PageContent | Should -Not -Match 'New-UDDivider\s+-Style'
-    }
-}
-
-Describe 'Configuration page PSU-native form and certificate upload' {
+Describe 'Configuration page authentication cleanup' {
     It 'does not render database schema maintenance controls' {
         $script:PageContent | Should -Not -Match 'CIEM Database'
         $script:PageContent | Should -Not -Match 'Reapplies CIEM database schema'
@@ -32,49 +16,21 @@ Describe 'Configuration page PSU-native form and certificate upload' {
         $script:PageContent | Should -Not -Match 'if\s*\(\s*-not\s+\$databaseExists\s*\)'
     }
 
-    It 'uses a PSU form submit handler for saving configuration values' {
-        $script:PageContent | Should -Match "New-UDForm\s+-Id\s+'ciemConfigForm'"
-        $script:PageContent | Should -Match '-OnSubmit\s*{'
-        $script:PageContent | Should -Match '\$EventData\.cloudProvider'
-        $script:PageContent | Should -Match '\$EventData\.authMethod'
+    It 'does not render authentication profile management controls' {
+        $script:PageContent | Should -Not -Match 'Cloud Provider Authentication'
+        $script:PageContent | Should -Not -Match "New-UDForm\s+-Id\s+'ciemConfigForm'"
+        $script:PageContent | Should -Not -Match "New-UDSelect\s+-Id\s+'cloudProvider'"
+        $script:PageContent | Should -Not -Match "New-UDSelect\s+-Id\s+'authMethod'"
+        $script:PageContent | Should -Not -Match 'Save-CIEMAzureAuthenticationProfile'
+        $script:PageContent | Should -Not -Match 'Set-CIEMAWSAuthenticationProfile'
+        $script:PageContent | Should -Not -Match 'Set-CIEMNotificationAuthenticationProfile'
     }
 
-    It 'reads Azure save values from EventData instead of scraping UD controls' {
-        foreach ($fieldId in @(
-            'azTenantId',
-            'azSpClientId',
-            'azSpClientSecret',
-            'azCertClientId',
-            'azCertPassword'
-        )) {
-            $script:PageContent | Should -Not -Match "Get-UDElement\s+-Id\s+'$fieldId'"
-        }
-    }
-
-    It 'uses New-UDUpload for certificate files instead of browser-local JavaScript transport' {
-        $script:PageContent | Should -Match "New-UDUpload\s+-Id\s+'azCertPfxUpload'"
-        $script:PageContent | Should -Match "-Accept\s+'\.pfx,\.p12'"
-        $script:PageContent | Should -Not -Match 'localStorage'
-        $script:PageContent | Should -Not -Match 'FileReader'
-        $script:PageContent | Should -Not -Match 'azCertProcess'
-        $script:PageContent | Should -Not -Match 'document\.createElement'
-    }
-
-    It 'keeps temporary certificate upload state in Page scope' {
-        $script:PageContent | Should -Match '\$Page:UploadedCertBase64'
-        $script:PageContent | Should -Match '\$Page:UploadedCertFileName'
-        $script:PageContent | Should -Not -Match '\$Session:UploadedCertBase64'
-        $script:PageContent | Should -Not -Match '\$Session:UploadedCertFileName'
-    }
-
-    It 'persists AWS authentication profile metadata through the AWS cache command' {
-        $script:PageContent | Should -Match 'Set-CIEMAWSAuthenticationProfile'
-        $script:PageContent | Should -Match '-Method\s+\$authMethod'
-        $script:PageContent | Should -Match '-Region\s+\$region'
-        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsProfile'"
-        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsRegion'"
-        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsAccessKeyId'"
-        $script:PageContent | Should -Match "Get-UDElement\s+-Id\s+'awsSecretAccessKey'"
+    It 'does not render authentication utility actions' {
+        $script:PageContent | Should -Not -Match 'Get Required Permissions'
+        $script:PageContent | Should -Not -Match 'Test Authentication'
+        $script:PageContent | Should -Not -Match 'Get-CIEMRequiredPermission'
+        $script:PageContent | Should -Not -Match 'Connect-CIEM'
     }
 }
 
@@ -89,33 +45,30 @@ Describe 'Configuration page scheduled discovery controls' {
         $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'saveAzureDiscoveryScheduleBtn'"
     }
 
-    It 'syncs scheduled discovery visibility with the selected cloud provider' {
-        $script:PageContent | Should -Match "Sync-UDElement -Id 'scheduledDiscoveryContainer'"
-        $script:PageContent | Should -Match "New-UDDynamic -Id 'scheduledDiscoveryContainer'"
+    It 'renders scheduled discovery directly without provider-auth visibility coupling' {
         $script:PageContent | Should -Match "New-UDElement -Tag 'div' -Id 'scheduledDiscoveryWrapper'"
-        $script:PageContent | Should -Match '\$scheduleDisplay = if \(\$scheduleProvider -eq ''Azure''\)'
+        $script:PageContent | Should -Not -Match "scheduledDiscoveryContainer"
+        $script:PageContent | Should -Not -Match '\$scheduleProvider'
+        $script:PageContent | Should -Not -Match '\$scheduleDisplay'
     }
 }
 
 Describe 'Configuration page notification controls' {
     It 'renders notification channel controls backed by notification commands' {
         $script:PageContent | Should -Match 'Notification Channels'
-        $script:PageContent | Should -Match 'Get-CIEMNotificationAuthenticationProfile'
-        $script:PageContent | Should -Match 'Set-CIEMNotificationAuthenticationProfile'
         $script:PageContent | Should -Match 'Get-CIEMNotificationChannel'
         $script:PageContent | Should -Match 'Set-CIEMNotificationChannel'
         $script:PageContent | Should -Match 'Get-CIEMNotificationHistory'
         $script:PageContent | Should -Match 'Send-CIEMNotification'
-        $script:PageContent | Should -Match "New-UDSelect\s+-Id\s+'notificationAuthMethod'"
-        $script:PageContent | Should -Match "New-UDTextbox\s+-Id\s+'notificationSmtpHost'"
         $script:PageContent | Should -Match "New-UDTextbox\s+-Id\s+'notificationToRecipients'"
         $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'saveNotificationsBtn'"
         $script:PageContent | Should -Match "New-UDButton\s+-Id\s+'testNotificationEmailBtn'"
     }
 
-    It 'stores notification SMTP passwords through the CIEM secret wrapper' {
-        $script:PageContent | Should -Match 'CIEM_Notification_Email_Password'
-        $script:PageContent | Should -Match 'Set-CIEMSecret\s+\$passwordSecretName\s+\$smtpPassword'
-        $script:PageContent | Should -Match 'PasswordSecretName\s+=\s+\$passwordSecretName'
+    It 'does not manage Email provider connection settings from Configuration' {
+        $script:PageContent | Should -Not -Match "New-UDSelect\s+-Id\s+'notificationAuthMethod'"
+        $script:PageContent | Should -Not -Match "New-UDTextbox\s+-Id\s+'notificationSmtpHost'"
+        $script:PageContent | Should -Not -Match 'CIEM_Notification_Email_Password'
+        $script:PageContent | Should -Not -Match 'Set-CIEMSecret\s+\$passwordSecretName\s+\$smtpPassword'
     }
 }

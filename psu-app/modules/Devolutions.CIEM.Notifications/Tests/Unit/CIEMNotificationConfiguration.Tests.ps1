@@ -13,19 +13,24 @@ Describe 'CIEM notification configuration commands' {
         Invoke-CIEMQuery -Query 'DELETE FROM notification_history' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM notifications' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM notification_channels' -AsNonQuery | Out-Null
-        Invoke-CIEMQuery -Query 'DELETE FROM notification_authentication_profiles' -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query 'DELETE FROM authentication_profile_assignments' -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query 'DELETE FROM authentication_profiles' -AsNonQuery | Out-Null
     }
 
-    It 'saves an SMTP Basic notification authentication profile with secret references only' {
-        $profile = Set-CIEMNotificationAuthenticationProfile `
+    It 'saves an SMTP Basic generic authentication profile with secret references only' {
+        $profile = Save-CIEMAuthenticationProfile `
             -Name 'Default SMTP' `
+            -Provider 'Email' `
             -Method 'SmtpBasic' `
-            -Host 'smtp.example.com' `
-            -Port 587 `
-            -TlsMode 'StartTls' `
-            -Username 'alerts@example.com' `
-            -PasswordSecretName 'CIEM_Notification_Email_Password'
+            -Settings @{
+                Host = 'smtp.example.com'
+                Port = 587
+                TlsMode = 'StartTls'
+                Username = 'alerts@example.com'
+            } `
+            -SecretRefs @{ Password = 'CIEM_Notification_Email_Password' }
 
+        $profile.Provider | Should -Be 'Email'
         $profile.Method | Should -Be 'SmtpBasic'
         $profile.Settings.Host | Should -Be 'smtp.example.com'
         $profile.Settings.Port | Should -Be 587
@@ -33,35 +38,36 @@ Describe 'CIEM notification configuration commands' {
         $profile.SecretRefs.Password | Should -Be 'CIEM_Notification_Email_Password'
         $profile.PSObject.Properties.Name | Should -Not -Contain 'Password'
 
-        $stored = @(Get-CIEMNotificationAuthenticationProfile -Id $profile.Id)[0]
+        $stored = @(Get-CIEMAuthenticationProfile -Id $profile.Id)[0]
         $stored.SecretRefs.Password | Should -Be 'CIEM_Notification_Email_Password'
     }
 
-    It 'throws when SMTP Basic authentication is saved without a password secret reference' {
+    It 'throws when SMTP Basic generic authentication is saved without a password secret reference' {
         {
-            Set-CIEMNotificationAuthenticationProfile `
+            Save-CIEMAuthenticationProfile `
                 -Name 'Broken SMTP' `
+                -Provider 'Email' `
                 -Method 'SmtpBasic' `
-                -Host 'smtp.example.com' `
-                -Port 587 `
-                -TlsMode 'StartTls' `
-                -Username 'alerts@example.com'
-        } | Should -Throw "*PasswordSecretName*"
+                -Settings @{
+                    Host = 'smtp.example.com'
+                    Port = 587
+                    TlsMode = 'StartTls'
+                    Username = 'alerts@example.com'
+                } `
+                -SecretRefs @{}
+        } | Should -Throw "*field 'Password' is required*"
     }
 
-    It 'saves an Email channel that references the notification authentication profile' {
-        $profile = Set-CIEMNotificationAuthenticationProfile -Name 'SMTP Relay' -Method 'SmtpAnonymous' -Host 'smtp-relay.example.com' -Port 25 -TlsMode 'None'
-
+    It 'saves an Email channel without storing authentication profile ownership' {
         $channel = Set-CIEMNotificationChannel `
             -Enabled $true `
-            -AuthenticationProfileId $profile.Id `
             -FromAddress 'ciem@example.com' `
             -ToRecipients @('security@example.com', 'it@example.com') `
             -CcRecipients @('audit@example.com')
 
         $channel.Type | Should -Be 'Email'
         $channel.Enabled | Should -BeTrue
-        $channel.AuthenticationProfileId | Should -Be $profile.Id
+        $channel.PSObject.Properties.Name | Should -Not -Contain 'AuthenticationProfileId'
         $channel.ToRecipients | Should -Contain 'security@example.com'
         $channel.CcRecipients | Should -Contain 'audit@example.com'
     }

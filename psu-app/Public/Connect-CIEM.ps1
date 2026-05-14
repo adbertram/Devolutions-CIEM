@@ -18,9 +18,9 @@ function Connect-CIEM {
         to the default provider defined in the database.
 
     .PARAMETER AuthenticationProfile
-        Optional. A pre-resolved authentication profile object to pass to the
-        provider connector (e.g., CIEMAzureAuthenticationProfile). If not
-        provided, the connector looks up the active profile automatically.
+        Optional. A pre-resolved generic authentication profile object to pass to
+        the provider connector. If not provided, the provider discovery
+        assignment is resolved from Authentication Profiles.
 
     .PARAMETER Force
         Force re-authentication even if already connected.
@@ -117,7 +117,12 @@ function Connect-CIEM {
 
         Write-CIEMLog -Message "Calling $connectorName..." -Severity INFO -Component 'Connect-CIEM'
         $connectorParams = @{}
-        if ($AuthenticationProfile) { $connectorParams.AuthenticationProfile = $AuthenticationProfile }
+        if ($AuthenticationProfile) {
+            $connectorParams.AuthenticationProfile = $AuthenticationProfile
+        }
+        else {
+            $connectorParams.AuthenticationProfile = GetCIEMAssignedAuthenticationProfile -UsageType 'ProviderDiscovery' -UsageId $p
+        }
         $authContext = & $connectorCmd @connectorParams
         $script:AuthContext[$providerKey] = $authContext
 

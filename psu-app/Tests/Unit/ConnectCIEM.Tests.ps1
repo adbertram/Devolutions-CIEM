@@ -19,8 +19,24 @@ Describe 'Connect-CIEM' {
                 $script:AuthContext = @{}
             }
             Mock -ModuleName Devolutions.CIEM Get-CIEMProvider { [PSCustomObject]@{ Name = 'Azure'; Enabled = $true } }
-            # Mock Connect-CIEMAzure directly — Get-Command will find the mock function
+            Mock -ModuleName Devolutions.CIEM GetCIEMAssignedAuthenticationProfile {
+                [PSCustomObject]@{
+                    Id       = 'test-auth-profile'
+                    Name     = 'Test Azure'
+                    Provider = 'Azure'
+                    Method   = 'ServicePrincipalSecret'
+                    Settings = [PSCustomObject]@{
+                        TenantId = 'test-tenant'
+                        ClientId = 'test-client-id'
+                    }
+                    Secrets  = [PSCustomObject]@{
+                        ClientSecret = 'test-secret'
+                    }
+                }
+            }
             Mock -ModuleName Devolutions.CIEM Connect-CIEMAzure {
+                param($AuthenticationProfile)
+
                 [PSCustomObject]@{
                     AccountId       = 'test-client-id'
                     AccountType     = 'ServicePrincipal'
@@ -44,7 +60,26 @@ Describe 'Connect-CIEM' {
                 $script:AuthContext = @{}
             }
             Mock -ModuleName Devolutions.CIEM Get-CIEMProvider { [PSCustomObject]@{ Name = 'Azure'; Enabled = $true } }
-            Mock -ModuleName Devolutions.CIEM Connect-CIEMAzure { throw 'Authentication failed: invalid client secret' }
+            Mock -ModuleName Devolutions.CIEM GetCIEMAssignedAuthenticationProfile {
+                [PSCustomObject]@{
+                    Id       = 'test-auth-profile'
+                    Name     = 'Test Azure'
+                    Provider = 'Azure'
+                    Method   = 'ServicePrincipalSecret'
+                    Settings = [PSCustomObject]@{
+                        TenantId = 'test-tenant'
+                        ClientId = 'test-client-id'
+                    }
+                    Secrets  = [PSCustomObject]@{
+                        ClientSecret = 'test-secret'
+                    }
+                }
+            }
+            Mock -ModuleName Devolutions.CIEM Connect-CIEMAzure {
+                param($AuthenticationProfile)
+
+                throw 'Authentication failed: invalid client secret'
+            }
         }
 
         It 'throws the connector error' {

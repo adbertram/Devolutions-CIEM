@@ -4,15 +4,16 @@ function Connect-CIEMAzure {
         Establishes Azure authentication for CIEM scans.
 
     .DESCRIPTION
-        Reads the active authentication profile, resolves credentials from PSU
-        secrets, acquires ARM/Graph/KeyVault tokens, and populates the
+        Reads the assigned generic authentication profile, resolves credentials
+        from PSU secrets, acquires ARM/Graph/KeyVault tokens, and populates the
         module-scoped AzureAuthContext.
 
         Supported methods: ServicePrincipalSecret, ServicePrincipalCertificate, ManagedIdentity.
 
     .PARAMETER AuthenticationProfile
-        Optional. A pre-resolved CIEMAzureAuthenticationProfile object (with secrets).
-        If not provided, the active profile is looked up automatically.
+        Optional. A pre-resolved generic authentication profile object with
+        secrets. If not provided, the Azure provider discovery assignment is
+        resolved from Authentication Profiles.
 
     .OUTPUTS
         [PSCustomObject] Auth context with TenantId, SubscriptionIds, AccountId, AccountType, ConnectedAt.
@@ -25,9 +26,7 @@ function Connect-CIEMAzure {
     [OutputType([PSCustomObject])]
     param(
         [Parameter()]
-        [object]$AuthenticationProfile = (
-            @(Get-CIEMAzureAuthenticationProfile -IsActive $true -ResolveSecrets) | Select-Object -First 1
-        )
+        [object]$AuthenticationProfile
     )
 
     $ErrorActionPreference = 'Stop'
@@ -42,22 +41,29 @@ function Connect-CIEMAzure {
     }
 
     # 2. Validate the authentication profile
-    $profile = $AuthenticationProfile
-    if (-not $profile) {
-        throw "No active Azure authentication profile found. Configure one on the Configuration page."
+    $profile = if ($AuthenticationProfile) {
+        $AuthenticationProfile
+    }
+    else {
+        GetCIEMAssignedAuthenticationProfile -UsageType 'ProviderDiscovery' -UsageId 'Azure'
+    }
+    if ($profile.Provider -ne 'Azure') {
+        throw "Authentication profile '$($profile.Id)' must have provider Azure."
     }
 
     Write-CIEMLog -Message "Using profile '$($profile.Name)' (method: $($profile.Method))" -Severity INFO -Component 'Connect-CIEMAzure'
+    $settings = $profile.Settings
+    $secrets = $profile.Secrets
 
     # 3. Create auth context and populate from profile
     $ctx = [CIEMAzureAuthContext]::new()
     $ctx.ProfileId = $profile.Id
     $ctx.ProfileName = $profile.Name
-    $ctx.ProviderId = $profile.ProviderId
+    $ctx.ProviderId = $azureProvider.Id
     $ctx.Method = $profile.Method
-    $ctx.TenantId = $profile.TenantId
-    $ctx.ClientId = $profile.ClientId
-    $ctx.ManagedIdentityClientId = $profile.ManagedIdentityClientId
+    $ctx.TenantId = $settings.TenantId
+    $ctx.ClientId = $settings.ClientId
+    $ctx.ManagedIdentityClientId = $settings.ManagedIdentityClientId
 
     # Set module-scoped context early so token assignments work
     $script:AzureAuthContext = $ctx
@@ -82,56 +88,60 @@ function Connect-CIEMAzure {
     switch ($profile.Method) {
         'ServicePrincipalSecret' {
             Write-CIEMLog -Message "Processing ServicePrincipalSecret authentication via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Write-CIEMLog -Message "ClientSecret resolved: $(if($profile.ClientSecret){'yes'}else{'no'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            Write-CIEMLog -Message "ClientSecret resolved: $(if($secrets.ClientSecret){'yes'}else{'no'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
-            if (-not $profile.ClientId -or -not $profile.ClientSecret -or -not $profile.TenantId) {
+            if (-not $settings.ClientId -or -not $secrets.ClientSecret -or -not $settings.TenantId) {
                 $ctx.LastError = "Missing credentials for ServicePrincipalSecret"
                 throw @"
 Authentication method is 'ServicePrincipalSecret' but credentials not found.
 
 Credential sources:
-  TenantId: Profile -> $($profile.TenantId) $(if($profile.TenantId){'[FOUND]'}else{'[MISSING]'})
-  ClientId: Profile -> $($profile.ClientId) $(if($profile.ClientId){'[FOUND]'}else{'[MISSING]'})
-  ClientSecret: Profile (resolved) $(if($profile.ClientSecret){'[FOUND]'}else{'[MISSING]'})
+  TenantId: Profile -> $($settings.TenantId) $(if($settings.TenantId){'[FOUND]'}else{'[MISSING]'})
+  ClientId: Profile -> $($settings.ClientId) $(if($settings.ClientId){'[FOUND]'}else{'[MISSING]'})
+  ClientSecret: Profile (resolved) $(if($secrets.ClientSecret){'[FOUND]'}else{'[MISSING]'})
 
 $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are not available." })
 "@
             }
 
-            $tokenUrl = "https://login.microsoftonline.com/$($profile.TenantId)/oauth2/v2.0/token"
+            $tokenUrl = "https://login.microsoftonline.com/$($settings.TenantId)/oauth2/v2.0/token"
 
             $getToken = {
                 param([string]$Scope)
                 $body = @{
-                    client_id     = $profile.ClientId
+                    client_id     = $settings.ClientId
                     scope         = $Scope
-                    client_secret = $profile.ClientSecret
+                    client_secret = $secrets.ClientSecret
                     grant_type    = 'client_credentials'
                 }
                 Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
             }
 
-            $ctx.AccountId = $profile.ClientId
+            $ctx.AccountId = $settings.ClientId
             $ctx.AccountType = 'ServicePrincipal'
         }
         'ServicePrincipalCertificate' {
             Write-CIEMLog -Message "Processing ServicePrincipalCertificate authentication..." -Severity INFO -Component 'Connect-CIEMAzure'
-            Write-CIEMLog -Message "Certificate resolved: $(if($profile.Certificate){'yes'}else{'no'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
+            Write-CIEMLog -Message "Certificate resolved: $(if($secrets.CertificatePfx){'yes'}else{'no'})" -Severity DEBUG -Component 'Connect-CIEMAzure'
 
-            if (-not $profile.ClientId -or -not $profile.TenantId) {
+            if (-not $settings.ClientId -or -not $settings.TenantId) {
                 $ctx.LastError = "Missing TenantId or ClientId for ServicePrincipalCertificate"
                 throw "Authentication method is 'ServicePrincipalCertificate' but tenantId or clientId not found in profile"
             }
 
-            if (-not $profile.Certificate) {
+            if (-not $secrets.CertificatePfx) {
                 $ctx.LastError = "PFX certificate not found or failed to load"
-                throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Configuration page."
+                throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Authentication Profiles page."
             }
 
+            $certificateBytes = [Convert]::FromBase64String([string]$secrets.CertificatePfx)
+            $certificatePassword = $secrets.CertificatePassword
+            $certificateStorageFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certificateBytes, $certificatePassword, $certificateStorageFlags)
+
             # Build client assertion JWT signed with certificate
-            Write-CIEMLog -Message "Building client assertion JWT with certificate (thumbprint: $($profile.Certificate.Thumbprint))..." -Severity INFO -Component 'Connect-CIEMAzure'
-            $cert = $profile.Certificate
-            $tokenUrl = "https://login.microsoftonline.com/$($profile.TenantId)/oauth2/v2.0/token"
+            Write-CIEMLog -Message "Building client assertion JWT with certificate (thumbprint: $($cert.Thumbprint))..." -Severity INFO -Component 'Connect-CIEMAzure'
+            $tokenUrl = "https://login.microsoftonline.com/$($settings.TenantId)/oauth2/v2.0/token"
 
             # JWT header with x5t (base64url-encoded SHA-1 thumbprint)
             $thumbprintBytes = [byte[]]::new($cert.Thumbprint.Length / 2)
@@ -143,8 +153,8 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $now = [DateTimeOffset]::UtcNow
             $jwtPayload = @{
                 aud = $tokenUrl
-                iss = $profile.ClientId
-                sub = $profile.ClientId
+                iss = $settings.ClientId
+                sub = $settings.ClientId
                 jti = [guid]::NewGuid().ToString()
                 nbf = $now.ToUnixTimeSeconds()
                 exp = $now.AddMinutes(10).ToUnixTimeSeconds()
@@ -164,7 +174,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
             $getToken = {
                 param([string]$Scope)
                 $body = @{
-                    client_id             = $profile.ClientId
+                    client_id             = $settings.ClientId
                     scope                 = $Scope
                     client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
                     client_assertion      = $clientAssertion
@@ -173,13 +183,13 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
                 Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType 'application/x-www-form-urlencoded' -ErrorAction Stop
             }
 
-            $ctx.AccountId = $profile.ClientId
+            $ctx.AccountId = $settings.ClientId
             $ctx.AccountType = 'ServicePrincipal'
         }
         'ManagedIdentity' {
             Write-CIEMLog -Message "Processing ManagedIdentity authentication via REST API..." -Severity INFO -Component 'Connect-CIEMAzure'
 
-            $miClientId = $profile.ManagedIdentityClientId
+            $miClientId = $settings.ManagedIdentityClientId
             if ($miClientId) {
                 Write-CIEMLog -Message "Using user-assigned managed identity: $miClientId" -Severity INFO -Component 'Connect-CIEMAzure'
             } else {

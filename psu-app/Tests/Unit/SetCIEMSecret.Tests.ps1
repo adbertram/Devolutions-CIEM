@@ -45,3 +45,33 @@ Describe 'Set-CIEMSecret' {
         }
     }
 }
+
+Describe 'Remove-CIEMSecret' {
+
+    Context 'when not in PSU context (Secret: drive absent)' {
+
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM Get-PSDrive { $null } -ParameterFilter { $Name -eq 'Secret' }
+        }
+
+        It 'throws indicating PSU context is required' {
+            { Remove-CIEMSecret -Name 'TestSecret' } | Should -Throw '*Not running in PSU context*'
+        }
+    }
+
+    Context 'when in PSU context' {
+
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM Get-PSDrive { [PSCustomObject]@{ Name = 'Secret' } } -ParameterFilter { $Name -eq 'Secret' }
+            Mock -ModuleName Devolutions.CIEM Remove-PSUVariable {}
+        }
+
+        It 'removes the PSU variable and backing secret' {
+            Remove-CIEMSecret -Name 'TestSecret'
+
+            Should -Invoke -CommandName Remove-PSUVariable -ModuleName Devolutions.CIEM -Times 1 -Exactly -ParameterFilter {
+                $Name -eq 'TestSecret' -and $RemoveSecret
+            }
+        }
+    }
+}

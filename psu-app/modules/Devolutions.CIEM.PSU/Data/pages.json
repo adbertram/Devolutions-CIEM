@@ -104,13 +104,26 @@
     }
   },
   {
+    "name": "Authentication Profiles",
+    "route": "/authentication-profiles",
+    "title": "Authentication Profiles",
+    "subtitle": "Reusable provider and notification connection profiles",
+    "icon": "Key",
+    "factory": "New-CIEMAuthenticationProfilesPage",
+    "order": 90,
+    "test": {
+      "expectedColumns": [],
+      "smokeSelector": "h4:has-text('Authentication Profiles')"
+    }
+  },
+  {
     "name": "Configuration",
     "route": "/config",
     "title": "Configuration",
-    "subtitle": "Provider authentication and CIEM settings",
+    "subtitle": "Scheduled discovery and notification settings",
     "icon": "Cog",
     "factory": "New-CIEMConfigPage",
-    "order": 90,
+    "order": 100,
     "test": {
       "expectedColumns": [],
       "smokeSelector": "h4:has-text('Configuration')"
@@ -123,7 +136,7 @@
     "subtitle": "CIEM module and runtime information",
     "icon": "InfoCircle",
     "factory": "New-CIEMAboutPage",
-    "order": 100,
+    "order": 110,
     "test": {
       "expectedColumns": [],
       "smokeSelector": "h4:has-text('About Devolutions CIEM')"

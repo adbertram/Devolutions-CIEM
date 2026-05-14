@@ -8,6 +8,15 @@ BeforeAll {
 }
 
 Describe 'Connect-CIEMAzure' {
+    BeforeEach {
+        Mock -ModuleName Devolutions.CIEM Write-CIEMLog {}
+        Mock -ModuleName Devolutions.CIEM Get-CIEMProvider {
+            [pscustomobject]@{
+                Id             = 'provider-azure'
+                ResourceFilter = @('sub-enabled')
+            }
+        }
+    }
 
     Context 'Az cmdlets removed from source' {
         It 'Does not contain Clear-AzContext' {
@@ -82,6 +91,111 @@ Describe 'Connect-CIEMAzure' {
 
         It 'does not reference CIEMAzureAuthenticationProfile in the public parameter declaration' {
             $script:ConnectSource | Should -Not -Match '\[CIEMAzureAuthenticationProfile\]\$AuthenticationProfile'
+        }
+    }
+
+    Context 'Runtime authentication paths' {
+        It 'throws clearly when ServicePrincipalSecret has no resolved client secret' {
+            $profile = [pscustomobject]@{
+                Id       = 'azure-sp'
+                Name     = 'Azure SP'
+                Provider = 'Azure'
+                Method   = 'ServicePrincipalSecret'
+                Settings = [pscustomobject]@{
+                    TenantId = '11111111-1111-1111-1111-111111111111'
+                    ClientId = '22222222-2222-2222-2222-222222222222'
+                }
+                Secrets  = [pscustomobject]@{}
+            }
+
+            { Connect-CIEMAzure -AuthenticationProfile $profile } | Should -Throw '*ClientSecret*Profile (resolved)*MISSING*'
+        }
+
+        It 'throws the upload guidance error when ServicePrincipalCertificate has no PFX certificate' {
+            $profile = [pscustomobject]@{
+                Id       = 'azure-cert'
+                Name     = 'Azure Certificate'
+                Provider = 'Azure'
+                Method   = 'ServicePrincipalCertificate'
+                Settings = [pscustomobject]@{
+                    TenantId = '11111111-1111-1111-1111-111111111111'
+                    ClientId = '22222222-2222-2222-2222-222222222222'
+                }
+                Secrets  = [pscustomobject]@{}
+            }
+
+            { Connect-CIEMAzure -AuthenticationProfile $profile } | Should -Throw '*Upload a PFX file on the Authentication Profiles page*'
+        }
+
+        It 'throws clearly when ManagedIdentity environment variables are missing' {
+            $originalEndpoint = $env:IDENTITY_ENDPOINT
+            $originalHeader = $env:IDENTITY_HEADER
+            Remove-Item Env:\IDENTITY_ENDPOINT -ErrorAction SilentlyContinue
+            Remove-Item Env:\IDENTITY_HEADER -ErrorAction SilentlyContinue
+            try {
+                $profile = [pscustomobject]@{
+                    Id       = 'azure-msi'
+                    Name     = 'Azure Managed Identity'
+                    Provider = 'Azure'
+                    Method   = 'ManagedIdentity'
+                    Settings = [pscustomobject]@{}
+                    Secrets  = [pscustomobject]@{}
+                }
+
+                { Connect-CIEMAzure -AuthenticationProfile $profile } | Should -Throw '*IDENTITY_ENDPOINT and IDENTITY_HEADER must be set*'
+            }
+            finally {
+                if ($null -ne $originalEndpoint) { $env:IDENTITY_ENDPOINT = $originalEndpoint }
+                if ($null -ne $originalHeader) { $env:IDENTITY_HEADER = $originalHeader }
+            }
+        }
+
+        It 'acquires ServicePrincipalSecret tokens and returns only enabled filtered subscriptions' {
+            Mock -ModuleName Devolutions.CIEM Invoke-RestMethod {
+                if ($Uri -match 'login\.microsoftonline\.com') {
+                    return [pscustomobject]@{
+                        access_token = "token:$($Body.scope)"
+                        expires_in   = 3600
+                    }
+                }
+                if ($Uri -match 'management\.azure\.com/subscriptions') {
+                    return [pscustomobject]@{
+                        value = @(
+                            [pscustomobject]@{ subscriptionId = 'sub-enabled'; state = 'Enabled' }
+                            [pscustomobject]@{ subscriptionId = 'sub-disabled'; state = 'Disabled' }
+                            [pscustomobject]@{ subscriptionId = 'sub-unfiltered'; state = 'Enabled' }
+                        )
+                    }
+                }
+                throw "Unexpected URI $Uri"
+            }
+
+            $profile = [pscustomobject]@{
+                Id       = 'azure-sp'
+                Name     = 'Azure SP'
+                Provider = 'Azure'
+                Method   = 'ServicePrincipalSecret'
+                Settings = [pscustomobject]@{
+                    TenantId = '11111111-1111-1111-1111-111111111111'
+                    ClientId = '22222222-2222-2222-2222-222222222222'
+                }
+                Secrets  = [pscustomobject]@{
+                    ClientSecret = 'resolved-secret'
+                }
+            }
+
+            $result = Connect-CIEMAzure -AuthenticationProfile $profile
+
+            $result.TenantId | Should -Be '11111111-1111-1111-1111-111111111111'
+            $result.AccountId | Should -Be '22222222-2222-2222-2222-222222222222'
+            $result.AccountType | Should -Be 'ServicePrincipal'
+            @($result.SubscriptionIds) | Should -Be @('sub-enabled')
+            Should -Invoke -ModuleName Devolutions.CIEM Invoke-RestMethod -Times 3 -ParameterFilter {
+                $Uri -match 'login\.microsoftonline\.com'
+            }
+            Should -Invoke -ModuleName Devolutions.CIEM Invoke-RestMethod -Times 1 -ParameterFilter {
+                $Uri -match 'management\.azure\.com/subscriptions'
+            }
         }
     }
 }

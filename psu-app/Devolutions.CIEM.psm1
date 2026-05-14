@@ -143,8 +143,6 @@ $script:PSUEnvironment = $null
 $script:DatabasePath = $null
 # Azure
 $script:AzureAuthContext = $null  # [CIEMAzureAuthContext] — set by Connect-CIEMAzure
-$script:AzureAuthProfilesCacheKey = 'CIEM:AuthProfiles:Azure'
-$script:AWSAuthProfileCacheKey    = 'CIEM:AuthProfile:AWS'
 $script:CIEMConfigCacheKey        = 'CIEM:Config'
 $script:ScanConfigCacheKey        = 'CIEM:ScanConfig'
 # AWS
@@ -205,6 +203,7 @@ foreach ($dir in $exportDirs) {
 }
 
 $exportFunctions += @(GetCIEMPSUPageRegistry | ForEach-Object { [string]$_.factory })
+$exportFunctions += 'New-CIEMAuthenticationProfileFieldControls'
 $exportFunctions = @($exportFunctions | Sort-Object -Unique)
 
 Write-CIEMLog -Message "Exporting $($exportFunctions.Count) functions" -Component 'ModuleInit'

@@ -502,8 +502,8 @@ try {
         $runtimeScript = @"
 `$moduleInfo = Get-Module Devolutions.CIEM | Select-Object Name, Version, Path
 `$installedEnvironment = Get-PSUInstalledEnvironment
-`$profiles = @(Get-CIEMAzureAuthenticationProfile) | Select-Object Id, Name, Method, IsActive, TenantId, ClientId
-`$activeProfile = `$profiles | Where-Object IsActive | Select-Object -First 1
+`$profiles = @(Get-CIEMAuthenticationProfile) | Select-Object Id, Name, Provider, Method, Settings, SecretRefs, Assignments
+`$azureDiscoveryAssignment = Get-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure'
 `$variableNames = @(
     @(Get-PSUVariable | Where-Object Name -like 'CIEM_Azure*' | Select-Object -ExpandProperty Name)
     @(Get-PSUVariable -Name 'azure-sp-cert_CertPfx' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)
@@ -515,7 +515,7 @@ try {
     InstalledEnvironment = `$installedEnvironment
     Module               = `$moduleInfo
     AuthProfiles         = `$profiles
-    ActiveProfile        = `$activeProfile
+    AzureDiscoveryAuth   = `$azureDiscoveryAssignment
     VariableNames        = `$variableNames
     JobStatusCounts      = @(`$jobs | Group-Object Status | Sort-Object Name | Select-Object Name, Count)
     Jobs                 = `$jobs

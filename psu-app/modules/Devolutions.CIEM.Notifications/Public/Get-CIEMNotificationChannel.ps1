@@ -9,7 +9,7 @@ function Get-CIEMNotificationChannel {
     $ErrorActionPreference = 'Stop'
 
     $query = @"
-SELECT id, name, type, enabled, authentication_profile_id, from_address,
+SELECT id, name, type, enabled, from_address,
        to_recipients_json, cc_recipients_json, bcc_recipients_json,
        created_at, updated_at
 FROM notification_channels
@@ -30,7 +30,6 @@ FROM notification_channels
             Name                    = [string]$row.name
             Type                    = [string]$row.type
             Enabled                 = [bool]([int]$row.enabled)
-            AuthenticationProfileId = [string]$row.authentication_profile_id
             FromAddress             = [string]$row.from_address
             ToRecipients            = [string[]]@(ConvertFromCIEMNotificationJsonArray -Json ([string]$row.to_recipients_json))
             CcRecipients            = [string[]]@(ConvertFromCIEMNotificationJsonArray -Json ([string]$row.cc_recipients_json))

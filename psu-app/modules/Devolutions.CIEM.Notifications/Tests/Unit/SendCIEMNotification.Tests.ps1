@@ -47,8 +47,13 @@ VALUES (
     }
 
     function InitializeTestNotificationConfiguration {
-        $profile = Set-CIEMNotificationAuthenticationProfile -Name 'SMTP Relay' -Method 'SmtpAnonymous' -Host 'smtp-relay.example.com' -Port 25 -TlsMode 'None'
-        Set-CIEMNotificationChannel -Enabled $true -AuthenticationProfileId $profile.Id -FromAddress 'ciem@example.com' -ToRecipients @('security@example.com') | Out-Null
+        $profile = Save-CIEMAuthenticationProfile -Name 'SMTP Relay' -Provider 'Email' -Method 'SmtpAnonymous' -Settings @{
+            Host = 'smtp-relay.example.com'
+            Port = 25
+            TlsMode = 'None'
+        } -SecretRefs @{}
+        Set-CIEMAuthenticationProfileAssignment -UsageType 'NotificationChannel' -UsageId 'email-default' -AuthenticationProfileId $profile.Id | Out-Null
+        Set-CIEMNotificationChannel -Enabled $true -FromAddress 'ciem@example.com' -ToRecipients @('security@example.com') | Out-Null
         Set-CIEMNotification -Enabled $true -AutoSendScope 'AnyDiscovery' -ChangeTypes @('NewRisk', 'RiskIncrease') -MinimumSeverity 'High' -SubjectTemplate '[CIEM] {{Severity}} {{Title}}' -TextBodyTemplate 'Text {{Title}} {{Evidence}}' -HtmlBodyTemplate '<p>HTML {{Title}} {{Evidence}}</p>' | Out-Null
     }
 }
@@ -62,7 +67,8 @@ Describe 'Send-CIEMNotification' {
         Invoke-CIEMQuery -Query 'DELETE FROM notification_history' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM notifications' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM notification_channels' -AsNonQuery | Out-Null
-        Invoke-CIEMQuery -Query 'DELETE FROM notification_authentication_profiles' -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query 'DELETE FROM authentication_profile_assignments' -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query 'DELETE FROM authentication_profiles' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM ciem_exposure_changes' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM azure_discovery_runs' -AsNonQuery | Out-Null
     }
@@ -110,8 +116,13 @@ Describe 'Send-CIEMNotification' {
     }
 
     It 'does not send when invocation source is excluded by auto-send scope' {
-        $profile = Set-CIEMNotificationAuthenticationProfile -Name 'SMTP Relay' -Method 'SmtpAnonymous' -Host 'smtp-relay.example.com' -Port 25 -TlsMode 'None'
-        Set-CIEMNotificationChannel -Enabled $true -AuthenticationProfileId $profile.Id -FromAddress 'ciem@example.com' -ToRecipients @('security@example.com') | Out-Null
+        $profile = Save-CIEMAuthenticationProfile -Name 'SMTP Relay' -Provider 'Email' -Method 'SmtpAnonymous' -Settings @{
+            Host = 'smtp-relay.example.com'
+            Port = 25
+            TlsMode = 'None'
+        } -SecretRefs @{}
+        Set-CIEMAuthenticationProfileAssignment -UsageType 'NotificationChannel' -UsageId 'email-default' -AuthenticationProfileId $profile.Id | Out-Null
+        Set-CIEMNotificationChannel -Enabled $true -FromAddress 'ciem@example.com' -ToRecipients @('security@example.com') | Out-Null
         Set-CIEMNotification -Enabled $true -AutoSendScope 'ScheduledDiscovery' -ChangeTypes @('NewRisk') -MinimumSeverity 'High' -SubjectTemplate '[CIEM] {{Title}}' -TextBodyTemplate 'Text {{Title}}' -HtmlBodyTemplate '<p>{{Title}}</p>' | Out-Null
         $run = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-12T12:00:00Z' -CompletedAt '2026-05-12T12:10:00Z'
         AddTestExposureChange -RunId $run.Id -Id 'critical-manual' -ChangeType 'NewRisk' -Severity 'Critical' -SeverityRank 1 -Title 'Critical manual risk'
@@ -120,5 +131,77 @@ Describe 'Send-CIEMNotification' {
 
         $result.SentCount | Should -Be 0
         Should -Invoke -CommandName SendCIEMEmailMessage -ModuleName Devolutions.CIEM -Times 0 -Exactly
+    }
+}
+
+Describe 'SendCIEMEmailMessage' {
+    BeforeEach {
+        $script:EmailProfile = [pscustomobject]@{
+            Id         = 'email-profile'
+            Provider   = 'Email'
+            Method     = 'SmtpAnonymous'
+            Settings   = [pscustomobject]@{
+                Host    = 'smtp.example.com'
+                Port    = 25
+                TlsMode = 'None'
+            }
+            Secrets    = [pscustomobject]@{}
+            SecretRefs = [pscustomobject]@{}
+        }
+        $script:EmailChannel = [pscustomobject]@{
+            Id            = 'email-default'
+            Type          = 'Email'
+            FromAddress   = 'ciem@example.com'
+            ToRecipients  = @('security@example.com')
+            CcRecipients  = @()
+            BccRecipients = @()
+        }
+    }
+
+    It 'rejects non-Email authentication profiles before sending' {
+        $script:EmailProfile.Provider = 'Azure'
+
+        {
+            InModuleScope Devolutions.CIEM -Parameters @{ Profile = $script:EmailProfile; Channel = $script:EmailChannel } {
+                param($Profile, $Channel)
+                SendCIEMEmailMessage -AuthenticationProfile $Profile -Channel $Channel -Subject 'Subject' -TextBody 'Text' -HtmlBody '<p>Text</p>'
+            }
+        } | Should -Throw "*must have provider Email*"
+    }
+
+    It 'rejects non-Email notification channels before sending' {
+        $script:EmailChannel.Type = 'Slack'
+
+        {
+            InModuleScope Devolutions.CIEM -Parameters @{ Profile = $script:EmailProfile; Channel = $script:EmailChannel } {
+                param($Profile, $Channel)
+                SendCIEMEmailMessage -AuthenticationProfile $Profile -Channel $Channel -Subject 'Subject' -TextBody 'Text' -HtmlBody '<p>Text</p>'
+            }
+        } | Should -Throw "*must be type Email*"
+    }
+
+    It 'rejects unsupported TLS modes before sending' {
+        $script:EmailProfile.Settings.TlsMode = 'BogusTls'
+
+        {
+            InModuleScope Devolutions.CIEM -Parameters @{ Profile = $script:EmailProfile; Channel = $script:EmailChannel } {
+                param($Profile, $Channel)
+                SendCIEMEmailMessage -AuthenticationProfile $Profile -Channel $Channel -Subject 'Subject' -TextBody 'Text' -HtmlBody '<p>Text</p>'
+            }
+        } | Should -Throw "*Unsupported SMTP TLS mode 'BogusTls'*"
+    }
+
+    It 'rejects SmtpBasic profiles when the resolved password is empty' {
+        $script:EmailProfile.Method = 'SmtpBasic'
+        $script:EmailProfile.Settings | Add-Member -NotePropertyName Username -NotePropertyValue 'alerts@example.com'
+        $script:EmailProfile.Secrets | Add-Member -NotePropertyName Password -NotePropertyValue ''
+        $script:EmailProfile.SecretRefs | Add-Member -NotePropertyName Password -NotePropertyValue 'CIEM_AuthProfile_email_Password'
+
+        {
+            InModuleScope Devolutions.CIEM -Parameters @{ Profile = $script:EmailProfile; Channel = $script:EmailChannel } {
+                param($Profile, $Channel)
+                SendCIEMEmailMessage -AuthenticationProfile $Profile -Channel $Channel -Subject 'Subject' -TextBody 'Text' -HtmlBody '<p>Text</p>'
+            }
+        } | Should -Throw "*did not return a password*"
     }
 }

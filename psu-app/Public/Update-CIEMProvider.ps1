@@ -7,8 +7,8 @@ function Update-CIEMProvider {
         Modifies properties of a provider in the CIEM SQLite database.
         Only specified parameters are updated; unspecified ones are preserved.
 
-        Authentication context is managed separately via provider-specific
-        functions (e.g., *-CIEMAzureAuthenticationProfile).
+        Authentication context is managed separately via generic authentication
+        profile assignments.
 
     .PARAMETER Name
         Provider name to update (case-insensitive).

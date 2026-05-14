@@ -62,6 +62,7 @@ function New-CIEMDatabase {
     }
 
     $isNew = -not (Test-Path $Path)
+    $script:DatabasePath = $Path
 
     # Read and execute schema SQL. The schema MUST be fully idempotent — every
     # CREATE TABLE / CREATE INDEX uses IF NOT EXISTS, and ALTER TABLE migrations
@@ -82,9 +83,6 @@ function New-CIEMDatabase {
     } else {
         Write-Verbose "CIEM DB: Database at $Path is up to date"
     }
-
-    # Store path in module scope for other functions
-    $script:DatabasePath = $Path
 
     foreach ($schema in @(
         @{ Path = Join-Path $script:AzureRoot          'Data/azure_schema.sql';     Label = 'Azure' }

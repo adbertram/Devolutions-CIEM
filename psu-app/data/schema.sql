@@ -75,13 +75,13 @@ CREATE INDEX IF NOT EXISTS idx_scan_results_resource ON scan_results(resource_id
 CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON scan_runs(scan_type);
 
 -- =============================================================================
--- Notification Tables
+-- Authentication Profile Tables
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS notification_authentication_profiles (
+CREATE TABLE IF NOT EXISTS authentication_profiles (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    type TEXT NOT NULL,
+    provider TEXT NOT NULL,
     method TEXT NOT NULL,
     settings_json TEXT NOT NULL,
     secret_refs_json TEXT NOT NULL,
@@ -89,19 +89,34 @@ CREATE TABLE IF NOT EXISTS notification_authentication_profiles (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS authentication_profile_assignments (
+    usage_type TEXT NOT NULL,
+    usage_id TEXT NOT NULL,
+    authentication_profile_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (usage_type, usage_id),
+    FOREIGN KEY (authentication_profile_id) REFERENCES authentication_profiles(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_profile_provider ON authentication_profiles(provider, method);
+CREATE INDEX IF NOT EXISTS idx_auth_profile_assignment_profile ON authentication_profile_assignments(authentication_profile_id);
+
+-- =============================================================================
+-- Notification Tables
+-- =============================================================================
+
 CREATE TABLE IF NOT EXISTS notification_channels (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     type TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 0,
-    authentication_profile_id TEXT NOT NULL,
     from_address TEXT NOT NULL,
     to_recipients_json TEXT NOT NULL,
     cc_recipients_json TEXT NOT NULL,
     bcc_recipients_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    FOREIGN KEY (authentication_profile_id) REFERENCES notification_authentication_profiles(id) ON DELETE RESTRICT
+    updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_notification_channels_enabled ON notification_channels(enabled);
@@ -171,4 +186,6 @@ INSERT OR IGNORE INTO provider_auth_methods (provider, method, display_name, sor
 ('Azure', 'ServicePrincipalCertificate', 'Service Principal (Certificate)', 2),
 ('Azure', 'ManagedIdentity', 'Managed Identity', 3),
 ('AWS', 'CurrentProfile', 'Current Profile', 1),
-('AWS', 'AccessKey', 'Access Key', 2);
+('AWS', 'AccessKey', 'Access Key', 2),
+('Email', 'SmtpAnonymous', 'SMTP Anonymous', 1),
+('Email', 'SmtpBasic', 'SMTP Basic', 2);

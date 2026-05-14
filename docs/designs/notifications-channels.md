@@ -6,7 +6,7 @@ CIEM can detect exposure changes, but it has no built-in way to notify users out
 
 ## Technical Plan
 
-The feature adds a `Devolutions.CIEM.Notifications` module area with notification-specific classes, database-backed CRUD commands, SMTP rendering/sending logic, and Configuration page controls. The Email channel points to a `NotificationAuthenticationProfile`, so SMTP server/auth settings live in a profile and recipient routing lives in the channel. `Send-CIEMNotification` reads the single enabled Exposure Change notification, filters exposure changes, renders text and HTML bodies, sends through the enabled Email channel, and records simple rows in `notification_history`.
+The feature adds a `Devolutions.CIEM.Notifications` module area with notification-specific classes, database-backed CRUD commands, SMTP rendering/sending logic, and Configuration page controls. The Email channel uses the generic authentication profile assignment model, so SMTP server/auth settings live in an `Email` authentication profile and recipient routing lives in the channel. `Send-CIEMNotification` reads the single enabled Exposure Change notification, filters exposure changes, renders text and HTML bodies, sends through the enabled Email channel, and records simple rows in `notification_history`.
 
 ```mermaid
 flowchart LR
@@ -14,7 +14,7 @@ flowchart LR
     Changes --> Send["Send-CIEMNotification"]
     Config["Configuration Page"] --> Notification["Notification Template"]
     Config --> Channel["Email Channel"]
-    Config --> AuthProfile["Notification Auth Profile"]
+    Config --> AuthProfile["Email Auth Profile"]
     Notification --> Send
     Channel --> Send
     AuthProfile --> Send
@@ -24,7 +24,7 @@ flowchart LR
 
 ## Alternatives Considered
 
-Generic authentication profiles for Azure, AWS, and notifications were considered. That would reduce conceptual duplication, but Azure and AWS currently use different cache-backed profile models and broad migration would expand the feature. V1 will add `CIEMNotificationAuthenticationProfile` only and leave existing provider auth unchanged.
+Provider-specific authentication profile models were replaced by a single generic profile and assignment model for Azure, AWS, and Email. This is a cutover design for new deployments; legacy notification authentication storage is not migrated.
 
 A delivery-attempt class was considered for history. The chosen design stores history as simple rows and returns PSCustomObjects because delivery history is audit data, not a domain object requiring class behavior.
 
@@ -39,13 +39,13 @@ Rationale: Durable design record for the notification subsystem and its explicit
 Rationale: Register `Devolutions.CIEM.Notifications` so classes and public/private commands are loaded.
 
 **`psu-app/data/schema.sql`** - modified  
-Rationale: Add idempotent notification auth profile, channel, notification, and history tables.
+Rationale: Add idempotent generic authentication profile, assignment, notification channel, notification, and history tables.
 
 **`psu-app/modules/Devolutions.CIEM.Notifications/**`** - created  
 Rationale: New module root for notification classes, public CRUD commands, send command, and private helpers.
 
 **`psu-app/modules/Devolutions.CIEM.PSU/Pages/New-CIEMConfigPage.ps1`** - modified  
-Rationale: Add Notifications UI section for auth profile, channel recipients, notification filters/templates, test email, and delivery history.
+Rationale: Keep notification routing, filters, templates, test email, and delivery history on Configuration while moving authentication profile management to the Authentication Profiles page.
 
 **`psu-app/modules/Devolutions.CIEM.PSU/Tests/Unit/PageCommandQualification.Tests.ps1`** - modified  
 Rationale: Permit new notification commands used from PSU page endpoints, while still enforcing module qualification.
@@ -57,6 +57,6 @@ Rationale: Pester coverage for schema, class structure, CRUD behavior, send beha
 Rationale: Add selectors and helper methods for the Notifications section.
 
 **`psu-app/ui/e2e/pages/Configuration/Configuration.test.js`** - modified  
-Rationale: Add Configuration page coverage for notification fields, auth method-driven inputs, test email action, and history table visibility.
+Rationale: Cover notification routing fields, test email action, and history table visibility.
 
 Ordering: tests are written and run before implementation; implementation then updates schema, module root, notification commands, Configuration UI, and discovery wiring. If an implementation discovery requires additional files, update this design before adding them.

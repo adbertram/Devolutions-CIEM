@@ -1,0 +1,72 @@
+[
+  {
+    "provider": "Azure",
+    "method": "ServicePrincipalSecret",
+    "displayName": "Service Principal (Secret)",
+    "fields": [
+      { "name": "TenantId", "label": "Tenant ID", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "ClientId", "label": "Client ID", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "ClientSecret", "label": "Client Secret", "kind": "secret", "inputType": "password", "required": true }
+    ]
+  },
+  {
+    "provider": "Azure",
+    "method": "ServicePrincipalCertificate",
+    "displayName": "Service Principal (Certificate)",
+    "fields": [
+      { "name": "TenantId", "label": "Tenant ID", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "ClientId", "label": "Client ID", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "CertificatePfx", "label": "PFX Certificate", "kind": "secret", "inputType": "upload", "required": true },
+      { "name": "CertificatePassword", "label": "Certificate Password", "kind": "secret", "inputType": "password", "required": false }
+    ]
+  },
+  {
+    "provider": "Azure",
+    "method": "ManagedIdentity",
+    "displayName": "Managed Identity",
+    "fields": [
+      { "name": "ManagedIdentityClientId", "label": "Managed Identity Client ID", "kind": "setting", "inputType": "text", "required": false }
+    ]
+  },
+  {
+    "provider": "AWS",
+    "method": "CurrentProfile",
+    "displayName": "Current Profile",
+    "fields": [
+      { "name": "Profile", "label": "AWS Profile", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "Region", "label": "AWS Region", "kind": "setting", "inputType": "text", "required": true }
+    ]
+  },
+  {
+    "provider": "AWS",
+    "method": "AccessKey",
+    "displayName": "Access Key",
+    "fields": [
+      { "name": "Region", "label": "AWS Region", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "AccessKeyId", "label": "Access Key ID", "kind": "secret", "inputType": "password", "required": true },
+      { "name": "SecretAccessKey", "label": "Secret Access Key", "kind": "secret", "inputType": "password", "required": true }
+    ]
+  },
+  {
+    "provider": "Email",
+    "method": "SmtpAnonymous",
+    "displayName": "SMTP Anonymous",
+    "fields": [
+      { "name": "Host", "label": "SMTP Host", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "Port", "label": "SMTP Port", "kind": "setting", "inputType": "number", "required": true },
+      { "name": "TlsMode", "label": "TLS Mode", "kind": "setting", "inputType": "select", "required": true, "options": ["None", "StartTls", "Ssl"] }
+    ]
+  },
+  {
+    "provider": "Email",
+    "method": "SmtpBasic",
+    "displayName": "SMTP Basic",
+    "fields": [
+      { "name": "Host", "label": "SMTP Host", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "Port", "label": "SMTP Port", "kind": "setting", "inputType": "number", "required": true },
+      { "name": "TlsMode", "label": "TLS Mode", "kind": "setting", "inputType": "select", "required": true, "options": ["None", "StartTls", "Ssl"] },
+      { "name": "Username", "label": "Username", "kind": "setting", "inputType": "text", "required": true },
+      { "name": "Password", "label": "Password", "kind": "secret", "inputType": "password", "required": true }
+    ]
+  }
+]
