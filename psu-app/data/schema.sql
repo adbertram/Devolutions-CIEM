@@ -102,6 +102,18 @@ CREATE TABLE IF NOT EXISTS authentication_profile_assignments (
 CREATE INDEX IF NOT EXISTS idx_auth_profile_provider ON authentication_profiles(provider, method);
 CREATE INDEX IF NOT EXISTS idx_auth_profile_assignment_profile ON authentication_profile_assignments(authentication_profile_id);
 
+-- Remove the legacy auto-created Azure Default profile. Auth profiles are user-managed.
+DELETE FROM authentication_profile_assignments
+WHERE usage_type = 'ProviderDiscovery'
+AND usage_id = 'Azure'
+AND authentication_profile_id = 'sp-clientsecret';
+
+DELETE FROM authentication_profiles
+WHERE id = 'sp-clientsecret'
+AND name = 'Default'
+AND provider = 'Azure'
+AND method = 'ServicePrincipalSecret';
+
 -- =============================================================================
 -- Notification Tables
 -- =============================================================================

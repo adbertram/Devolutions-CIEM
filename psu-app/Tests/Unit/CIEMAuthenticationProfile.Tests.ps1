@@ -32,6 +32,49 @@ ORDER BY name
         $assignmentColumns.name | Should -Contain 'usage_id'
         $assignmentColumns.name | Should -Contain 'authentication_profile_id'
     }
+
+    It 'does not seed a Default authentication profile during database initialization' {
+        $profiles = @(Invoke-CIEMQuery -Query 'SELECT id, name FROM authentication_profiles')
+        $assignments = @(Invoke-CIEMQuery -Query 'SELECT usage_type, usage_id FROM authentication_profile_assignments')
+
+        $profiles | Should -HaveCount 0
+        $assignments | Should -HaveCount 0
+    }
+
+    It 'removes the legacy seeded Default Azure authentication profile when database initialization reruns' {
+        Invoke-CIEMQuery -Query @"
+INSERT INTO authentication_profiles (
+    id, name, provider, method, settings_json, secret_refs_json, created_at, updated_at
+)
+VALUES (
+    'sp-clientsecret',
+    'Default',
+    'Azure',
+    'ServicePrincipalSecret',
+    '{"TenantId":"legacy-tenant","ClientId":"legacy-client"}',
+    '{"ClientSecret":"CIEM_Azure_sp-clientsecret_ClientSecret"}',
+    '2026-05-15T00:00:00.0000000Z',
+    '2026-05-15T00:00:00.0000000Z'
+)
+"@ -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query @"
+INSERT INTO authentication_profile_assignments (
+    usage_type, usage_id, authentication_profile_id, created_at, updated_at
+)
+VALUES (
+    'ProviderDiscovery',
+    'Azure',
+    'sp-clientsecret',
+    '2026-05-15T00:00:00.0000000Z',
+    '2026-05-15T00:00:00.0000000Z'
+)
+"@ -AsNonQuery | Out-Null
+
+        New-CIEMDatabase -Path "$TestDrive/ciem.db" | Out-Null
+
+        @(Get-CIEMAuthenticationProfile -Id 'sp-clientsecret') | Should -HaveCount 0
+        @(Get-CIEMAuthenticationProfileAssignment -UsageType 'ProviderDiscovery' -UsageId 'Azure') | Should -HaveCount 0
+    }
 }
 
 Describe 'Generic CIEM authentication profile commands' {
@@ -271,6 +314,7 @@ Describe 'Generic CIEM authentication profile commands' {
 
     It 'exports the generic authentication profile field schema command for PSU pages' {
         Get-Command -Module Devolutions.CIEM -Name 'Get-CIEMAuthenticationProfileFieldSchema' -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        Get-Command -Module Devolutions.CIEM -Name 'New-CIEMAuthenticationProfileFieldControls' -ErrorAction Stop | Should -Not -BeNullOrEmpty
 
         $allSchemas = @(Get-CIEMAuthenticationProfileFieldSchema)
         @($allSchemas.provider | Sort-Object -Unique) | Should -Be @('AWS', 'Azure', 'Email')

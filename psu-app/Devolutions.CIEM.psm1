@@ -204,6 +204,8 @@ foreach ($dir in $exportDirs) {
 
 $exportFunctions += @(GetCIEMPSUPageRegistry | ForEach-Object { [string]$_.factory })
 $exportFunctions += 'New-CIEMAuthenticationProfileFieldControls'
+$exportFunctions += 'New-CIEMAuthenticationProfileFormContent'
+$exportFunctions += 'Set-CIEMAuthenticationProfileFormContent'
 $exportFunctions = @($exportFunctions | Sort-Object -Unique)
 
 Write-CIEMLog -Message "Exporting $($exportFunctions.Count) functions" -Component 'ModuleInit'

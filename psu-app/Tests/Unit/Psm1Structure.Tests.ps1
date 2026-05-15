@@ -19,6 +19,15 @@ BeforeAll {
 }
 
 Describe 'Devolutions.CIEM.psm1 Structure' {
+    Context 'Module version policy' {
+        It 'Keeps the PSU package on the 0.2.x version line' {
+            $manifest = Import-PowerShellDataFile -Path $script:ManifestPath
+            $version = [version]$manifest.ModuleVersion
+
+            $version.Major | Should -Be 0
+            $version.Minor | Should -Be 2
+        }
+    }
 
     Context 'Sub-module root variables' {
         It 'Preserves $script:AzureDiscoveryRoot for runtime consumers' {

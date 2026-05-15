@@ -48,10 +48,7 @@ function New-CIEMAuthenticationProfileFieldControls {
                     }
                 }
                 elseif ($field.kind -eq 'setting') {
-                    New-UDTextbox -Id $inputId -Label $field.label -Type $fieldType -FullWidth
-                    if ($null -ne $renderedValue) {
-                        Set-UDElement -Id $inputId -Properties @{ value = $renderedValue }
-                    }
+                    New-UDTextbox -Id $inputId -Label $field.label -Value $renderedValue -Type $fieldType -FullWidth
                 }
                 else {
                     $value = if ($currentSelectedProfile -and $currentSelectedProfile.Provider -eq $schemaProvider -and $currentSelectedProfile.Method -eq $schemaMethod -and $field.kind -eq 'secret' -and $currentSelectedProfile.SecretRefs.$fieldName) { '********' } else { $existingValue }
@@ -66,6 +63,223 @@ function New-CIEMAuthenticationProfileFieldControls {
                     New-UDChip -Label "$($fileKey): $($Page:UploadedAuthProfileSecretFiles[$fileKey].Name)" -Size 'small'
                 }
             }
+        }
+    }
+}
+
+function Set-CIEMAuthenticationProfileFormContent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Provider,
+
+        [Parameter(Mandatory)]
+        [string]$Method
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $nameElement = Get-UDElement -Id 'authProfileName'
+    if ($null -eq $nameElement) {
+        throw 'Authentication profile form did not render the name field.'
+    }
+
+    $Page:AuthenticationProfileName = [string]$nameElement.value
+    $Page:AuthenticationProfileProvider = $Provider
+    $Page:AuthenticationProfileMethod = $Method
+
+    Set-UDElement -Id 'authenticationProfileForm' -Content {
+        New-CIEMAuthenticationProfileFormContent `
+            -Provider ([string]$Page:AuthenticationProfileProvider) `
+            -Method ([string]$Page:AuthenticationProfileMethod) `
+            -Name ([string]$Page:AuthenticationProfileName) `
+            -SelectedProfileId $Page:SelectedAuthenticationProfileId
+    }
+}
+
+function New-CIEMAuthenticationProfileFormContent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Provider,
+
+        [Parameter(Mandatory)]
+        [string]$Method,
+
+        [string]$Name = '',
+
+        [string]$SelectedProfileId
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $providerSchemas = @(Devolutions.CIEM\Get-CIEMAuthenticationProfileFieldSchema -Provider $Provider)
+    if ($providerSchemas.Count -eq 0) {
+        throw "No authentication profile methods are configured for provider '$Provider'."
+    }
+    if (@($providerSchemas.method) -notcontains $Method) {
+        $Method = [string]$providerSchemas[0].method
+    }
+
+    $Page:AuthenticationProfileProvider = $Provider
+    $Page:AuthenticationProfileMethod = $Method
+    $Page:AuthenticationProfileName = $Name
+
+    New-UDGrid -Container -Spacing 2 -Content {
+        New-UDGrid -Item -ExtraSmallSize 12 -Content {
+            New-UDTextbox -Id 'authProfileName' -Label 'Name' -Value $Name -FullWidth -OnChange {
+                $Page:AuthenticationProfileName = [string]$EventData
+            }
+        }
+        New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+            New-UDTypography -Text 'Provider' -Variant 'caption'
+            New-UDElement -Tag 'input' -Id 'authProfileProvider' -Attributes @{ type = 'hidden'; value = $Provider }
+            New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; gap = '8px'; flexWrap = 'wrap' } } -Content {
+                $awsProviderButtonVariant = if ('AWS' -eq $Provider) { 'contained' } else { 'outlined' }
+                New-UDButton -Id 'authProfileProviderOption_AWS' -Text 'AWS' -Variant $awsProviderButtonVariant -OnClick {
+                    Set-CIEMAuthenticationProfileFormContent -Provider 'AWS' -Method 'CurrentProfile'
+                }
+                $azureProviderButtonVariant = if ('Azure' -eq $Provider) { 'contained' } else { 'outlined' }
+                New-UDButton -Id 'authProfileProviderOption_Azure' -Text 'Azure' -Variant $azureProviderButtonVariant -OnClick {
+                    Set-CIEMAuthenticationProfileFormContent -Provider 'Azure' -Method 'ServicePrincipalSecret'
+                }
+                $emailProviderButtonVariant = if ('Email' -eq $Provider) { 'contained' } else { 'outlined' }
+                New-UDButton -Id 'authProfileProviderOption_Email' -Text 'Email' -Variant $emailProviderButtonVariant -OnClick {
+                    Set-CIEMAuthenticationProfileFormContent -Provider 'Email' -Method 'SmtpAnonymous'
+                }
+            }
+        }
+        New-UDGrid -Item -ExtraSmallSize 12 -Content {
+            New-UDGrid -Container -Spacing 2 -Content {
+                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
+                    New-UDTypography -Text 'Method' -Variant 'caption'
+                    New-UDElement -Tag 'input' -Id 'authProfileMethod' -Attributes @{ type = 'hidden'; value = $Method }
+                    New-UDElement -Tag 'div' -Attributes @{ style = @{ display = 'flex'; gap = '8px'; flexWrap = 'wrap' } } -Content {
+                        if ($Provider -eq 'Azure') {
+                            $spSecretVariant = if ('ServicePrincipalSecret' -eq $Method) { 'contained' } else { 'outlined' }
+                            $spCertificateVariant = if ('ServicePrincipalCertificate' -eq $Method) { 'contained' } else { 'outlined' }
+                            $managedIdentityVariant = if ('ManagedIdentity' -eq $Method) { 'contained' } else { 'outlined' }
+                            New-UDButton -Id 'authProfileMethodOption_ServicePrincipalSecret' -Text 'Service Principal (Secret)' -Variant $spSecretVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'Azure' -Method 'ServicePrincipalSecret'
+                            }
+                            New-UDButton -Id 'authProfileMethodOption_ServicePrincipalCertificate' -Text 'Service Principal (Certificate)' -Variant $spCertificateVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'Azure' -Method 'ServicePrincipalCertificate'
+                            }
+                            New-UDButton -Id 'authProfileMethodOption_ManagedIdentity' -Text 'Managed Identity' -Variant $managedIdentityVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'Azure' -Method 'ManagedIdentity'
+                            }
+                        }
+                        elseif ($Provider -eq 'AWS') {
+                            $currentProfileVariant = if ('CurrentProfile' -eq $Method) { 'contained' } else { 'outlined' }
+                            $accessKeyVariant = if ('AccessKey' -eq $Method) { 'contained' } else { 'outlined' }
+                            New-UDButton -Id 'authProfileMethodOption_CurrentProfile' -Text 'Current Profile' -Variant $currentProfileVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'AWS' -Method 'CurrentProfile'
+                            }
+                            New-UDButton -Id 'authProfileMethodOption_AccessKey' -Text 'Access Key' -Variant $accessKeyVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'AWS' -Method 'AccessKey'
+                            }
+                        }
+                        elseif ($Provider -eq 'Email') {
+                            $smtpAnonymousVariant = if ('SmtpAnonymous' -eq $Method) { 'contained' } else { 'outlined' }
+                            $smtpBasicVariant = if ('SmtpBasic' -eq $Method) { 'contained' } else { 'outlined' }
+                            New-UDButton -Id 'authProfileMethodOption_SmtpAnonymous' -Text 'SMTP Anonymous' -Variant $smtpAnonymousVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'Email' -Method 'SmtpAnonymous'
+                            }
+                            New-UDButton -Id 'authProfileMethodOption_SmtpBasic' -Text 'SMTP Basic' -Variant $smtpBasicVariant -OnClick {
+                                Set-CIEMAuthenticationProfileFormContent -Provider 'Email' -Method 'SmtpBasic'
+                            }
+                        }
+                        else {
+                            throw "No authentication profile method buttons are configured for provider '$Provider'."
+                        }
+                    }
+                }
+                New-UDGrid -Item -ExtraSmallSize 12 -Content {
+                    New-CIEMAuthenticationProfileFieldControls -Provider $Provider -Method $Method -SelectedProfileId $SelectedProfileId
+                }
+            }
+        }
+    }
+    New-UDButton -Id 'saveAuthenticationProfileBtn' -Text 'Save Profile' -Variant 'contained' -OnClick {
+        try {
+            $profileId = if ($Page:SelectedAuthenticationProfileId) { [string]$Page:SelectedAuthenticationProfileId } else { [guid]::NewGuid().ToString() }
+            $profileName = [string](Get-UDElement -Id 'authProfileName').value
+            $provider = [string]$Page:AuthenticationProfileProvider
+            $method = [string]$Page:AuthenticationProfileMethod
+            if ([string]::IsNullOrWhiteSpace($provider)) {
+                throw 'Authentication profile form did not submit a provider value.'
+            }
+            if ([string]::IsNullOrWhiteSpace($method)) {
+                throw 'Authentication profile form did not submit a method value.'
+            }
+            $fieldSchema = @(Devolutions.CIEM\Get-CIEMAuthenticationProfileFieldSchema -Provider $provider -Method $method | Select-Object -First 1)
+            $existingProfile = if ($Page:SelectedAuthenticationProfileId) {
+                @(Devolutions.CIEM\Get-CIEMAuthenticationProfile -Id $profileId) | Select-Object -First 1
+            }
+
+            $settings = @{}
+            $secretRefs = @{}
+
+            foreach ($field in @($fieldSchema.fields)) {
+                $fieldName = [string]$field.name
+                $inputId = "authProfileField_${provider}_${method}_$fieldName"
+                if ($field.kind -eq 'setting') {
+                    $fieldElement = Get-UDElement -Id $inputId
+                    if ($null -eq $fieldElement) {
+                        throw "Authentication profile form did not render field '$inputId'."
+                    }
+                    $value = $fieldElement.value
+                    if (-not [string]::IsNullOrWhiteSpace([string]$value)) {
+                        $settings[$fieldName] = $value
+                    }
+                }
+                elseif ($field.kind -eq 'secret') {
+                    $secretName = "CIEM_AuthProfile_${profileId}_$fieldName"
+                    $existingSecretRef = if ($existingProfile -and $existingProfile.Provider -eq $provider -and $existingProfile.Method -eq $method -and $existingProfile.SecretRefs.PSObject.Properties[$fieldName]) {
+                        [string]$existingProfile.SecretRefs.$fieldName
+                    }
+                    if ($field.inputType -eq 'upload') {
+                        if ($Page:UploadedAuthProfileSecretFiles.ContainsKey($fieldName)) {
+                            Devolutions.CIEM\Set-CIEMSecret $secretName ([string]$Page:UploadedAuthProfileSecretFiles[$fieldName].Data)
+                            $secretRefs[$fieldName] = $secretName
+                        }
+                        elseif (-not [string]::IsNullOrWhiteSpace($existingSecretRef)) {
+                            $secretRefs[$fieldName] = $existingSecretRef
+                        }
+                    }
+                    else {
+                        $secretValue = [string](Get-UDElement -Id $inputId).value
+                        if (-not [string]::IsNullOrWhiteSpace($secretValue) -and $secretValue -ne '********') {
+                            Devolutions.CIEM\Set-CIEMSecret $secretName $secretValue
+                            $secretRefs[$fieldName] = $secretName
+                        }
+                        elseif (-not [string]::IsNullOrWhiteSpace($existingSecretRef)) {
+                            $secretRefs[$fieldName] = $existingSecretRef
+                        }
+                    }
+                }
+                else {
+                    throw "Unsupported authentication profile field kind '$($field.kind)'."
+                }
+            }
+
+            $savedProfile = Devolutions.CIEM\Save-CIEMAuthenticationProfile -Id $profileId -Name $profileName -Provider $provider -Method $method -Settings $settings -SecretRefs $secretRefs
+            $Page:SelectedAuthenticationProfileId = $savedProfile.Id
+            $Page:UploadedAuthProfileSecretFiles = @{}
+            Sync-UDElement -Id 'authProfileListRegion'
+            Set-UDElement -Id 'authenticationProfileForm' -Content {
+                New-CIEMAuthenticationProfileFormContent `
+                    -Provider ([string]$Page:AuthenticationProfileProvider) `
+                    -Method ([string]$Page:AuthenticationProfileMethod) `
+                    -Name ([string]$profileName) `
+                    -SelectedProfileId $Page:SelectedAuthenticationProfileId
+            }
+            Sync-UDElement -Id 'authProfileAssignmentsRegion'
+            Show-UDToast -Message 'Authentication profile saved.' -Duration 5000 -BackgroundColor '#4caf50'
+        }
+        catch {
+            Devolutions.CIEM\Write-CIEMLog -Message "Authentication profile save failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-AuthenticationProfilesPage'
+            Show-UDToast -Message "Authentication profile save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
         }
     }
 }
@@ -179,148 +393,11 @@ Sync-UDElement -Id 'authProfileAssignmentsRegion'
                         $Page:AuthenticationProfileName = $selectedName
 
                         New-UDElement -Tag 'div' -Id 'authenticationProfileForm' -Content {
-                            New-UDGrid -Container -Spacing 2 -Content {
-                                New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                    New-UDTextbox -Id 'authProfileName' -Label 'Name' -Value $selectedName -FullWidth -OnChange {
-                                        $Page:AuthenticationProfileName = [string]$EventData
-                                    }
-                                }
-                                New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                    New-UDTypography -Text 'Provider' -Variant 'caption'
-                                    New-UDElement -Tag 'input' -Id 'authProfileProvider' -Attributes @{ type = 'hidden'; value = $selectedProvider }
-                                    New-UDStack -Direction 'row' -Spacing 1 -Content {
-                                        foreach ($provider in @($fieldSchemas.provider | Sort-Object -Unique)) {
-                                            $providerValue = [string]$provider
-                                            $providerSchemasForOption = @(Devolutions.CIEM\Get-CIEMAuthenticationProfileFieldSchema -Provider $providerValue)
-                                            if ($providerSchemasForOption.Count -eq 0) {
-                                                throw "No authentication profile methods are configured for provider '$providerValue'."
-                                            }
-                                            $defaultMethod = [string]$providerSchemasForOption[0].method
-                                            $providerButtonVariant = if ($providerValue -eq $selectedProvider) { 'contained' } else { 'outlined' }
-                                            $providerHandler = [scriptblock]::Create(@"
-`$Page:AuthenticationProfileProvider = '$providerValue'
-`$Page:AuthenticationProfileMethod = '$defaultMethod'
-Sync-UDElement -Id 'authProfileMethodAndFieldsRegion'
-"@)
-                                            New-UDButton -Id "authProfileProviderOption_$providerValue" -Text $providerValue -Variant $providerButtonVariant -OnClick $providerHandler
-                                        }
-                                    }
-                                }
-                                New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                    New-UDDynamic -Id 'authProfileMethodAndFieldsRegion' -Content {
-                                        New-UDGrid -Container -Spacing 2 -Content {
-                                            New-UDGrid -Item -ExtraSmallSize 12 -MediumSize 6 -Content {
-                                                New-UDTypography -Text 'Method' -Variant 'caption'
-                                                $currentProvider = [string]$Page:AuthenticationProfileProvider
-                                                $providerSchemas = @(Devolutions.CIEM\Get-CIEMAuthenticationProfileFieldSchema -Provider $currentProvider)
-                                                if ($providerSchemas.Count -eq 0) {
-                                                    throw "No authentication profile methods are configured for provider '$currentProvider'."
-                                                }
-                                                $currentMethod = [string]$Page:AuthenticationProfileMethod
-                                                if (@($providerSchemas.method) -notcontains $currentMethod) {
-                                                    $currentMethod = [string]$providerSchemas[0].method
-                                                }
-                                                $Page:AuthenticationProfileMethod = $currentMethod
-
-                                                New-UDElement -Tag 'input' -Id 'authProfileMethod' -Attributes @{ type = 'hidden'; value = $currentMethod }
-                                                New-UDStack -Direction 'row' -Spacing 1 -Content {
-                                                    foreach ($schema in $providerSchemas) {
-                                                        $methodValue = [string]$schema.method
-                                                        $methodLabel = [string]$schema.displayName
-                                                        $buttonVariant = if ($methodValue -eq $currentMethod) { 'contained' } else { 'outlined' }
-                                                        $methodHandler = [scriptblock]::Create(@"
-`$Page:AuthenticationProfileMethod = '$methodValue'
-Sync-UDElement -Id 'authProfileFieldsRegion'
-"@)
-                                                        New-UDButton -Id "authProfileMethodOption_$methodValue" -Text $methodLabel -Variant $buttonVariant -OnClick $methodHandler
-                                                    }
-                                                }
-                                            }
-                                            New-UDGrid -Item -ExtraSmallSize 12 -Content {
-                                                New-UDDynamic -Id 'authProfileFieldsRegion' -Content {
-                                                    New-CIEMAuthenticationProfileFieldControls -Provider ([string]$Page:AuthenticationProfileProvider) -Method ([string]$Page:AuthenticationProfileMethod) -SelectedProfileId $Page:SelectedAuthenticationProfileId
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            New-UDButton -Id 'saveAuthenticationProfileBtn' -Text 'Save Profile' -Variant 'contained' -OnClick {
-                            try {
-                                $profileId = if ($Page:SelectedAuthenticationProfileId) { [string]$Page:SelectedAuthenticationProfileId } else { [guid]::NewGuid().ToString() }
-                                $profileName = [string](Get-UDElement -Id 'authProfileName').value
-                                $provider = [string]$Page:AuthenticationProfileProvider
-                                $method = [string]$Page:AuthenticationProfileMethod
-                                if ([string]::IsNullOrWhiteSpace($provider)) {
-                                    throw 'Authentication profile form did not submit a provider value.'
-                                }
-                                if ([string]::IsNullOrWhiteSpace($method)) {
-                                    throw 'Authentication profile form did not submit a method value.'
-                                }
-                                $fieldSchema = @(Devolutions.CIEM\Get-CIEMAuthenticationProfileFieldSchema -Provider $provider -Method $method | Select-Object -First 1)
-                                $existingProfile = if ($Page:SelectedAuthenticationProfileId) {
-                                    @(Devolutions.CIEM\Get-CIEMAuthenticationProfile -Id $profileId) | Select-Object -First 1
-                                }
-
-                                $settings = @{}
-                                $secretRefs = @{}
-
-                                foreach ($field in @($fieldSchema.fields)) {
-                                    $fieldName = [string]$field.name
-                                    $inputId = "authProfileField_${provider}_${method}_$fieldName"
-                                    if ($field.kind -eq 'setting') {
-                                        $fieldElement = Get-UDElement -Id $inputId
-                                        if ($null -eq $fieldElement) {
-                                            throw "Authentication profile form did not render field '$inputId'."
-                                        }
-                                        $value = $fieldElement.value
-                                        if (-not [string]::IsNullOrWhiteSpace([string]$value)) {
-                                            $settings[$fieldName] = $value
-                                        }
-                                    }
-                                    elseif ($field.kind -eq 'secret') {
-                                        $secretName = "CIEM_AuthProfile_${profileId}_$fieldName"
-                                        $existingSecretRef = if ($existingProfile -and $existingProfile.Provider -eq $provider -and $existingProfile.Method -eq $method -and $existingProfile.SecretRefs.PSObject.Properties[$fieldName]) {
-                                            [string]$existingProfile.SecretRefs.$fieldName
-                                        }
-                                        if ($field.inputType -eq 'upload') {
-                                            if ($Page:UploadedAuthProfileSecretFiles.ContainsKey($fieldName)) {
-                                                Devolutions.CIEM\Set-CIEMSecret $secretName ([string]$Page:UploadedAuthProfileSecretFiles[$fieldName].Data)
-                                                $secretRefs[$fieldName] = $secretName
-                                            }
-                                            elseif (-not [string]::IsNullOrWhiteSpace($existingSecretRef)) {
-                                                $secretRefs[$fieldName] = $existingSecretRef
-                                            }
-                                        }
-                                        else {
-                                            $secretValue = [string](Get-UDElement -Id $inputId).value
-                                            if (-not [string]::IsNullOrWhiteSpace($secretValue) -and $secretValue -ne '********') {
-                                                Devolutions.CIEM\Set-CIEMSecret $secretName $secretValue
-                                                $secretRefs[$fieldName] = $secretName
-                                            }
-                                            elseif (-not [string]::IsNullOrWhiteSpace($existingSecretRef)) {
-                                                $secretRefs[$fieldName] = $existingSecretRef
-                                            }
-                                        }
-                                    }
-                                    else {
-                                        throw "Unsupported authentication profile field kind '$($field.kind)'."
-                                    }
-                                }
-
-                                $savedProfile = Devolutions.CIEM\Save-CIEMAuthenticationProfile -Id $profileId -Name $profileName -Provider $provider -Method $method -Settings $settings -SecretRefs $secretRefs
-                                $Page:SelectedAuthenticationProfileId = $savedProfile.Id
-                                $Page:UploadedAuthProfileSecretFiles = @{}
-                                Sync-UDElement -Id 'authProfileListRegion'
-                                Sync-UDElement -Id 'authProfileDetailsRegion'
-                                Sync-UDElement -Id 'authProfileAssignmentsRegion'
-                                Show-UDToast -Message 'Authentication profile saved.' -Duration 5000 -BackgroundColor '#4caf50'
-                            }
-                            catch {
-                                Devolutions.CIEM\Write-CIEMLog -Message "Authentication profile save failed: $($_.Exception.Message)" -Severity ERROR -Component 'PSU-AuthenticationProfilesPage'
-                                Show-UDToast -Message "Authentication profile save failed: $($_.Exception.Message)" -Duration 10000 -BackgroundColor '#f44336'
-                            }
-                        }
+                            New-CIEMAuthenticationProfileFormContent `
+                                -Provider $selectedProvider `
+                                -Method $selectedMethod `
+                                -Name $selectedName `
+                                -SelectedProfileId $Page:SelectedAuthenticationProfileId
                         }
                     }
 

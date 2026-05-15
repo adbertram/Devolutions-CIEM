@@ -31,6 +31,16 @@ test.describe('Authentication Profiles Page', () => {
   });
 
   test.describe('when managing Email profiles', () => {
+    test('should move the selected Provider button styling away from Azure', async () => {
+      await authPage.clickNewProfile();
+      await expect(authPage.page.locator('#authProfileProviderOption_Azure')).toHaveClass(/MuiButton-contained/);
+
+      await authPage.selectProvider('Email');
+
+      await expect(authPage.page.locator('#authProfileProviderOption_Azure')).toHaveClass(/MuiButton-outlined/);
+      await expect(authPage.page.locator('#authProfileProviderOption_Email')).toHaveClass(/MuiButton-contained/);
+    });
+
     test('should show only the selected provider schema and provider-scoped method options', async () => {
       await authPage.clickNewProfile();
 

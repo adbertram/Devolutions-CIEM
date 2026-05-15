@@ -70,15 +70,26 @@ class AuthenticationProfilesPageHelpers extends BasePage {
   async selectProvider(value) {
     const providerButton = this.page.locator(`#authProfileProviderOption_${value}`);
     await providerButton.waitFor({ state: 'visible', timeout: 15000 });
-    await this.activateButtonUntil(
-      providerButton,
-      expectedValues => {
-        const actualValues = Array.from(document.querySelectorAll('button[id^="authProfileMethodOption_"]'))
-          .map(node => node.id.replace('authProfileMethodOption_', ''));
-        return expectedValues.length === actualValues.length && expectedValues.every((value, index) => actualValues[index] === value);
-      },
-      this.providerMethods[value]
-    );
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await providerButton.scrollIntoViewIfNeeded();
+      await providerButton.click();
+      try {
+        await this.page.waitForFunction(
+          expectedValues => {
+            const actualValues = Array.from(document.querySelectorAll('button[id^="authProfileMethodOption_"]'))
+              .map(node => node.id.replace('authProfileMethodOption_', ''));
+            return expectedValues.length === actualValues.length && expectedValues.every((value, index) => actualValues[index] === value);
+          },
+          this.providerMethods[value],
+          { timeout: 5000 }
+        );
+        break;
+      } catch (error) {
+        if (attempt === 2) {
+          throw error;
+        }
+      }
+    }
     await this.waitForElement(this.methodReadySelectors[this.providerMethods[value][0]]);
     await this.page.waitForLoadState('networkidle');
   }
