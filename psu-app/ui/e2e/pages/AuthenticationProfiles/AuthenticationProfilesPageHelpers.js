@@ -38,6 +38,7 @@ class AuthenticationProfilesPageHelpers extends BasePage {
       awsRegion: '#authProfileField_AWS_CurrentProfile_Region',
       tlsModeCombobox: '[role="combobox"][aria-labelledby="authProfileField_Email_SmtpAnonymous_TlsModelabel"]',
       saveButton: '#saveAuthenticationProfileBtn',
+      testAuthButton: '#testAuthenticationProfileBtn',
       assignProviderButton: '#assignProviderDiscoveryBtn',
       assignEmailButton: '#assignEmailNotificationBtn',
       removeButton: '#removeAuthenticationProfileBtn'
@@ -53,17 +54,20 @@ class AuthenticationProfilesPageHelpers extends BasePage {
     await this.click(this.selectors.newButton);
     await this.waitForElement(this.selectors.form);
     await this.page.waitForFunction(
-      expectedValues => {
+      () => {
         const providerValue = document.querySelector('#authProfileProvider')?.value;
         const actualValues = Array.from(document.querySelectorAll('button[id^="authProfileMethodOption_"]'))
           .map(node => node.id.replace('authProfileMethodOption_', ''));
-        const defaultField = document.querySelector('#authProfileField_Azure_ServicePrincipalSecret_TenantId');
-        return providerValue === 'Azure' &&
-          Boolean(defaultField) &&
-          expectedValues.length === actualValues.length &&
-          expectedValues.every((value, index) => actualValues[index] === value);
-      },
-      this.providerMethods.Azure
+        const nameValue = document.querySelector('#authProfileName')?.value;
+        const selectedProviderButtons = Array.from(document.querySelectorAll('button[id^="authProfileProviderOption_"]'))
+          .filter(node => node.className.includes('MuiButton-contained'));
+        return providerValue === '' &&
+          nameValue === '' &&
+          selectedProviderButtons.length === 0 &&
+          actualValues.length === 0 &&
+          document.querySelector('#saveAuthenticationProfileBtn') === null &&
+          document.querySelector('[id^="authProfileField_"]') === null;
+      }
     );
   }
 
@@ -75,12 +79,15 @@ class AuthenticationProfilesPageHelpers extends BasePage {
       await providerButton.click();
       try {
         await this.page.waitForFunction(
-          expectedValues => {
+          ({ expectedProvider, expectedValues }) => {
+            const providerValue = document.querySelector('#authProfileProvider')?.value;
             const actualValues = Array.from(document.querySelectorAll('button[id^="authProfileMethodOption_"]'))
               .map(node => node.id.replace('authProfileMethodOption_', ''));
-            return expectedValues.length === actualValues.length && expectedValues.every((value, index) => actualValues[index] === value);
+            return providerValue === expectedProvider &&
+              expectedValues.length === actualValues.length &&
+              expectedValues.every((value, index) => actualValues[index] === value);
           },
-          this.providerMethods[value],
+          { expectedProvider: value, expectedValues: this.providerMethods[value] },
           { timeout: 5000 }
         );
         break;
@@ -161,6 +168,8 @@ class AuthenticationProfilesPageHelpers extends BasePage {
   }
 
   async fillAzureServicePrincipalSecretProfile(name, tenantId, clientId, clientSecret) {
+    await this.selectProvider('Azure');
+    await this.selectMethod('ServicePrincipalSecret');
     await this.fill(this.selectors.name, name);
     await this.fill(this.selectors.azureTenantId, tenantId);
     await this.fill(this.selectors.azureClientId, clientId);
@@ -213,6 +222,16 @@ class AuthenticationProfilesPageHelpers extends BasePage {
   async editProfile(name) {
     const card = this.page.locator('.MuiCard-root').filter({ hasText: name }).first();
     await card.locator("button:has-text('Edit')").click();
+    await this.waitForElement(this.selectors.form);
+    await this.page.waitForFunction(
+      ({ selector, expectedValue }) => document.querySelector(selector)?.value === expectedValue,
+      { selector: this.selectors.name, expectedValue: name }
+    );
+  }
+
+  async clickProfileCard(name) {
+    const card = this.page.locator('#authProfileListPane .MuiCard-root').filter({ hasText: name }).first();
+    await card.click();
     await this.waitForElement(this.selectors.form);
     await this.page.waitForFunction(
       ({ selector, expectedValue }) => document.querySelector(selector)?.value === expectedValue,

@@ -24,16 +24,45 @@ test.describe('Authentication Profiles Page', () => {
   test.describe('when the page loads', () => {
     test('should render the split profile list and details panes', async () => {
       await authPage.waitForElement(authPage.selectors.listPane);
-      await authPage.waitForElement(authPage.selectors.detailsPane);
-      await authPage.waitForElement(authPage.selectors.providerCombobox);
-      await authPage.waitForElement(authPage.selectors.methodCombobox);
+      await authPage.page.locator(authPage.selectors.detailsPane).waitFor({ state: 'attached', timeout: 15000 });
+      expect(await authPage.page.locator(authPage.selectors.form).count()).toBe(0);
+      expect(await authPage.page.locator(authPage.selectors.providerCombobox).count()).toBe(0);
+      expect(await authPage.page.locator(authPage.selectors.methodCombobox).count()).toBe(0);
+    });
+
+    test('should clear provider-specific fields when starting a new profile', async () => {
+      await authPage.clickNewProfile();
+      await authPage.fillAzureServicePrincipalSecretProfile(
+        'E2E Draft Azure Service Principal',
+        '11111111-1111-1111-1111-111111111111',
+        '22222222-2222-2222-2222-222222222222',
+        'draft-client-secret'
+      );
+
+      await authPage.clickNewProfile();
+
+      await expect(authPage.page.locator(authPage.selectors.name)).toHaveValue('');
+      expect(await authPage.page.locator(authPage.selectors.azureTenantId).count()).toBe(0);
+      expect(await authPage.page.locator(authPage.selectors.azureClientId).count()).toBe(0);
+      expect(await authPage.page.locator(authPage.selectors.azureClientSecret).count()).toBe(0);
+    });
+
+    test('should not select a provider when starting a new profile', async () => {
+      await authPage.clickNewProfile();
+
+      await expect(authPage.page.locator('#authProfileProviderOption_Azure')).toHaveClass(/MuiButton-outlined/);
+      await expect(authPage.page.locator('#authProfileProviderOption_AWS')).toHaveClass(/MuiButton-outlined/);
+      await expect(authPage.page.locator('#authProfileProviderOption_Email')).toHaveClass(/MuiButton-outlined/);
+      expect(await authPage.page.locator('button[id^="authProfileMethodOption_"]').count()).toBe(0);
+      expect(await authPage.page.locator('[id^="authProfileField_"]').count()).toBe(0);
+      expect(await authPage.page.locator(authPage.selectors.saveButton).count()).toBe(0);
     });
   });
 
   test.describe('when managing Email profiles', () => {
     test('should move the selected Provider button styling away from Azure', async () => {
       await authPage.clickNewProfile();
-      await expect(authPage.page.locator('#authProfileProviderOption_Azure')).toHaveClass(/MuiButton-contained/);
+      await expect(authPage.page.locator('#authProfileProviderOption_Azure')).toHaveClass(/MuiButton-outlined/);
 
       await authPage.selectProvider('Email');
 
@@ -101,6 +130,21 @@ $second = Devolutions.CIEM\\Save-CIEMAuthenticationProfile -Name 'E2E Zulu SMTP'
       expect(await authPage.currentProfileName()).toBe('E2E Alpha SMTP');
     });
 
+    test('should show the profile fields after clicking a profile card', async () => {
+      const seed = await runPSUCommand(`
+Devolutions.CIEM\\Save-CIEMAuthenticationProfile -Name 'E2E Card Click SMTP' -Provider 'Email' -Method 'SmtpAnonymous' -Settings @{ Host = 'card-click.example.com'; Port = 25; TlsMode = 'None' } -SecretRefs @{} | Out-Null
+`);
+      expect(seed.status).toBe('Completed');
+      await authPage.navigateToAuthenticationProfilesPage();
+      await authPage.waitForProfileCard('E2E Card Click SMTP');
+      expect(await authPage.page.locator(authPage.selectors.form).count()).toBe(0);
+
+      await authPage.clickProfileCard('E2E Card Click SMTP');
+
+      expect(await authPage.currentProfileName()).toBe('E2E Card Click SMTP');
+      await expect(authPage.page.locator(authPage.selectors.host)).toHaveValue('card-click.example.com');
+    });
+
     test('should assign an Email profile to Email notifications and block removal while assigned', async () => {
       await authPage.clickNewProfile();
       await authPage.fillSmtpAnonymousProfile('E2E Assigned SMTP Relay', 'smtp-assigned.example.com', 25);
@@ -131,6 +175,23 @@ $profile = Devolutions.CIEM\\Get-CIEMAuthenticationProfile -Id $assignment.Authe
   });
 
   test.describe('when assigning provider discovery profiles', () => {
+    test('should show Test Authentication for a selected Azure profile', async () => {
+      const seed = await runPSUCommand(`
+Devolutions.CIEM\\Set-CIEMSecret -Name 'CIEM_E2E_Azure_ClientSecret' -Value 'e2e-client-secret'
+Devolutions.CIEM\\Save-CIEMAuthenticationProfile -Name 'E2E Azure Testable Profile' -Provider 'Azure' -Method 'ServicePrincipalSecret' -Settings @{ TenantId = '11111111-1111-1111-1111-111111111111'; ClientId = '22222222-2222-2222-2222-222222222222' } -SecretRefs @{ ClientSecret = 'CIEM_E2E_Azure_ClientSecret' } | Out-Null
+`);
+      expect(seed.status).toBe('Completed');
+      await authPage.navigateToAuthenticationProfilesPage();
+      await authPage.waitForProfileCard('E2E Azure Testable Profile');
+      await authPage.editProfile('E2E Azure Testable Profile');
+
+      await authPage.waitForElement(authPage.selectors.testAuthButton);
+      await expect(authPage.page.locator(authPage.selectors.testAuthButton)).toHaveText('Test Authentication');
+      const testAuthBox = await authPage.page.locator(authPage.selectors.testAuthButton).boundingBox();
+      const assignmentsBox = await authPage.page.getByText('Assignments', { exact: true }).boundingBox();
+      expect(testAuthBox.y).toBeLessThan(assignmentsBox.y);
+    });
+
     test('should assign an Azure profile to provider discovery', async () => {
       const seed = await runPSUCommand(`
 Devolutions.CIEM\\Set-CIEMSecret -Name 'CIEM_E2E_Azure_ClientSecret' -Value 'e2e-client-secret'

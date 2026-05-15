@@ -87,6 +87,16 @@ Describe 'Authentication Profiles PSU page' {
         $content | Should -Not -Match 'foreach \(\$schema in \$fieldSchemas\)\s*\{\s*New-UDSelectOption'
     }
 
+    It 'does not render the editor before a profile is selected or a draft is started' {
+        $script:AuthenticationProfilesPagePath | Should -Exist
+        $content = Get-Content -Path $script:AuthenticationProfilesPagePath -Raw
+
+        $content | Should -Match '\$shouldRenderProfileEditor\s*=\s*\$selectedProfile -or \(\$null -ne \$Page:AuthenticationProfileProvider -and \$null -ne \$Page:AuthenticationProfileMethod\)'
+        $content | Should -Match 'if \(\$shouldRenderProfileEditor\)'
+        $content | Should -Not -Match '\$selectedProvider = if \(\$Page:AuthenticationProfileProvider\).*else \{ \[string\]\$fieldSchemas\[0\]\.provider \}'
+        $content | Should -Not -Match '\$selectedMethod = if \(\$Page:AuthenticationProfileMethod\).*else \{ \[string\]\$fieldSchemas\[0\]\.method \}'
+    }
+
     It 'replaces the form when Provider changes so buttons and fields rerender together' {
         $script:AuthenticationProfilesPagePath | Should -Exist
         $content = Get-Content -Path $script:AuthenticationProfilesPagePath -Raw
@@ -96,17 +106,47 @@ Describe 'Authentication Profiles PSU page' {
         $content | Should -Match ([regex]::Escape('$Page:AuthenticationProfileName = [string]$nameElement.value'))
         $content | Should -Match ([regex]::Escape('$Page:AuthenticationProfileProvider = $Provider'))
         $content | Should -Match ([regex]::Escape('$Page:AuthenticationProfileMethod = $Method'))
-        $content | Should -Match ([regex]::Escape('$selectedProvider = if ($Page:AuthenticationProfileProvider) { [string]$Page:AuthenticationProfileProvider } elseif ($selectedProfile) { [string]$selectedProfile.Provider } else { [string]$fieldSchemas[0].provider }'))
-        $content | Should -Match ([regex]::Escape('$selectedMethod = if ($Page:AuthenticationProfileMethod) { [string]$Page:AuthenticationProfileMethod } elseif ($selectedProfile) { [string]$selectedProfile.Method } else { [string]$fieldSchemas[0].method }'))
+        $content | Should -Match ([regex]::Escape('$selectedProvider = if ($null -ne $Page:AuthenticationProfileProvider) { [string]$Page:AuthenticationProfileProvider } else { [string]$selectedProfile.Provider }'))
+        $content | Should -Match ([regex]::Escape('$selectedMethod = if ($null -ne $Page:AuthenticationProfileMethod) { [string]$Page:AuthenticationProfileMethod } else { [string]$selectedProfile.Method }'))
         $content | Should -Match ([regex]::Escape("Set-UDElement -Id 'authenticationProfileForm' -Content"))
         $content | Should -Not -Match ([regex]::Escape('Set-UDElement -Id ''authProfileProvider'' -Properties @{ value = ''Email'' }'))
-        $content | Should -Not -Match "Get-UDElement -Id 'authProfileProvider'"
-        $content | Should -Not -Match "Get-UDElement -Id 'authProfileMethod'"
         $content | Should -Not -Match '\$providerElementValue'
         $content | Should -Not -Match '\$methodElementValue'
         $content | Should -Not -Match ([regex]::Escape("Sync-UDElement -Id 'authProfileProviderOptionsRegion'"))
         $content | Should -Not -Match ([regex]::Escape("Sync-UDElement -Id 'authProfileMethodAndFieldsRegion'"))
         $content | Should -Not -Match ([regex]::Escape("Sync-UDElement -Id 'authProfileFieldsRegion'"))
+    }
+
+    It 'renders a new draft with no provider or method selected by default' {
+        $script:AuthenticationProfilesPagePath | Should -Exist
+        $content = Get-Content -Path $script:AuthenticationProfilesPagePath -Raw
+
+        $content | Should -Match '\$providerSelected = -not \[string\]::IsNullOrWhiteSpace\(\$Provider\)'
+        $content | Should -Match '\$methodSelected = -not \[string\]::IsNullOrWhiteSpace\(\$Method\)'
+        $content | Should -Match '\$awsProviderButtonVariant = if \(''AWS'' -eq \$Provider\) \{ ''contained'' \} else \{ ''outlined'' \}'
+        $content | Should -Match '\$azureProviderButtonVariant = if \(''Azure'' -eq \$Provider\) \{ ''contained'' \} else \{ ''outlined'' \}'
+        $content | Should -Match '\$emailProviderButtonVariant = if \(''Email'' -eq \$Provider\) \{ ''contained'' \} else \{ ''outlined'' \}'
+        $content | Should -Match 'if \(\$providerSelected -and \$methodSelected\)'
+        $content | Should -Match '\$Page:AuthenticationProfileProvider = '''''
+        $content | Should -Match '\$Page:AuthenticationProfileMethod = '''''
+        $content | Should -Not -Match '\$Page:AuthenticationProfileProvider = \[string\]\$fieldSchemas\[0\]\.provider'
+        $content | Should -Not -Match '\$Page:AuthenticationProfileMethod = \[string\]\$fieldSchemas\[0\]\.method'
+    }
+
+    It 'replaces the form when starting a new profile so stale schema field values are removed' {
+        $script:AuthenticationProfilesPagePath | Should -Exist
+        $content = Get-Content -Path $script:AuthenticationProfilesPagePath -Raw
+
+        $content | Should -Match "New-UDButton\s+-Id 'newAuthenticationProfileBtn'"
+        $content | Should -Match '\$hasEditorState = \$Page:AuthenticationProfileProvider -and \$Page:AuthenticationProfileMethod'
+        $content | Should -Match 'if \(\$hasEditorState\)'
+        $content | Should -Match "Set-UDElement -Id 'authenticationProfileForm' -Content"
+        $content | Should -Match "Sync-UDElement -Id 'authProfileDetailsRegion'"
+        $content | Should -Match '\$Page:SelectedAuthenticationProfileId = \$null'
+        $content | Should -Match '\$Page:AuthenticationProfileProvider = '''''
+        $content | Should -Match '\$Page:AuthenticationProfileMethod = '''''
+        $content | Should -Match ([regex]::Escape('-SelectedProfileId $null'))
+        $content | Should -Not -Match "Set-UDElement -Id 'authProfileName' -Properties @\{ value = '' \}"
     }
 
     It 'passes each profile id into deferred edit button handlers with literal scriptblocks' {
@@ -115,10 +155,11 @@ Describe 'Authentication Profiles PSU page' {
 
         $content | Should -Match '\$editProfileId\s*=\s*\[string\]\$profile\.Id'
         $content | Should -Match '\$editHandler\s*=\s*\[scriptblock\]::Create'
+        $content | Should -Match 'New-UDCard\s+-Id "authProfileCard_\$editProfileId"[\s\S]*-OnClick \$editHandler'
         $content | Should -Match ([regex]::Escape('`$selectedId = ''$editProfileId'''))
         $content | Should -Match ([regex]::Escape('`$Page:SelectedAuthenticationProfileId = `$selectedId'))
-        $content | Should -Match "Set-UDElement -Id 'authProfileName'"
-        $content | Should -Match "Set-UDElement -Id 'authProfileProvider'"
+        $content | Should -Not -Match '\$editHandler\s*=\s*\[scriptblock\]::Create\(@"[\s\S]*?Set-UDElement -Id ''authProfileName''[\s\S]*?"@\)'
+        $content | Should -Not -Match '\$editHandler\s*=\s*\[scriptblock\]::Create\(@"[\s\S]*?Set-UDElement -Id ''authProfileProvider''[\s\S]*?"@\)'
         $content | Should -Not -Match '\$Page:SelectedAuthenticationProfileId\s*=\s*\$profile\.Id'
     }
 
@@ -143,6 +184,23 @@ Describe 'Authentication Profiles PSU page' {
         $content | Should -Match "Authentication profile form did not submit a provider value"
         $content | Should -Match "Authentication profile form did not submit a method value"
         $content | Should -Match 'authProfileField_\$\{provider\}_\$\{method\}_\$fieldName'
+    }
+
+    It 'renders a selected profile test action that resolves secrets before connecting with the selected profile' {
+        $script:AuthenticationProfilesPagePath | Should -Exist
+        $content = Get-Content -Path $script:AuthenticationProfilesPagePath -Raw
+
+        $content | Should -Match "New-UDButton\s+-Id 'testAuthenticationProfileBtn'\s+-Text 'Test Authentication'"
+        $testAuthenticationButtonIndex = $content.IndexOf("New-UDButton -Id 'testAuthenticationProfileBtn'")
+        $assignmentsHeadingIndex = $content.IndexOf("New-UDTypography -Text 'Assignments'")
+        $testAuthenticationButtonIndex | Should -BeGreaterThan -1
+        $assignmentsHeadingIndex | Should -BeGreaterThan -1
+        $testAuthenticationButtonIndex | Should -BeLessThan $assignmentsHeadingIndex
+        $content | Should -Match 'Get-CIEMAuthenticationProfile\s+-Id \$selectedProfile\.Id\s+-ResolveSecrets'
+        $content | Should -Match 'Devolutions\.CIEM\\Connect-CIEM\s+-Provider \$testProfile\.Provider\s+-AuthenticationProfile \$testProfile\s+-Force'
+        $content | Should -Not -Match 'Connect-CIEM\s+-Provider \$selectedProfile\.Provider\s+-AuthenticationProfile \$selectedProfile'
+        $content | Should -Match ([regex]::Escape('Show-UDToast -Message "Authentication test succeeded for $($selectedProfile.Name)."'))
+        $content | Should -Match ([regex]::Escape('Show-UDToast -Message "Authentication test failed: $($_.Exception.Message)"'))
     }
 
     It 'rebuilds secret references from the selected schema without carrying stale method secrets' {
@@ -171,6 +229,16 @@ Describe 'Authentication Profiles PSU page' {
         $content | Should -Not -Match '\$value\s*=\s*\$EventData\[\$inputId\]'
         $content | Should -Not -Match '\$secretValue\s*=\s*\[string\]\$EventData\[\$inputId\]'
         $content | Should -Not -Match '\$fieldProperty\s*=\s*\$EventData\.PSObject\.Properties\[\$inputId\]'
+    }
+
+    It 'renders new profile field textboxes with explicit empty values' {
+        $script:AuthenticationProfilesPagePath | Should -Exist
+        $content = Get-Content -Path $script:AuthenticationProfilesPagePath -Raw
+
+        $content | Should -Match '\$renderedValue\s*=\s*if\s*\(\$null -ne \$existingValue\)\s*\{\s*\$existingValue\s*\}\s*else\s*\{\s*''''\s*\}'
+        $content | Should -Match '\$value\s*=\s*if\s*\(\$currentSelectedProfile -and \$currentSelectedProfile\.Provider -eq \$schemaProvider -and \$currentSelectedProfile\.Method -eq \$schemaMethod -and \$field\.kind -eq ''secret'' -and \$currentSelectedProfile\.SecretRefs\.\$fieldName\)\s*\{\s*''\*\*\*\*\*\*\*\*''\s*\}\s*else\s*\{\s*''''\s*\}'
+        $content | Should -Not -Match '\$renderedValue\s*=\s*\$existingValue'
+        $content | Should -Not -Match '\}\s*else\s*\{\s*\$existingValue\s*\}'
     }
 
     It 'does not use provider-specific authentication profile labels' {
