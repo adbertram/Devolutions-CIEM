@@ -20,8 +20,8 @@ function Deploy-PSUModule {
         current location.
 
     .PARAMETER Version
-        Specific Gallery version to install. If not specified, PSU installs the
-        latest version from PowerShell Gallery.
+        Specific Gallery version to install. If not specified, the version is
+        read from the module manifest at ModulePath.
 
     .PARAMETER EnvFilePath
         Path to .env file for PSU connection credentials.
@@ -76,20 +76,31 @@ function Deploy-PSUModule {
 
     $moduleName = 'Devolutions.CIEM'
     $galleryUrl = "https://www.powershellgallery.com/packages/$moduleName"
+    $versionToInstall = $Version
+    if (-not $versionToInstall) {
+        $resolvedModulePath = Resolve-Path -Path $ModulePath -ErrorAction Stop | Select-Object -ExpandProperty Path
+        $manifestFile = Get-ChildItem -Path $resolvedModulePath -Filter "$moduleName.psd1" -File | Select-Object -First 1
+        if (-not $manifestFile) {
+            throw "No $moduleName.psd1 manifest found in: $resolvedModulePath"
+        }
 
-    $shouldProcessTarget = if ($Version) { "$moduleName v$Version" } else { "$moduleName (latest Gallery version)" }
+        $manifest = Import-PowerShellDataFile -Path $manifestFile.FullName
+        $versionToInstall = [string]$manifest.ModuleVersion
+    }
+
+    $shouldProcessTarget = "$moduleName v$versionToInstall"
     $shouldProcessAction = "Install into $Environment PSU"
 
     if (-not $PSCmdlet.ShouldProcess($shouldProcessTarget, $shouldProcessAction)) {
         Write-Host ''
         Write-Host '[DRY RUN] Would deploy:' -ForegroundColor Yellow
         Write-Host "  Module:      $moduleName"
-        Write-Host "  Version:     $(if ($Version) { $Version } else { 'latest from PSGallery' })"
+        Write-Host "  Version:     $versionToInstall"
         Write-Host "  Environment: $Environment"
 
         return [PSCustomObject]@{
             ModuleName  = $moduleName
-            Version     = $Version
+            Version     = $versionToInstall
             Environment = $Environment
             GalleryUrl  = $galleryUrl
             UpdatedPSU  = $false
@@ -115,9 +126,23 @@ function Deploy-PSUModule {
     Write-Host "  [OK] Connected to $Environment PSU" -ForegroundColor Green
 
     Write-Host ''
-    Write-Host "Step 2: Installing $moduleName from PowerShell Gallery..." -ForegroundColor Yellow
-    $installParams = @{ Name = $moduleName }
-    if ($Version) { $installParams.Version = $Version }
+    Write-Host "Step 2: Removing existing $moduleName module versions..." -ForegroundColor Yellow
+    $removeParams = @{
+        Name        = $moduleName
+        Environment = $Environment
+        Force       = $true
+        ErrorAction = 'Stop'
+    }
+    if ($EnvFilePath) { $removeParams.EnvFilePath = $EnvFilePath }
+    Remove-PSUModule @removeParams | Out-Null
+    Write-Host "  [OK] Removed existing $moduleName module versions" -ForegroundColor Green
+
+    Write-Host ''
+    Write-Host "Step 3: Installing $moduleName from PowerShell Gallery..." -ForegroundColor Yellow
+    $installParams = @{
+        Name    = $moduleName
+        Version = $versionToInstall
+    }
     $installResult = Install-PSUModule @installParams
     $resolvedVersion = $installResult.Version
     Write-Host "  [OK] Installed $moduleName $resolvedVersion" -ForegroundColor Green
@@ -133,7 +158,7 @@ function Deploy-PSUModule {
 
     if ($ValidateDeployment) {
         Write-Host ''
-        Write-Host 'Step 3: Validating deployment...' -ForegroundColor Yellow
+        Write-Host 'Step 4: Validating deployment...' -ForegroundColor Yellow
         return Invoke-CIEMPSUModuleDeployment `
             -Environment $Environment `
             -ModulePath $ModulePath `
@@ -144,11 +169,11 @@ function Deploy-PSUModule {
     }
 
     if (-not $SkipAppRestart) {
-        Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 3
+        Restart-CIEMPSUApp -ModulePath $ModulePath -StepNumber 4
     }
     else {
         Write-Host ''
-        Write-Host 'Step 3: Skipping app restart (-SkipAppRestart).' -ForegroundColor Yellow
+        Write-Host 'Step 4: Skipping app restart (-SkipAppRestart).' -ForegroundColor Yellow
     }
 
     Write-Host ''

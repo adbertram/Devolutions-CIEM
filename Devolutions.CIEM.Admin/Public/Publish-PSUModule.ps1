@@ -4,8 +4,8 @@ function Publish-PSUModule {
         Publishes a PowerShell module to the PowerShell Gallery.
 
     .DESCRIPTION
-        Automatically bumps the version and publishes a module to PowerShell Gallery.
-        Modules with the 'PowerShellUniversal' tag appear in the PSU Gallery.
+        Bumps the local manifest version and publishes that version to PowerShell
+        Gallery. Modules with the 'PowerShellUniversal' tag appear in the PSU Gallery.
 
         This cmdlet does NOT install the module into any PSU instance. Use
         Deploy-PSUModule for that.
@@ -27,10 +27,10 @@ function Publish-PSUModule {
         Path to .env file for loading NuGetApiKey.
 
     .EXAMPLE
-        Publish-PSUModule -ModulePath ./psu-app
+        Publish-PSUModule -ModulePath ./psu-app -BumpVersion Minor
 
     .EXAMPLE
-        Publish-PSUModule -ModulePath ./psu-app -BumpVersion Minor
+        Publish-PSUModule -ModulePath ./psu-app
     #>
     [CmdletBinding(SupportsShouldProcess)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
@@ -105,11 +105,18 @@ function Publish-PSUModule {
     }
 
     Write-Host ''
-    Write-Host 'Step 2: Querying PowerShell Gallery for current version...' -ForegroundColor Yellow
+    Write-Host 'Step 2: Resolving package version...' -ForegroundColor Yellow
 
     $manifest = Import-PowerShellDataFile -Path $manifestPath
     $localVersion = [version]$manifest.ModuleVersion
     Write-Host "  Local manifest version: $localVersion" -ForegroundColor Gray
+
+    $newVersion = GetBumpedVersion -Base $localVersion -Component $BumpVersion
+    if ($newVersion.Major -ne 0 -or $newVersion.Minor -ne 2) {
+        throw "Publish-PSUModule requires a 0.2.x manifest version after increment. Current manifest version: $localVersion; incremented version: $newVersion"
+    }
+
+    Write-Host "  Incremented manifest version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
 
     $galleryVersion = $null
     try {
@@ -127,22 +134,27 @@ function Publish-PSUModule {
         throw "Failed to query PowerShell Gallery for module '$moduleName'. Error: $_"
     }
 
+    if (Test-CIEMPSGalleryPackageVersion -Name $moduleName -Version $newVersion) {
+        throw "PowerShell Gallery version $moduleName $newVersion already exists and cannot be republished. Update the manifest version before publishing."
+    }
+
+    $delistVersion = $null
     if ($galleryVersion) {
-        $baseVersion = if ($galleryVersion -gt $localVersion) { $galleryVersion } else { $localVersion }
-        Write-Host "  Base version for bump: $baseVersion" -ForegroundColor Gray
-    }
-    else {
-        $baseVersion = $localVersion
-        Write-Host "  Base version for bump: $baseVersion (local)" -ForegroundColor Gray
+        if ($galleryVersion.Build -lt 0) {
+            throw "Gallery version must include a patch component. Current Gallery version: $galleryVersion"
+        }
+
+        $expectedLocalVersion = [version]::new($galleryVersion.Major, $galleryVersion.Minor, $galleryVersion.Build + 1)
+        if ($newVersion -eq $expectedLocalVersion) {
+            Write-Host "  Incremented manifest is one patch above Gallery version $galleryVersion" -ForegroundColor Green
+        }
+        else {
+            $delistVersion = $galleryVersion
+            Write-Host "  Incremented manifest is not one patch above Gallery version $galleryVersion; $galleryVersion will be delisted before publish" -ForegroundColor Yellow
+        }
     }
 
-    $newVersion = GetBumpedVersion -Base $baseVersion -Component $BumpVersion
-    while (Test-CIEMPSGalleryPackageVersion -Name $moduleName -Version $newVersion) {
-        Write-Host "  Gallery already contains version $newVersion; checking next $BumpVersion version..." -ForegroundColor Yellow
-        $newVersion = GetBumpedVersion -Base $newVersion -Component $BumpVersion
-    }
-
-    Write-Host "  New version: $newVersion ($BumpVersion bump)" -ForegroundColor Green
+    Write-Host "  Version to publish: $newVersion" -ForegroundColor Green
 
     Write-Host ''
     Write-Host 'Step 3: Checking API key...' -ForegroundColor Yellow
@@ -196,14 +208,23 @@ NuGet API key required. Options:
         Write-Host ''
         Write-Host '[DRY RUN] Would publish:' -ForegroundColor Yellow
         Write-Host "  Module: $moduleName"
-        Write-Host "  New version: $fullVersion"
+        Write-Host "  Version: $fullVersion"
         Write-Host "  Path: $ModulePath"
+        if ($delistVersion) {
+            Write-Host "  Delist first: $delistVersion"
+        }
+
+        $delistedVersionText = $null
+        if ($delistVersion) {
+            $delistedVersionText = $delistVersion.ToString()
+        }
 
         return [PSCustomObject]@{
-            ModuleName = $moduleName
-            Version    = $fullVersion
-            GalleryUrl = $galleryUrl
-            Status     = 'DryRun'
+            ModuleName       = $moduleName
+            Version          = $fullVersion
+            GalleryUrl       = $galleryUrl
+            DelistedVersion  = $delistedVersionText
+            Status           = 'DryRun'
         }
     }
 
@@ -213,6 +234,12 @@ NuGet API key required. Options:
     $tags = (Import-PowerShellDataFile -Path $manifestPath).PrivateData.PSData.Tags
     if ($tags) {
         Write-Host "  [OK] Tags: $($tags -join ', ')" -ForegroundColor Green
+    }
+
+    if ($delistVersion) {
+        Write-Host "  Delisting $moduleName $delistVersion from PowerShell Gallery..." -ForegroundColor Yellow
+        Unlist-CIEMPSGalleryPackageVersion -Name $moduleName -Version $delistVersion -ApiKey $NuGetApiKey
+        Write-Host "  [OK] Delisted $moduleName $delistVersion" -ForegroundColor Green
     }
 
     Write-Host ''
@@ -257,8 +284,7 @@ NuGet API key required. Options:
 
     for ($i = 1; $i -le $maxRetries; $i++) {
         Write-Host "  Checking PowerShell Gallery (attempt $i/$maxRetries)..." -ForegroundColor Gray
-        $published = Find-Module -Name $moduleName -AllowPrerelease -ErrorAction SilentlyContinue
-        if ($published -and $published.Version -eq $fullVersion) {
+        if (Test-CIEMPSGalleryPackageVersion -Name $moduleName -Version $newVersion) {
             $verified = $true
             break
         }
@@ -281,10 +307,16 @@ NuGet API key required. Options:
     Write-Host "Publication Successful! ($moduleName $fullVersion)" -ForegroundColor Green
     Write-Host '========================================' -ForegroundColor Cyan
 
+    $publishedDelistedVersionText = $null
+    if ($delistVersion) {
+        $publishedDelistedVersionText = $delistVersion.ToString()
+    }
+
     [PSCustomObject]@{
-        ModuleName = $moduleName
-        Version    = $fullVersion
-        GalleryUrl = $galleryUrl
-        Status     = 'Published'
+        ModuleName       = $moduleName
+        Version          = $fullVersion
+        GalleryUrl       = $galleryUrl
+        DelistedVersion  = $publishedDelistedVersionText
+        Status           = 'Published'
     }
 }

@@ -27,6 +27,28 @@ Describe 'Publish-PSUModule parameter surface' {
     }
 }
 
+Describe 'Unlist-CIEMPSGalleryPackageVersion' {
+    It 'sends the NuGet delete request for the exact package version' {
+        $script:capturedDeleteUri = $null
+        $script:capturedDeleteHeaders = $null
+        $script:capturedDeleteMethod = $null
+
+        Mock -ModuleName Devolutions.CIEM.Admin Invoke-WebRequest {
+            $script:capturedDeleteUri = $Uri
+            $script:capturedDeleteHeaders = $Headers
+            $script:capturedDeleteMethod = $Method
+        }
+
+        InModuleScope Devolutions.CIEM.Admin {
+            Unlist-CIEMPSGalleryPackageVersion -Name 'Devolutions.CIEM' -Version ([version]'0.2.108') -ApiKey 'fake-key'
+        }
+
+        $script:capturedDeleteMethod | Should -Be 'Delete'
+        $script:capturedDeleteUri | Should -Be 'https://www.powershellgallery.com/api/v2/package/Devolutions.CIEM/0.2.108'
+        $script:capturedDeleteHeaders['X-NuGet-ApiKey'] | Should -Be 'fake-key'
+    }
+}
+
 Describe 'Publish-PSUModule -> PSGallery' {
     BeforeAll {
         $script:srcDir = Join-Path $TestDrive 'psu-app'
@@ -36,7 +58,7 @@ Describe 'Publish-PSUModule -> PSGallery' {
 
         New-ModuleManifest `
             -Path (Join-Path $script:srcDir 'Devolutions.CIEM.psd1') `
-            -ModuleVersion '0.0.1' `
+            -ModuleVersion '0.2.109' `
             -RootModule 'Devolutions.CIEM.psm1'
         Set-Content -Path (Join-Path $script:srcDir 'Devolutions.CIEM.psm1') -Value ''
         Set-Content `
@@ -55,13 +77,20 @@ Describe 'Publish-PSUModule -> PSGallery' {
         Set-Content -Path (Join-Path $script:srcDir 'modules/PSUSQLite/PSUSQLite.psm1') -Value ''
     }
 
+    BeforeEach {
+        $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
+        $manifestContent = Get-Content -Path $manifestPath -Raw
+        $reset = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '0.2.109'"
+        Set-Content -Path $manifestPath -Value $reset -NoNewline
+    }
+
     Context 'when PowerShell Gallery version lookup fails' {
         BeforeAll {
             Mock -ModuleName Devolutions.CIEM.Admin Find-Module { throw 'mock gallery unavailable' }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
         }
 
-        It 'throws instead of silently using only the local version baseline' {
+        It 'throws instead of publishing without a listed Gallery version' {
             { Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false } |
                 Should -Throw -ExpectedMessage '*mock gallery unavailable*'
         }
@@ -70,18 +99,8 @@ Describe 'Publish-PSUModule -> PSGallery' {
     Context 'when publishing succeeds' {
         BeforeAll {
             $script:publishCalls = [System.Collections.Generic.List[object]]::new()
-            $script:findCallCount = 0
+            $script:unlistCalls = [System.Collections.Generic.List[object]]::new()
 
-            Mock -ModuleName Devolutions.CIEM.Admin Find-Module {
-                $script:findCallCount++
-                # First call: pre-publish baseline. Subsequent calls: post-publish verification.
-                if ($script:findCallCount -eq 1) {
-                    [PSCustomObject]@{ Version = '0.0.2' }
-                }
-                else {
-                    [PSCustomObject]@{ Version = '0.0.3' }
-                }
-            }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {
                 $script:publishCalls.Add([pscustomobject]@{
                         Path       = $Path
@@ -89,72 +108,88 @@ Describe 'Publish-PSUModule -> PSGallery' {
                         Repository = $Repository
                     })
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Unlist-CIEMPSGalleryPackageVersion {
+                $script:unlistCalls.Add([pscustomobject]@{
+                        Name    = $Name
+                        Version = $Version
+                        ApiKey  = $ApiKey
+                    })
+            }
             Mock -ModuleName Devolutions.CIEM.Admin Start-Sleep {}
-            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { throw 'Connect-PSU must not be called from Publish-PSUModule (deploy responsibility moved to Deploy-PSUModule)' }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule { throw 'Install-PSUModule must not be called from Publish-PSUModule' }
         }
 
         BeforeEach {
-            $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
-            $manifestContent = Get-Content -Path $manifestPath -Raw
-            $reset = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '0.0.1'"
-            Set-Content -Path $manifestPath -Value $reset -NoNewline
             $script:publishCalls.Clear()
-            $script:findCallCount = 0
+            $script:unlistCalls.Clear()
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.2.109' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
         }
 
-        It 'publishes the bumped version to PSGallery' {
-            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Patch -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
+        It 'bumps and publishes the manifest version when the bumped version is exactly one patch above the listed Gallery version' {
+            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
 
             $result.Status | Should -Be 'Published'
             $result.ModuleName | Should -Be 'Devolutions.CIEM'
-            $result.Version | Should -Be '0.0.3'
-            $result.GalleryUrl | Should -Be 'https://www.powershellgallery.com/packages/Devolutions.CIEM'
+            $result.Version | Should -Be '0.2.110'
+            $result.DelistedVersion | Should -BeNullOrEmpty
             $script:publishCalls.Count | Should -Be 1
-            $script:publishCalls[0].Repository | Should -Be 'PSGallery'
-            $script:publishCalls[0].ApiKey | Should -Be 'fake-key'
+            $script:unlistCalls.Count | Should -Be 0
+
+            $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
+            $data = Import-PowerShellDataFile -Path $manifestPath
+            $data.ModuleVersion | Should -Be '0.2.110'
         }
 
-        It 'never calls Connect-PSU or Install-PSUModule from Publish-PSUModule (deploy responsibilities live in Deploy-PSUModule)' {
+        It 'delists the listed Gallery version before publishing when the bumped manifest is not exactly one patch higher' {
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.2.105' } }
+
+            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
+
+            $result.Version | Should -Be '0.2.110'
+            $result.DelistedVersion | Should -Be '0.2.105'
+            $script:unlistCalls.Count | Should -Be 1
+            $script:unlistCalls[0].Version | Should -Be ([version]'0.2.105')
+            $script:publishCalls.Count | Should -Be 1
+        }
+
+        It 'delists a listed Gallery version from a different line before publishing the bumped 0.2.x manifest version' {
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '1.0.83' } }
+
+            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
+
+            $result.Version | Should -Be '0.2.110'
+            $result.DelistedVersion | Should -Be '1.0.83'
+            $script:unlistCalls.Count | Should -Be 1
+            $script:publishCalls.Count | Should -Be 1
+        }
+
+        It 'fails before delisting when the bumped manifest version is already consumed on PSGallery' {
+            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion {
+                $Version -eq [version]'0.2.110'
+            }
+
+            { Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*0.2.110*already exists*cannot be republished*'
+
+            $script:unlistCalls.Count | Should -Be 0
+            $script:publishCalls.Count | Should -Be 0
+        }
+
+        It 'never calls Connect-PSU or Install-PSUModule from Publish-PSUModule' {
             Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false | Out-Null
 
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Connect-PSU -Times 0 -Scope It
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Install-PSUModule -Times 0 -Scope It
         }
 
-        It 'writes the bumped version back to the manifest' {
-            Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Patch -EnvFilePath 'NO_ENV_FILE' -Confirm:$false | Out-Null
+        It 'rewrites the manifest version when publishing succeeds' {
+            Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false | Out-Null
 
             $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
             $data = Import-PowerShellDataFile -Path $manifestPath
-            $data.ModuleVersion | Should -Be '0.0.3'
-        }
-
-        It 'bumps from the higher of local manifest or current Gallery version' {
-            $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
-            $content = Get-Content -Path $manifestPath -Raw
-            $bumped = $content -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '0.0.5'"
-            Set-Content -Path $manifestPath -Value $bumped -NoNewline
-
-            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Patch -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
-
-            $result.Version | Should -Be '0.0.6'
-        }
-
-        It 'skips Gallery versions that exist even when the baseline lookup is stale' {
-            Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion {
-                $Version.ToString() -in @('0.0.3', '0.0.4')
-            }
-
-            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Patch -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
-
-            $result.Version | Should -Be '0.0.5'
-        }
-
-        It 'supports Minor and Major bumps' {
-            $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Minor -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
-            $result.Version | Should -Be '0.1.0'
+            $data.ModuleVersion | Should -Be '0.2.110'
         }
 
         It 'stages a clean copy that excludes Tests, ui/e2e, *.db, and node_modules before publishing' {
@@ -175,9 +210,30 @@ Describe 'Publish-PSUModule -> PSGallery' {
         }
     }
 
+    Context 'when the local manifest version leaves the 0.2.x line' {
+        BeforeAll {
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.2.109' } }
+        }
+
+        It 'throws before publishing' {
+            $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
+            $manifestContent = Get-Content -Path $manifestPath -Raw
+            $updated = $manifestContent -replace "ModuleVersion\s*=\s*'[^']*'", "ModuleVersion = '0.3.0'"
+            Set-Content -Path $manifestPath -Value $updated -NoNewline
+
+            { Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*0.2.x*'
+        }
+
+        It 'throws when an explicit bump would leave the 0.2.x line' {
+            { Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -BumpVersion Minor -EnvFilePath 'NO_ENV_FILE' -Confirm:$false } |
+                Should -Throw -ExpectedMessage '*0.2.x*'
+        }
+    }
+
     Context 'when NUGET_API_KEY is not provided' {
         BeforeAll {
-            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.0.2' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.2.109' } }
             Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource {}
         }
@@ -191,16 +247,24 @@ Describe 'Publish-PSUModule -> PSGallery' {
 
     Context 'when running in -WhatIf mode' {
         BeforeAll {
-            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.0.2' } }
+            Mock -ModuleName Devolutions.CIEM.Admin Find-Module { [PSCustomObject]@{ Version = '0.2.105' } }
             Mock -ModuleName Devolutions.CIEM.Admin Test-CIEMPSGalleryPackageVersion { $false }
             Mock -ModuleName Devolutions.CIEM.Admin Publish-PSResource { throw 'Publish-PSResource should not run in WhatIf mode' }
+            Mock -ModuleName Devolutions.CIEM.Admin Unlist-CIEMPSGalleryPackageVersion { throw 'Unlist-CIEMPSGalleryPackageVersion should not run in WhatIf mode' }
         }
 
-        It 'returns a DryRun status without publishing' {
+        It 'returns a DryRun status without delisting or publishing' {
             $result = Publish-PSUModule -ModulePath $script:srcDir -NuGetApiKey 'fake-key' -EnvFilePath 'NO_ENV_FILE' -WhatIf
 
             $result.Status | Should -Be 'DryRun'
+            $result.Version | Should -Be '0.2.110'
+            $result.DelistedVersion | Should -Be '0.2.105'
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Publish-PSResource -Times 0 -Scope It
+            Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Unlist-CIEMPSGalleryPackageVersion -Times 0 -Scope It
+
+            $manifestPath = Join-Path $script:srcDir 'Devolutions.CIEM.psd1'
+            $data = Import-PowerShellDataFile -Path $manifestPath
+            $data.ModuleVersion | Should -Be '0.2.109'
         }
     }
 }

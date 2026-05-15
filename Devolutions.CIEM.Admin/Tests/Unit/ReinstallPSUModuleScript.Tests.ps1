@@ -37,14 +37,15 @@ Describe 'scripts/reinstall-ciem-psu-module.sh' {
         $script:ScriptSource | Should -Match 'ValidateSet\("local", "azure"\)'
     }
 
-    It 'checks the published Gallery version before removing CIEM for a validated reinstall' {
-        $preflightIndex = $script:ScriptSource.IndexOf('Find-Module -Name $moduleName')
+    It 'checks the exact local manifest Gallery version before removing CIEM for a validated reinstall' {
+        $preflightIndex = $script:ScriptSource.IndexOf('Packages(Id=$quote$safeName$quote,Version=$quote$safeVersion$quote)')
         $removeIndex = $script:ScriptSource.IndexOf('Remove-CIEMPSUModule @removeParams')
 
         $preflightIndex | Should -BeGreaterOrEqual 0
         $removeIndex | Should -BeGreaterThan $preflightIndex
         $script:ScriptSource | Should -Match 'CIEM_VALIDATE_DEPLOYMENT="\$VALIDATE_DEPLOYMENT"'
         $script:ScriptSource | Should -Match 'PowerShell Gallery'
-        $script:ScriptSource | Should -Match 'local validation requires'
+        $script:ScriptSource | Should -Match '\$quote\s*=\s*\[char\]39'
+        $script:ScriptSource | Should -Match 'Publish \$localVersion before running --validate-deployment'
     }
 }

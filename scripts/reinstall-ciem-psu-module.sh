@@ -102,17 +102,31 @@ if (-not $manifestFile) {
 $moduleName = $manifestFile.BaseName
 $manifest = Import-PowerShellDataFile -Path $manifestFile.FullName
 $localVersion = [version]$manifest.ModuleVersion
-$publishedModule = Find-Module -Name $moduleName -ErrorAction Stop
-$publishedVersion = [version]([string]$publishedModule.Version -replace "-.*$", "")
+$quote = [char]39
+$safeName = $moduleName.Replace($quote, "$quote$quote")
+$safeVersion = $localVersion.ToString().Replace($quote, "$quote$quote")
+$packageUri = "https://www.powershellgallery.com/api/v2/Packages(Id=$quote$safeName$quote,Version=$quote$safeVersion$quote)"
 
-if ($publishedVersion -lt $localVersion) {
-    throw "Latest PowerShell Gallery module ''$moduleName'' is $publishedVersion, but local validation requires $localVersion. Publish $localVersion or newer before running --validate-deployment."
+try {
+    $publishedPackage = Invoke-WebRequest -Uri $packageUri -UseBasicParsing -ErrorAction Stop
+}
+catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    if ($statusCode -eq 404) {
+        throw "PowerShell Gallery module $moduleName version $localVersion is not published. Publish $localVersion before running --validate-deployment."
+    }
+
+    throw
+}
+
+if (-not $publishedPackage -or [int]$publishedPackage.StatusCode -ne 200) {
+    throw "PowerShell Gallery module $moduleName version $localVersion is not published. Publish $localVersion before running --validate-deployment."
 }
 
 [pscustomobject]@{
     ModuleName              = $moduleName
     LocalValidationVersion  = $localVersion
-    PublishedGalleryVersion = $publishedVersion
+    PublishedGalleryVersion = $localVersion
     Status                  = "Compatible"
 }
 '

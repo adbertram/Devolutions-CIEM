@@ -1,5 +1,12 @@
 function GetBumpedVersion {
-    param([version]$Base, [string]$Component)
+    param(
+        [Parameter(Mandatory)]
+        [version]$Base,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Patch', 'Minor', 'Major')]
+        [string]$Component
+    )
 
     $ErrorActionPreference = 'Stop'
 

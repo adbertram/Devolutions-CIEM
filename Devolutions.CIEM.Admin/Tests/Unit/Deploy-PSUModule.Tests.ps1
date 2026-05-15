@@ -57,12 +57,19 @@ Describe 'Deploy-PSUModule' {
     Context 'when Environment is local' {
         BeforeAll {
             $script:connectCalls = [System.Collections.Generic.List[object]]::new()
+            $script:removeCalls = [System.Collections.Generic.List[object]]::new()
             $script:installCalls = [System.Collections.Generic.List[object]]::new()
+            $script:operationOrder = [System.Collections.Generic.List[string]]::new()
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {
                 $script:connectCalls.Add([pscustomobject]@{ Local = [bool]$Local; Azure = [bool]$Azure; EnvFilePath = $EnvFilePath })
                 [PSCustomObject]@{ Url = 'http://mocked-local'; Status = 'Connected'; IsAzure = $false }
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {
+                $script:operationOrder.Add('remove')
+                $script:removeCalls.Add([pscustomobject]@{ Name = $Name; Environment = $Environment; Force = [bool]$Force; EnvFilePath = $EnvFilePath })
+            }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
+                $script:operationOrder.Add('install')
                 $script:installCalls.Add([pscustomobject]@{ Name = $Name; Version = $Version })
                 [pscustomobject]@{ Name = $Name; Version = '5.1.6'; Repository = 'PSGallery'; Status = 'Installed' }
             }
@@ -72,7 +79,9 @@ Describe 'Deploy-PSUModule' {
 
         BeforeEach {
             $script:connectCalls.Clear()
+            $script:removeCalls.Clear()
             $script:installCalls.Clear()
+            $script:operationOrder.Clear()
         }
 
         It 'connects with -Local' {
@@ -89,6 +98,17 @@ Describe 'Deploy-PSUModule' {
             $script:installCalls.Count | Should -Be 1
             $script:installCalls[0].Name | Should -Be 'Devolutions.CIEM'
             $script:installCalls[0].Version | Should -Be '5.1.6'
+        }
+
+        It 'removes existing module versions before installing the requested version' {
+            Deploy-PSUModule -Environment local -ModulePath $script:srcDir -Version '5.1.6' -EnvFilePath 'NO_ENV_FILE' -Confirm:$false | Out-Null
+
+            $script:removeCalls.Count | Should -Be 1
+            $script:removeCalls[0].Name | Should -Be 'Devolutions.CIEM'
+            $script:removeCalls[0].Environment | Should -Be 'local'
+            $script:removeCalls[0].Force | Should -BeTrue
+            $script:removeCalls[0].EnvFilePath | Should -Be 'NO_ENV_FILE'
+            $script:operationOrder | Should -Be @('remove', 'install')
         }
 
         It 'restarts the CIEM app by default' {
@@ -119,6 +139,7 @@ Describe 'Deploy-PSUModule' {
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
                 [pscustomobject]@{ Name = $Name; Version = '5.1.6'; Repository = 'PSGallery'; Status = 'Installed' }
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {}
             Mock -ModuleName Devolutions.CIEM.Admin Restart-CIEMPSUApp {}
         }
 
@@ -141,23 +162,23 @@ Describe 'Deploy-PSUModule' {
                 [PSCustomObject]@{ Url = 'http://mocked'; Status = 'Connected'; IsAzure = $false }
             }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
-                # Install-PSUModule itself resolves latest when Version is empty; mirror that contract.
-                [pscustomobject]@{ Name = $Name; Version = '5.1.6'; Repository = 'PSGallery'; Status = 'Installed' }
+                [pscustomobject]@{ Name = $Name; Version = $Version; Repository = 'PSGallery'; Status = 'Installed' }
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {}
             Mock -ModuleName Devolutions.CIEM.Admin Restart-CIEMPSUApp {}
         }
 
-        It 'passes through to Install-PSUModule without a Version (lets PSU resolve latest)' {
+        It 'passes the local manifest version to Install-PSUModule' {
             Deploy-PSUModule -Environment local -ModulePath $script:srcDir -EnvFilePath 'NO_ENV_FILE' -Confirm:$false | Out-Null
 
             Should -Invoke -ModuleName Devolutions.CIEM.Admin -CommandName Install-PSUModule -Times 1 -Scope It -ParameterFilter {
-                $Name -eq 'Devolutions.CIEM' -and [string]::IsNullOrEmpty($Version)
+                $Name -eq 'Devolutions.CIEM' -and $Version -eq '0.0.1'
             }
         }
 
         It 'returns the version that Install-PSUModule reports' {
             $result = Deploy-PSUModule -Environment local -ModulePath $script:srcDir -EnvFilePath 'NO_ENV_FILE' -Confirm:$false
-            $result.Version | Should -Be '5.1.6'
+            $result.Version | Should -Be '0.0.1'
         }
     }
 
@@ -169,6 +190,7 @@ Describe 'Deploy-PSUModule' {
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
                 [pscustomobject]@{ Name = $Name; Version = '5.1.6'; Repository = 'PSGallery'; Status = 'Installed' }
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {}
             Mock -ModuleName Devolutions.CIEM.Admin Restart-CIEMPSUApp { throw 'Restart-CIEMPSUApp must not run when -SkipAppRestart is set' }
         }
 
@@ -188,6 +210,7 @@ Describe 'Deploy-PSUModule' {
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule {
                 [pscustomobject]@{ Name = $Name; Version = '5.1.6'; Repository = 'PSGallery'; Status = 'Installed' }
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {}
             Mock -ModuleName Devolutions.CIEM.Admin Restart-CIEMPSUApp { throw 'Restart-CIEMPSUApp must not run when -ValidateDeployment is set (validation handles its own restart)' }
             Mock -ModuleName Devolutions.CIEM.Admin Invoke-CIEMPSUModuleDeployment {
                 $script:validateCalls.Add([pscustomobject]@{ Environment = $Environment; ModulePath = $ModulePath; EnvFilePath = $EnvFilePath; TimeoutSeconds = $TimeoutSeconds })
@@ -211,6 +234,7 @@ Describe 'Deploy-PSUModule' {
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU {
                 [PSCustomObject]@{ Url = 'http://mocked'; Status = 'Connected'; IsAzure = $false }
             }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule {}
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule { throw 'Mocked install failure: PSU rejected the module upload' }
             Mock -ModuleName Devolutions.CIEM.Admin Restart-CIEMPSUApp { throw 'Restart must not run when install failed' }
         }
@@ -226,6 +250,7 @@ Describe 'Deploy-PSUModule' {
     Context 'when Connect-PSU throws' {
         BeforeAll {
             Mock -ModuleName Devolutions.CIEM.Admin Connect-PSU { throw 'Mocked connect failure: AZURE_PSU_TOKEN missing' }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule { throw 'Remove must not run when connect failed' }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule { throw 'Install must not run when connect failed' }
         }
 
@@ -243,6 +268,7 @@ Describe 'Deploy-PSUModule' {
                 [PSCustomObject]@{ Url = 'http://mocked'; Status = 'Connected'; IsAzure = $false }
             }
             Mock -ModuleName Devolutions.CIEM.Admin Install-PSUModule { throw 'Install must not run in -WhatIf mode' }
+            Mock -ModuleName Devolutions.CIEM.Admin Remove-PSUModule { throw 'Remove must not run in -WhatIf mode' }
             Mock -ModuleName Devolutions.CIEM.Admin Restart-CIEMPSUApp { throw 'Restart must not run in -WhatIf mode' }
         }
 
