@@ -58,7 +58,22 @@ if ($moduleCount -eq 1) {
     $moduleBase = [string]$modules[0].ModuleBase
 }
 
-$appCount = @(Get-PSUApp -Integrated | Where-Object { $_.Name -eq 'Devolutions CIEM' -and $_.BaseUrl -eq '/ciem' }).Count
+$ciemApps = @(Get-PSUApp -Integrated | Where-Object { $_.Name -eq 'Devolutions CIEM' -and $_.BaseUrl -eq '/ciem' })
+$appCount = $ciemApps.Count
+$appAuthenticated = $false
+$appRoles = @()
+if ($appCount -eq 1) {
+    $ciemApp = $ciemApps[0]
+    if (-not $ciemApp.PSObject.Properties['Authenticated']) {
+        throw 'Get-PSUApp did not return an Authenticated property for the Devolutions CIEM app.'
+    }
+    if (-not $ciemApp.PSObject.Properties['Role']) {
+        throw 'Get-PSUApp did not return a Role property for the Devolutions CIEM app.'
+    }
+
+    $appAuthenticated = [bool]$ciemApp.Authenticated
+    $appRoles = @($ciemApp.Role | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+}
 $managedScriptNotes = 'ManagedBy=Devolutions.CIEM;Source=data/psu-scripts.json'
 $registeredManagedScripts = @(Get-PSUScript -Integrated | Where-Object {
         $_.Notes -eq $managedScriptNotes -or
@@ -141,6 +156,8 @@ if ($validateManagedIdentityRead) {
     ModuleVersion                    = $moduleVersion
     ModuleBase                       = $moduleBase
     AppCount                         = $appCount
+    AppAuthenticated                 = $appAuthenticated
+    AppRoles                         = @($appRoles)
     ScriptCount                      = $scriptCount
     ExpectedScriptCount              = $expectedScriptCount
     UnsupportedScriptCount           = @($unsupportedScriptNames).Count
@@ -195,6 +212,16 @@ if ($validateManagedIdentityRead) {
     }
     if ([int]$details.AppCount -ne 1) {
         throw "CIEM deployment validation failed: expected one Devolutions CIEM app at /ciem on $Environment, found $($details.AppCount)."
+    }
+    if (-not [bool]$details.AppAuthenticated) {
+        throw "CIEM deployment validation failed: CIEM app at /ciem is not authenticated on $Environment."
+    }
+    $appRoles = @($details.AppRoles | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    if ($appRoles -notcontains 'User') {
+        throw "CIEM deployment validation failed: CIEM app at /ciem does not grant the User role on $Environment."
+    }
+    if ($appRoles -notcontains 'Administrator') {
+        throw "CIEM deployment validation failed: CIEM app at /ciem does not grant the Administrator role on $Environment."
     }
     if ([int]$details.ExpectedScriptCount -lt 1) {
         throw "CIEM deployment validation failed: expected script count could not be determined on $Environment."
@@ -260,7 +287,7 @@ if ($validateManagedIdentityRead) {
         Checklist           = @(
             [pscustomobject]@{ Name = 'PSU version'; Status = 'Healthy'; Detail = "PowerShell Universal $($details.PsuVersion)." }
             [pscustomobject]@{ Name = 'CIEM module import path'; Status = 'Healthy'; Detail = "$($details.ModuleVersion) at $($details.ModuleBase)." }
-            [pscustomobject]@{ Name = 'CIEM app route'; Status = 'Healthy'; Detail = "$ciemUrl returned usable CIEM content." }
+            [pscustomobject]@{ Name = 'CIEM app route'; Status = 'Healthy'; Detail = "$ciemUrl is registered as an authenticated PSU app for the User and Administrator roles." }
             [pscustomobject]@{ Name = 'CIEM automation scripts'; Status = 'Healthy'; Detail = "$($details.ScriptCount) managed script(s) registered, including Devolutions.CIEM\Start-CIEMAzureDiscovery." }
             [pscustomobject]@{ Name = 'Scheduled discovery support'; Status = 'Healthy'; Detail = 'New-PSUSchedule is available for the next scheduled-discovery phase.' }
             [pscustomobject]@{ Name = 'CIEM SQLite database'; Status = 'Healthy'; Detail = "Initialized at $($details.DatabasePath). Supported for the validated single-instance PSU topology." }

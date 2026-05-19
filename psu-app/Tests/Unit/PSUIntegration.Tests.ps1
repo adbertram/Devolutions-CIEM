@@ -25,13 +25,22 @@ Describe 'PSU Integration Changes' {
 
     Context 'PSU script registration' {
         BeforeAll {
+            $script:DashboardsPath = Join-Path $script:ModuleRoot '.universal' 'dashboards.ps1'
             $script:ScriptsPath = Join-Path $script:ModuleRoot '.universal' 'scripts.ps1'
             $script:InitializePath = Join-Path $script:ModuleRoot '.universal' 'initialize.ps1'
             $script:SetupPath = Join-Path $script:ModuleRoot 'setup.ps1'
             $script:AuthenticationPath = Join-Path $script:ModuleRoot '.universal' 'authentication.ps1'
             $script:RolesPath = Join-Path $script:ModuleRoot '.universal' 'roles.ps1'
             $script:SettingsPath = Join-Path $script:ModuleRoot '.universal' 'settings.ps1'
+            $script:DashboardsContent = Get-Content -Path $script:DashboardsPath -Raw
             $script:AppContent = Get-Content (Join-Path $script:ModuleRoot 'modules' 'Devolutions.CIEM.PSU' 'Public' 'New-DevolutionsCIEMApp.ps1') -Raw
+        }
+
+        It 'Registers the CIEM app as authenticated for PSU users and administrators' {
+            $script:DashboardsPath | Should -Exist
+            $script:DashboardsContent | Should -Match "New-PSUApp[\s\S]*-Name\s+'Devolutions CIEM'"
+            $script:DashboardsContent | Should -Match "New-PSUApp[\s\S]*-Authenticated"
+            $script:DashboardsContent | Should -Match "New-PSUApp[\s\S]*-Role\s+@\('User',\s*'Administrator'\)"
         }
 
         It 'Ships scripts.ps1 as the install-time module resource for core CIEM commands' {

@@ -399,6 +399,8 @@ Describe 'Test-CIEMPSUDeployment' {
                 [Parameter()][string[]]$UnsupportedScriptNames = @(),
                 [Parameter()][bool]$DiscoveryCommandRegistered = $true,
                 [Parameter()][bool]$ScheduleSupportAvailable = $true,
+                [Parameter()][bool]$AppAuthenticated = $true,
+                [Parameter()][string[]]$AppRoles = @('User', 'Administrator'),
                 [Parameter()][string]$ManagedIdentityReadStatus = 'NotRequested',
                 [Parameter()][int]$ManagedIdentitySubscriptionCount = 0
             )
@@ -411,6 +413,8 @@ Describe 'Test-CIEMPSUDeployment' {
                 ModuleVersion                    = '4.0.21'
                 ModuleBase                       = '/Users/adam/psu/Repository/Modules/Devolutions.CIEM'
                 AppCount                         = 1
+                AppAuthenticated                 = $AppAuthenticated
+                AppRoles                         = @($AppRoles)
                 ScriptCount                      = $ScriptCount
                 ExpectedScriptCount              = $ExpectedScriptCount
                 UnsupportedScriptCount           = $UnsupportedScriptCount
@@ -566,5 +570,26 @@ Describe 'Test-CIEMPSUDeployment' {
 
         { Test-CIEMPSUDeployment -Environment azure } |
             Should -Throw -ExpectedMessage '*CIEM app page is not running*'
+    }
+
+    It 'throws when the CIEM app is not authenticated' {
+        $script:probeOutput = NewTestDeploymentProbeJson -AppAuthenticated $false
+
+        { Test-CIEMPSUDeployment -Environment azure } |
+            Should -Throw -ExpectedMessage '*CIEM app at /ciem is not authenticated*'
+    }
+
+    It 'throws when the CIEM app does not grant the PSU User role' {
+        $script:probeOutput = NewTestDeploymentProbeJson -AppRoles @('Administrator')
+
+        { Test-CIEMPSUDeployment -Environment azure } |
+            Should -Throw -ExpectedMessage '*CIEM app at /ciem does not grant the User role*'
+    }
+
+    It 'throws when the CIEM app does not grant the PSU Administrator role' {
+        $script:probeOutput = NewTestDeploymentProbeJson -AppRoles @('User')
+
+        { Test-CIEMPSUDeployment -Environment azure } |
+            Should -Throw -ExpectedMessage '*CIEM app at /ciem does not grant the Administrator role*'
     }
 }

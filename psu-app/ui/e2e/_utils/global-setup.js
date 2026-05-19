@@ -1,9 +1,67 @@
 const path = require('path');
+const fs = require('fs');
+const { chromium } = require('@playwright/test');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
 const { isPSUReady, startPSU, waitForPSU, cancelRunningPSUJobs, runPSUCommand } = require('./psu-helpers');
 const { cleanupTestData, seedChecks, seedTestData } = require('./cleanup');
 const { testConfig } = require('./test-config');
+
+const AUTH_STATE_PATH = path.resolve(__dirname, '../.auth/psu-ui-state.json');
+
+function ensureEmptyAuthState() {
+  fs.mkdirSync(path.dirname(AUTH_STATE_PATH), { recursive: true });
+  fs.writeFileSync(AUTH_STATE_PATH, JSON.stringify({ cookies: [], origins: [] }, null, 2));
+}
+
+async function createAuthenticatedUiState() {
+  if (!testConfig.environment.uiUsername || !testConfig.environment.uiPassword) {
+    const prefix = testConfig.environment.name.toUpperCase();
+    throw new Error(`${prefix}_PSU_USERNAME and ${prefix}_PSU_PASSWORD are required because ${testConfig.environment.name} PSU redirects CIEM pages to /login.`);
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`${testConfig.urls.psu}/ciem/ciem/config`, { waitUntil: 'networkidle' });
+    if (!new URL(page.url()).pathname.startsWith('/login')) {
+      await context.storageState({ path: AUTH_STATE_PATH });
+      return;
+    }
+
+    await page.getByRole('textbox', { name: 'User Name' }).fill(testConfig.environment.uiUsername);
+    await page.getByRole('textbox', { name: 'Password' }).fill(testConfig.environment.uiPassword);
+    await page.getByRole('button', { name: 'Login' }).click();
+    await page.waitForLoadState('networkidle');
+
+    const finalPath = new URL(page.url()).pathname;
+    if (finalPath.startsWith('/login')) {
+      throw new Error(`PSU UI login failed for ${testConfig.environment.name}; browser remained on ${page.url()}.`);
+    }
+
+    await context.storageState({ path: AUTH_STATE_PATH });
+  }
+  finally {
+    await browser.close();
+  }
+}
+
+async function prepareUiAuthState() {
+  ensureEmptyAuthState();
+
+  const ciemUrl = `${testConfig.urls.psu}/ciem/ciem`;
+  const response = await fetch(ciemUrl);
+  const body = await response.text();
+  const finalUrl = new URL(response.url);
+  const requiresLogin = finalUrl.pathname.startsWith('/login') || body.includes('Log in to your account');
+
+  if (requiresLogin) {
+    await createAuthenticatedUiState();
+  }
+
+  return { response, requiresLogin };
+}
 
 module.exports = async function globalSetup() {
   console.log('[setup] Running global test setup...');
@@ -22,15 +80,15 @@ module.exports = async function globalSetup() {
   }
 
   // 2. Verify CIEM app is accessible
-  const ciemUrl = `${testConfig.urls.psu}/ciem/ciem`;
   try {
-    const response = await fetch(ciemUrl);
+    const { response, requiresLogin } = await prepareUiAuthState();
     if (!response.ok) {
-      throw new Error(`CIEM app returned ${response.status} at ${ciemUrl}`);
+      throw new Error(`CIEM app returned ${response.status} at ${testConfig.urls.psu}/ciem/ciem`);
     }
-    console.log('[setup] CIEM app is accessible.');
+    const authStatus = requiresLogin ? 'authenticated' : 'anonymous';
+    console.log(`[setup] CIEM app is accessible (${authStatus}).`);
   } catch (error) {
-    throw new Error(`Cannot reach CIEM app at ${ciemUrl}: ${error.message}`);
+    throw new Error(`Cannot reach CIEM app at ${testConfig.urls.psu}/ciem/ciem: ${error.message}`);
   }
 
   // 3. Cancel any zombie PSU jobs from previous killed test runs

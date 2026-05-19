@@ -1,7 +1,9 @@
+const path = require('path');
 const { defineConfig, devices } = require('@playwright/test');
 const { testConfig } = require('./_utils/test-config');
 
 const baseURL = testConfig.urls.psu;
+const storageState = path.resolve(__dirname, '.auth/psu-ui-state.json');
 
 module.exports = defineConfig({
   testDir: './pages',
@@ -22,7 +24,8 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
     headless: true,
     actionTimeout: 15000,
-    navigationTimeout: 30000
+    navigationTimeout: 30000,
+    storageState
   },
   projects: [
     {

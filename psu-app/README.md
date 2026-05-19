@@ -29,6 +29,10 @@ Sync-PSUConfiguration                       # re-runs .universal/*.ps1 to regist
 
 After import, navigate to `/ciem` (or `/<app-base>/ciem`) and the dashboard renders.
 
+## App Access
+
+CIEM registers as an authenticated PSU app for the built-in `User` and `Administrator` roles. Control who can open the CIEM app from PSU **Security > Roles** by assigning identities directly, configuring role policy scripts, or mapping identity provider claims to those roles. Users without either role receive PSU's not-authorized page.
+
 ## Azure Managed Identity Setup
 
 When PSU runs on Azure App Service, configure a **system-assigned managed identity** so the CIEM module can authenticate to Azure and Microsoft Graph without storing a client secret.

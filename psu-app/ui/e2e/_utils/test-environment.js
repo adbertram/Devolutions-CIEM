@@ -7,11 +7,15 @@ const ENVIRONMENTS = {
   local: {
     urlVariable: 'LOCAL_PSU_URL',
     tokenVariable: 'LOCAL_PSU_TOKEN',
+    usernameVariable: 'LOCAL_PSU_USERNAME',
+    passwordVariable: 'LOCAL_PSU_PASSWORD',
     usesPublishPointDatabase: true
   },
   azure: {
     urlVariable: 'AZURE_PSU_URL',
     tokenVariable: 'AZURE_PSU_TOKEN',
+    usernameVariable: 'AZURE_PSU_USERNAME',
+    passwordVariable: 'AZURE_PSU_PASSWORD',
     usesPublishPointDatabase: false
   }
 };
@@ -38,6 +42,8 @@ function resolveTestEnvironment(name = process.env.CIEM_TEST_ENVIRONMENT || 'loc
     name,
     psuUrl: normalizeUrl(getRequiredEnv(definition.urlVariable)),
     psuToken: getRequiredEnv(definition.tokenVariable),
+    uiUsername: process.env[definition.usernameVariable] || '',
+    uiPassword: process.env[definition.passwordVariable] || '',
     healthEndpoint: '/api/v1/alive',
     usesPublishPointDatabase: definition.usesPublishPointDatabase
   };
