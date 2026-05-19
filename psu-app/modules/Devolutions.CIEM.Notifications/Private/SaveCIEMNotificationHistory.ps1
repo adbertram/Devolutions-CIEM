@@ -14,6 +14,10 @@ function SaveCIEMNotificationHistory {
         [string]$SourceSignalType,
 
         [Parameter(Mandatory)]
+        [ValidateSet('Manual', 'ScheduledDiscovery')]
+        [string]$InvocationSource,
+
+        [Parameter(Mandatory)]
         [ValidateSet('Succeeded', 'Failed')]
         [string]$Status,
 
@@ -35,17 +39,18 @@ function SaveCIEMNotificationHistory {
     Invoke-CIEMQuery -Query @"
 INSERT INTO notification_history (
     notification_id, channel_id, source_signal_id, source_signal_type,
-    status, attempted_at, completed_at, message_id, recipient_summary, error_message
+    invocation_source, status, attempted_at, completed_at, message_id, recipient_summary, error_message
 )
 VALUES (
     @notification_id, @channel_id, @source_signal_id, @source_signal_type,
-    @status, @attempted_at, @completed_at, @message_id, @recipient_summary, @error_message
+    @invocation_source, @status, @attempted_at, @completed_at, @message_id, @recipient_summary, @error_message
 )
 "@ -Parameters @{
         notification_id   = $NotificationId
         channel_id        = $ChannelId
         source_signal_id  = $SourceSignalId
         source_signal_type = $SourceSignalType
+        invocation_source = $InvocationSource
         status            = $Status
         attempted_at      = $AttemptedAt
         completed_at      = (Get-Date).ToString('o')

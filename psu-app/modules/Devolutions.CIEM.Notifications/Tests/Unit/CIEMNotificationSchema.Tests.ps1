@@ -27,6 +27,65 @@ WHERE type = 'table'
         $tables.name | Should -Contain 'notification_history'
     }
 
+    It 'creates notification history with an invocation source column' {
+        $columns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('notification_history')")
+        $column = @($columns | Where-Object { $_.name -eq 'invocation_source' })
+
+        $column | Should -HaveCount 1
+        $column[0].type | Should -Be 'TEXT'
+    }
+
+    It 'adds the invocation source column to existing notification history tables' {
+        $originalDatabasePath = InModuleScope Devolutions.CIEM { $script:DatabasePath }
+        $legacyDatabasePath = "$TestDrive/legacy-notification-history.db"
+        $connection = Open-PSUSQLiteConnection -Database $legacyDatabasePath
+        try {
+            Invoke-PSUSQLiteQuery -Connection $connection -Query @"
+CREATE TABLE notification_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    notification_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL,
+    source_signal_id TEXT NOT NULL,
+    source_signal_type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    attempted_at TEXT NOT NULL,
+    completed_at TEXT,
+    message_id TEXT,
+    recipient_summary TEXT,
+    error_message TEXT
+)
+"@ -AsNonQuery | Out-Null
+        }
+        finally {
+            $connection.Dispose()
+        }
+
+        try {
+            InModuleScope Devolutions.CIEM -Parameters @{ DatabasePath = $legacyDatabasePath } {
+                param($DatabasePath)
+                $script:DatabasePath = $DatabasePath
+                UpdateCIEMNotificationHistorySchema
+                UpdateCIEMNotificationHistorySchema
+            }
+
+            InModuleScope Devolutions.CIEM -Parameters @{ DatabasePath = $legacyDatabasePath } {
+                param($DatabasePath)
+                $script:DatabasePath = $DatabasePath
+                $columns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('notification_history')")
+                $column = @($columns | Where-Object { $_.name -eq 'invocation_source' })
+
+                $column | Should -HaveCount 1
+                $column[0].type | Should -Be 'TEXT'
+            }
+        }
+        finally {
+            InModuleScope Devolutions.CIEM -Parameters @{ DatabasePath = $originalDatabasePath } {
+                param($DatabasePath)
+                $script:DatabasePath = $DatabasePath
+            }
+        }
+    }
+
     It 'does not store authentication profile ownership on notification channels' {
         $columns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('notification_channels')")
 

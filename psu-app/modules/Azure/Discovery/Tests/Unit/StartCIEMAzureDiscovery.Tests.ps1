@@ -87,6 +87,96 @@ Describe 'Start-CIEMAzureDiscovery' {
         }
     }
 
+    Context 'Notification invocation source' {
+        BeforeEach {
+            Mock -ModuleName Devolutions.CIEM InvokeCIEMDiscoveryPhase {
+                param(
+                    [string]$Name,
+                    [scriptblock]$Action,
+                    [object]$ErrorMessages,
+                    [ref]$WarningCounter,
+                    [string]$FailureMode,
+                    [scriptblock]$OnSuccess,
+                    [scriptblock]$DetailBuilder,
+                    [int]$DiscoveryRunId
+                )
+
+                $phaseResult = switch ($Name) {
+                    'Entra entity collection' {
+                        [PSCustomObject]@{
+                            Id = 'user-1'
+                            DisplayName = 'User One'
+                            Type = 'user'
+                        }
+                    }
+                    'Build data load' {
+                        [PSCustomObject]@{
+                            ArmCount = 0
+                            EntraCount = 1
+                            RelCount = 0
+                        }
+                    }
+                    default { $null }
+                }
+
+                [PSCustomObject]@{
+                    Name = $Name
+                    Succeeded = $true
+                    Result = $phaseResult
+                    ElapsedSeconds = 0
+                }
+            }
+            Mock -ModuleName Devolutions.CIEM Save-CIEMExposureSnapshot { @([PSCustomObject]@{ Id = 'snapshot-item' }) }
+            Mock -ModuleName Devolutions.CIEM Compare-CIEMExposureSnapshot {}
+            Mock -ModuleName Devolutions.CIEM Send-CIEMNotification {}
+            Mock -ModuleName Devolutions.CIEM Update-CIEMAzureDiscoveryScheduleStatus {}
+
+            InModuleScope Devolutions.CIEM {
+                $script:AzureAuthContext = [PSCustomObject]@{
+                    IsConnected = $true
+                    SubscriptionIds = @()
+                }
+                foreach ($variableName in @('UAScheduleId', 'UAJobId')) {
+                    Remove-Variable -Name $variableName -Scope Script -ErrorAction SilentlyContinue
+                }
+                Invoke-CIEMQuery -Query 'DELETE FROM azure_discovery_runs' -AsNonQuery | Out-Null
+                New-CIEMAzureDiscoveryRun -Scope 'Entra' -Status 'Completed' -StartedAt '2026-05-12T12:00:00Z' -CompletedAt '2026-05-12T12:10:00Z' | Out-Null
+            }
+        }
+
+        AfterEach {
+            InModuleScope Devolutions.CIEM {
+                foreach ($variableName in @('UAScheduleId', 'UAJobId')) {
+                    Remove-Variable -Name $variableName -Scope Script -ErrorAction SilentlyContinue
+                }
+                $script:AzureAuthContext = $null
+            }
+        }
+
+        It 'uses Manual notification source when PSU job context has no schedule id' {
+            InModuleScope Devolutions.CIEM {
+                $script:UAJobId = 501
+                Start-CIEMAzureDiscovery -Scope 'Entra' | Out-Null
+            }
+
+            Should -Invoke -CommandName Send-CIEMNotification -ModuleName Devolutions.CIEM -Times 1 -Exactly -ParameterFilter {
+                $InvocationSource -eq 'Manual'
+            }
+        }
+
+        It 'uses ScheduledDiscovery notification source when PSU schedule and job ids exist' {
+            InModuleScope Devolutions.CIEM {
+                $script:UAScheduleId = 701
+                $script:UAJobId = 702
+                Start-CIEMAzureDiscovery -Scope 'Entra' | Out-Null
+            }
+
+            Should -Invoke -CommandName Send-CIEMNotification -ModuleName Devolutions.CIEM -Times 1 -Exactly -ParameterFilter {
+                $InvocationSource -eq 'ScheduledDiscovery'
+            }
+        }
+    }
+
     Context 'Phase array refactor' {
         BeforeAll {
             $script:StartDiscoverySource = Get-Content (Join-Path $PSScriptRoot '..' '..' 'Public' 'Start-CIEMAzureDiscovery.ps1') -Raw

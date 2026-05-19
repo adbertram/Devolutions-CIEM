@@ -81,6 +81,40 @@ function Send-CIEMNotification {
     $matchingChanges = @($changes | Where-Object {
         $notification.ChangeTypes -contains $_.ChangeType -and [int]$_.SeverityRank -le $minimumSeverityRank
     })
+    $notificationGroups = @($matchingChanges | Group-Object -Property ChangeType, ExposureType, Title | ForEach-Object {
+            $groupChanges = @($_.Group | Sort-Object @{ Expression = { [int]$_.SeverityRank } }, ImpactedIdentityName, ImpactedResourceName, Id)
+            $primaryChange = $groupChanges[0]
+            $identities = @($groupChanges | ForEach-Object { [string]$_.ImpactedIdentityName } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+            $targets = @($groupChanges | ForEach-Object { [string]$_.ImpactedResourceName } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+            $signalIds = @($groupChanges | ForEach-Object { [string]$_.Id })
+            $groupLines = @(foreach ($groupChange in $groupChanges) {
+                    $lineParts = [System.Collections.Generic.List[string]]::new()
+                    if (-not [string]::IsNullOrWhiteSpace([string]$groupChange.ImpactedIdentityName)) {
+                        $lineParts.Add("Identity: $($groupChange.ImpactedIdentityName)")
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace([string]$groupChange.ImpactedResourceName)) {
+                        $lineParts.Add("Target: $($groupChange.ImpactedResourceName)")
+                    }
+                    if (-not [string]::IsNullOrWhiteSpace([string]$groupChange.Evidence)) {
+                        $lineParts.Add("Evidence: $($groupChange.Evidence)")
+                    }
+                    $lineParts.Add("Signal: $($groupChange.Id)")
+                    "- $($lineParts -join '; ')"
+                })
+            $changeCountLabel = if ($groupChanges.Count -eq 1) { '1 matching exposure change' } else { "$($groupChanges.Count) matching exposure changes" }
+
+            [PSCustomObject]@{
+                Id                    = $signalIds -join ','
+                CurrentDiscoveryRunId = $primaryChange.CurrentDiscoveryRunId
+                ChangeType            = $primaryChange.ChangeType
+                Severity              = $primaryChange.Severity
+                SeverityRank          = $primaryChange.SeverityRank
+                Title                 = $primaryChange.Title
+                Evidence              = "$changeCountLabel`n$($groupLines -join "`n")"
+                ImpactedIdentityName  = $identities -join ', '
+                ImpactedResourceName  = $targets -join ', '
+            }
+        })
 
     $sentCount = 0
     $failedCount = 0
@@ -92,7 +126,7 @@ function Send-CIEMNotification {
         $recipientSummary += "; Bcc: $($channel.BccRecipients -join ', ')"
     }
 
-    foreach ($change in $matchingChanges) {
+    foreach ($change in $notificationGroups) {
         $templateValues = @{
             Severity              = $change.Severity
             Title                 = $change.Title
@@ -116,6 +150,7 @@ function Send-CIEMNotification {
                 -ChannelId $channel.Id `
                 -SourceSignalId ([string]$change.Id) `
                 -SourceSignalType 'ExposureChange' `
+                -InvocationSource $InvocationSource `
                 -Status 'Succeeded' `
                 -AttemptedAt $attemptedAt `
                 -MessageId $sendResult.MessageId `
@@ -129,6 +164,7 @@ function Send-CIEMNotification {
                 -ChannelId $channel.Id `
                 -SourceSignalId ([string]$change.Id) `
                 -SourceSignalType 'ExposureChange' `
+                -InvocationSource $InvocationSource `
                 -Status 'Failed' `
                 -AttemptedAt $attemptedAt `
                 -RecipientSummary $recipientSummary `

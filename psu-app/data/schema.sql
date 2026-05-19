@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS notification_history (
     channel_id TEXT NOT NULL,
     source_signal_id TEXT NOT NULL,
     source_signal_type TEXT NOT NULL,
+    invocation_source TEXT,
     status TEXT NOT NULL,
     attempted_at TEXT NOT NULL,
     completed_at TEXT,

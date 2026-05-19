@@ -14,7 +14,10 @@ BeforeAll {
             [Parameter(Mandatory)][string]$ChangeType,
             [Parameter(Mandatory)][string]$Severity,
             [Parameter(Mandatory)][int]$SeverityRank,
-            [Parameter(Mandatory)][string]$Title
+            [Parameter(Mandatory)][string]$Title,
+            [Parameter()][string]$ExposureType = 'AttackPath',
+            [Parameter()][string]$IdentityName = 'Notification User',
+            [Parameter()][string]$ResourceName = 'Production Subscription'
         )
 
         $ErrorActionPreference = 'Stop'
@@ -29,9 +32,9 @@ INSERT INTO ciem_exposure_changes (
 )
 VALUES (
     @id, NULL, @run_id, @exposure_key,
-    @change_type, 'IdentityRisk', @severity, @severity_rank, @title, NULL,
-    @severity, 'user-notify', 'Notification User',
-    'User', '/subscriptions/prod', 'Production Subscription',
+    @change_type, @exposure_type, @severity, @severity_rank, @title, NULL,
+    @severity, @identity_id, @identity_name,
+    'User', @resource_id, @resource_name,
     '2026-05-12T12:00:00Z', NULL, '{}', @evidence, '2026-05-12T12:00:00Z'
 )
 "@ -Parameters @{
@@ -39,14 +42,25 @@ VALUES (
             run_id        = $RunId
             exposure_key  = "identity:$Id"
             change_type   = $ChangeType
+            exposure_type = $ExposureType
             severity      = $Severity
             severity_rank = $SeverityRank
             title         = $Title
+            identity_id   = "identity:$IdentityName"
+            identity_name = $IdentityName
+            resource_id   = "resource:$ResourceName"
+            resource_name = $ResourceName
             evidence      = "$Title evidence"
         } -AsNonQuery | Out-Null
     }
 
     function InitializeTestNotificationConfiguration {
+        param(
+            [Parameter()]
+            [ValidateSet('AnyDiscovery', 'ScheduledDiscovery', 'ManualOnly')]
+            [string]$AutoSendScope = 'AnyDiscovery'
+        )
+
         $profile = Save-CIEMAuthenticationProfile -Name 'SMTP Relay' -Provider 'Email' -Method 'SmtpAnonymous' -Settings @{
             Host = 'smtp-relay.example.com'
             Port = 25
@@ -54,13 +68,19 @@ VALUES (
         } -SecretRefs @{}
         Set-CIEMAuthenticationProfileAssignment -UsageType 'NotificationChannel' -UsageId 'email-default' -AuthenticationProfileId $profile.Id | Out-Null
         Set-CIEMNotificationChannel -Enabled $true -FromAddress 'ciem@example.com' -ToRecipients @('security@example.com') | Out-Null
-        Set-CIEMNotification -Enabled $true -AutoSendScope 'AnyDiscovery' -ChangeTypes @('NewRisk', 'RiskIncrease') -MinimumSeverity 'High' -SubjectTemplate '[CIEM] {{Severity}} {{Title}}' -TextBodyTemplate 'Text {{Title}} {{Evidence}}' -HtmlBodyTemplate '<p>HTML {{Title}} {{Evidence}}</p>' | Out-Null
+        Set-CIEMNotification -Enabled $true -AutoSendScope $AutoSendScope -ChangeTypes @('NewRisk', 'RiskIncrease') -MinimumSeverity 'High' -SubjectTemplate '[CIEM] {{Severity}} {{Title}}' -TextBodyTemplate 'Text {{Title}} {{Evidence}}' -HtmlBodyTemplate '<p>HTML {{Title}} {{Evidence}}</p>' | Out-Null
     }
 }
 
 Describe 'Send-CIEMNotification' {
     BeforeEach {
+        $script:SentMessages = [System.Collections.Generic.List[object]]::new()
         Mock -ModuleName Devolutions.CIEM SendCIEMEmailMessage {
+            $script:SentMessages.Add([PSCustomObject]@{
+                    Subject  = $Subject
+                    TextBody = $TextBody
+                    HtmlBody = $HtmlBody
+                })
             [PSCustomObject]@{ MessageId = 'smtp-test-message' }
         }
 
@@ -84,7 +104,30 @@ Describe 'Send-CIEMNotification' {
         $history = @(Get-CIEMNotificationHistory)
         $history | Should -HaveCount 1
         $history[0].Status | Should -Be 'Succeeded'
+        $history[0].InvocationSource | Should -Be 'Manual'
         $history[0].SourceSignalId | Should -Be 'critical-new'
+        Should -Invoke -CommandName SendCIEMEmailMessage -ModuleName Devolutions.CIEM -Times 1 -Exactly
+    }
+
+    It 'groups matching exposure changes by attack path title into one email body' {
+        InitializeTestNotificationConfiguration
+        $run = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-12T12:00:00Z' -CompletedAt '2026-05-12T12:10:00Z'
+        AddTestExposureChange -RunId $run.Id -Id 'grouped-risk-one' -ChangeType 'NewRisk' -Severity 'High' -SeverityRank 2 -Title 'Management port open to the internet' -IdentityName 'VM Admin One' -ResourceName 'Public NSG One'
+        AddTestExposureChange -RunId $run.Id -Id 'grouped-risk-two' -ChangeType 'NewRisk' -Severity 'High' -SeverityRank 2 -Title 'Management port open to the internet' -IdentityName 'VM Admin Two' -ResourceName 'Public NSG Two'
+
+        $result = Send-CIEMNotification -CurrentDiscoveryRunId $run.Id -InvocationSource 'Manual'
+
+        $result.SentCount | Should -Be 1
+        $history = @(Get-CIEMNotificationHistory)
+        $history | Should -HaveCount 1
+        $history[0].Status | Should -Be 'Succeeded'
+        $history[0].SourceSignalId | Should -Be 'grouped-risk-one,grouped-risk-two'
+        $script:SentMessages | Should -HaveCount 1
+        $script:SentMessages[0].Subject | Should -Be '[CIEM] High Management port open to the internet'
+        $script:SentMessages[0].TextBody | Should -Match 'VM Admin One'
+        $script:SentMessages[0].TextBody | Should -Match 'Public NSG One'
+        $script:SentMessages[0].TextBody | Should -Match 'VM Admin Two'
+        $script:SentMessages[0].TextBody | Should -Match 'Public NSG Two'
         Should -Invoke -CommandName SendCIEMEmailMessage -ModuleName Devolutions.CIEM -Times 1 -Exactly
     }
 
@@ -112,7 +155,24 @@ Describe 'Send-CIEMNotification' {
         $history = @(Get-CIEMNotificationHistory)
         $history | Should -HaveCount 1
         $history[0].Status | Should -Be 'Failed'
+        $history[0].InvocationSource | Should -Be 'Manual'
         $history[0].ErrorMessage | Should -Be 'smtp unavailable'
+    }
+
+    It 'sends scheduled discovery exposure changes under scheduled auto-send scope and records scheduled history' {
+        InitializeTestNotificationConfiguration -AutoSendScope 'ScheduledDiscovery'
+        $run = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-12T12:00:00Z' -CompletedAt '2026-05-12T12:10:00Z'
+        AddTestExposureChange -RunId $run.Id -Id 'critical-scheduled' -ChangeType 'NewRisk' -Severity 'Critical' -SeverityRank 1 -Title 'Critical scheduled risk'
+
+        $result = Send-CIEMNotification -CurrentDiscoveryRunId $run.Id -InvocationSource 'ScheduledDiscovery'
+
+        $result.SentCount | Should -Be 1
+        $history = @(Get-CIEMNotificationHistory)
+        $history | Should -HaveCount 1
+        $history[0].Status | Should -Be 'Succeeded'
+        $history[0].InvocationSource | Should -Be 'ScheduledDiscovery'
+        $history[0].SourceSignalId | Should -Be 'critical-scheduled'
+        Should -Invoke -CommandName SendCIEMEmailMessage -ModuleName Devolutions.CIEM -Times 1 -Exactly
     }
 
     It 'does not send when invocation source is excluded by auto-send scope' {
@@ -130,6 +190,7 @@ Describe 'Send-CIEMNotification' {
         $result = Send-CIEMNotification -CurrentDiscoveryRunId $run.Id -InvocationSource 'Manual'
 
         $result.SentCount | Should -Be 0
+        @(Get-CIEMNotificationHistory) | Should -HaveCount 0
         Should -Invoke -CommandName SendCIEMEmailMessage -ModuleName Devolutions.CIEM -Times 0 -Exactly
     }
 }

@@ -45,7 +45,7 @@ Rationale: Add idempotent generic authentication profile, assignment, notificati
 Rationale: New module root for notification classes, public CRUD commands, send command, and private helpers.
 
 **`psu-app/modules/Devolutions.CIEM.PSU/Pages/New-CIEMConfigPage.ps1`** - modified  
-Rationale: Keep notification routing, filters, templates, test email, and delivery history on Configuration while moving authentication profile management to the Authentication Profiles page.
+Rationale: Show available channel types first, open a temporary Email channel editor with only routing fields, and return users to the channel table after save. Notification filters, templates, test email, and delivery history are separate notification concerns and should not be visible in the channel manager by default.
 
 **`psu-app/modules/Devolutions.CIEM.PSU/Tests/Unit/PageCommandQualification.Tests.ps1`** - modified  
 Rationale: Permit new notification commands used from PSU page endpoints, while still enforcing module qualification.
@@ -57,6 +57,6 @@ Rationale: Pester coverage for schema, class structure, CRUD behavior, send beha
 Rationale: Add selectors and helper methods for the Notifications section.
 
 **`psu-app/ui/e2e/pages/Configuration/Configuration.test.js`** - modified  
-Rationale: Cover notification routing fields, test email action, and history table visibility.
+Rationale: Cover the initial channel-type list, temporary Email editor pane, save-to-table flow, and absence of SMTP/profile, template, test-email, and history controls from the channel manager.
 
 Ordering: tests are written and run before implementation; implementation then updates schema, module root, notification commands, Configuration UI, and discovery wiring. If an implementation discovery requires additional files, update this design before adding them.
