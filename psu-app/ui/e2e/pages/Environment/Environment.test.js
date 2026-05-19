@@ -203,7 +203,7 @@ test.describe('Environment Page', () => {
 
       const failureToast = envPage.page.locator('.iziToast:has-text("Discovery failed: No authentication profile assignment found for ProviderDiscovery")');
       await expect(failureToast).toBeVisible({ timeout: 15000 });
-      await expect(failureToast).toContainText('Configure one on the Authentication Profiles page.');
+      await expect(failureToast).toContainText('Configure one on the Configuration page.');
 
       const startBtn = envPage.page.locator(envPage.selectors.startDiscoveryBtn);
       await expect(startBtn).toBeEnabled({ timeout: 15000 });
@@ -227,7 +227,7 @@ test.describe('Environment Page', () => {
         throw new Error(`Could not verify Azure discovery auth assignment: ${result.status}`);
       }
       if (count !== 1) {
-        throw new Error(`Expected exactly one Azure discovery auth assignment before discovery, got ${count}. Configure ProviderDiscovery/Azure in Authentication Profiles.`);
+        throw new Error(`Expected exactly one Azure discovery auth assignment before discovery, got ${count}. Configure ProviderDiscovery/Azure in Configuration.`);
       }
     });
 

@@ -131,7 +131,7 @@ $(if (-not $inPSUContext) { "NOTE: Not running in PSU context - PSU secrets are 
 
             if (-not $secrets.CertificatePfx) {
                 $ctx.LastError = "PFX certificate not found or failed to load"
-                throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Authentication Profiles page."
+                throw "Certificate authentication requires a PFX certificate stored in PSU vault. Upload a PFX file on the Configuration page."
             }
 
             $certificateBytes = [Convert]::FromBase64String([string]$secrets.CertificatePfx)

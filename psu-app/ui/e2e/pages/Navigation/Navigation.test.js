@@ -39,7 +39,6 @@ test.describe('Navigation', () => {
       'Scan History',
       'Identities',
       'Reports',
-      'Authentication Profiles',
       'Configuration',
       'About'
     ]) {

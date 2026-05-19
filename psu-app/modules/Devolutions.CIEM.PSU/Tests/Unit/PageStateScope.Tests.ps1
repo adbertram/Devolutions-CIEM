@@ -3,7 +3,6 @@ BeforeAll {
     $script:PageFiles = @{}
     foreach ($fileName in @(
         'New-CIEMConfigPage.ps1',
-        'New-CIEMAuthenticationProfilesPage.ps1',
         'New-CIEMScanPage.ps1',
         'New-CIEMDashboardPage.ps1',
         'New-CIEMIdentitiesPage.ps1',
@@ -17,7 +16,7 @@ BeforeAll {
 Describe 'PSU page-local UI state' {
     $stateExpectations = @(
         @{
-            File = 'New-CIEMAuthenticationProfilesPage.ps1'
+            File = 'New-CIEMConfigPage.ps1'
             Variables = @('SelectedAuthenticationProfileId', 'UploadedAuthProfileSecretFiles')
         }
         @{

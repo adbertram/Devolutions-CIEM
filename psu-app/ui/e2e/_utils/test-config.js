@@ -14,7 +14,6 @@ const testConfig = {
     history: getPagePathByName('Scan History'),
     reports: getPagePathByName('Reports'),
     environment: getPagePathByName('Environment'),
-    authenticationProfiles: getPagePathByName('Authentication Profiles'),
     config: getPagePathByName('Configuration'),
     about: getPagePathByName('About'),
     identities: getPagePathByName('Identities'),

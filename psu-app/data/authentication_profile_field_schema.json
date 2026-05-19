@@ -54,7 +54,7 @@
     "fields": [
       { "name": "Host", "label": "SMTP Host", "kind": "setting", "inputType": "text", "required": true },
       { "name": "Port", "label": "SMTP Port", "kind": "setting", "inputType": "number", "required": true },
-      { "name": "TlsMode", "label": "TLS Mode", "kind": "setting", "inputType": "select", "required": true, "options": ["None", "StartTls", "Ssl"] }
+      { "name": "TlsMode", "label": "TLS Mode", "kind": "setting", "inputType": "select", "required": true, "defaultValue": "None", "options": ["None", "StartTls", "Ssl"] }
     ]
   },
   {
@@ -64,7 +64,7 @@
     "fields": [
       { "name": "Host", "label": "SMTP Host", "kind": "setting", "inputType": "text", "required": true },
       { "name": "Port", "label": "SMTP Port", "kind": "setting", "inputType": "number", "required": true },
-      { "name": "TlsMode", "label": "TLS Mode", "kind": "setting", "inputType": "select", "required": true, "options": ["None", "StartTls", "Ssl"] },
+      { "name": "TlsMode", "label": "TLS Mode", "kind": "setting", "inputType": "select", "required": true, "defaultValue": "None", "options": ["None", "StartTls", "Ssl"] },
       { "name": "Username", "label": "Username", "kind": "setting", "inputType": "text", "required": true },
       { "name": "Password", "label": "Password", "kind": "secret", "inputType": "password", "required": true }
     ]

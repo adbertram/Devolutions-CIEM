@@ -14,7 +14,7 @@ function GetCIEMAssignedAuthenticationProfile {
 
     $assignments = @(Get-CIEMAuthenticationProfileAssignment -UsageType $UsageType -UsageId $UsageId)
     if ($assignments.Count -ne 1) {
-        throw "No authentication profile assignment found for $UsageType '$UsageId'. Configure one on the Authentication Profiles page."
+        throw "No authentication profile assignment found for $UsageType '$UsageId'. Configure one on the Configuration page."
     }
 
     $profiles = @(Get-CIEMAuthenticationProfile -Id $assignments[0].AuthenticationProfileId -ResolveSecrets)

@@ -124,7 +124,7 @@ Describe 'Connect-CIEMAzure' {
                 Secrets  = [pscustomobject]@{}
             }
 
-            { Connect-CIEMAzure -AuthenticationProfile $profile } | Should -Throw '*Upload a PFX file on the Authentication Profiles page*'
+            { Connect-CIEMAzure -AuthenticationProfile $profile } | Should -Throw '*Upload a PFX file on the Configuration page*'
         }
 
         It 'throws clearly when ManagedIdentity environment variables are missing' {

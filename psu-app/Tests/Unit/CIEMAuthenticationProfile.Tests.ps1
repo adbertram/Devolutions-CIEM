@@ -41,6 +41,14 @@ ORDER BY name
         $assignments | Should -HaveCount 0
     }
 
+    It 'declares default TLS mode for Email authentication profile forms' {
+        $anonymousSchema = Get-CIEMAuthenticationProfileFieldSchema -Provider 'Email' -Method 'SmtpAnonymous'
+        $basicSchema = Get-CIEMAuthenticationProfileFieldSchema -Provider 'Email' -Method 'SmtpBasic'
+
+        ($anonymousSchema.fields | Where-Object name -eq 'TlsMode').defaultValue | Should -Be 'None'
+        ($basicSchema.fields | Where-Object name -eq 'TlsMode').defaultValue | Should -Be 'None'
+    }
+
     It 'removes the legacy seeded Default Azure authentication profile when database initialization reruns' {
         Invoke-CIEMQuery -Query @"
 INSERT INTO authentication_profiles (

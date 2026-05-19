@@ -14,7 +14,7 @@ BeforeAll {
 Describe 'CIEM PSU page registry' {
     It 'Defines strict page metadata for every app page' {
         $script:RegistryPath | Should -Exist
-        $script:RegistryPages | Should -HaveCount 11
+        $script:RegistryPages | Should -HaveCount 10
 
         foreach ($page in $script:RegistryPages) {
             $page.PSObject.Properties.Name | Sort-Object | Should -Be @('factory', 'icon', 'name', 'order', 'route', 'subtitle', 'test', 'title')

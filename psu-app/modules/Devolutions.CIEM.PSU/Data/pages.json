@@ -104,23 +104,10 @@
     }
   },
   {
-    "name": "Authentication Profiles",
-    "route": "/authentication-profiles",
-    "title": "Authentication Profiles",
-    "subtitle": "Reusable provider and notification connection profiles",
-    "icon": "Key",
-    "factory": "New-CIEMAuthenticationProfilesPage",
-    "order": 90,
-    "test": {
-      "expectedColumns": [],
-      "smokeSelector": "h4:has-text('Authentication Profiles')"
-    }
-  },
-  {
     "name": "Configuration",
     "route": "/config",
     "title": "Configuration",
-    "subtitle": "Scheduled discovery and notification settings",
+    "subtitle": "Authentication profiles, scheduled discovery, and notification settings",
     "icon": "Cog",
     "factory": "New-CIEMConfigPage",
     "order": 100,
