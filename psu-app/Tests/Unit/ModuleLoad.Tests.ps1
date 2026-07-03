@@ -113,6 +113,16 @@ Describe 'Module Load — Post-Discovery-Schema' {
         It 'Invoke-CIEMReport is available as a public command' {
             Get-Command -Module Devolutions.CIEM -Name Invoke-CIEMReport -ErrorAction Stop | Should -Not -BeNullOrEmpty
         }
+
+        It 'GetCIEMEnvironmentalProgressReportData remains private' {
+            (Get-Module Devolutions.CIEM).ExportedCommands.Keys | Should -Not -Contain 'GetCIEMEnvironmentalProgressReportData'
+        }
+    }
+
+    Context 'Validation helpers are exported' {
+        It 'Use-CIEMTemporaryDatabase is available as a public command' {
+            Get-Command -Module Devolutions.CIEM -Name Use-CIEMTemporaryDatabase -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
     }
 
     Context 'Check functions are exported' {

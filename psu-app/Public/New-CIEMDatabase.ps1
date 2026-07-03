@@ -116,6 +116,7 @@ function New-CIEMDatabase {
     Write-Verbose "CIEM DB: Synced $($attackPathRuleSync.RuleCount) attack path rules"
 
     UpdateCIEMCheckStorageSchema
+    UpdateCIEMScanRunStorageSchema
 
     foreach ($providerName in @('Azure', 'AWS')) {
         SyncCIEMCheckCatalog -Provider $providerName

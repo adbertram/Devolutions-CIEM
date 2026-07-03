@@ -46,11 +46,35 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     skipped_results INTEGER DEFAULT 0,
     manual_results INTEGER DEFAULT 0,
     error_message TEXT,
+    discovery_run_id INTEGER,
+    provider_explicit INTEGER NOT NULL DEFAULT 0,
+    progress_eligible INTEGER NOT NULL DEFAULT 0,
+    progress_scope_hash TEXT,
+    FOREIGN KEY (discovery_run_id) REFERENCES azure_discovery_runs(id) ON DELETE SET NULL,
     FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_scan_runs_provider ON scan_runs(provider_id);
 CREATE INDEX IF NOT EXISTS idx_scan_runs_started ON scan_runs(started_at);
+
+CREATE TABLE IF NOT EXISTS scan_run_providers (
+    scan_run_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    PRIMARY KEY (scan_run_id, provider),
+    FOREIGN KEY (scan_run_id) REFERENCES scan_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_run_providers_provider ON scan_run_providers(provider, scan_run_id);
+
+CREATE TABLE IF NOT EXISTS scan_run_check_snapshots (
+    scan_run_id TEXT NOT NULL,
+    check_id TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    PRIMARY KEY (scan_run_id, check_id),
+    FOREIGN KEY (scan_run_id) REFERENCES scan_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_run_check_snapshots_check ON scan_run_check_snapshots(check_id);
 
 CREATE TABLE IF NOT EXISTS scan_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,8 +85,7 @@ CREATE TABLE IF NOT EXISTS scan_results (
     resource_id TEXT,
     resource_name TEXT,
     location TEXT,
-    FOREIGN KEY (scan_run_id) REFERENCES scan_runs(id) ON DELETE CASCADE,
-    FOREIGN KEY (check_id) REFERENCES checks(id) ON DELETE CASCADE
+    FOREIGN KEY (scan_run_id) REFERENCES scan_runs(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_scan_results_run_status ON scan_results(scan_run_id, status);
