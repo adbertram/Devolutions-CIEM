@@ -6,12 +6,10 @@ const {
   restoreChecks,
   getTestCheckCounts,
   getCompletedDiscoveryRunCount,
-  backupAndClearAllDiscoveryRuns,
-  restoreDiscoveryRuns,
-  seedCompletedDiscoveryRun,
-  backupAndClearAllScanHistory,
-  restoreScanHistory
+  getScanResultCount,
+  TEST_PREFIX
 } = require('../../_utils/cleanup');
+const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
 
 test.describe('Scan Page', () => {
   let scanPage;
@@ -40,7 +38,7 @@ test.describe('Scan Page', () => {
     let discoveryBackup = null;
 
     test.beforeAll(() => {
-      discoveryBackup = backupAndClearAllDiscoveryRuns();
+      discoveryBackup = backupAndApplyFixture('coverage-no-completed-discovery');
       const count = getCompletedDiscoveryRunCount();
       if (count !== 0) {
         throw new Error(`Expected 0 completed discovery runs, got ${count}`);
@@ -49,7 +47,7 @@ test.describe('Scan Page', () => {
     });
 
     test.afterAll(() => {
-      restoreDiscoveryRuns(discoveryBackup);
+      restoreFixtureBackup(discoveryBackup);
     });
 
     test('should disable the Start Scan button', async () => {
@@ -276,19 +274,22 @@ test.describe('Scan Page', () => {
     let scanHistoryBackup = null;
 
     test.beforeAll(() => {
-      discoveryBackup = backupAndClearAllDiscoveryRuns();
-      scanHistoryBackup = backupAndClearAllScanHistory();
-      seedCompletedDiscoveryRun();
+      discoveryBackup = backupAndApplyFixture('coverage-completed-discovery');
+      scanHistoryBackup = backupAndApplyFixture('scan-history-empty');
       const count = getCompletedDiscoveryRunCount();
       if (count !== 1) {
         throw new Error(`Expected 1 completed discovery run, got ${count}`);
+      }
+      const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
+      if (run1Count !== 0) {
+        throw new Error(`Expected no seeded scan results, got ${run1Count}`);
       }
       console.log(`[setup:completed-discovery] Verified ${count} completed discovery run.`);
     });
 
     test.afterAll(() => {
-      restoreScanHistory(scanHistoryBackup);
-      restoreDiscoveryRuns(discoveryBackup);
+      restoreFixtureBackup(scanHistoryBackup);
+      restoreFixtureBackup(discoveryBackup);
     });
 
     test.describe('when the user clicks Start Scan without selecting any checks', () => {

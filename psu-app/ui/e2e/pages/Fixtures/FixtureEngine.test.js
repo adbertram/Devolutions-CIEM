@@ -22,6 +22,8 @@ test.describe('E2E fixture engine', () => {
       const counts = getFixtureTableCounts('scan-history-summary');
       expect(counts.checks).toBe(10);
       expect(counts.scan_runs).toBe(2);
+      expect(counts.scan_run_providers).toBe(2);
+      expect(counts.scan_run_check_snapshots).toBe(8);
       expect(counts.scan_results).toBe(8);
     } finally {
       restoreFixtureBackup(backup);

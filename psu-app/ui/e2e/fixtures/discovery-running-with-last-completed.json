@@ -1,0 +1,53 @@
+{
+  "name": "discovery-running-with-last-completed",
+  "description": "One completed discovery plus one running discovery for Environment status banner tests.",
+  "touchedTables": [
+    "azure_discovery_runs",
+    "azure_discovery_phase_metrics"
+  ],
+  "tables": {
+    "azure_discovery_runs": [
+      {
+        "id": 930101,
+        "psu_job_id": -930101,
+        "scope": "All",
+        "status": "Completed",
+        "started_at": "2026-03-14T09:15:00Z",
+        "completed_at": "2026-03-14T09:15:30Z",
+        "arm_type_count": 1,
+        "arm_row_count": 1,
+        "entra_type_count": 1,
+        "entra_row_count": 1,
+        "warning_count": 0,
+        "error_message": null,
+        "attack_path_scope_hash": null,
+        "discovery_scope_hash": null,
+        "exposure_snapshot_completed_at": null
+      },
+      {
+        "id": 930102,
+        "psu_job_id": -930102,
+        "scope": "All",
+        "status": "Running",
+        "started_at": "2026-03-14T09:16:00Z",
+        "completed_at": null,
+        "arm_type_count": 0,
+        "arm_row_count": 0,
+        "entra_type_count": 0,
+        "entra_row_count": 0,
+        "warning_count": 0,
+        "error_message": null,
+        "attack_path_scope_hash": null,
+        "discovery_scope_hash": null,
+        "exposure_snapshot_completed_at": null
+      }
+    ],
+    "azure_discovery_phase_metrics": []
+  },
+  "preconditions": [],
+  "expectedCounts": {
+    "azure_discovery_runs": 2,
+    "azure_discovery_phase_metrics": 0
+  },
+  "cleanup": "restoreTouchedTables"
+}

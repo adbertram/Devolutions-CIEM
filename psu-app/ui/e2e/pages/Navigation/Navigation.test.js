@@ -1,11 +1,7 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const NavigationPageHelpers = require('./NavigationPageHelpers');
 const { getExpectedNavItems } = require('../../_utils/page-registry');
-const {
-  backupAndClearAllDiscoveryRuns,
-  restoreDiscoveryRuns,
-  seedCompletedDiscoveryRunAt
-} = require('../../_utils/cleanup');
+const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
 
 test.describe('Navigation', () => {
   let navPage;
@@ -52,17 +48,15 @@ test.describe('Navigation', () => {
 
   test.describe('when a completed discovery run exists', () => {
     let backup = null;
-    const completedAt = '2026-03-14T09:15:30Z';
     const expectedTimestamp = '2026-03-14 09:15 UTC';
     const pages = getExpectedNavItems().map((item) => ({ name: item.label, path: item.path }));
 
     test.beforeAll(() => {
-      backup = backupAndClearAllDiscoveryRuns();
-      seedCompletedDiscoveryRunAt(completedAt);
+      backup = backupAndApplyFixture('discovery-last-completed');
     });
 
     test.afterAll(() => {
-      restoreDiscoveryRuns(backup);
+      restoreFixtureBackup(backup);
     });
 
     for (const pageConfig of pages) {

@@ -232,7 +232,8 @@ function selectFixtureRows(fixture, table) {
 }
 
 function deleteTables(touchedTables, tables = null) {
-  const statements = touchedTables.map(table => {
+  const deleteOrder = [...touchedTables].reverse();
+  const statements = deleteOrder.map(table => {
     assertSqlIdentifier(table, 'table');
     if (isMutableCatalogTable(table)) {
       if (!tables || !Array.isArray(tables[table])) {
@@ -286,9 +287,8 @@ function buildCheckUpdateStatements(rows) {
 
 function insertTableRows(tables, touchedTables) {
   const statements = [];
-  const insertOrder = [...touchedTables].reverse();
 
-  for (const table of insertOrder) {
+  for (const table of touchedTables) {
     if (isMutableCatalogTable(table)) {
       statements.push(...buildCheckUpdateStatements(tables[table]));
     } else {

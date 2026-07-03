@@ -4,7 +4,7 @@ const { chromium } = require('@playwright/test');
 require('dotenv').config({ path: path.resolve(__dirname, '../../../../.env') });
 
 const { isPSUReady, startPSU, waitForPSU, cancelRunningPSUJobs, runPSUCommand } = require('./psu-helpers');
-const { cleanupTestData, seedChecks, seedTestData } = require('./cleanup');
+const { cleanupTestData, seedChecks } = require('./cleanup');
 const { testConfig } = require('./test-config');
 
 const AUTH_STATE_PATH = path.resolve(__dirname, '../.auth/psu-ui-state.json');
@@ -149,7 +149,6 @@ module.exports = async function globalSetup() {
   // 5. Clean stale test data and seed fresh data in the selected PSU target
   cleanupTestData();
   seedChecks();
-  seedTestData();
 
   // 6. Export env vars for tests
   process.env.PSU_BASE_URL = testConfig.urls.psu;

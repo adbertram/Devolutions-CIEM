@@ -1,8 +1,6 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const ScanHistoryPageHelpers = require('./ScanHistoryPageHelpers');
 const {
-  backupAndClearAllScanHistory,
-  restoreScanHistory,
   getScanResultCount,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
@@ -160,13 +158,12 @@ test.describe('Scan History Page', () => {
     let backup = null;
 
     test.beforeAll(() => {
-      backup = backupAndClearAllScanHistory();
-      const { scanRunCount, scanResultCount } = backup;
-      console.log(`[setup] Verified 0 scan_runs and 0 scan_results (backed up ${scanRunCount} + ${scanResultCount}).`);
+      backup = backupAndApplyFixture('scan-history-empty');
+      console.log('[setup] Verified 0 scan_runs and 0 scan_results.');
     });
 
     test.afterAll(() => {
-      restoreScanHistory(backup);
+      restoreFixtureBackup(backup);
     });
 
     test('should display empty state message', async () => {

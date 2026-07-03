@@ -12,7 +12,9 @@ class ReportsPageHelpers extends BasePage {
       reportResultTable: '[data-ciem-report-result-table="true"]',
       generateReportButton: '#generateReportBtn',
       reportHistory: '[data-ciem-report-history="true"]',
-      reportRunSelector: '#reportRunSelector'
+      reportRunSelector: '#reportRunSelector',
+      reportEvidencePairSelector: '#reportEvidencePairSelector',
+      contextChip: key => `[data-ciem-report-context-chip="${key}"]`
     };
   }
 
@@ -30,11 +32,16 @@ class ReportsPageHelpers extends BasePage {
 
   async getReportContextText() {
     await this.waitForSelector(this.selectors.reportContext);
-    await this.page.waitForFunction(selector => {
-      const text = document.querySelector(selector)?.textContent ?? '';
-      return /Run #\d+/.test(text) && text.includes('Scope ') && text.includes('Status ');
-    }, this.selectors.reportContext);
     return (await this.page.locator(this.selectors.reportContext).textContent()).trim();
+  }
+
+  async waitForContextChip(key) {
+    await this.waitForSelector(this.selectors.contextChip(key));
+  }
+
+  async getContextChipText(key) {
+    await this.waitForContextChip(key);
+    return (await this.page.locator(this.selectors.contextChip(key)).textContent()).trim();
   }
 
   async getReportSummaryText() {
@@ -63,6 +70,17 @@ class ReportsPageHelpers extends BasePage {
 
   async isReportRunSelectorVisible() {
     return await this.isElementVisible(this.selectors.reportRunSelector);
+  }
+
+  async isReportEvidencePairSelectorVisible() {
+    return await this.isElementVisible(this.selectors.reportEvidencePairSelector);
+  }
+
+  async expectEnvironmentalProgressCell({ status, signalType, signalKey }) {
+    const tableText = await this.getReportResultTableText();
+    if (!tableText.includes(status) || !tableText.includes(signalType) || !tableText.includes(signalKey)) {
+      throw new Error(`Expected environmental progress row ${status}/${signalType}/${signalKey}`);
+    }
   }
 }
 

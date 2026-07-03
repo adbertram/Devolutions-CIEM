@@ -70,6 +70,85 @@ function New-CIEMDashboardPage {
             }
         }
 
+        New-UDElement -Tag 'section' -Id 'dashboardEnvironmentalProgressSection' -Attributes @{
+            'data-ciem-environmental-progress' = 'true'
+            style = @{
+                marginBottom = '18px'
+                display = 'grid'
+                gap = '12px'
+            }
+        } -Content {
+            try {
+                $environmentalProgress = Devolutions.CIEM\Invoke-CIEMReport -Id 'azure.environmental.progress'
+                $reportsPage = @(GetCIEMPSUPageRegistry | Where-Object { $_.name -eq 'Reports' })
+                if ($reportsPage.Count -ne 1) {
+                    throw "Expected one registered Reports page, got $($reportsPage.Count)."
+                }
+                $reportsHref = GetCIEMPSUPageHref -Page $reportsPage[0]
+
+                New-UDStack -Direction 'row' -Spacing 2 -AlignItems 'center' -Content {
+                    New-UDTypography -Text 'Environmental Progress' -Variant 'h5'
+                    New-UDElement -Tag 'span' -Attributes @{ 'data-ciem-environmental-progress-reports-link' = 'true' } -Content {
+                        New-UDButton -Text 'Reports' -Variant 'outlined' -Size 'small' -OnClick {
+                            Invoke-UDRedirect $reportsHref
+                        }
+                    }
+                }
+
+                New-UDElement -Tag 'div' -Attributes @{
+                    style = @{
+                        display = 'grid'
+                        gridTemplateColumns = 'repeat(auto-fit, minmax(160px, 1fr))'
+                        gap = '10px'
+                    }
+                } -Content {
+                    foreach ($metricKey in @($environmentalProgress.Context.MetricKeys)) {
+                        $metricValue = $environmentalProgress.Context[$metricKey]
+                        if ($null -eq $metricValue) {
+                            $metricValue = 'No baseline'
+                        }
+                        New-UDElement -Tag 'div' -Attributes @{
+                            'data-ciem-environmental-progress-metric' = $metricKey
+                            style = @{
+                                padding = '12px'
+                                border = '1px solid #d0d7de'
+                                borderRadius = '6px'
+                                backgroundColor = '#ffffff'
+                            }
+                        } -Content {
+                            New-UDTypography -Text $metricKey -Variant 'caption' -Style @{ color = '#666' }
+                            New-UDTypography -Text ([string]$metricValue) -Variant 'h6' -Style @{ marginTop = '4px' }
+                        }
+                    }
+                }
+
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-environmental-progress-status' = 'true'
+                    style = @{
+                        padding = '12px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text ([string]$environmentalProgress.Context.StatusMessage) -Variant 'body2' -Style @{ color = '#666' }
+                }
+            }
+            catch {
+                New-UDElement -Tag 'div' -Attributes @{
+                    'data-ciem-environmental-progress-error' = 'true'
+                    style = @{
+                        padding = '12px'
+                        border = '1px solid #d0d7de'
+                        borderRadius = '6px'
+                        backgroundColor = '#ffffff'
+                    }
+                } -Content {
+                    New-UDTypography -Text "Unable to load environmental progress: $($_.Exception.Message)" -Variant 'body2' -Style @{ color = '#d32f2f' }
+                }
+            }
+        }
+
         New-UDElement -Tag 'section' -Id 'dashboardPriorityWorkSection' -Attributes @{
             style = @{
                 display = 'grid'

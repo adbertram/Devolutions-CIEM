@@ -449,6 +449,7 @@ $statements = @($statementsJson | ConvertFrom-Json)
 $databasePath = Get-CIEMDatabasePath
 $connection = Open-PSUSQLiteConnection -Database $databasePath
 try {
+    Invoke-PSUSQLiteQuery -Connection $connection -Query 'PRAGMA foreign_keys=ON' -AsNonQuery | Out-Null
     foreach ($statement in $statements) {
         try {
             Invoke-PSUSQLiteQuery -Connection $connection -Query $statement -AsNonQuery | Out-Null
@@ -503,7 +504,7 @@ function sshNonQuery(sql) {
   const databasePath = testConfig.environment.databasePath;
   // Pipe SQL via stdin so large statement batches don't hit ARG_MAX (E2BIG).
   // sqlite3 reads SQL commands from stdin when no command argument is supplied.
-  const fullSql = `${sql};\nPRAGMA wal_checkpoint(TRUNCATE);\n`;
+  const fullSql = `PRAGMA foreign_keys=ON;\n${sql};\nPRAGMA wal_checkpoint(TRUNCATE);\n`;
   execSync(
     `ssh ${sshHost} "sqlite3 '${databasePath}'"`,
     { encoding: 'utf8', timeout: 60000, maxBuffer: 256 * 1024 * 1024, input: fullSql }

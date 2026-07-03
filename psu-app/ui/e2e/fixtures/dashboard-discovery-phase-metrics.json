@@ -1,0 +1,55 @@
+{
+  "name": "dashboard-discovery-phase-metrics",
+  "description": "Completed discovery phase timing rows for Dashboard scan efficiency tests.",
+  "touchedTables": [
+    "azure_discovery_runs",
+    "azure_discovery_phase_metrics"
+  ],
+  "tables": {
+    "azure_discovery_runs": [
+      {
+        "id": 930301,
+        "psu_job_id": -920301,
+        "scope": "All",
+        "status": "Completed",
+        "started_at": "2026-05-07T04:00:00.000Z",
+        "completed_at": "2026-05-07T04:00:16.000Z",
+        "arm_type_count": 2,
+        "arm_row_count": 10,
+        "entra_type_count": 2,
+        "entra_row_count": 8,
+        "warning_count": 0,
+        "error_message": null,
+        "attack_path_scope_hash": null,
+        "discovery_scope_hash": null,
+        "exposure_snapshot_completed_at": null
+      }
+    ],
+    "azure_discovery_phase_metrics": [
+      {
+        "id": 930302,
+        "discovery_run_id": 930301,
+        "phase_name": "ARM collection",
+        "succeeded": 1,
+        "elapsed_seconds": 10.12,
+        "evidence": "_E2E_TEST_10 ARM rows",
+        "recorded_at": "2026-05-07T04:00:16.000Z"
+      },
+      {
+        "id": 930303,
+        "discovery_run_id": 930301,
+        "phase_name": "Graph build",
+        "succeeded": 1,
+        "elapsed_seconds": 5.33,
+        "evidence": "_E2E_TEST_3 nodes, 2 edges",
+        "recorded_at": "2026-05-07T04:00:16.000Z"
+      }
+    ]
+  },
+  "preconditions": [],
+  "expectedCounts": {
+    "azure_discovery_runs": 1,
+    "azure_discovery_phase_metrics": 2
+  },
+  "cleanup": "restoreTouchedTables"
+}

@@ -48,16 +48,26 @@ Describe 'Reports PSU page registration' {
         $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
         $reportsPageContent | Should -Match "New-UDButton\s+-Id 'generateReportBtn'\s+-Text 'Generate Report'"
         $reportsPageContent | Should -Match 'Devolutions\.CIEM\\Invoke-CIEMReport'
-        $reportsPageContent | Should -Match 'RunId\s*=\s*\$selectedRunId'
+        $reportsPageContent | Should -Match '\$Page:SelectedReportParameters'
+        $reportsPageContent | Should -Match 'Invoke-CIEMReport\s+-InputObject\s+\$selectedReport\s+-Parameter\s+\$parameters'
         $reportsPageContent | Should -Match "Sync-UDElement\s+-Id 'ciemReportsPanel'"
     }
 
     It 'Renders completed discovery run selection for past report views' {
         $script:ReportsPagePath | Should -Exist
         $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
-        $reportsPageContent | Should -Match "New-UDSelect\s+-Id 'reportRunSelector'"
         $reportsPageContent | Should -Match "Devolutions\.CIEM\\Get-CIEMAzureDiscoveryRun\s+-Status 'Completed'\s+-Last"
+        $reportsPageContent | Should -Match 'New-UDSelect\s+-Id \(\[string\]\$parameter\.selectorId\)'
+        $reportsPageContent | Should -Match '\$parameter\.selectorId'
         $reportsPageContent | Should -Match 'data-ciem-report-history'
+    }
+
+    It 'Renders environmental progress pair selection from the public option command' {
+        $script:ReportsPagePath | Should -Exist
+        $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
+        $reportsPageContent | Should -Match 'Devolutions\.CIEM\\Get-CIEMEnvironmentalProgressEvidencePairOption'
+        $reportsPageContent | Should -Match 'EnvironmentalProgressEvidencePairs'
+        $reportsPageContent | Should -Match '\$parameter\.selectorId'
     }
 
     It 'Renders report context, summary, and result table regions' {
@@ -65,6 +75,8 @@ Describe 'Reports PSU page registration' {
         $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
         $reportsPageContent | Should -Match 'data-ciem-report-result'
         $reportsPageContent | Should -Match 'data-ciem-report-context'
+        $reportsPageContent | Should -Match 'ContextChipKeys'
+        $reportsPageContent | Should -Match 'data-ciem-report-context-chip'
         $reportsPageContent | Should -Match 'data-ciem-report-summary'
         $reportsPageContent | Should -Match 'data-ciem-report-result-table'
     }
@@ -74,6 +86,7 @@ Describe 'Reports PSU page registration' {
         $reportsPageContent = Get-Content -Path $script:ReportsPagePath -Raw
         $reportsPageContent | Should -Match '\$selectedReport\.StatusSummary'
         $reportsPageContent | Should -Match '\$selectedReport\.EmptyState'
+        $reportsPageContent | Should -Match 'StatusMessage'
         $reportsPageContent | Should -Not -Match "@\\('Collected', 'Partial', 'Missing', 'Skipped'\\)"
     }
 }

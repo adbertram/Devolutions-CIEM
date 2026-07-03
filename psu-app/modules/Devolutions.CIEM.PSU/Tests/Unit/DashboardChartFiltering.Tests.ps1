@@ -80,6 +80,19 @@ Describe 'Dashboard information architecture' {
         }
     }
 
+    It 'Renders Environmental Progress from the report context without route hardcoding' {
+        $script:PageSource | Should -Match "New-UDElement\s+-Tag 'section'\s+-Id 'dashboardEnvironmentalProgressSection'"
+        $script:PageSource | Should -Match "'data-ciem-environmental-progress'\s*=\s*'true'"
+        $script:PageSource | Should -Match "Invoke-CIEMReport\s+-Id 'azure.environmental.progress'"
+        $script:PageSource | Should -Match 'Context\.MetricKeys'
+        $script:PageSource | Should -Match '''data-ciem-environmental-progress-metric''\s*=\s*\$metricKey'
+        $script:PageSource | Should -Match "'data-ciem-environmental-progress-status'\s*=\s*'true'"
+        $script:PageSource | Should -Match "'data-ciem-environmental-progress-reports-link'\s*=\s*'true'"
+        $script:PageSource | Should -Match 'GetCIEMPSUPageRegistry'
+        $script:PageSource | Should -Match 'GetCIEMPSUPageHref'
+        $script:PageSource | Should -Not -Match "Invoke-UDRedirect\s+'/ciem/reports'"
+    }
+
     It 'Calculates identity stats from identity data tables' {
         $script:PageSource | Should -Match 'graph_nodes'
         $script:PageSource | Should -Match 'azure_effective_role_assignments'

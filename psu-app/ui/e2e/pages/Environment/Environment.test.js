@@ -5,10 +5,10 @@ const {
   getTestArmResourceCount, getArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns,
-  seedRunningDiscoveryRun, getRunningDiscoveryRunCount,
-  backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRunAt,
+  getRunningDiscoveryRunCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount
 } = require('../../_utils/cleanup');
+const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
 const {
   clearAzureDiscoveryAuthAssignment, setAzureDiscoveryAuthAssignment,
   getAzureDiscoveryAuthAssignmentCount, cancelRunningPSUJobs
@@ -65,13 +65,11 @@ test.describe('Environment Page', () => {
   test.describe('when a discovery run is in progress', () => {
     let backup = null;
     let seededRunId = null;
-    const completedAt = '2026-03-14T09:15:30Z';
     const expectedTimestamp = '2026-03-14 09:15 UTC';
 
     test.beforeAll(() => {
-      backup = backupAndClearAllDiscoveryRuns();
-      seedCompletedDiscoveryRunAt(completedAt);
-      seededRunId = seedRunningDiscoveryRun();
+      backup = backupAndApplyFixture('discovery-running-with-last-completed');
+      seededRunId = 930102;
       const count = getRunningDiscoveryRunCount();
       if (count < 1) {
         throw new Error(`Expected >= 1 running discovery run, got ${count}`);
@@ -80,7 +78,7 @@ test.describe('Environment Page', () => {
     });
 
     test.afterAll(() => {
-      restoreDiscoveryRuns(backup);
+      restoreFixtureBackup(backup);
     });
 
     test('should display the discovery status banner', async () => {
@@ -129,13 +127,19 @@ test.describe('Environment Page', () => {
   // --- Discovery status banner: no running discovery ---
 
   test.describe('when no discovery run is in progress', () => {
+    let backup = null;
+
     test.beforeAll(() => {
-      clearStaleDiscoveryRuns();
+      backup = backupAndApplyFixture('coverage-no-completed-discovery');
       const count = getRunningDiscoveryRunCount();
       if (count !== 0) {
         throw new Error(`Expected 0 running discovery runs, got ${count}`);
       }
       console.log('[setup] Verified 0 running discovery runs.');
+    });
+
+    test.afterAll(() => {
+      restoreFixtureBackup(backup);
     });
 
     test('should NOT display the discovery status banner', async () => {

@@ -5,7 +5,7 @@ const {
   LONG_RUNNING_ATTACK_PATH_SCRIPT_NAME,
   LONG_RUNNING_ATTACK_PATH_REMEDIATION_SCRIPT_PATH
 } = require('./psu-helpers');
-const { insertFixtureRows, loadFixture } = require('./fixtures');
+const { loadFixture } = require('./fixtures');
 
 const TEST_PREFIX = '_E2E_TEST_';
 const P = TEST_PREFIX; // shorthand for SQL literals
@@ -106,46 +106,8 @@ function restoreChecks(rows) {
   console.log(`[teardown] Restored mutable state for ${rows.length} catalog checks.`);
 }
 
-function seedTestData() {
-  insertFixtureRows(SCAN_HISTORY_FIXTURE);
-  const run1Count = getScanResultCount(`${P}scan_run_1`);
-  const run2Count = getScanResultCount(`${P}scan_run_2`);
-  console.log(`[seed] Seeded scan-history fixture (${run1Count} + ${run2Count} results).`);
-}
-
-function backupAndClearAllScanHistory() {
-  const scanRuns = sshQuery('SELECT * FROM scan_runs');
-  const scanResults = sshQuery('SELECT * FROM scan_results');
-  sshNonQuery('DELETE FROM scan_results; DELETE FROM scan_runs');
-  console.log(`[setup] Backed up ${scanRuns.length} scan runs and ${scanResults.length} scan results, cleared tables.`);
-  return { scanRuns, scanResults, scanRunCount: scanRuns.length, scanResultCount: scanResults.length };
-}
-
-function restoreScanHistory(backup) {
-  if (!backup) return;
-  const { scanRuns = [], scanResults = [] } = backup;
-
-  const stmts = ['DELETE FROM scan_results', 'DELETE FROM scan_runs'];
-  for (const r of scanRuns) {
-    const v = [r.id, r.provider_id, r.status, r.started_at, r.completed_at, r.duration_seconds, r.total_results, r.failed_results, r.passed_results]
-      .map(sqlValue).join(', ');
-    stmts.push(`INSERT OR REPLACE INTO scan_runs (id, provider_id, status, started_at, completed_at, duration_seconds, total_results, failed_results, passed_results) VALUES (${v})`);
-  }
-  for (const r of scanResults) {
-    const v = [r.scan_run_id, r.check_id, r.status, r.status_extended, r.resource_id, r.resource_name]
-      .map(sqlValue).join(', ');
-    stmts.push(`INSERT OR REPLACE INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name) VALUES (${v})`);
-  }
-  sshNonQuery(stmts.join('; '));
-  console.log(`[teardown] Restored ${scanRuns.length} scan runs and ${scanResults.length} scan results.`);
-}
-
 function getScanResultCount(scanRunId) {
   return sshQuery(`SELECT COUNT(*) as cnt FROM scan_results WHERE scan_run_id = '${scanRunId}'`)[0].cnt;
-}
-
-function getScanHistoryCounts() {
-  return sshQuery('SELECT (SELECT COUNT(*) FROM scan_runs) as scanRunCount, (SELECT COUNT(*) FROM scan_results) as scanResultCount')[0];
 }
 
 function getTestCheckCounts() {
@@ -563,101 +525,8 @@ function getCompletedDiscoveryRunCount() {
   return sshQuery("SELECT COUNT(*) as count FROM azure_discovery_runs WHERE status = 'Completed'")[0].count;
 }
 
-function backupAndClearAllDiscoveryRuns() {
-  const rows = sshQuery('SELECT * FROM azure_discovery_runs');
-  rows.phaseMetrics = sshQuery('SELECT * FROM azure_discovery_phase_metrics');
-  sshNonQuery('DELETE FROM azure_discovery_phase_metrics; DELETE FROM azure_discovery_runs');
-  console.log(`[setup] Backed up ${rows.length} discovery runs and ${rows.phaseMetrics.length} phase metrics, cleared tables.`);
-  return rows;
-}
-
-function restoreDiscoveryRuns(rows) {
-  if (!rows) return;
-
-  const cols = ['id', 'psu_job_id', 'scope', 'status', 'started_at', 'completed_at', 'arm_type_count', 'arm_row_count', 'entra_type_count', 'entra_row_count', 'warning_count', 'error_message'];
-  const metricCols = ['id', 'discovery_run_id', 'phase_name', 'succeeded', 'elapsed_seconds', 'evidence', 'recorded_at'];
-  const stmts = ['DELETE FROM azure_discovery_phase_metrics', 'DELETE FROM azure_discovery_runs'];
-  for (const r of rows) {
-    const vals = cols.map(c => sqlValue(r[c])).join(', ');
-    stmts.push(`INSERT OR REPLACE INTO azure_discovery_runs (${cols.join(', ')}) VALUES (${vals})`);
-  }
-  for (const r of rows.phaseMetrics) {
-    const vals = metricCols.map(c => sqlValue(r[c])).join(', ');
-    stmts.push(`INSERT OR REPLACE INTO azure_discovery_phase_metrics (${metricCols.join(', ')}) VALUES (${vals})`);
-  }
-  sshNonQuery(stmts.join('; '));
-  console.log(`[teardown] Restored ${rows.length} discovery runs and ${rows.phaseMetrics.length} phase metrics.`);
-}
-
-function cleanupDashboardDiscoveryPhaseMetrics() {
-  sshNonQuery(`DELETE FROM azure_discovery_phase_metrics WHERE discovery_run_id IN (SELECT id FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID}); DELETE FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID}`);
-  console.log('[cleanup] Dashboard discovery phase timing data cleaned up.');
-}
-
-function seedDashboardDiscoveryPhaseMetrics() {
-  cleanupDashboardDiscoveryPhaseMetrics();
-  const startedAt = '2026-05-07T04:00:00.000Z';
-  const completedAt = '2026-05-07T04:00:16.000Z';
-  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (${DASHBOARD_DISCOVERY_PHASE_JOB_ID}, 'All', 'Completed', '${startedAt}', '${completedAt}', 2, 10, 2, 8, 0, NULL)`);
-  const rows = sshQuery(`SELECT id FROM azure_discovery_runs WHERE psu_job_id = ${DASHBOARD_DISCOVERY_PHASE_JOB_ID} ORDER BY id DESC LIMIT 1`);
-  if (rows.length !== 1) {
-    throw new Error('Seed verification failed: dashboard discovery run was not inserted');
-  }
-
-  const runId = rows[0].id;
-  const stmts = [
-    `INSERT INTO azure_discovery_phase_metrics (discovery_run_id, phase_name, succeeded, elapsed_seconds, evidence, recorded_at) VALUES (${runId}, 'ARM collection', 1, 10.12, '${P}10 ARM rows', '${completedAt}')`,
-    `INSERT INTO azure_discovery_phase_metrics (discovery_run_id, phase_name, succeeded, elapsed_seconds, evidence, recorded_at) VALUES (${runId}, 'Graph build', 1, 5.33, '${P}3 nodes, 2 edges', '${completedAt}')`
-  ];
-  sshNonQuery(stmts.join('; '));
-
-  const count = getDashboardDiscoveryPhaseMetricCount(runId);
-  if (count !== 2) {
-    throw new Error(`Seed verification failed: dashboard discovery phase metrics count is ${count}, expected 2`);
-  }
-  console.log(`[seed] Seeded dashboard discovery phase timing for run id=${runId}`);
-  return runId;
-}
-
 function getDashboardDiscoveryPhaseMetricCount(runId) {
   return sshQuery(`SELECT COUNT(*) as count FROM azure_discovery_phase_metrics WHERE discovery_run_id = ${runId}`)[0].count;
-}
-
-function seedCompletedDiscoveryRun() {
-  const now = new Date().toISOString();
-  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (-1, 'All', 'Completed', '${now}', '${now}', 1, 1, 1, 1, 0, NULL)`);
-  const rows = sshQuery("SELECT id FROM azure_discovery_runs WHERE psu_job_id = -1 AND status = 'Completed' ORDER BY id DESC LIMIT 1");
-  if (rows.length !== 1) {
-    throw new Error('Seed verification failed: completed discovery run was not inserted');
-  }
-  const id = rows[0].id;
-  console.log(`[seed] Seeded completed discovery run id=${id}`);
-  return id;
-}
-
-function seedCompletedDiscoveryRunAt(completedAt) {
-  sshNonQuery(`INSERT INTO azure_discovery_runs (psu_job_id, scope, status, started_at, completed_at, arm_type_count, arm_row_count, entra_type_count, entra_row_count, warning_count, error_message) VALUES (-2, 'All', 'Completed', '${completedAt}', '${completedAt}', 1, 1, 1, 1, 0, NULL)`);
-  const rows = sshQuery(`SELECT id, completed_at FROM azure_discovery_runs WHERE psu_job_id = -2 AND status = 'Completed' AND completed_at = '${completedAt}' ORDER BY id DESC LIMIT 1`);
-  if (rows.length !== 1) {
-    throw new Error('Seed verification failed: fixed completed discovery run was not inserted');
-  }
-  const id = rows[0].id;
-  console.log(`[seed] Seeded fixed completed discovery run id=${id}, completed_at=${completedAt}`);
-  return id;
-}
-
-function seedRunningDiscoveryRun() {
-  const now = new Date().toISOString();
-  sshNonQuery(`INSERT INTO azure_discovery_runs (scope, status, started_at) VALUES ('All', 'Running', '${now}')`);
-  const rows = sshQuery("SELECT id FROM azure_discovery_runs WHERE status = 'Running' ORDER BY id DESC LIMIT 1");
-  const id = rows[0].id;
-  console.log(`[seed] Seeded running discovery run id=${id}`);
-  return id;
-}
-
-function cleanupDiscoveryRun(id) {
-  sshNonQuery(`DELETE FROM azure_discovery_runs WHERE id = ${id}`);
-  console.log(`[cleanup] Removed discovery run id=${id}`);
 }
 
 function getRunningDiscoveryRunCount() {
@@ -744,17 +613,15 @@ function getTestExposureChangeCount() {
 }
 
 module.exports = {
-  cleanupTestData, seedChecks, backupAndClearAllChecks, restoreChecks, seedTestData,
+  cleanupTestData, seedChecks, backupAndClearAllChecks, restoreChecks,
   backupAuthenticationProfileState, restoreAuthenticationProfileState,
-  backupAndClearAllScanHistory, restoreScanHistory, getScanResultCount, getScanHistoryCounts, getTestCheckCounts,
+  getScanResultCount, getTestCheckCounts,
   seedEnvironmentData, cleanupEnvironmentData,
   getArmResourceCount, getTestArmResourceCount,
   backupAndClearAllArmResources, restoreArmResources,
   clearStaleDiscoveryRuns, getCompletedDiscoveryRunCount,
-  backupAndClearAllDiscoveryRuns, restoreDiscoveryRuns, seedCompletedDiscoveryRun,
-  seedCompletedDiscoveryRunAt,
-  seedDashboardDiscoveryPhaseMetrics, cleanupDashboardDiscoveryPhaseMetrics, getDashboardDiscoveryPhaseMetricCount,
-  seedRunningDiscoveryRun, cleanupDiscoveryRun, getRunningDiscoveryRunCount,
+  getDashboardDiscoveryPhaseMetricCount,
+  getRunningDiscoveryRunCount,
   seedExposureChangeData, cleanupExposureChangeData, getTestExposureChangeCount,
   seedIdentityViewData, cleanupIdentityViewData, getTestEffectiveRoleAssignmentCount,
   backupAndClearDashboardIdentityData, restoreDashboardIdentityData, getDashboardIdentityCounts,

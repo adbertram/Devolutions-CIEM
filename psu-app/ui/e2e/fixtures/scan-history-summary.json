@@ -2,8 +2,10 @@
   "name": "scan-history-summary",
   "description": "Two completed scan runs with deterministic results for Dashboard and Scan History tests.",
   "touchedTables": [
-    "scan_results",
     "scan_runs",
+    "scan_run_providers",
+    "scan_run_check_snapshots",
+    "scan_results",
     "checks"
   ],
   "tables": {
@@ -87,6 +89,58 @@
         "error_message": null
       }
     ],
+    "scan_run_providers": [
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "provider": "Azure"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "provider": "Azure"
+      }
+    ],
+    "scan_run_check_snapshots": [
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_security_defaults_enabled",
+        "snapshot_json": "{\"id\":\"entra_security_defaults_enabled\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Security defaults enabled\",\"description\":\"Security defaults should be enabled.\",\"risk\":\"Accounts can authenticate without baseline protection.\",\"severity\":\"High\",\"remediation\":{\"text\":\"Enable security defaults.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_conditional_access_policy_require_mfa_for_management_api",
+        "snapshot_json": "{\"id\":\"entra_conditional_access_policy_require_mfa_for_management_api\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"MFA required for management APIs\",\"description\":\"Management API access should require MFA.\",\"risk\":\"Privileged access can bypass MFA.\",\"severity\":\"High\",\"remediation\":{\"text\":\"Require MFA for management API access.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_non_privileged_user_has_mfa",
+        "snapshot_json": "{\"id\":\"entra_non_privileged_user_has_mfa\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Non-privileged users have MFA\",\"description\":\"Users should have MFA registered.\",\"risk\":\"User accounts can be compromised with only a password.\",\"severity\":\"Medium\",\"remediation\":{\"text\":\"Register MFA for users.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_policy_guest_user_access_restriction",
+        "snapshot_json": "{\"id\":\"entra_policy_guest_user_access_restriction\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Guest access is restricted\",\"description\":\"Guest access should be restricted.\",\"risk\":\"Guest users can access more directory data than intended.\",\"severity\":\"Medium\",\"remediation\":{\"text\":\"Restrict guest user access.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_1",
+        "check_id": "entra_trusted_named_location_exist",
+        "snapshot_json": "{\"id\":\"entra_trusted_named_location_exist\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Trusted named locations exist\",\"description\":\"Trusted named locations should be configured.\",\"risk\":\"Conditional access policies cannot distinguish trusted networks.\",\"severity\":\"Low\",\"remediation\":{\"text\":\"Create trusted named locations.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "check_id": "entra_security_defaults_enabled",
+        "snapshot_json": "{\"id\":\"entra_security_defaults_enabled\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Security defaults enabled\",\"description\":\"Security defaults should be enabled.\",\"risk\":\"Accounts can authenticate without baseline protection.\",\"severity\":\"High\",\"remediation\":{\"text\":\"Enable security defaults.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "check_id": "entra_conditional_access_policy_require_mfa_for_management_api",
+        "snapshot_json": "{\"id\":\"entra_conditional_access_policy_require_mfa_for_management_api\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"MFA required for management APIs\",\"description\":\"Management API access should require MFA.\",\"risk\":\"Privileged access can bypass MFA.\",\"severity\":\"High\",\"remediation\":{\"text\":\"Require MFA for management API access.\",\"url\":null}}"
+      },
+      {
+        "scan_run_id": "_E2E_TEST_scan_run_2",
+        "check_id": "entra_non_privileged_user_has_mfa",
+        "snapshot_json": "{\"id\":\"entra_non_privileged_user_has_mfa\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Non-privileged users have MFA\",\"description\":\"Users should have MFA registered.\",\"risk\":\"User accounts can be compromised with only a password.\",\"severity\":\"Medium\",\"remediation\":{\"text\":\"Register MFA for users.\",\"url\":null}}"
+      }
+    ],
     "scan_results": [
       {
         "scan_run_id": "_E2E_TEST_scan_run_1",
@@ -164,8 +218,10 @@
   },
   "preconditions": [],
   "expectedCounts": {
-    "scan_results": 8,
     "scan_runs": 2,
+    "scan_run_providers": 2,
+    "scan_run_check_snapshots": 8,
+    "scan_results": 8,
     "checks": 10
   },
   "cleanup": "restoreTouchedTables"

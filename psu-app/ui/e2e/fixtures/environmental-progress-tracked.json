@@ -1,0 +1,232 @@
+{
+  "name": "environmental-progress-tracked",
+  "description": "Two comparable Azure environmental progress evidence points with fixed, remaining, and new signals.",
+  "touchedTables": [
+    "azure_discovery_runs",
+    "ciem_exposure_snapshot_items",
+    "scan_runs",
+    "scan_run_providers",
+    "scan_run_check_snapshots",
+    "scan_results"
+  ],
+  "tables": {
+    "azure_discovery_runs": [
+      {
+        "id": 910101,
+        "psu_job_id": -910101,
+        "scope": "All",
+        "status": "Completed",
+        "started_at": "2026-05-01T00:00:00Z",
+        "completed_at": "2026-05-01T00:10:00Z",
+        "arm_type_count": 1,
+        "arm_row_count": 1,
+        "entra_type_count": 1,
+        "entra_row_count": 1,
+        "warning_count": 0,
+        "error_message": null,
+        "attack_path_scope_hash": "attack-scope",
+        "discovery_scope_hash": "discovery-scope",
+        "exposure_snapshot_completed_at": "2026-05-01T00:10:00Z"
+      },
+      {
+        "id": 910202,
+        "psu_job_id": -910202,
+        "scope": "All",
+        "status": "Completed",
+        "started_at": "2026-05-02T00:00:00Z",
+        "completed_at": "2026-05-02T00:10:00Z",
+        "arm_type_count": 1,
+        "arm_row_count": 1,
+        "entra_type_count": 1,
+        "entra_row_count": 1,
+        "warning_count": 0,
+        "error_message": null,
+        "attack_path_scope_hash": "attack-scope",
+        "discovery_scope_hash": "discovery-scope",
+        "exposure_snapshot_completed_at": "2026-05-02T00:10:00Z"
+      }
+    ],
+    "ciem_exposure_snapshot_items": [
+      {
+        "discovery_run_id": 910101,
+        "exposure_key": "attack-path:e2e-fixed",
+        "exposure_type": "AttackPath",
+        "severity": "High",
+        "severity_rank": 2,
+        "impacted_identity_id": "identity-fixed",
+        "impacted_identity_name": "Fixed identity",
+        "impacted_identity_type": "User",
+        "impacted_resource_id": "resource-fixed",
+        "impacted_resource_name": "Fixed resource",
+        "title": "Fixed attack path",
+        "state_json": "{}",
+        "evidence": "Attack path evidence for Fixed attack path",
+        "observed_at": "2026-05-01T00:10:00Z",
+        "progress_key": "attack-fixed"
+      },
+      {
+        "discovery_run_id": 910101,
+        "exposure_key": "attack-path:e2e-remaining-baseline",
+        "exposure_type": "AttackPath",
+        "severity": "High",
+        "severity_rank": 2,
+        "impacted_identity_id": "identity-remaining",
+        "impacted_identity_name": "Remaining identity",
+        "impacted_identity_type": "User",
+        "impacted_resource_id": "resource-remaining",
+        "impacted_resource_name": "Remaining resource",
+        "title": "Remaining attack path",
+        "state_json": "{}",
+        "evidence": "Attack path evidence for Remaining attack path",
+        "observed_at": "2026-05-01T00:10:00Z",
+        "progress_key": "attack-remaining"
+      },
+      {
+        "discovery_run_id": 910202,
+        "exposure_key": "attack-path:e2e-remaining-current",
+        "exposure_type": "AttackPath",
+        "severity": "High",
+        "severity_rank": 2,
+        "impacted_identity_id": "identity-remaining",
+        "impacted_identity_name": "Remaining identity",
+        "impacted_identity_type": "User",
+        "impacted_resource_id": "resource-remaining",
+        "impacted_resource_name": "Remaining resource",
+        "title": "Remaining attack path",
+        "state_json": "{}",
+        "evidence": "Attack path evidence for Remaining attack path",
+        "observed_at": "2026-05-02T00:10:00Z",
+        "progress_key": "attack-remaining"
+      },
+      {
+        "discovery_run_id": 910202,
+        "exposure_key": "attack-path:e2e-new",
+        "exposure_type": "AttackPath",
+        "severity": "High",
+        "severity_rank": 2,
+        "impacted_identity_id": "identity-new",
+        "impacted_identity_name": "New identity",
+        "impacted_identity_type": "User",
+        "impacted_resource_id": "resource-new",
+        "impacted_resource_name": "New resource",
+        "title": "New attack path",
+        "state_json": "{}",
+        "evidence": "Attack path evidence for New attack path",
+        "observed_at": "2026-05-02T00:10:00Z",
+        "progress_key": "attack-new"
+      }
+    ],
+    "scan_runs": [
+      {
+        "id": "e2e-baseline-scan",
+        "provider_id": "azure",
+        "scan_type": "checks",
+        "status": "Completed",
+        "resource_filter": null,
+        "resource_providers": null,
+        "include_passed": 1,
+        "started_at": "2026-05-01T00:10:00Z",
+        "completed_at": "2026-05-01T00:20:00Z",
+        "duration_seconds": 600,
+        "total_results": 2,
+        "failed_results": 2,
+        "passed_results": 0,
+        "skipped_results": 0,
+        "manual_results": 0,
+        "error_message": null,
+        "discovery_run_id": 910101,
+        "provider_explicit": 1,
+        "progress_eligible": 1,
+        "progress_scope_hash": "same-scope"
+      },
+      {
+        "id": "e2e-current-scan",
+        "provider_id": "azure",
+        "scan_type": "checks",
+        "status": "Completed",
+        "resource_filter": null,
+        "resource_providers": null,
+        "include_passed": 1,
+        "started_at": "2026-05-02T00:10:00Z",
+        "completed_at": "2026-05-02T00:20:00Z",
+        "duration_seconds": 600,
+        "total_results": 1,
+        "failed_results": 1,
+        "passed_results": 0,
+        "skipped_results": 0,
+        "manual_results": 0,
+        "error_message": null,
+        "discovery_run_id": 910202,
+        "provider_explicit": 1,
+        "progress_eligible": 1,
+        "progress_scope_hash": "same-scope"
+      }
+    ],
+    "scan_run_providers": [
+      {
+        "scan_run_id": "e2e-baseline-scan",
+        "provider": "Azure"
+      },
+      {
+        "scan_run_id": "e2e-current-scan",
+        "provider": "Azure"
+      }
+    ],
+    "scan_run_check_snapshots": [
+      {
+        "scan_run_id": "e2e-baseline-scan",
+        "check_id": "check-fixed",
+        "snapshot_json": "{\"id\":\"check-fixed\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Fixed failed check\",\"description\":\"Historical description\",\"risk\":\"Historical risk\",\"severity\":\"High\",\"remediation\":{\"text\":\"Historical remediation\",\"url\":\"https://example.invalid/remediation\"},\"relatedUrl\":\"https://example.invalid/related\"}"
+      },
+      {
+        "scan_run_id": "e2e-baseline-scan",
+        "check_id": "check-remaining",
+        "snapshot_json": "{\"id\":\"check-remaining\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Remaining failed check\",\"description\":\"Historical description\",\"risk\":\"Historical risk\",\"severity\":\"High\",\"remediation\":{\"text\":\"Historical remediation\",\"url\":\"https://example.invalid/remediation\"},\"relatedUrl\":\"https://example.invalid/related\"}"
+      },
+      {
+        "scan_run_id": "e2e-current-scan",
+        "check_id": "check-remaining",
+        "snapshot_json": "{\"id\":\"check-remaining\",\"provider\":\"Azure\",\"service\":\"Entra\",\"title\":\"Remaining failed check\",\"description\":\"Historical description\",\"risk\":\"Historical risk\",\"severity\":\"High\",\"remediation\":{\"text\":\"Historical remediation\",\"url\":\"https://example.invalid/remediation\"},\"relatedUrl\":\"https://example.invalid/related\"}"
+      }
+    ],
+    "scan_results": [
+      {
+        "scan_run_id": "e2e-baseline-scan",
+        "check_id": "check-fixed",
+        "status": "FAIL",
+        "status_extended": "fixed failed evidence",
+        "resource_id": "resource-fixed-check",
+        "resource_name": "Fixed check resource",
+        "location": "Global"
+      },
+      {
+        "scan_run_id": "e2e-baseline-scan",
+        "check_id": "check-remaining",
+        "status": "FAIL",
+        "status_extended": "remaining failed evidence",
+        "resource_id": "resource-remaining-check",
+        "resource_name": "Remaining check resource",
+        "location": "Global"
+      },
+      {
+        "scan_run_id": "e2e-current-scan",
+        "check_id": "check-remaining",
+        "status": "FAIL",
+        "status_extended": "remaining failed evidence",
+        "resource_id": "resource-remaining-check",
+        "resource_name": "Remaining check resource",
+        "location": "Global"
+      }
+    ]
+  },
+  "preconditions": [],
+  "expectedCounts": {
+    "scan_results": 3,
+    "scan_run_check_snapshots": 3,
+    "scan_run_providers": 2,
+    "scan_runs": 2,
+    "ciem_exposure_snapshot_items": 4,
+    "azure_discovery_runs": 2
+  },
+  "cleanup": "restoreTouchedTables"
+}

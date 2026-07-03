@@ -1,11 +1,7 @@
 const { test, expect } = require('../../_utils/BaseTestSetup');
 const ReportsPageHelpers = require('./ReportsPageHelpers');
-const {
-  backupAndClearAllDiscoveryRuns,
-  restoreDiscoveryRuns,
-  seedCompletedDiscoveryRun,
-  getCompletedDiscoveryRunCount
-} = require('../../_utils/cleanup');
+const { getCompletedDiscoveryRunCount } = require('../../_utils/cleanup');
+const { backupAndApplyFixture, restoreFixtureBackup } = require('../../_utils/fixtures');
 
 test.describe('Reports Page', () => {
   let reportsPage;
@@ -13,8 +9,8 @@ test.describe('Reports Page', () => {
   let seededRunId;
 
   test.beforeAll(async () => {
-    discoveryBackup = backupAndClearAllDiscoveryRuns();
-    seededRunId = seedCompletedDiscoveryRun();
+    discoveryBackup = backupAndApplyFixture('coverage-completed-discovery');
+    seededRunId = 930001;
     const count = getCompletedDiscoveryRunCount();
     if (count !== 1) {
       throw new Error(`Expected 1 completed discovery run, got ${count}`);
@@ -22,7 +18,7 @@ test.describe('Reports Page', () => {
   });
 
   test.afterAll(async () => {
-    restoreDiscoveryRuns(discoveryBackup);
+    restoreFixtureBackup(discoveryBackup);
   });
 
   test.beforeEach(async ({ ciemPage }) => {
@@ -41,7 +37,7 @@ test.describe('Reports Page', () => {
       expect(await reportsPage.isReportRunSelectorVisible()).toBe(true);
 
       const historyText = await reportsPage.getReportHistoryText();
-      expect(historyText).toContain('Completed Discovery Runs');
+      expect(historyText).toContain('Report Selection');
       expect(historyText).toContain(`Run #${seededRunId}`);
     });
 
@@ -53,9 +49,12 @@ test.describe('Reports Page', () => {
 
       const contextText = await reportsPage.getReportContextText();
       expect(contextText).toContain('Azure Discovery Coverage');
-      expect(contextText).toContain(`Run #${seededRunId}`);
-      expect(contextText).toContain('Scope All');
-      expect(contextText).toContain('Status Completed');
+      await reportsPage.waitForContextChip('RunId');
+      await reportsPage.waitForContextChip('Scope');
+      await reportsPage.waitForContextChip('Status');
+      expect(await reportsPage.getContextChipText('RunId')).toContain(String(seededRunId));
+      expect(await reportsPage.getContextChipText('Scope')).toContain('All');
+      expect(await reportsPage.getContextChipText('Status')).toContain('Completed');
 
       const summaryText = await reportsPage.getReportSummaryText();
       expect(summaryText).toContain('Collected');

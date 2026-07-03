@@ -2,10 +2,7 @@ const { test, expect } = require('../../_utils/BaseTestSetup');
 const DashboardPageHelpers = require('./DashboardPageHelpers');
 const AttackPathsPageHelpers = require('../AttackPaths/AttackPathsPageHelpers');
 const {
-  backupAndClearAllScanHistory,
-  restoreScanHistory,
   getScanResultCount,
-  getScanHistoryCounts,
   seedIdentityViewData,
   seedIdentitiesPageData,
   getTestIdentitiesGraphEdgeCount,
@@ -16,8 +13,6 @@ const {
   backupAndClearDashboardIdentityData,
   restoreDashboardIdentityData,
   getDashboardIdentityCounts,
-  seedDashboardDiscoveryPhaseMetrics,
-  cleanupDashboardDiscoveryPhaseMetrics,
   getDashboardDiscoveryPhaseMetricCount,
   TEST_PREFIX
 } = require('../../_utils/cleanup');
@@ -47,13 +42,15 @@ test.describe('Dashboard Page', () => {
   test.describe('when seeded scan history exists in the database', () => {
     let backup = null;
     let identityBackup = null;
+    let discoveryMetricBackup = null;
     let discoveryPhaseRunId = null;
 
     test.beforeAll(() => {
       backup = backupAndApplyFixture('scan-history-summary');
+      discoveryMetricBackup = backupAndApplyFixture('dashboard-discovery-phase-metrics');
       identityBackup = backupAndClearDashboardIdentityData();
       seedIdentityViewData();
-      discoveryPhaseRunId = seedDashboardDiscoveryPhaseMetrics();
+      discoveryPhaseRunId = 930301;
       const run1Count = getScanResultCount(`${TEST_PREFIX}scan_run_1`);
       const run2Count = getScanResultCount(`${TEST_PREFIX}scan_run_2`);
       const discoveryPhaseMetricCount = getDashboardDiscoveryPhaseMetricCount(discoveryPhaseRunId);
@@ -72,8 +69,8 @@ test.describe('Dashboard Page', () => {
 
     test.afterAll(() => {
       restoreFixtureBackup(backup);
+      restoreFixtureBackup(discoveryMetricBackup);
       restoreDashboardIdentityData(identityBackup);
-      cleanupDashboardDiscoveryPhaseMetrics();
     });
 
     test('should reveal scan run selector inside Checks & Scans details', async () => {
@@ -266,16 +263,12 @@ test.describe('Dashboard Page', () => {
     let backup = null;
 
     test.beforeAll(() => {
-      backup = backupAndClearAllScanHistory();
-      const counts = getScanHistoryCounts();
-      if (counts.scanRunCount !== 0 || counts.scanResultCount !== 0) {
-        throw new Error(`Expected empty scan history, got ${counts.scanRunCount} scan runs and ${counts.scanResultCount} scan results`);
-      }
+      backup = backupAndApplyFixture('scan-history-empty');
       console.log('[setup:dashboard-empty] Verified empty scan history.');
     });
 
     test.afterAll(() => {
-      restoreScanHistory(backup);
+      restoreFixtureBackup(backup);
     });
 
     test('should display empty state card with No Scan Data Available text', async () => {
