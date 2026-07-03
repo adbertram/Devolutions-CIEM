@@ -22,6 +22,7 @@ class CIEMScanResult {
     CIEMScanResult() {}
 
     static [CIEMScanResult] Create([object]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName, [string]$Location) {
+        AssertCIEMScanResultKey -Status $Status -CheckId $Check.Id -ResourceId $ResourceId
         $result = [CIEMScanResult]::new()
         $result.Check = $Check
         $result.Status = [CIEMScanStatus]$Status
@@ -55,6 +56,10 @@ class CIEMScanRun {
     [int]$ManualResults
     [object[]]$ScanResults
     [string]$ErrorMessage
+    [nullable[int]]$DiscoveryRunId
+    [bool]$ProviderExplicit
+    [bool]$ProgressEligible
+    [string]$ProgressScopeHash
 
     # Default constructor - generates Id and sets StartTime
     CIEMScanRun() {

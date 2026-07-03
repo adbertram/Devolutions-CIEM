@@ -32,11 +32,26 @@ function Get-CIEMScanRun {
 
     $ErrorActionPreference = 'Stop'
 
-    # Build query
     if ($Id) {
-        $rows = @(Invoke-CIEMQuery -Query "SELECT * FROM scan_runs WHERE id = @id" -Parameters @{ id = $Id })
+        $rows = @(Invoke-CIEMQuery -Query @'
+SELECT
+    id, provider_id, scan_type, status, resource_filter, resource_providers,
+    include_passed, started_at, completed_at, duration_seconds, total_results,
+    failed_results, passed_results, skipped_results, manual_results, error_message,
+    discovery_run_id, provider_explicit, progress_eligible, progress_scope_hash
+FROM scan_runs
+WHERE id = @id
+'@ -Parameters @{ id = $Id })
     } else {
-        $rows = @(Invoke-CIEMQuery -Query "SELECT * FROM scan_runs ORDER BY started_at DESC")
+        $rows = @(Invoke-CIEMQuery -Query @'
+SELECT
+    id, provider_id, scan_type, status, resource_filter, resource_providers,
+    include_passed, started_at, completed_at, duration_seconds, total_results,
+    failed_results, passed_results, skipped_results, manual_results, error_message,
+    discovery_run_id, provider_explicit, progress_eligible, progress_scope_hash
+FROM scan_runs
+ORDER BY julianday(started_at) DESC, rowid DESC
+'@)
     }
 
     if ($rows.Count -eq 0) {
@@ -46,37 +61,14 @@ function Get-CIEMScanRun {
     }
 
     $scanRuns = foreach ($row in $rows) {
-        $providers = if ($row.resource_providers) { @($row.resource_providers -split ',') } else { @() }
-
-        $obj = [PSCustomObject]@{
-            Id                = $row.id
-            Type              = if ($row.scan_type) { $row.scan_type } else { 'checks' }
-            Status            = $row.status
-            Providers         = $providers
-            ProviderSummaries = @()
-            Services          = @()
-            StartTime         = if ($row.started_at) { [datetime]$row.started_at } else { $null }
-            EndTime           = if ($row.completed_at) { [datetime]$row.completed_at } else { $null }
-            Duration          = if ($row.duration_seconds) {
-                $span = [timespan]::FromSeconds($row.duration_seconds)
-                if ($span.TotalMinutes -ge 1) { "{0:N0}m {1:N0}s" -f [Math]::Floor($span.TotalMinutes), $span.Seconds }
-                else { "{0:N0}s" -f $span.TotalSeconds }
-            } else { $null }
-            IncludePassed     = [bool]$row.include_passed
-            TotalResults      = [int]$row.total_results
-            FailedResults     = [int]$row.failed_results
-            PassedResults     = [int]$row.passed_results
-            SkippedResults    = [int]$row.skipped_results
-            ManualResults     = [int]$row.manual_results
-            ErrorMessage      = $row.error_message
-        }
+        $obj = ConvertFromCIEMScanRunStorageRow -Row $row
 
         if ($IncludeResults) {
             $results = @(Get-CIEMScanResult -ScanRunId $row.id)
             $obj | Add-Member -NotePropertyName ScanResults -NotePropertyValue $results -Force
 
             # Compute per-provider summaries
-            $obj.ProviderSummaries = @(foreach ($provName in $providers) {
+            $obj.ProviderSummaries = @(foreach ($provName in @($obj.Providers)) {
                 $pr = @($results | Where-Object { $_.Check.Provider -eq $provName })
                 [PSCustomObject]@{
                     Provider       = $provName

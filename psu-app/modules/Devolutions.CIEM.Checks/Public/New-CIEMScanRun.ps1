@@ -58,11 +58,13 @@ function New-CIEMScanRun {
     )
 
     $ErrorActionPreference = 'Stop'
+    $providerExplicit = $PSBoundParameters.ContainsKey('Provider') -and $Provider -and @($Provider).Count -gt 0
 
     # PSU doesn't pass -Parameters to module command scripts, so read from cache
     if (-not $Provider -and -not $CheckId -and -not $Service) {
         $scanConfig = ReadPSUCache -Key 'CIEM:ScanConfig'
         if ($scanConfig -and $scanConfig.Provider) {
+            $providerExplicit = $true
             $Provider      = $scanConfig.Provider
             $CheckId       = $scanConfig.CheckId
             $Service       = $scanConfig.Service
@@ -82,6 +84,7 @@ function New-CIEMScanRun {
         }
         Write-Verbose "No -Provider specified; scanning all enabled providers: $($Provider -join ', ')"
     }
+    $Provider = @(ConvertToCIEMCanonicalProviderList -Providers @($Provider))
 
     # --- Determine the union of all services across requested providers ---
     $allProviderServices = @(foreach ($p in $Provider) {
@@ -102,7 +105,49 @@ function New-CIEMScanRun {
     # --- Create and persist ScanRun ---
     $scanRun = [CIEMScanRun]::new($Provider, $scanServices, $IncludePassed.IsPresent)
     $scanRun.Status = [CIEMScanRunStatus]::Running
-    Save-CIEMScanRun -ScanRun $scanRun
+    $scanRun.ProviderExplicit = [bool]$providerExplicit
+
+    InvokeCIEMImmediateTransaction {
+        param($conn)
+
+        $latestProgressDiscovery = $null
+        if ($Provider -contains 'Azure') {
+            AssertCIEMAzureMutationAllowed -Connection $conn -Starting AzureScan
+            $latestProgressDiscovery = GetCIEMLatestAzureProgressDiscoveryRun -Connection $conn
+            if ($latestProgressDiscovery) {
+                $scanRun.DiscoveryRunId = [int]$latestProgressDiscovery.id
+            }
+        }
+
+        $hasCheckFilter = $CheckId -and @($CheckId).Count -gt 0
+        $hasServiceFilter = $Service -and @($Service).Count -gt 0
+        $scanStartsAfterDiscovery = $false
+        if ($latestProgressDiscovery) {
+            $scanStartsAfterDiscovery = ([datetime]$scanRun.StartTime) -ge ([datetime]$latestProgressDiscovery.completed_at)
+        }
+
+        $scanRun.ProgressEligible = (
+            $Provider.Count -eq 1 -and
+            $Provider[0] -eq 'Azure' -and
+            $scanRun.ProviderExplicit -and
+            -not $hasCheckFilter -and
+            -not $hasServiceFilter -and
+            $latestProgressDiscovery -and
+            $scanStartsAfterDiscovery
+        )
+
+        if ($scanRun.ProgressEligible) {
+            $scanRun.ProgressScopeHash = GetCIEMAzureProgressScopeHash `
+                -AttackPathScopeHash ([string]$latestProgressDiscovery.attack_path_scope_hash) `
+                -DiscoveryScopeHash ([string]$latestProgressDiscovery.discovery_scope_hash)
+        }
+        else {
+            $scanRun.ProgressScopeHash = $null
+        }
+
+        SaveCIEMScanRunCore -Connection $conn -ScanRun $scanRun
+    }
+
     Write-Verbose "Started ScanRun: $($scanRun.Id) for providers: $($Provider -join ', ')"
 
     # --- Execute scan and collect results ---

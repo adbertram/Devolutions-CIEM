@@ -19,7 +19,7 @@ function ConvertToCIEMScanEfficiencyRun {
     [PSCustomObject]@{
         Id               = [string]$Row.id
         Status           = [string]$Row.status
-        Providers        = @(([string]$Row.resource_providers -split ',') | Where-Object { $_ })
+        Providers        = @(([string]$Row.providers_csv -split ',') | Where-Object { $_ })
         StartedAt        = [string]$Row.started_at
         CompletedAt      = [string]$Row.completed_at
         DurationSeconds  = [math]::Round($durationSeconds, 2)
@@ -69,12 +69,31 @@ LIMIT 1
     }
 
     $rows = @(Invoke-CIEMQuery -Query @"
-SELECT id, status, resource_providers, started_at, completed_at, duration_seconds,
-       total_results, failed_results, passed_results, skipped_results, manual_results
+SELECT
+    sr.id,
+    sr.status,
+    (
+        SELECT group_concat(provider, ',')
+        FROM (
+            SELECT provider
+            FROM scan_run_providers
+            WHERE scan_run_id = sr.id
+            ORDER BY provider
+        )
+    ) AS providers_csv,
+    sr.started_at,
+    sr.completed_at,
+    sr.duration_seconds,
+    sr.total_results,
+    sr.failed_results,
+    sr.passed_results,
+    sr.skipped_results,
+    sr.manual_results
 FROM scan_runs
+    sr
 WHERE completed_at IS NOT NULL
   AND duration_seconds IS NOT NULL
-ORDER BY started_at DESC
+ORDER BY julianday(started_at) DESC, rowid DESC
 LIMIT @last
 "@ -Parameters @{ last = $Last })
 

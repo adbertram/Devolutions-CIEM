@@ -20,8 +20,16 @@ function Remove-CIEMScanRun {
             }
         } elseif ($PSCmdlet.ParameterSetName -eq 'ByProvider') {
             if ($PSCmdlet.ShouldProcess("provider '$ProviderId'", 'Remove all CIEM scan runs')) {
-                Write-CIEMLog -Message "DELETE scan_runs WHERE provider_id='$ProviderId' (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ScanRun'
-                Invoke-CIEMQuery -Query "DELETE FROM scan_runs WHERE provider_id = @pid" -Parameters @{ pid = $ProviderId } -AsNonQuery | Out-Null
+                $providerName = @(ConvertToCIEMCanonicalProviderList -Providers @($ProviderId))[0]
+                Write-CIEMLog -Message "DELETE scan_runs WHERE scan_run_providers.provider='$providerName' (caller: $((Get-PSCallStack)[1].Command))" -Severity WARNING -Component 'Remove-ScanRun'
+                Invoke-CIEMQuery -Query @'
+DELETE FROM scan_runs
+WHERE id IN (
+    SELECT scan_run_id
+    FROM scan_run_providers
+    WHERE provider = @provider
+)
+'@ -Parameters @{ provider = $providerName } -AsNonQuery | Out-Null
             }
         } else {
             if ($PSCmdlet.ShouldProcess($Id, 'Remove CIEM scan run')) {

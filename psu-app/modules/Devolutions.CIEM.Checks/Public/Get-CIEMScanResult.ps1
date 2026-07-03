@@ -25,8 +25,11 @@ function Get-CIEMScanResult {
 
     $rows = @(Invoke-CIEMQuery -Query @"
 SELECT sr.status, sr.status_extended, sr.resource_id, sr.resource_name, sr.location,
-       sr.check_id
+       sr.check_id, scs.snapshot_json
 FROM scan_results sr
+LEFT JOIN scan_run_check_snapshots scs
+  ON scs.scan_run_id = sr.scan_run_id
+ AND scs.check_id = sr.check_id
 WHERE sr.scan_run_id = @scan_run_id
 "@ -Parameters @{ scan_run_id = $ScanRunId })
 
@@ -36,34 +39,39 @@ WHERE sr.scan_run_id = @scan_run_id
     }
 
     $results = @(foreach ($row in $rows) {
-        $check = @(Get-CIEMCheck -CheckId $row.check_id)
-        if ($check.Count -eq 0) {
-            throw "Scan result references unknown catalog check '$($row.check_id)'."
+        $check = if (-not [string]::IsNullOrWhiteSpace([string]$row.snapshot_json)) {
+            ConvertFromCIEMCheckSnapshotJson -SnapshotJson $row.snapshot_json -Context "scan run '$ScanRunId' check '$($row.check_id)'"
         }
-
+        else {
+            $catalogCheck = @(Get-CIEMCheck -CheckId $row.check_id)
+            if ($catalogCheck.Count -eq 0) {
+                throw "Scan result references unknown catalog check '$($row.check_id)'."
+            }
+            $catalogCheck[0]
+        }
         [PSCustomObject]@{
             Check = [PSCustomObject]@{
-                Id          = $check[0].Id
-                Provider    = $check[0].Provider
-                Service     = $check[0].Service
-                Title       = $check[0].Title
-                Description = $check[0].Description
-                Risk        = $check[0].Risk
-                Severity    = $check[0].Severity
+                Id          = $check.Id
+                Provider    = $check.Provider
+                Service     = $check.Service
+                Title       = $check.Title
+                Description = $check.Description
+                Risk        = $check.Risk
+                Severity    = $check.Severity
                 Remediation = [PSCustomObject]@{
-                    Text = $check[0].Remediation.Text
-                    Url  = $check[0].Remediation.Url
+                    Text = $check.Remediation.Text
+                    Url  = $check.Remediation.Url
                 }
-                RelatedUrl      = $check[0].RelatedUrl
-                CheckScript     = $check[0].CheckScript
-                ExecutionMode   = $check[0].ExecutionMode
-                ManualReason    = $check[0].ManualReason
-                Evaluator       = $check[0].Evaluator
-                EvaluatorConfig = $check[0].EvaluatorConfig
-                DependsOn       = @($check[0].DependsOn)
-                DataNeeds       = if ($null -ne $check[0].DataNeeds) { @($check[0].DataNeeds) } else { $null }
-                Disabled        = [bool]$check[0].Disabled
-                Permissions     = $check[0].Permissions
+                RelatedUrl      = $check.RelatedUrl
+                CheckScript     = $check.CheckScript
+                ExecutionMode   = $check.ExecutionMode
+                ManualReason    = $check.ManualReason
+                Evaluator       = $check.Evaluator
+                EvaluatorConfig = $check.EvaluatorConfig
+                DependsOn       = @($check.DependsOn)
+                DataNeeds       = if ($null -ne $check.DataNeeds) { @($check.DataNeeds) } else { $null }
+                Disabled        = [bool]$check.Disabled
+                Permissions     = $check.Permissions
             }
             Status         = $row.status
             StatusExtended = $row.status_extended

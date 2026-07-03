@@ -1,3 +1,97 @@
+function SaveCIEMScanRunCore {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$Connection,
+
+        [Parameter(Mandatory)]
+        [object]$ScanRun
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $parameters = ConvertToCIEMScanRunStorageParameters -ScanRun $ScanRun -Connection $Connection
+    $snapshotByCheckId = @{}
+    $failedKeys = @{}
+
+    if ($ScanRun.ScanResults) {
+        foreach ($result in @($ScanRun.ScanResults)) {
+            $checkId = [string]$result.Check.Id
+            AssertCIEMScanResultKey -Status ([string]$result.Status) -CheckId $checkId -ResourceId $result.ResourceId -Context "scan run '$($ScanRun.Id)'"
+
+            if ([string]$result.Status -eq 'FAIL') {
+                $failedKey = "$checkId|$($result.ResourceId)"
+                if ($failedKeys.ContainsKey($failedKey)) {
+                    throw "Duplicate failed scan result key '$failedKey' in scan run '$($ScanRun.Id)'."
+                }
+                $failedKeys[$failedKey] = $true
+            }
+
+            if (-not $snapshotByCheckId.ContainsKey($checkId)) {
+                $snapshotByCheckId[$checkId] = NewCIEMCheckSnapshotJson -Check $result.Check
+            }
+            else {
+                $snapshotJson = NewCIEMCheckSnapshotJson -Check $result.Check
+                if ($snapshotByCheckId[$checkId] -ne $snapshotJson) {
+                    throw "Conflicting check snapshot payloads for check '$checkId' in scan run '$($ScanRun.Id)'."
+                }
+            }
+        }
+    }
+
+    $providerExists = Invoke-PSUSQLiteQuery -Connection $Connection -Query 'SELECT id FROM providers WHERE id = @id' -Parameters @{
+        id = $parameters.provider_id
+    }
+    if (-not $providerExists) {
+        throw "Save-CIEMScanRun cannot persist scan run '$($ScanRun.Id)' because provider '$($parameters.provider_id)' does not exist."
+    }
+
+    Invoke-PSUSQLiteQuery -Connection $Connection -ErrorAction Stop -Query @"
+INSERT OR REPLACE INTO scan_runs (id, provider_id, scan_type, status, resource_filter, resource_providers, include_passed,
+    started_at, completed_at, duration_seconds, total_results, failed_results, passed_results, skipped_results, manual_results,
+    error_message, discovery_run_id, provider_explicit, progress_eligible, progress_scope_hash)
+VALUES (@id, @provider_id, @scan_type, @status, @resource_filter, @resource_providers, @include_passed,
+    @started_at, @completed_at, @duration_seconds, @total_results, @failed_results, @passed_results, @skipped_results, @manual_results,
+    @error_message, @discovery_run_id, @provider_explicit, @progress_eligible, @progress_scope_hash)
+"@ -Parameters $parameters -AsNonQuery | Out-Null
+
+    SetCIEMScanRunProviders -Connection $Connection -ScanRunId $ScanRun.Id -Providers @($ScanRun.Providers)
+
+    if ($ScanRun.ScanResults -and $ScanRun.ScanResults.Count -gt 0) {
+        Write-CIEMLog -Message "DELETE scan_results WHERE scan_run_id='$($ScanRun.Id)' (upsert in Save-CIEMScanRun)" -Severity WARNING -Component 'Save-ScanRun'
+        Invoke-PSUSQLiteQuery -Connection $Connection -ErrorAction Stop -Query 'DELETE FROM scan_results WHERE scan_run_id = @id' -Parameters @{ id = $ScanRun.Id } -AsNonQuery | Out-Null
+        Invoke-PSUSQLiteQuery -Connection $Connection -ErrorAction Stop -Query 'DELETE FROM scan_run_check_snapshots WHERE scan_run_id = @id' -Parameters @{ id = $ScanRun.Id } -AsNonQuery | Out-Null
+
+        foreach ($checkId in @($snapshotByCheckId.Keys | Sort-Object)) {
+            Invoke-PSUSQLiteQuery -Connection $Connection -ErrorAction Stop -Query @"
+INSERT INTO scan_run_check_snapshots (scan_run_id, check_id, snapshot_json)
+VALUES (@scan_run_id, @check_id, @snapshot_json)
+"@ -Parameters @{
+                scan_run_id   = $ScanRun.Id
+                check_id      = $checkId
+                snapshot_json = $snapshotByCheckId[$checkId]
+            } -AsNonQuery | Out-Null
+        }
+
+        foreach ($result in $ScanRun.ScanResults) {
+            $checkId = [string]$result.Check.Id
+
+            Invoke-PSUSQLiteQuery -Connection $Connection -ErrorAction Stop -Query @"
+INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
+VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resource_name, @location)
+"@ -Parameters @{
+                scan_run_id     = $ScanRun.Id
+                check_id        = $checkId
+                status          = [string]$result.Status
+                status_extended = $result.StatusExtended
+                resource_id     = $result.ResourceId
+                resource_name   = $result.ResourceName
+                location        = $result.Location
+            } -AsNonQuery | Out-Null
+        }
+    }
+}
+
 function Save-CIEMScanRun {
     <#
     .SYNOPSIS
@@ -26,84 +120,21 @@ function Save-CIEMScanRun {
 
     process {
         $ErrorActionPreference = 'Stop'
-        # Resolve provider_id for FK (use first provider, lowercased)
-        $primaryProvider = @($ScanRun.Providers)[0]
-        $providerId = $primaryProvider.ToString().ToLower()
-
-        # Ensure the provider exists in the DB (it should, but be safe)
-        $providerExists = Invoke-CIEMQuery -Query "SELECT id FROM providers WHERE id = @id" -Parameters @{ id = $providerId }
-        if (-not $providerExists) {
-            throw "Save-CIEMScanRun cannot persist scan run '$($ScanRun.Id)' because provider '$providerId' does not exist."
-        }
-
         $conn = Open-PSUSQLiteConnection -Database (Get-CIEMDatabasePath)
+        $transactionStarted = $false
         try {
             Invoke-PSUSQLiteQuery -Connection $conn -Query "PRAGMA foreign_keys=ON" -AsNonQuery | Out-Null
-            $tx = $conn.BeginTransaction()
-
-            # Upsert scan run metadata
-            $startedAt = if ($ScanRun.StartTime) { ([datetime]$ScanRun.StartTime).ToString('o') } else { (Get-Date).ToString('o') }
-            $completedAt = if ($ScanRun.EndTime) { ([datetime]$ScanRun.EndTime).ToString('o') } else { $null }
-            $durationSeconds = if ($ScanRun.EndTime -and $ScanRun.StartTime) {
-                (([datetime]$ScanRun.EndTime) - ([datetime]$ScanRun.StartTime)).TotalSeconds
-            } else { $null }
-
-            Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query @"
-INSERT OR REPLACE INTO scan_runs (id, provider_id, scan_type, status, resource_filter, resource_providers, include_passed,
-    started_at, completed_at, duration_seconds, total_results, failed_results, passed_results, skipped_results, manual_results, error_message)
-VALUES (@id, @provider_id, @scan_type, @status, @resource_filter, @resource_providers, @include_passed,
-    @started_at, @completed_at, @duration_seconds, @total_results, @failed_results, @passed_results, @skipped_results, @manual_results, @error_message)
-"@ -Parameters @{
-                id                 = $ScanRun.Id
-                provider_id        = $providerId
-                scan_type          = if ($ScanRun.Type) { [string]$ScanRun.Type } else { 'checks' }
-                status             = [string]$ScanRun.Status
-                resource_filter    = $null
-                resource_providers = ($ScanRun.Providers -join ',')
-                include_passed     = if ($ScanRun.IncludePassed) { 1 } else { 0 }
-                started_at         = $startedAt
-                completed_at       = $completedAt
-                duration_seconds   = $durationSeconds
-                total_results      = [int]$ScanRun.TotalResults
-                failed_results     = [int]$ScanRun.FailedResults
-                passed_results     = [int]$ScanRun.PassedResults
-                skipped_results    = [int]$ScanRun.SkippedResults
-                manual_results     = [int]$ScanRun.ManualResults
-                error_message      = $ScanRun.ErrorMessage
-            } -AsNonQuery | Out-Null
-
-            # Insert scan results (if present)
-            if ($ScanRun.ScanResults -and $ScanRun.ScanResults.Count -gt 0) {
-                # Delete existing results for this run (for upsert behavior)
-                Write-CIEMLog -Message "DELETE scan_results WHERE scan_run_id='$($ScanRun.Id)' (upsert in Save-CIEMScanRun)" -Severity WARNING -Component 'Save-ScanRun'
-                Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query "DELETE FROM scan_results WHERE scan_run_id = @id" -Parameters @{ id = $ScanRun.Id } -AsNonQuery | Out-Null
-
-                foreach ($result in $ScanRun.ScanResults) {
-                    $checkId = if ($result.Check.Id) { $result.Check.Id } else { $result.Check.id }
-                    if (-not $checkId) {
-                        throw "Save-CIEMScanRun cannot persist scan result for run '$($ScanRun.Id)' because the check id is empty."
-                    }
-
-                    Invoke-PSUSQLiteQuery -Connection $conn -ErrorAction Stop -Query @"
-INSERT INTO scan_results (scan_run_id, check_id, status, status_extended, resource_id, resource_name, location)
-VALUES (@scan_run_id, @check_id, @status, @status_extended, @resource_id, @resource_name, @location)
-"@ -Parameters @{
-                        scan_run_id     = $ScanRun.Id
-                        check_id        = $checkId
-                        status          = [string]$result.Status
-                        status_extended = $result.StatusExtended
-                        resource_id     = $result.ResourceId
-                        resource_name   = $result.ResourceName
-                        location        = $result.Location
-                    } -AsNonQuery | Out-Null
-                }
-            }
-
-            $tx.Commit()
+            Invoke-PSUSQLiteQuery -Connection $conn -Query 'BEGIN TRANSACTION' -AsNonQuery | Out-Null
+            $transactionStarted = $true
+            SaveCIEMScanRunCore -Connection $conn -ScanRun $ScanRun
+            Invoke-PSUSQLiteQuery -Connection $conn -Query 'COMMIT' -AsNonQuery | Out-Null
+            $transactionStarted = $false
             Write-Verbose "Persisted ScanRun: $($ScanRun.Id) (Status: $($ScanRun.Status), Results: $($ScanRun.ScanResults.Count))"
         }
         catch {
-            if ($tx) { $tx.Rollback() }
+            if ($transactionStarted) {
+                Invoke-PSUSQLiteQuery -Connection $conn -Query 'ROLLBACK' -AsNonQuery | Out-Null
+            }
             throw "Save-CIEMScanRun failed to persist scan run '$($ScanRun.Id)': $($_.Exception.Message)"
         }
         finally {

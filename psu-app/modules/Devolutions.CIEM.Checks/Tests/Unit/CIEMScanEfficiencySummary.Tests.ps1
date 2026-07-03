@@ -15,6 +15,7 @@ Describe 'Get-CIEMScanEfficiencySummary' {
         Invoke-CIEMQuery -Query 'DELETE FROM azure_discovery_phase_metrics' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM azure_discovery_runs' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM scan_results' -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query 'DELETE FROM scan_run_providers' -AsNonQuery | Out-Null
         Invoke-CIEMQuery -Query 'DELETE FROM scan_runs' -AsNonQuery | Out-Null
     }
 
@@ -54,6 +55,13 @@ VALUES
 ('scan-old', 'azure', 'checks', 'Completed', 'Azure', 1, '2026-05-07T01:00:00Z', '2026-05-07T01:01:40Z', 100, 50, 5, 40, 3, 2),
 ('scan-new', 'azure', 'checks', 'Completed', 'Azure,AWS', 1, '2026-05-07T02:00:00Z', '2026-05-07T02:00:20Z', 20, 10, 1, 8, 1, 0)
 "@ -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query @"
+INSERT INTO scan_run_providers (scan_run_id, provider)
+VALUES
+('scan-old', 'Azure'),
+('scan-new', 'Azure'),
+('scan-new', 'AWS')
+"@ -AsNonQuery | Out-Null
 
         $summary = Get-CIEMScanEfficiencySummary -Last 5
 
@@ -85,6 +93,13 @@ VALUES
 ('scan-1', 'azure', 'checks', 'Completed', 'Azure', 1, '2026-05-07T01:00:00Z', '2026-05-07T01:00:10Z', 10, 10, 1, 9, 0, 0),
 ('scan-2', 'azure', 'checks', 'Completed', 'Azure', 1, '2026-05-07T02:00:00Z', '2026-05-07T02:00:20Z', 20, 20, 2, 18, 0, 0),
 ('scan-3', 'azure', 'checks', 'Completed', 'Azure', 1, '2026-05-07T03:00:00Z', '2026-05-07T03:00:30Z', 30, 30, 3, 27, 0, 0)
+"@ -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query @"
+INSERT INTO scan_run_providers (scan_run_id, provider)
+VALUES
+('scan-1', 'Azure'),
+('scan-2', 'Azure'),
+('scan-3', 'Azure')
 "@ -AsNonQuery | Out-Null
 
         $summary = Get-CIEMScanEfficiencySummary -Last 2
@@ -120,6 +135,10 @@ INSERT INTO scan_runs (
 VALUES
 ('scan-new', 'azure', 'checks', 'Completed', 'Azure', 1, '2026-05-07T03:00:00Z', '2026-05-07T03:00:20Z', 20, 10, 1, 8, 1, 0)
 "@ -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query @"
+INSERT INTO scan_run_providers (scan_run_id, provider)
+VALUES ('scan-new', 'Azure')
+"@ -AsNonQuery | Out-Null
 
         $summary = Get-CIEMScanEfficiencySummary
 
@@ -130,5 +149,28 @@ VALUES
         $summary.LatestDiscoveryPhaseMetrics.PhaseName | Should -Contain 'ARM collection'
         $summary.LatestDiscoveryPhaseMetrics.PhaseName | Should -Contain 'Graph build'
         $summary.LatestDiscoveryPhaseMetrics.Evidence | Should -Contain '3 nodes, 2 edges'
+    }
+
+    It 'reads provider membership from scan_run_providers when legacy resource_providers is null' {
+        Invoke-CIEMQuery -Query @"
+INSERT INTO scan_runs (
+    id, provider_id, scan_type, status, resource_providers, include_passed,
+    started_at, completed_at, duration_seconds, total_results, failed_results,
+    passed_results, skipped_results, manual_results
+)
+VALUES (
+    'scan-membership', 'aws', 'checks', 'Completed', NULL, 1,
+    '2026-05-07T04:00:00Z', '2026-05-07T04:00:20Z', 20, 10, 1, 8, 1, 0
+)
+"@ -AsNonQuery | Out-Null
+        Invoke-CIEMQuery -Query @"
+INSERT INTO scan_run_providers (scan_run_id, provider)
+VALUES ('scan-membership', 'AWS'), ('scan-membership', 'Azure')
+"@ -AsNonQuery | Out-Null
+
+        $summary = Get-CIEMScanEfficiencySummary
+
+        $summary.Runs | Should -HaveCount 1
+        $summary.Runs[0].Providers | Should -Be @('AWS', 'Azure')
     }
 }
