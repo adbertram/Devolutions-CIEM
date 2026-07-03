@@ -2,7 +2,7 @@
 
 CIEM (Cloud Infrastructure Entitlement Management) on PowerShell Universal (PSU). Identity-first, not resource-first. Strategic context, business model, stakeholders, and architecture decisions: `docs/project-context.md`. Product direction: `docs/ciem-feature-todos.md`.
 
-@/Users/adam/.claude/skills/testing-methodology/SKILL.md
+@/Users/adam/.claude/skills/test-methodology/SKILL.md
 
 ## Test-Driven Development (MANDATORY)
 

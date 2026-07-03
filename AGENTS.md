@@ -198,3 +198,7 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 - PSU Azure hosting docs: `docs/psu-docs/config/hosting/azure.md`
 
 
+
+## Skill Files
+
+Skills referenced in this file live at `.agents/skills/<name>/SKILL.md` relative to this file. Read a skill's SKILL.md before using it.
