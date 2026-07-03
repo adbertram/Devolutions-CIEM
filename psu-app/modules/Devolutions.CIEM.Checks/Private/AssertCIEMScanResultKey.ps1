@@ -15,16 +15,5 @@ function AssertCIEMScanResultKey {
     )
 
     $ErrorActionPreference = 'Stop'
-
-    if ($Status -ne 'FAIL') {
-        return
-    }
-
-    $prefix = if ([string]::IsNullOrWhiteSpace($Context)) { 'Failed scan result' } else { "Failed scan result in $Context" }
-    if ([string]::IsNullOrWhiteSpace($CheckId)) {
-        throw "${prefix}: CheckId is required for failed scan results."
-    }
-    if ([string]::IsNullOrWhiteSpace($ResourceId)) {
-        throw "${prefix}: ResourceId is required for failed scan results."
-    }
+    [CIEMScanResult]::AssertScanResultKey($Status, $CheckId, $ResourceId, $Context)
 }

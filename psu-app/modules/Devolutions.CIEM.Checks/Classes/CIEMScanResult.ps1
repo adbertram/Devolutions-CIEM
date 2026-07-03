@@ -22,7 +22,7 @@ class CIEMScanResult {
     CIEMScanResult() {}
 
     static [CIEMScanResult] Create([object]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName, [string]$Location) {
-        AssertCIEMScanResultKey -Status $Status -CheckId $Check.Id -ResourceId $ResourceId
+        [CIEMScanResult]::AssertScanResultKey($Status, $Check.Id, $ResourceId, '')
         $result = [CIEMScanResult]::new()
         $result.Check = $Check
         $result.Status = [CIEMScanStatus]$Status
@@ -35,6 +35,20 @@ class CIEMScanResult {
 
     static [CIEMScanResult] Create([object]$Check, [string]$Status, [string]$StatusExtended, [string]$ResourceId, [string]$ResourceName) {
         return [CIEMScanResult]::Create($Check, $Status, $StatusExtended, $ResourceId, $ResourceName, 'Global')
+    }
+
+    hidden static [void] AssertScanResultKey([string]$Status, [string]$CheckId, [string]$ResourceId, [string]$Context) {
+        if ($Status -ne 'FAIL') {
+            return
+        }
+
+        $prefix = if ([string]::IsNullOrWhiteSpace($Context)) { 'Failed scan result' } else { "Failed scan result in $Context" }
+        if ([string]::IsNullOrWhiteSpace($CheckId)) {
+            throw "${prefix}: CheckId is required for failed scan results."
+        }
+        if ([string]::IsNullOrWhiteSpace($ResourceId)) {
+            throw "${prefix}: ResourceId is required for failed scan results."
+        }
     }
 }
 
