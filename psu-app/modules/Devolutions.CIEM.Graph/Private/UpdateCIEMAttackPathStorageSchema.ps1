@@ -87,4 +87,31 @@ CREATE TABLE attack_paths (
     Invoke-CIEMQuery -Query 'CREATE INDEX IF NOT EXISTS idx_attack_path_rules_disabled ON attack_path_rules(disabled)' -AsNonQuery | Out-Null
     Invoke-CIEMQuery -Query 'CREATE INDEX IF NOT EXISTS idx_attack_paths_rule ON attack_paths(rule_id)' -AsNonQuery | Out-Null
     Invoke-CIEMQuery -Query 'CREATE INDEX IF NOT EXISTS idx_attack_paths_evaluated_at ON attack_paths(evaluated_at)' -AsNonQuery | Out-Null
+
+    $snapshotColumns = @{}
+    foreach ($column in @(Invoke-CIEMQuery -Query "PRAGMA table_info('ciem_exposure_snapshot_items')")) {
+        $snapshotColumns[[string]$column.name] = [string]$column.type
+    }
+    if ($snapshotColumns.Count -gt 0 -and -not $snapshotColumns.ContainsKey('progress_key')) {
+        Invoke-CIEMQuery -Query 'ALTER TABLE ciem_exposure_snapshot_items ADD COLUMN progress_key TEXT' -AsNonQuery | Out-Null
+    }
+    Invoke-CIEMQuery -Query 'CREATE INDEX IF NOT EXISTS idx_ciem_exposure_snapshot_progress_key ON ciem_exposure_snapshot_items(progress_key)' -AsNonQuery | Out-Null
+
+    $discoveryColumns = @{}
+    foreach ($column in @(Invoke-CIEMQuery -Query "PRAGMA table_info('azure_discovery_runs')")) {
+        $discoveryColumns[[string]$column.name] = [string]$column.type
+    }
+    if ($discoveryColumns.Count -gt 0) {
+        foreach ($column in @(
+            @{ Name = 'attack_path_scope_hash';           Definition = 'TEXT' },
+            @{ Name = 'discovery_scope_hash';              Definition = 'TEXT' },
+            @{ Name = 'exposure_snapshot_completed_at';    Definition = 'TEXT' }
+        )) {
+            if (-not $discoveryColumns.ContainsKey($column.Name)) {
+                Invoke-CIEMQuery -Query "ALTER TABLE azure_discovery_runs ADD COLUMN $($column.Name) $($column.Definition)" -AsNonQuery | Out-Null
+            }
+        }
+    }
+    Invoke-CIEMQuery -Query 'CREATE INDEX IF NOT EXISTS idx_discovery_runs_attack_path_scope ON azure_discovery_runs(attack_path_scope_hash)' -AsNonQuery | Out-Null
+    Invoke-CIEMQuery -Query 'CREATE INDEX IF NOT EXISTS idx_discovery_runs_scope_hash ON azure_discovery_runs(discovery_scope_hash)' -AsNonQuery | Out-Null
 }

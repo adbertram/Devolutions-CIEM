@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS ciem_exposure_snapshot_items (
     state_json TEXT NOT NULL,
     evidence TEXT NOT NULL,
     observed_at TEXT NOT NULL,
+    progress_key TEXT,
     PRIMARY KEY (discovery_run_id, exposure_key),
     FOREIGN KEY (discovery_run_id) REFERENCES azure_discovery_runs(id) ON DELETE CASCADE
 );

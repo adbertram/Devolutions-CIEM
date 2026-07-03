@@ -79,6 +79,11 @@ Describe 'CIEM exposure change detection' {
         $tables | Should -HaveCount 2
         $changeColumns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('ciem_exposure_changes')")
         $changeColumns.name | Should -Contain 'title'
+        $snapshotColumns = @(Invoke-CIEMQuery -Query "PRAGMA table_info('ciem_exposure_snapshot_items')")
+        $snapshotIndexes = @(Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'ciem_exposure_snapshot_items'")
+
+        $snapshotColumns.name | Should -Contain 'progress_key'
+        $snapshotIndexes.name | Should -Contain 'idx_ciem_exposure_snapshot_progress_key'
     }
 
     It 'materializes current identity and attack path exposures for a discovery run' {
@@ -128,6 +133,44 @@ VALUES (
         $attackPathExposure.ImpactedIdentityName | Should -Be 'Snapshot User'
         $attackPathExposure.ImpactedIdentityType | Should -Be 'User'
         $attackPathExposure.ImpactedResourceName | Should -Be 'Test Subscription'
+        $attackPathExposure.ProgressKey | Should -Match '^attack-path:[a-f0-9]{64}$'
+
+        $storedAttackPath = Invoke-CIEMQuery -Query "SELECT progress_key FROM ciem_exposure_snapshot_items WHERE discovery_run_id = @run_id AND exposure_type = 'AttackPath'" -Parameters @{ run_id = $run.Id }
+        $storedAttackPath.progress_key | Should -Be $attackPathExposure.ProgressKey
+    }
+
+    It 'builds stable attack path progress keys from semantic path shape' {
+        $keys = InModuleScope Devolutions.CIEM {
+            $first = [CIEMAttackPath]::new()
+            $first.Id = 'volatile-1'
+            $first.RuleId = 'rule-1'
+            $first.Path = @(
+                [pscustomobject]@{ id = 'user-1'; kind = 'EntraUser'; display_name = 'Original User' }
+                [pscustomobject]@{ id = 'sub-1'; kind = 'AzureSubscription'; display_name = 'Original Subscription' }
+            )
+            $first.Edges = @(
+                [pscustomobject]@{ id = 1; source_id = 'user-1'; target_id = 'sub-1'; kind = 'HasRole'; properties = '{"role":"Owner"}'; evaluated_at = '2026-01-01T00:00:00Z' }
+            )
+
+            $second = [CIEMAttackPath]::new()
+            $second.Id = 'volatile-2'
+            $second.RuleId = 'rule-1'
+            $second.Path = @(
+                [pscustomobject]@{ id = 'user-1'; kind = 'EntraUser'; display_name = 'Renamed User' }
+                [pscustomobject]@{ id = 'sub-1'; kind = 'AzureSubscription'; display_name = 'Renamed Subscription' }
+            )
+            $second.Edges = @(
+                [pscustomobject]@{ id = 99; source_id = 'user-1'; target_id = 'sub-1'; kind = 'HasRole'; properties = '{"role":"Owner"}'; evaluated_at = '2026-02-01T00:00:00Z' }
+            )
+
+            @(
+                GetCIEMStableAttackPathProgressKey -AttackPath $first
+                GetCIEMStableAttackPathProgressKey -AttackPath $second
+            )
+        }
+
+        $keys[0] | Should -Be $keys[1]
+        $keys[0] | Should -Match '^attack-path:[a-f0-9]{64}$'
     }
 
     It 'persists deterministic new risk, removed risk, and risk increase records from two snapshots' {
