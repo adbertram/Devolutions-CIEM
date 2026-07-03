@@ -173,6 +173,46 @@ VALUES (
         $keys[0] | Should -Match '^attack-path:[a-f0-9]{64}$'
     }
 
+    It 'does not create change records when attack path IDs change but progress key is stable' {
+        $previousRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-06T01:00:00Z' -CompletedAt '2026-05-06T01:10:00Z'
+        $currentRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-07T01:00:00Z' -CompletedAt '2026-05-07T01:10:00Z'
+        $progressKey = 'attack-path:stable-semantic-path'
+
+        Invoke-CIEMQuery -Query @"
+INSERT INTO ciem_exposure_snapshot_items (
+    discovery_run_id, exposure_key, exposure_type, severity, severity_rank,
+    impacted_identity_id, impacted_identity_name, impacted_identity_type,
+    impacted_resource_id, impacted_resource_name, title, state_json, evidence,
+    observed_at, progress_key
+)
+VALUES
+(
+    @previous_run_id, 'attack-path:volatile-previous', 'AttackPath', 'High', 2,
+    'user-1', 'Stable User', 'User',
+    '/subscriptions/test-sub', 'Test Subscription', 'Stable attack path',
+    @state_json, 'Stable User -> Test Subscription', '2026-05-06T01:10:00Z',
+    @progress_key
+),
+(
+    @current_run_id, 'attack-path:volatile-current', 'AttackPath', 'High', 2,
+    'user-1', 'Stable User', 'User',
+    '/subscriptions/test-sub', 'Test Subscription', 'Stable attack path',
+    @state_json, 'Stable User -> Test Subscription', '2026-05-07T01:10:00Z',
+    @progress_key
+)
+"@ -Parameters @{
+            previous_run_id = $previousRun.Id
+            current_run_id  = $currentRun.Id
+            state_json      = @{ PatternName = 'Stable attack path'; PathChain = 'Stable User -> Test Subscription' } | ConvertTo-Json -Compress
+            progress_key    = $progressKey
+        } -AsNonQuery | Out-Null
+
+        $changes = @(Compare-CIEMExposureSnapshot -PreviousDiscoveryRunId $previousRun.Id -CurrentDiscoveryRunId $currentRun.Id)
+
+        $changes | Should -HaveCount 0
+        @(Get-CIEMExposureChange -CurrentDiscoveryRunId $currentRun.Id) | Should -HaveCount 0
+    }
+
     It 'persists deterministic new risk, removed risk, and risk increase records from two snapshots' {
         $previousRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-06T01:00:00Z' -CompletedAt '2026-05-06T01:10:00Z'
         $currentRun = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-07T01:00:00Z' -CompletedAt '2026-05-07T01:10:00Z'

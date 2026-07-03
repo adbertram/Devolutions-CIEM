@@ -61,6 +61,23 @@ function NewCIEMExposureChange {
     }
 }
 
+function GetCIEMExposureComparisonKey {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [object]$SnapshotItem
+    )
+
+    $ErrorActionPreference = 'Stop'
+
+    $progressKey = [string]$SnapshotItem.progress_key
+    if (-not [string]::IsNullOrWhiteSpace($progressKey)) {
+        return $progressKey
+    }
+
+    [string]$SnapshotItem.exposure_key
+}
+
 function Compare-CIEMExposureSnapshot {
     [CmdletBinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Persists local exposure-change records generated from two snapshots')]
@@ -84,19 +101,19 @@ function Compare-CIEMExposureSnapshot {
 
     $previousByKey = @{}
     foreach ($row in $previousRows) {
-        $previousByKey[[string]$row.exposure_key] = $row
+        $previousByKey[(GetCIEMExposureComparisonKey -SnapshotItem $row)] = $row
     }
 
     $currentByKey = @{}
     foreach ($row in $currentRows) {
-        $currentByKey[[string]$row.exposure_key] = $row
+        $currentByKey[(GetCIEMExposureComparisonKey -SnapshotItem $row)] = $row
     }
 
     $createdAt = (Get-Date).ToString('o')
     $changes = @()
 
     foreach ($current in $currentRows) {
-        $key = [string]$current.exposure_key
+        $key = GetCIEMExposureComparisonKey -SnapshotItem $current
         $previous = $previousByKey[$key]
         if ($null -eq $previous) {
             if (TestCIEMExposureSeverityIsRisk -Severity ([string]$current.severity)) {
@@ -112,7 +129,7 @@ function Compare-CIEMExposureSnapshot {
     }
 
     foreach ($previous in $previousRows) {
-        $key = [string]$previous.exposure_key
+        $key = GetCIEMExposureComparisonKey -SnapshotItem $previous
         if (-not $currentByKey.ContainsKey($key) -and (TestCIEMExposureSeverityIsRisk -Severity ([string]$previous.severity))) {
             $changes += NewCIEMExposureChange -ChangeType 'RemovedRisk' -Previous $previous -Current $null -PreviousDiscoveryRunId $PreviousDiscoveryRunId -CurrentDiscoveryRunId $CurrentDiscoveryRunId -CreatedAt $createdAt
         }
