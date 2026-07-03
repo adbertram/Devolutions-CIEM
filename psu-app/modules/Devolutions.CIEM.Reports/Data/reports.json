@@ -20,7 +20,13 @@
       "coverage-row-table"
     ],
     "parameters": [
-      "RunId"
+      {
+        "name": "RunId",
+        "selectorId": "reportRunSelector",
+        "label": "Discovery run",
+        "optionSource": "CompletedDiscoveryRuns",
+        "allowEmpty": false
+      }
     ],
     "statusSummary": [
       {
@@ -41,5 +47,55 @@
       }
     ],
     "emptyState": "No Azure discovery coverage rows are available."
+  },
+  {
+    "id": "azure.environmental.progress",
+    "provider": "Azure",
+    "category": "Progress",
+    "title": "Azure Environmental Progress",
+    "description": "Shows fixed, remaining, and new Azure attack path and failed-check findings between comparable evidence points.",
+    "executorName": "GetCIEMEnvironmentalProgressReportData",
+    "columns": [
+      "Status",
+      "SignalType",
+      "SignalKey",
+      "Severity",
+      "Title",
+      "Identity",
+      "Resource",
+      "BaselineDiscoveryRunId",
+      "CurrentDiscoveryRunId",
+      "BaselineScanRunId",
+      "CurrentScanRunId",
+      "Evidence"
+    ],
+    "visuals": [
+      "coverage-status-summary",
+      "coverage-row-table"
+    ],
+    "parameters": [
+      {
+        "name": "EvidencePairId",
+        "selectorId": "reportEvidencePairSelector",
+        "label": "Evidence pair",
+        "optionSource": "EnvironmentalProgressEvidencePairs",
+        "allowEmpty": true
+      }
+    ],
+    "statusSummary": [
+      {
+        "status": "Fixed",
+        "color": "#2e7d32"
+      },
+      {
+        "status": "Remaining",
+        "color": "#ed6c02"
+      },
+      {
+        "status": "New",
+        "color": "#d32f2f"
+      }
+    ],
+    "emptyState": "No comparable Azure progress evidence is available."
   }
 ]

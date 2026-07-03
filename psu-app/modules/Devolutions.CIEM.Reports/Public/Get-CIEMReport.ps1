@@ -27,7 +27,7 @@ function Get-CIEMReport {
             $report.ExecutorName = $entry.executorName
             $report.Columns = [string[]]@($entry.columns)
             $report.Visuals = [string[]]@($entry.visuals)
-            $report.Parameters = [string[]]@($entry.parameters)
+            $report.Parameters = [object[]]@($entry.parameters)
             $report.StatusSummary = [object[]]@($entry.statusSummary)
             $report.EmptyState = [string]$entry.emptyState
             $report

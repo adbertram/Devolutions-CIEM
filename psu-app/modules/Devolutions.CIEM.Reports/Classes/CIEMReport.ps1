@@ -7,7 +7,7 @@ class CIEMReport {
     [string]$ExecutorName
     [string[]]$Columns
     [string[]]$Visuals
-    [string[]]$Parameters
+    [object[]]$Parameters
     [object[]]$StatusSummary
     [string]$EmptyState
 

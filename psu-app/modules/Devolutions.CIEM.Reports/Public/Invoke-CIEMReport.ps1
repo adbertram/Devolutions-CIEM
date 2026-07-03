@@ -28,9 +28,28 @@ function Invoke-CIEMReport {
             }
         }
 
-        Get-Command -Name $report.ExecutorName -CommandType Function -ErrorAction Stop | Out-Null
+        $executorCommand = Get-Command -Name $report.ExecutorName -CommandType Function -ErrorAction Stop
 
-        $execution = & $report.ExecutorName @Parameter
+        $declaredParameters = @{}
+        foreach ($parameterDefinition in @($report.Parameters)) {
+            if (-not $parameterDefinition.PSObject.Properties['name']) {
+                throw "CIEM report '$($report.Id)' contains an invalid parameter definition."
+            }
+            $declaredParameters[[string]$parameterDefinition.name] = $true
+        }
+
+        $executionParameters = @{}
+        foreach ($parameterName in @($Parameter.Keys)) {
+            if (-not $declaredParameters.ContainsKey([string]$parameterName)) {
+                throw "CIEM report '$($report.Id)' does not declare parameter '$parameterName'."
+            }
+            if (-not $executorCommand.Parameters.ContainsKey([string]$parameterName)) {
+                throw "CIEM report '$($report.Id)' executor '$($report.ExecutorName)' does not accept parameter '$parameterName'."
+            }
+            $executionParameters[[string]$parameterName] = $Parameter[$parameterName]
+        }
+
+        $execution = & $report.ExecutorName @executionParameters
         foreach ($requiredProperty in @('Rows', 'Context')) {
             if (-not $execution.PSObject.Properties[$requiredProperty]) {
                 throw "CIEM report '$($report.Id)' executor '$($report.ExecutorName)' did not return required property '$requiredProperty'."

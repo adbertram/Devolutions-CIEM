@@ -76,9 +76,30 @@ Describe 'CIEM Reports' {
             $report.Columns | Should -Contain 'Area'
             $report.Columns | Should -Contain 'Status'
             $report.Visuals | Should -Contain 'coverage-status-summary'
-            $report.Parameters | Should -Contain 'RunId'
+            $report.Parameters[0].name | Should -Be 'RunId'
+            $report.Parameters[0].selectorId | Should -Be 'reportRunSelector'
+            $report.Parameters[0].label | Should -Be 'Discovery run'
+            $report.Parameters[0].optionSource | Should -Be 'CompletedDiscoveryRuns'
+            $report.Parameters[0].allowEmpty | Should -BeFalse
             $report.StatusSummary.Status | Should -Contain 'Collected'
             $report.EmptyState | Should -Be 'No Azure discovery coverage rows are available.'
+        }
+
+        It 'Returns the Azure environmental progress definition with parameter object metadata' {
+            $report = Get-CIEMReport -Id 'azure.environmental.progress'
+
+            $report.GetType().Name | Should -Be 'CIEMReport'
+            $report.Id | Should -Be 'azure.environmental.progress'
+            $report.ExecutorName | Should -Be 'GetCIEMEnvironmentalProgressReportData'
+            $report.Columns | Should -Contain 'SignalKey'
+            $report.Columns | Should -Contain 'BaselineDiscoveryRunId'
+            $report.Parameters[0].name | Should -Be 'EvidencePairId'
+            $report.Parameters[0].selectorId | Should -Be 'reportEvidencePairSelector'
+            $report.Parameters[0].optionSource | Should -Be 'EnvironmentalProgressEvidencePairs'
+            $report.Parameters[0].allowEmpty | Should -BeTrue
+            $report.StatusSummary.Status | Should -Contain 'Fixed'
+            $report.StatusSummary.Status | Should -Contain 'Remaining'
+            $report.StatusSummary.Status | Should -Contain 'New'
         }
 
         It 'Filters reports by provider' {
@@ -119,6 +140,11 @@ Describe 'CIEM Reports' {
 
             { Invoke-CIEMReport -Id 'azure.discovery.coverage' -Parameter @{ RunId = 1 } } |
                 Should -Throw "*row is missing configured column 'SourceApi'*"
+        }
+
+        It 'Rejects supplied parameters that the selected report does not declare' {
+            { Invoke-CIEMReport -Id 'azure.discovery.coverage' -Parameter @{ Unexpected = 'x' } } |
+                Should -Throw "*does not declare parameter 'Unexpected'*"
         }
     }
 

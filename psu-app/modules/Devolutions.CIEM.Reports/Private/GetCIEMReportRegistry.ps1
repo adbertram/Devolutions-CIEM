@@ -81,7 +81,7 @@ function TestCIEMReportRegistry {
         }
         $seenIds[[string]$entry.id] = $true
 
-        Get-Command -Name ([string]$entry.executorName) -CommandType Function -ErrorAction Stop | Out-Null
+        $executorCommand = Get-Command -Name ([string]$entry.executorName) -CommandType Function -ErrorAction Stop
 
         if (@($entry.columns).Count -eq 0) {
             throw "CIEM report '$($entry.id)' has no columns."
@@ -109,6 +109,46 @@ function TestCIEMReportRegistry {
                 if ([string]::IsNullOrWhiteSpace([string]$summary.$summaryProperty)) {
                     throw "CIEM report '$($entry.id)' statusSummary entry has empty '$summaryProperty'."
                 }
+            }
+        }
+
+        $parameterNames = @{}
+        $parameterSelectorIds = @{}
+        foreach ($parameter in @($entry.parameters)) {
+            if ($parameter -is [string]) {
+                throw "CIEM report '$($entry.id)' has a non-object parameter entry."
+            }
+
+            foreach ($parameterProperty in @('name', 'selectorId', 'label', 'optionSource', 'allowEmpty')) {
+                if (-not $parameter.PSObject.Properties[$parameterProperty]) {
+                    throw "CIEM report '$($entry.id)' parameter entry is missing '$parameterProperty'."
+                }
+            }
+
+            foreach ($stringProperty in @('name', 'selectorId', 'label', 'optionSource')) {
+                if ([string]::IsNullOrWhiteSpace([string]$parameter.$stringProperty)) {
+                    throw "CIEM report '$($entry.id)' parameter entry has empty '$stringProperty'."
+                }
+            }
+
+            if ($parameter.allowEmpty -isnot [bool]) {
+                throw "CIEM report '$($entry.id)' parameter '$($parameter.name)' has non-boolean allowEmpty."
+            }
+
+            $parameterName = [string]$parameter.name
+            if ($parameterNames.ContainsKey($parameterName)) {
+                throw "CIEM report '$($entry.id)' contains duplicate parameter name '$parameterName'."
+            }
+            $parameterNames[$parameterName] = $true
+
+            $selectorId = [string]$parameter.selectorId
+            if ($parameterSelectorIds.ContainsKey($selectorId)) {
+                throw "CIEM report '$($entry.id)' contains duplicate parameter selectorId '$selectorId'."
+            }
+            $parameterSelectorIds[$selectorId] = $true
+
+            if (-not $executorCommand.Parameters.ContainsKey($parameterName)) {
+                throw "CIEM report '$($entry.id)' declares parameter '$parameterName' that executor '$($entry.executorName)' does not accept."
             }
         }
     }
