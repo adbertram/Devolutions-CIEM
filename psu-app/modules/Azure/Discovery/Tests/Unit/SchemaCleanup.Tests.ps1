@@ -165,6 +165,21 @@ Describe 'Schema Cleanup' {
             $idx = Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_resource_rel_target'"
             $idx | Should -Not -BeNullOrEmpty
         }
+
+        It 'progress evidence columns exist on azure_discovery_runs' {
+            $cols = Invoke-CIEMQuery -Query "PRAGMA table_info(azure_discovery_runs)"
+
+            $cols.name | Should -Contain 'attack_path_scope_hash'
+            $cols.name | Should -Contain 'discovery_scope_hash'
+            $cols.name | Should -Contain 'exposure_snapshot_completed_at'
+        }
+
+        It 'progress evidence indexes exist on azure_discovery_runs' {
+            $idx = Invoke-CIEMQuery -Query "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='azure_discovery_runs'"
+
+            $idx.name | Should -Contain 'idx_discovery_runs_attack_path_scope'
+            $idx.name | Should -Contain 'idx_discovery_runs_scope_hash'
+        }
     }
 
     Context 'Discovery schema SQL file exists' {

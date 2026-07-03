@@ -256,7 +256,7 @@ Describe 'Start-CIEMAzureDiscovery' {
         }
 
         It 'Start-CIEMAzureDiscovery saves and compares exposure snapshots after successful discovery' {
-            $script:StartDiscoverySource | Should -Match 'Save-CIEMExposureSnapshot'
+            $script:StartDiscoverySource | Should -Match 'SaveCIEMExposureSnapshotCore'
             $script:StartDiscoverySource | Should -Match 'Compare-CIEMExposureSnapshot'
             $script:StartDiscoverySource | Should -Match "status IN \('Completed', 'Partial'\)"
         }

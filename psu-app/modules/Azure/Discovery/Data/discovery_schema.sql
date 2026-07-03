@@ -81,7 +81,10 @@ CREATE TABLE IF NOT EXISTS azure_discovery_runs (
     entra_type_count INTEGER DEFAULT 0,
     entra_row_count INTEGER DEFAULT 0,
     warning_count INTEGER DEFAULT 0,
-    error_message TEXT
+    error_message TEXT,
+    attack_path_scope_hash TEXT,
+    discovery_scope_hash TEXT,
+    exposure_snapshot_completed_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_discovery_runs_status ON azure_discovery_runs(status);

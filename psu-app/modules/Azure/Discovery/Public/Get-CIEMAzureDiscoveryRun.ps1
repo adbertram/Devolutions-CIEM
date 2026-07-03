@@ -9,6 +9,17 @@ function Get-CIEMAzureDiscoveryRun {
         [string]$Status,
 
         [Parameter()]
+        [string]$Scope,
+
+        [Parameter()]
+        [ValidateSet('StartedAt', 'CompletedAt')]
+        [string]$OrderBy = 'StartedAt',
+
+        [Parameter()]
+        [ValidateSet('Asc', 'Desc')]
+        [string]$SortDirection = 'Desc',
+
+        [Parameter()]
         [int]$Last
     )
 
@@ -25,13 +36,43 @@ function Get-CIEMAzureDiscoveryRun {
         $conditions += "status = @status"
         $parameters.status = $Status
     }
+    if ($PSBoundParameters.ContainsKey('Scope')) {
+        $conditions += "scope = @scope"
+        $parameters.scope = $Scope
+    }
 
-    $query = "SELECT * FROM azure_discovery_runs"
+    $query = @"
+SELECT
+    id,
+    psu_job_id,
+    scope,
+    status,
+    started_at,
+    completed_at,
+    arm_type_count,
+    arm_row_count,
+    entra_type_count,
+    entra_row_count,
+    warning_count,
+    error_message
+FROM azure_discovery_runs
+"@
     if ($conditions.Count -gt 0) {
         $query += "`nWHERE " + ($conditions -join ' AND ')
     }
+
+    if ($PSBoundParameters.ContainsKey('Last') -or $PSBoundParameters.ContainsKey('OrderBy') -or $PSBoundParameters.ContainsKey('SortDirection')) {
+        $orderColumn = switch ($OrderBy) {
+            'StartedAt' { 'started_at' }
+            'CompletedAt' { 'completed_at' }
+        }
+
+        $sortSql = $SortDirection.ToUpperInvariant()
+        $query += "`nORDER BY julianday($orderColumn) $sortSql, id $sortSql"
+    }
+
     if ($PSBoundParameters.ContainsKey('Last')) {
-        $query += "`nORDER BY julianday(started_at) DESC, id DESC LIMIT @last"
+        $query += "`nLIMIT @last"
         $parameters.last = $Last
     }
 

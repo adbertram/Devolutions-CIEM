@@ -127,6 +127,7 @@ function GetCIEMAzureDiscoveryCoverageReportData {
             RunId = [int]$run.id
             Scope = $run.scope
             Status = $run.status
+            ContextChipKeys = @('RunId', 'Scope', 'Status')
         }
     }
 }

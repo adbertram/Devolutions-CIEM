@@ -163,6 +163,66 @@ Describe 'Discovery Run CRUD' {
             $results[0].Status | Should -Be 'Completed'
             $results[0].CompletedAt | Should -Be '2026-01-01T00:30:00Z'
         }
+
+        It 'Filters by -Scope' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-01-01T00:00:00Z' -CompletedAt '2026-01-01T00:30:00Z'
+            New-CIEMAzureDiscoveryRun -Scope 'ARM' -Status 'Completed' -StartedAt '2026-01-02T00:00:00Z' -CompletedAt '2026-01-02T00:30:00Z'
+
+            $results = @(Get-CIEMAzureDiscoveryRun -Scope All)
+
+            $results | Should -HaveCount 1
+            $results[0].Scope | Should -Be 'All'
+        }
+
+        It 'Orders -Last by normalized completed_at timestamp when requested' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-14T17:00:00Z' -CompletedAt '2026-05-14T17:44:58.106Z' | Out-Null
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-14T17:10:00Z' -CompletedAt '2026-05-14T12:59:51.1161110-05:00' | Out-Null
+
+            $result = Get-CIEMAzureDiscoveryRun -Status Completed -Scope All -OrderBy CompletedAt -SortDirection Desc -Last 1
+
+            $result.CompletedAt | Should -Be '2026-05-14T12:59:51.1161110-05:00'
+        }
+
+        It 'Orders by normalized started_at timestamp when requested' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-14T17:44:58.106Z' | Out-Null
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-05-14T12:59:51.1161110-05:00' | Out-Null
+
+            $result = Get-CIEMAzureDiscoveryRun -OrderBy StartedAt -SortDirection Desc -Last 1
+
+            $result.StartedAt | Should -Be '2026-05-14T12:59:51.1161110-05:00'
+        }
+
+        It 'Supports ascending sort direction' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-01-02T00:00:00Z' | Out-Null
+            New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-01-01T00:00:00Z' | Out-Null
+
+            $result = Get-CIEMAzureDiscoveryRun -OrderBy StartedAt -SortDirection Asc -Last 1
+
+            $result.StartedAt | Should -Be '2026-01-01T00:00:00Z'
+        }
+
+        It 'Rejects invalid -OrderBy values through parameter validation' {
+            { Get-CIEMAzureDiscoveryRun -OrderBy Id } | Should -Throw '*Cannot validate argument*'
+        }
+
+        It 'Rejects invalid -SortDirection values through parameter validation' {
+            { Get-CIEMAzureDiscoveryRun -SortDirection Sideways } | Should -Throw '*Cannot validate argument*'
+        }
+
+        It 'Preserves core discovery fields with the explicit projection' {
+            Invoke-CIEMQuery -Query "DELETE FROM azure_discovery_runs"
+            $created = New-CIEMAzureDiscoveryRun -Scope 'All' -Status 'Completed' -StartedAt '2026-01-01T00:00:00Z' -CompletedAt '2026-01-01T00:30:00Z'
+
+            $result = Get-CIEMAzureDiscoveryRun -Id $created.Id
+
+            $result.Id | Should -Be $created.Id
+            $result.Status | Should -Be 'Completed'
+            $result.CompletedAt | Should -Be '2026-01-01T00:30:00Z'
+        }
     }
 
     Context 'Update-CIEMAzureDiscoveryRun' {
@@ -260,6 +320,28 @@ Describe 'Discovery Run CRUD' {
             Remove-CIEMAzureDiscoveryRun -InputObject $obj -Confirm:$false
             $result = Get-CIEMAzureDiscoveryRun -Id $script:rmRun.Id
             $result | Should -BeNullOrEmpty
+        }
+
+        It 'Clears linked scan discovery ids through the foreign key on delete' {
+            Invoke-CIEMQuery -Query @"
+INSERT INTO scan_runs (
+    id, provider_id, scan_type, status, resource_providers, include_passed,
+    started_at, completed_at, duration_seconds, total_results, failed_results,
+    passed_results, skipped_results, manual_results, discovery_run_id,
+    provider_explicit, progress_eligible, progress_scope_hash
+)
+VALUES (
+    'linked-progress-scan', 'azure', 'checks', 'Completed', NULL, 1,
+    '2026-05-01T00:11:00Z', '2026-05-01T00:12:00Z', 60, 0, 0, 0, 0, 0,
+    @discovery_run_id, 1, 1, 'progress-hash'
+)
+"@ -Parameters @{ discovery_run_id = $script:rmRun.Id } -AsNonQuery | Out-Null
+            Invoke-CIEMQuery -Query "INSERT INTO scan_run_providers (scan_run_id, provider) VALUES ('linked-progress-scan', 'Azure')" -AsNonQuery | Out-Null
+
+            Remove-CIEMAzureDiscoveryRun -Id $script:rmRun.Id -Confirm:$false
+
+            $row = Invoke-CIEMQuery -Query "SELECT discovery_run_id FROM scan_runs WHERE id = 'linked-progress-scan'"
+            $row.discovery_run_id | Should -BeNullOrEmpty
         }
 
         It 'Throws when -All switch is used (safety constraint — discovery runs are audit records)' {

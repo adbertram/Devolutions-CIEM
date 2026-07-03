@@ -49,19 +49,6 @@ function Start-CIEMAzureDiscovery {
         }
     }
 
-    $runningRuns = @(Get-CIEMAzureDiscoveryRun -Status 'Running')
-    if ($runningRuns.Count -gt 0) {
-        throw "A discovery run is already in progress (Id=$($runningRuns[0].Id)). Wait for it to complete or clear stale runs."
-    }
-
-    if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
-        Write-CIEMLog 'Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure...' -Severity INFO -Component 'Discovery'
-        Connect-CIEMAzure | Out-Null
-    }
-
-    $run = New-CIEMAzureDiscoveryRun -Scope $Scope -Status 'Running' -StartedAt (Get-Date).ToString('o')
-    Write-CIEMLog "Start-CIEMAzureDiscovery: run #$($run.Id) started, Scope=$Scope" -Severity INFO -Component 'Discovery'
-
     $scheduleIdVariable = Get-Variable -Name 'UAScheduleId' -ErrorAction SilentlyContinue
     $jobIdVariable = Get-Variable -Name 'UAJobId' -ErrorAction SilentlyContinue
     $hasScheduleId = $scheduleIdVariable -and $null -ne $scheduleIdVariable.Value
@@ -77,8 +64,30 @@ function Start-CIEMAzureDiscovery {
         }
     }
     $notificationInvocationSource = if ($scheduledDiscoveryContext) { 'ScheduledDiscovery' } else { 'Manual' }
+    $psuJobId = if ($scheduledDiscoveryContext) { $scheduledDiscoveryContext.PsuJobId } else { 0 }
+
+    $run = $null
+    InvokeCIEMImmediateTransaction {
+        param($conn)
+
+        AssertCIEMAzureMutationAllowed -Connection $conn -Starting AzureDiscovery
+        $script:StartedDiscoveryRun = NewCIEMAzureDiscoveryRunCore `
+            -Connection $conn `
+            -Scope $Scope `
+            -Status 'Running' `
+            -StartedAt (Get-Date).ToString('o') `
+            -PsuJobId $psuJobId
+    }
+    $run = $script:StartedDiscoveryRun
+    $script:StartedDiscoveryRun = $null
+    Write-CIEMLog "Start-CIEMAzureDiscovery: run #$($run.Id) started, Scope=$Scope" -Severity INFO -Component 'Discovery'
 
     try {
+    if (-not $script:AzureAuthContext -or -not $script:AzureAuthContext.IsConnected) {
+        Write-CIEMLog 'Start-CIEMAzureDiscovery: No auth context, calling Connect-CIEMAzure...' -Severity INFO -Component 'Discovery'
+        Connect-CIEMAzure | Out-Null
+    }
+
     if ($scheduledDiscoveryContext) {
         Update-CIEMAzureDiscoveryScheduleStatus `
             -PsuScheduleId $scheduledDiscoveryContext.PsuScheduleId `
@@ -91,6 +100,11 @@ function Start-CIEMAzureDiscovery {
     $errorMessages = [System.Collections.Generic.List[string]]::new()
     $runStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $subscriptionIds = @($script:AzureAuthContext.SubscriptionIds)
+    $discoveryScopeHash = $null
+    if ($Scope -eq 'All') {
+        $discoveryScopeHash = GetCIEMAzureDiscoveryScopeHash -TenantId $script:AzureAuthContext.TenantId -SubscriptionIds $subscriptionIds
+    }
+    $attackPathScopeHash = $null
 
     # Per-phase success flags. Scope=ARM means Entra is "successful" by virtue of
     # not running, and vice versa — this matches the pre-refactor semantics.
@@ -421,9 +435,12 @@ function Start-CIEMAzureDiscovery {
                 -DiscoveryRunId $run.Id `
             -Action {
                 Sync-CIEMAttackPathRuleCatalog | Out-Null
+                $script:CurrentDiscoveryAttackPathScopeHash = GetCIEMAttackPathRuleScopeHash
                 $attackPathCount = @(Update-CIEMAttackPath -PassThru).Count
                 Write-CIEMLog "AttackPaths: $attackPathCount findings materialized" -Component 'Discovery'
             }
+        $attackPathScopeHash = $script:CurrentDiscoveryAttackPathScopeHash
+        $script:CurrentDiscoveryAttackPathScopeHash = $null
 
         $allArmResources = $null
         $allEntraResources = $null
@@ -443,19 +460,32 @@ function Start-CIEMAzureDiscovery {
             'Completed'
         }
 
-        $run = Update-CIEMAzureDiscoveryRun -Id $run.Id `
-            -Status $finalStatus `
-            -CompletedAt (Get-Date).ToString('o') `
-            -ArmTypeCount $armTypeCount `
-            -ArmRowCount $armRowCount `
-            -EntraTypeCount $entraTypeCount `
-            -EntraRowCount $entraRowCount `
-            -WarningCount $warningCount `
-            -ErrorMessage ($errorMessages -join '; ') `
-            -PassThru
-
+        $completedAt = (Get-Date).ToString('o')
         if ($finalStatus -in @('Completed', 'Partial')) {
-            $snapshotItems = @(Save-CIEMExposureSnapshot -DiscoveryRunId $run.Id)
+            $snapshotItemsToSave = @(NewCIEMExposureSnapshotItems -DiscoveryRunId $run.Id -ObservedAt $completedAt)
+            $terminalAttackPathScopeHash = if ($Scope -eq 'All') { $attackPathScopeHash } else { $null }
+            $terminalDiscoveryScopeHash = if ($Scope -eq 'All') { $discoveryScopeHash } else { $null }
+            InvokeCIEMTransaction {
+                param($conn)
+
+                $script:SavedDiscoverySnapshotItems = @(SaveCIEMExposureSnapshotCore `
+                    -Connection $conn `
+                    -DiscoveryRunId $run.Id `
+                    -ObservedAt $completedAt `
+                    -AttackPathScopeHash $terminalAttackPathScopeHash `
+                    -DiscoveryScopeHash $terminalDiscoveryScopeHash `
+                    -TerminalStatus $finalStatus `
+                    -ArmTypeCount $armTypeCount `
+                    -ArmRowCount $armRowCount `
+                    -EntraTypeCount $entraTypeCount `
+                    -EntraRowCount $entraRowCount `
+                    -WarningCount $warningCount `
+                    -ErrorMessage ($errorMessages -join '; ') `
+                    -Items $snapshotItemsToSave)
+            }
+            $snapshotItems = @($script:SavedDiscoverySnapshotItems)
+            $script:SavedDiscoverySnapshotItems = $null
+            $run = Get-CIEMAzureDiscoveryRun -Id $run.Id
             $previousSnapshotRunRows = @(Invoke-CIEMQuery -Query @"
 SELECT id
 FROM azure_discovery_runs
@@ -469,6 +499,18 @@ LIMIT 1
                 Send-CIEMNotification -CurrentDiscoveryRunId $run.Id -InvocationSource $notificationInvocationSource | Out-Null
             }
             Write-CIEMLog "Exposure snapshot saved for discovery run #$($run.Id): $($snapshotItems.Count) item(s)" -Severity INFO -Component 'Discovery'
+        }
+        else {
+            $run = Update-CIEMAzureDiscoveryRun -Id $run.Id `
+                -Status $finalStatus `
+                -CompletedAt $completedAt `
+                -ArmTypeCount $armTypeCount `
+                -ArmRowCount $armRowCount `
+                -EntraTypeCount $entraTypeCount `
+                -EntraRowCount $entraRowCount `
+                -WarningCount $warningCount `
+                -ErrorMessage ($errorMessages -join '; ') `
+                -PassThru
         }
 
         Write-CIEMLog "Discovery run #$($run.Id) finished: Status=$finalStatus, ARM=$armRowCount, Entra=$entraRowCount, Relationships=$relationshipCount, Warnings=$warningCount" -Severity INFO -Component 'Discovery'
