@@ -6,6 +6,7 @@ This folder captures Simon Chalifoux's CIEM feedback from the Devolutions Slack 
 
 - [simon-feedback.md](simon-feedback.md) - source-faithful feedback inventory with screenshots.
 - [implementation-instructions.md](implementation-instructions.md) - detailed execution plan and acceptance criteria.
+- [sqlite-deployment-topology.md](sqlite-deployment-topology.md) - v1 SQLite single-instance answer, multi-instance risks, and Samuel/Nicolas sync checklist.
 
 ## Images
 
