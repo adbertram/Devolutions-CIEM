@@ -66,6 +66,7 @@ Execution order:
 ### Phase 4: Production Readiness
 
 - SQLite topology answer: `sqlite-deployment-topology.md`.
+- Deployment readiness checklist and sync evidence packet: `production-deployment-readiness-checklist.md`.
 - Pester covers the deployment validation command.
 - Local and Azure runtime checks validate app load, script registration, discovery command, and database path.
 

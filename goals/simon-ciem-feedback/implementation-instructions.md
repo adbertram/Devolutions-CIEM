@@ -211,6 +211,11 @@ Simon wants CIEM to help show PAM initiative progress.
 
 Do this before Simon's requested sync with Samuel and Nicolas.
 
+Deployment design artifacts:
+
+- [sqlite-deployment-topology.md](sqlite-deployment-topology.md) documents the supported v1 SQLite topology and multi-instance blocker.
+- [production-deployment-readiness-checklist.md](production-deployment-readiness-checklist.md) defines the production evidence packet, validation categories, and sync agenda.
+
 ### Work
 
 1. Build a deployment checklist for the Devolutions PSU production instance.
