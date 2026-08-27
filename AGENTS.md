@@ -1,7 +1,10 @@
-# AGENTS.md
+# Devolutions CIEM
+
+CIEM (Cloud Infrastructure Entitlement Management) on PowerShell Universal (PSU). Identity-first, not resource-first. Strategic context, business model, stakeholders, and architecture decisions: `docs/project-context.md`. Product direction: `docs/ciem-feature-todos.md`.
 
 ## Mandatory Testing Skill
 
+- **Claude Code only:** `@/Users/adam/.claude/skills/test-methodology/SKILL.md` is auto-imported into context for this project.
 - **MUST** load `$test-methodology` before writing, changing, debugging, reviewing, or validating tests or behavior-changing code.
 - **MUST** load the `testing-expert` skill before writing, reviewing, or running any test.
 - **MUST** load `pester-tests` for Pester-specific work.
@@ -9,6 +12,23 @@
 - Playwright E2E tests are required for PSU UI/page/interaction changes.
 - Both Pester and Playwright are required when module behavior is surfaced in the UI.
 - `Invoke-TestCommand` is required for PSU runtime validation when PSU context matters; it is additional validation, not a substitute for tests.
+
+## Test-Driven Development (MANDATORY)
+
+**Your first action on any code change is to identify and write tests.** Do not read source, do not explore, do not plan changes — go to the relevant test files first.
+
+- **Claude Code only:** a PreToolUse hook (`enforce-tdd.sh`) DENIES source edits until test files have been touched. Detailed rules in `.claude/rules/tdd-enforcement.md` (auto-loaded for `psu-app/` and `e2e/`).
+- Pester for PowerShell/module logic; Playwright E2E for PSU UI; both when a change crosses boundaries
+- Tests must FAIL before any implementation/debugging (red-green-refactor)
+- Cover all scenarios where the issue could manifest, not just the reported case
+- All relevant tests green before "done"; never pipe test output through head/tail/grep
+- Bug fixes: write the failing test reproducing the bug FIRST — the test defines what "fixed" means
+
+Run commands:
+```bash
+pwsh -NoProfile -Command "Invoke-Pester psu-app/ -Output Detailed"   # Pester
+cd psu-app/ui/e2e && npx playwright test                              # Playwright
+```
 
 ## Project Context
 - CIEM solution built on PowerShell Universal (PSU).
@@ -36,14 +56,18 @@
 ## Mandatory PSU Delegation
 - Any PSU feature, API, config, publishing, restart, troubleshooting, or other PSU-specific question or operation must go through the `psu-expert` agent.
 - Do not use web search or guess PSU behavior.
+- The `psu-expert` has local PSU v5 docs at `docs/psu-docs/` and Azure server filesystem access.
 
 ## PSU Instances
+
 ### Local PSU
-- "Local" means the always-on PSU instance on `adam-server`, not the MacBook.
-- Normal workflow is edit on MacBook, then `Publish-PSUModule` (Gallery) followed by `Deploy-PSUModule -Environment local` to install the new Gallery version into adam-server PSU.
+- **CRITICAL:** "Local" PSU means the always-on PSU instance on `adam-server` (Mac Mini) — there is NO MacBook PSU. Default to "local" unless the user explicitly says "Azure" or "production".
+- Normal workflow is edit on MacBook, then `Publish-PSUModule` (Gallery) followed by `Deploy-PSUModule -Environment local` to install the new Gallery version into adam-server PSU (and restart the app).
 - LAN URL: `http://192.168.86.36:5001` (set as `LOCAL_PSU_URL` in `.env`)
-- `Connect-PSU` defaults to local and reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`; use `Connect-PSU -Azure` only for explicit Azure work.
+- `Connect-PSU` defaults to local and reads `LOCAL_PSU_URL` and `LOCAL_PSU_TOKEN` from `.env`; use `Connect-PSU -Azure` only for explicit Azure/production work.
+- `Invoke-TestCommand -Environment local` (default) runs commands inside PSU.
 - PSU Repository on adam-server: `/Users/adam/psu/Repository` (pushed via SSH, not Dropbox-synced).
+- Server config, additional `.env` keys, recovery escalation, and log access: `.claude/rules/psu-instances.md` (**Claude Code:** auto-loaded for PSU paths).
 
 ### Azure PSU
 - URL: `https://devolutions-ciem-psu.azurewebsites.net`
@@ -56,43 +80,43 @@
 - To remove CIEM from the Azure PSU target, use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force`. Do not hand-run Azure CLI deletion or ad hoc PSU cleanup commands for CIEM removal.
 
 ## Module Deployment
-- Never upload module files directly to the Azure PSU instance.
-- Publishing and deploying are two distinct steps. `Publish-PSUModule` is PSGallery-only; `Deploy-PSUModule` installs the current Gallery version into a PSU instance.
-- Initial CIEM setup is owned by `psu-app/setup.ps1`, which is invoked during `Devolutions.CIEM` module import. Keep this setup path limited to idempotent local module initialization such as database/schema/catalog setup.
-- PSU resource registration remains in `.universal/dashboards.ps1` and `.universal/scripts.ps1`. Do not move `New-PSUApp`, `New-PSUScript`, `Get-PSUScript`, or other PSU management cmdlets into import-time setup.
+- Never upload module files directly to the Azure PSU instance (or any PSU instance).
+- Publishing and deploying are two distinct steps.
+  1. `Publish-PSUModule` (from `Devolutions.CIEM.Admin`) bumps the manifest and publishes to PowerShell Gallery. PSGallery-only — does not touch PSU. Use the `publish-psu-module` skill.
+  2. `Deploy-PSUModule` installs the current (or pinned) Gallery version into a PSU instance via `Install-PSUModule`, restarts the CIEM app, and optionally validates. Use the `deploy-psu-module` skill.
+- Initial CIEM setup is owned by `psu-app/setup.ps1`, invoked during `Devolutions.CIEM` module import. Keep this setup path limited to idempotent local module initialization such as database/schema/catalog setup — do not move `New-PSUApp`, `New-PSUScript`, `Get-PSUScript`, or other PSU management cmdlets into import-time setup.
+- PSU resource registration remains in `.universal/dashboards.ps1` and `.universal/scripts.ps1`.
 
 ```powershell
 Import-Module ./Devolutions.CIEM.Admin
 
-# Publish (PSGallery only — does not touch PSU)
-Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch -WhatIf
-Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch
+# Step 1: publish to PSGallery (does not touch PSU)
+Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch -WhatIf  # Dry run
+Publish-PSUModule -ModulePath ./psu-app -BumpVersion Patch          # Publish to Gallery
 
-# Deploy the current Gallery version into a PSU instance
-Deploy-PSUModule -Environment local
-Deploy-PSUModule -Environment azure
-Deploy-PSUModule -Environment local -ValidateDeployment
+# Step 2: deploy the current PSGallery version to a PSU instance
+Deploy-PSUModule -Environment local                                  # adam-server
+Deploy-PSUModule -Environment azure                                  # production
+Deploy-PSUModule -Environment local -ValidateDeployment              # with end-to-end validation
 ```
 
 - Both local and Azure deploys install from PSGallery via `Install-PSUModule`. The previous `-LocalOnly` SSH/rsync path has been retired.
-- `scripts/azure_psu_file_manager.sh` and `scripts/invoke_command_in_azure_webapp.sh` are for inspection only, not deployment.
+- `scripts/azure_psu_file_manager.sh` and `scripts/invoke_command_in_azure_webapp.sh` (also referenced as `azure_psu_file_manager.sh` and `invoke_command_in_azure_webapp.sh`) are for inspection/troubleshooting only — never for deploying code.
 - Use `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment local -Force` or `pwsh -NoProfile -File ./scripts/remove-psu.ps1 -Environment azure -Force` to remove CIEM-owned PSU apps, scripts, schedules, active jobs, configuration cache, variables, local data files, and the `Devolutions.CIEM` module from a PSU target.
 
 ## Testing and Validation
-- Use `Invoke-TestCommand` to validate CIEM code inside PSU instead of publish-debug-publish cycles.
-- `Invoke-TestCommand` validates PSU runtime behavior after tests are in place; it does not replace Pester or Playwright tests.
+- `Invoke-TestCommand` (in `Devolutions.CIEM.Admin`) runs commands against the CIEM module inside PSU; handles connection and credentials. Use it to validate CIEM code inside PSU instead of publish-debug-publish cycles — it validates PSU runtime behavior after tests are in place, it does not replace Pester or Playwright tests.
 
-```powershell
-Import-Module ./Devolutions.CIEM.Admin
-Invoke-TestCommand -ScriptBlock { Get-CIEMProvider }
-Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment azure
+```bash
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Invoke-TestCommand -ScriptBlock { Get-CIEMProvider }"
+pwsh -NoProfile -Command "Import-Module ./Devolutions.CIEM.Admin; Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment azure"
 ```
 
 - Use `local` by default and `azure` only when explicitly validating production behavior.
 
 ## Troubleshooting
-- Always use `./scripts/ciem-log.sh` to locate and read the active CIEM log. Do not hardcode `psu-app/data/ciem.log`.
-- Read-only tooling:
+- Always use `./scripts/ciem-log.sh` to locate and read the active CIEM application log on adam-server (with local fallback). Run `./scripts/ciem-log.sh --help` for flags. Do not hardcode `psu-app/data/ciem.log`. The CIEM log captures issues PSU's own logs miss (module init, provider registration, schema). If `ciem.log` doesn't explain it, check PSU logs via `./scripts/download-psu-logs.sh --local`.
+- Read-only tooling (inspection/troubleshooting only, never deployment):
   - `scripts/azure_psu_file_manager.sh`
   - `scripts/invoke_command_in_azure_webapp.sh`
   - `scripts/download-psu-logs.sh`
@@ -100,6 +124,11 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
   1. `Restart-PSUApp -Name 'Devolutions CIEM'`
   2. Restart the PSU server only if needed
   3. Do not reset local PSU state without explicit user approval
+- Recovery escalation and `.env` keys: `.claude/rules/psu-instances.md`.
+
+## Status Reports & Slack
+
+Status reports → `status-reports` skill (**Claude Code:** invoked via the `/send-status-report` slash command). Slack DMs as Adam → `devolutions-team-member` agent. Never draft updates ad-hoc with `git log` + `slack` CLI; never read the team group DM directly.
 
 ## Known Issues
 
@@ -197,7 +226,16 @@ Invoke-TestCommand -ScriptBlock { Invoke-CIEMScan -Service Entra } -Environment 
 - Resource icons: `psu-app/modules/Devolutions.CIEM.PSU/Data/icons/` contains official Azure, Entra, and AWS icon source packs, curated SVGs in `resources/`, and `resource-icon-map.json` for CIEM resource type mappings.
 - PSU Azure hosting docs: `docs/psu-docs/config/hosting/azure.md`
 
+## Other Project Rules
 
+**Claude Code:** the following rule files are auto-loaded by path:
+- `.claude/rules/tdd-enforcement.md` — TDD details (psu-app/, e2e/)
+- `.claude/rules/psu-instances.md` — PSU server config, .env, recovery, logs
+- `.claude/rules/known-issues.md` — recurring bugs and their fixes
+- `.claude/rules/azure-infra.md` — Azure infra and file manager
+- `.claude/rules/crud-convention.md` — DB CRUD conventions
+- `.claude/rules/checks-management.md` — check management functions
+- `.claude/rules/e2e-testing.md`, `.claude/rules/error-action-preference.md`, `.claude/rules/psu-admin-cmdlets.md`
 
 ## Skill Files
 
